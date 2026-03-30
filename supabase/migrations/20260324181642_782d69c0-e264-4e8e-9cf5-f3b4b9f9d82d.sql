@@ -1,0 +1,1 @@
+ALTER TABLE public.daily_revenue DROP CONSTRAINT daily_revenue_date_key;

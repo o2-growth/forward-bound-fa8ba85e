@@ -1,0 +1,1 @@
+export { RevenueChartGroupedBars } from './RevenueChartGroupedBars';

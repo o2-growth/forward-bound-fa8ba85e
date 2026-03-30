@@ -1,0 +1,52 @@
+project_id = "dgwmwmofyaxstykwuzxh"
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.manage-user]
+verify_jwt = false
+
+[functions.sync-sales-data]
+verify_jwt = true
+
+[functions.sync-pipefy-funnel]
+verify_jwt = false
+
+[functions.sync-from-sheets]
+verify_jwt = false
+
+[functions.read-sheet-tab]
+verify_jwt = false
+
+[functions.query-external-db]
+verify_jwt = false
+
+[functions.read-marketing-sheet]
+verify_jwt = false
+
+[functions.fetch-meta-campaigns]
+verify_jwt = false
+
+[functions.fetch-campaign-adsets]
+verify_jwt = false
+
+[functions.fetch-adset-ads]
+verify_jwt = false
+
+[functions.fetch-google-adgroups]
+verify_jwt = false
+
+[functions.fetch-google-ads]
+verify_jwt = false
+
+[functions.fetch-google-keywords]
+verify_jwt = false
+
+[functions.fetch-oxy-finance]
+verify_jwt = false
+
+[functions.sync-daily-revenue]
+verify_jwt = false
+
+[functions.manage-redistribution]
+verify_jwt = false
