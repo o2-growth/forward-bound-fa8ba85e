@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, Legend, Line } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell, Legend, Line, BarChart, Bar, Tooltip } from "recharts";
 import { Building2, DollarSign, Rocket, Users, TrendingUp, Target, Megaphone, BarChart3, Info, Settings, Filter, Lock, Pencil, ChevronDown, ChevronUp, CheckCircle2, XCircle, AlertCircle, Save, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { SalesFunnelVisual } from "./SalesFunnelVisual";
@@ -1005,6 +1005,7 @@ export function MediaInvestmentTab() {
   const { user } = useAuth();
   const { isAdmin } = useUserPermissions(user?.id);
   const [redistOpen, setRedistOpen] = useState(false);
+  const [consolidadoOpen, setConsolidadoOpen] = useState(true);
 
   // Helper: Get metas from database for a BU
   const getDbMetasForBU = (bu: BuType): Record<string, number> | null => {
@@ -2364,6 +2365,155 @@ export function MediaInvestmentTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Consolidado Anual */}
+      <Collapsible defaultOpen open={consolidadoOpen} onOpenChange={setConsolidadoOpen}>
+        <CollapsibleTrigger className="w-full">
+          <h3 className="font-display text-2xl font-bold mb-4 flex items-center gap-2 cursor-pointer hover:text-primary transition-colors">
+            <BarChart3 className="h-6 w-6 text-primary" />
+            Consolidado Anual
+            {consolidadoOpen ? <ChevronUp className="h-5 w-5 ml-auto" /> : <ChevronDown className="h-5 w-5 ml-auto" />}
+          </h3>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+              <div className="space-y-6">
+                <Card className="glass-card">
+                  <CardContent className="pt-6 overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs font-bold">Mês</TableHead>
+                          <TableHead className="text-xs text-right">Modelo Atual</TableHead>
+                          <TableHead className="text-xs text-right">O2 TAX</TableHead>
+                          <TableHead className="text-xs text-right">Oxy Hacker</TableHead>
+                          <TableHead className="text-xs text-right">Franquia</TableHead>
+                          <TableHead className="text-xs text-right font-bold">Meta Total</TableHead>
+                          <TableHead className="text-xs text-right font-bold">DRE Total</TableHead>
+                          <TableHead className="text-xs text-right font-bold">Ating. %</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {(() => {
+                          let sumMA = 0, sumO2 = 0, sumOH = 0, sumFR = 0, sumMeta = 0, sumDre = 0;
+                          const rows = months.map((m) => {
+                            const maMonth = effectiveModeloAtualFunnel.find((d: FunnelData) => d.month === m);
+                            const o2Month = effectiveO2TaxFunnel.find((d: FunnelData) => d.month === m);
+                            const ohMonth = effectiveOxyHackerFunnel.find((d: FunnelData) => d.month === m);
+                            const frMonth = effectiveFranquiaFunnel.find((d: FunnelData) => d.month === m);
+                            const ma = maMonth?.faturamentoMeta || 0;
+                            const o2 = o2Month?.faturamentoMeta || 0;
+                            const oh = ohMonth?.faturamentoMeta || 0;
+                            const fr = frMonth?.faturamentoMeta || 0;
+                            const metaTotal = ma + o2 + oh + fr;
+                            const dreTotal = (dreByBU.modelo_atual?.[m] || 0) + (dreByBU.o2_tax?.[m] || 0) +
+                              (dreByBU.oxy_hacker?.[m] || 0) + (dreByBU.franquia?.[m] || 0);
+                            const ating = metaTotal > 0 ? (dreTotal / metaTotal) * 100 : 0;
+                            sumMA += ma; sumO2 += o2; sumOH += oh; sumFR += fr;
+                            sumMeta += metaTotal; sumDre += dreTotal;
+                            return (
+                              <TableRow key={m}>
+                                <TableCell className="text-xs font-medium">{m}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(ma)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(o2)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(oh)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(fr)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono font-bold">{formatCompact(metaTotal)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono font-bold">{formatCompact(dreTotal)}</TableCell>
+                                <TableCell className={`text-xs text-right font-mono font-bold ${ating >= 100 ? 'text-emerald-600' : ating > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                  {dreTotal > 0 ? `${ating.toFixed(1)}%` : '-'}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          });
+                          const totalAting = sumMeta > 0 ? (sumDre / sumMeta) * 100 : 0;
+                          return (
+                            <>
+                              {rows}
+                              <TableRow className="border-t-2 font-bold bg-muted/30">
+                                <TableCell className="text-xs font-bold">Total</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumMA)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumO2)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumOH)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumFR)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumMeta)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumDre)}</TableCell>
+                                <TableCell className={`text-xs text-right font-mono ${totalAting >= 100 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                  {sumDre > 0 ? `${totalAting.toFixed(1)}%` : '-'}
+                                </TableCell>
+                              </TableRow>
+                            </>
+                          );
+                        })()}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+
+                <Card className="glass-card">
+                  <CardHeader>
+                    <CardTitle className="text-base">Meta vs DRE por Mês (Empilhado por BU)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[350px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={months.map((m) => {
+                            const maMonth = effectiveModeloAtualFunnel.find((d: FunnelData) => d.month === m);
+                            const o2Month = effectiveO2TaxFunnel.find((d: FunnelData) => d.month === m);
+                            const ohMonth = effectiveOxyHackerFunnel.find((d: FunnelData) => d.month === m);
+                            const frMonth = effectiveFranquiaFunnel.find((d: FunnelData) => d.month === m);
+                            return {
+                              month: m,
+                              metaMA: maMonth?.faturamentoMeta || 0,
+                              metaO2: o2Month?.faturamentoMeta || 0,
+                              metaOH: ohMonth?.faturamentoMeta || 0,
+                              metaFR: frMonth?.faturamentoMeta || 0,
+                              dreTotal: (dreByBU.modelo_atual?.[m] || 0) + (dreByBU.o2_tax?.[m] || 0) +
+                                (dreByBU.oxy_hacker?.[m] || 0) + (dreByBU.franquia?.[m] || 0),
+                            };
+                          })}
+                          margin={{ top: 10, right: 10, left: 0, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                          <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                          <YAxis tickFormatter={(v: number) => formatCompact(v)} tick={{ fontSize: 10 }} />
+                          <Tooltip
+                            formatter={(value: number, name: string) => {
+                              const labels: Record<string, string> = {
+                                metaMA: 'Meta Modelo Atual',
+                                metaO2: 'Meta O2 TAX',
+                                metaOH: 'Meta Oxy Hacker',
+                                metaFR: 'Meta Franquia',
+                                dreTotal: 'DRE Total',
+                              };
+                              return [formatCompact(value), labels[name] || name];
+                            }}
+                          />
+                          <Legend
+                            formatter={(value: string) => {
+                              const labels: Record<string, string> = {
+                                metaMA: 'Modelo Atual',
+                                metaO2: 'O2 TAX',
+                                metaOH: 'Oxy Hacker',
+                                metaFR: 'Franquia',
+                                dreTotal: 'DRE Total',
+                              };
+                              return labels[value] || value;
+                            }}
+                          />
+                          <Bar dataKey="metaMA" stackId="meta" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="metaO2" stackId="meta" fill="hsl(var(--warning))" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="metaOH" stackId="meta" fill="hsl(var(--accent))" radius={[0, 0, 0, 0]} />
+                          <Bar dataKey="metaFR" stackId="meta" fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="dreTotal" fill="#10b981" radius={[4, 4, 0, 0]} opacity={0.7} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {/* BU Detail Tables */}
       <div>

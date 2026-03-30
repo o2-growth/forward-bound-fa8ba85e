@@ -18,6 +18,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import {
   ArrowRightLeft,
   Trash2,
@@ -29,6 +31,7 @@ import {
   History,
   ChevronDown,
   ChevronRight,
+  Repeat,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -91,8 +94,90 @@ export function MetaRedistributionPanel({
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
   const [sessionChanges, setSessionChanges] = useState<Record<string, RedistributionChangeRow[]>>({});
 
+  // Multi-month selection state (Improvement 2)
+  const [fromMode, setFromMode] = useState<'single' | 'quarter' | 'range'>('single');
+  const [fromQuarter, setFromQuarter] = useState<string>('');
+  const [fromMonthEnd, setFromMonthEnd] = useState<MonthType | ''>('');
+
+  // BU-to-BU redistribution state (Improvement 3)
+  const [buRedistFromBU, setBuRedistFromBU] = useState<BuType | ''>('');
+  const [buRedistToBU, setBuRedistToBU] = useState<BuType | ''>('');
+
   const validation = validateTotal();
   const newGrid = useMemo(() => calculateNewTotals(), [calculateNewTotals]);
+
+  // Quarter-to-months mapping
+  const QUARTER_MONTHS: Record<string, MonthType[]> = {
+    Q1: ['Jan', 'Fev', 'Mar'] as MonthType[],
+    Q2: ['Abr', 'Mai', 'Jun'] as MonthType[],
+    Q3: ['Jul', 'Ago', 'Set'] as MonthType[],
+    Q4: ['Out', 'Nov', 'Dez'] as MonthType[],
+  };
+
+  // Get selected "from" months based on mode
+  const selectedFromMonths = useMemo((): MonthType[] => {
+    if (fromMode === 'single') {
+      return fromMonth ? [fromMonth as MonthType] : [];
+    }
+    if (fromMode === 'quarter') {
+      return fromQuarter ? (QUARTER_MONTHS[fromQuarter] || []) : [];
+    }
+    if (fromMode === 'range' && fromMonth && fromMonthEnd) {
+      const startIdx = MONTHS.indexOf(fromMonth as MonthType);
+      const endIdx = MONTHS.indexOf(fromMonthEnd as MonthType);
+      if (startIdx >= 0 && endIdx >= 0 && endIdx >= startIdx) {
+        return MONTHS.slice(startIdx, endIdx + 1);
+      }
+    }
+    return [];
+  }, [fromMode, fromMonth, fromQuarter, fromMonthEnd]);
+
+  // Total gap across selected from months
+  const totalSelectedGap = useMemo(() => {
+    if (!fromBU || selectedFromMonths.length === 0) return 0;
+    return selectedFromMonths.reduce((sum, m) => {
+      const meta = currentGrid[fromBU]?.[m] || 0;
+      const dre = dreByBU[fromBU]?.[m] || 0;
+      const gap = meta - dre;
+      return sum + (gap > 0 ? gap : 0);
+    }, 0);
+  }, [fromBU, selectedFromMonths, currentGrid, dreByBU]);
+
+  // BU-to-BU redistribution preview
+  const buRedistPreview = useMemo(() => {
+    if (!buRedistFromBU) return [];
+    return MONTHS.map((month) => {
+      const meta = currentGrid[buRedistFromBU]?.[month] || 0;
+      const dre = dreByBU[buRedistFromBU]?.[month] || 0;
+      const gap = meta - dre;
+      return { month, meta, dre, gap: gap > 0 ? gap : 0 };
+    }).filter((r) => r.gap > 0);
+  }, [buRedistFromBU, currentGrid, dreByBU]);
+
+  const buRedistTotal = useMemo(() => buRedistPreview.reduce((s, r) => s + r.gap, 0), [buRedistPreview]);
+
+  // Handle BU-to-BU redistribution
+  const handleBuRedist = () => {
+    if (!buRedistFromBU || !buRedistToBU) {
+      toast.error('Selecione as BUs de origem e destino');
+      return;
+    }
+    if (buRedistFromBU === buRedistToBU) {
+      toast.error('BU de origem e destino devem ser diferentes');
+      return;
+    }
+    if (buRedistPreview.length === 0) {
+      toast.error('Nenhum gap encontrado na BU de origem');
+      return;
+    }
+    for (const row of buRedistPreview) {
+      addChange(buRedistFromBU as BuType, row.month as MonthType, buRedistToBU as BuType, row.month as MonthType, row.gap);
+    }
+    toast.success(`${buRedistPreview.length} redistribuições adicionadas`);
+    setBuRedistFromBU('');
+    setBuRedistToBU('');
+    setActiveTab('redistribute');
+  };
 
   // Select a gap cell to start redistribution
   const handleSelectGap = (bu: BuType, month: MonthType) => {
@@ -105,23 +190,48 @@ export function MetaRedistributionPanel({
     setActiveTab('redistribute');
   };
 
-  // Add pending change
+  // Add pending change (supports multi-month)
   const handleAddChange = () => {
-    if (!fromBU || !fromMonth || !toBU || !toMonth) {
+    if (!fromBU || !toBU || !toMonth) {
       toast.error('Preencha todos os campos');
       return;
     }
-    const numAmount = parseFloat(amount);
-    if (isNaN(numAmount) || numAmount <= 0) {
-      toast.error('Valor deve ser maior que zero');
+    if (selectedFromMonths.length === 0) {
+      toast.error('Selecione o(s) mês(es) de origem');
       return;
     }
-    addChange(fromBU as BuType, fromMonth as MonthType, toBU as BuType, toMonth as MonthType, numAmount);
+
+    if (fromMode === 'single') {
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        toast.error('Valor deve ser maior que zero');
+        return;
+      }
+      addChange(fromBU as BuType, fromMonth as MonthType, toBU as BuType, toMonth as MonthType, numAmount);
+      toast.success('Redistribuição adicionada');
+    } else {
+      // Multi-month: distribute proportionally
+      const totalGap = totalSelectedGap;
+      if (totalGap <= 0) {
+        toast.error('Nenhum gap nos meses selecionados');
+        return;
+      }
+      let addedCount = 0;
+      for (const m of selectedFromMonths) {
+        const meta = currentGrid[fromBU]?.[m] || 0;
+        const dre = dreByBU[fromBU]?.[m] || 0;
+        const gap = meta - dre;
+        if (gap > 0) {
+          addChange(fromBU as BuType, m, toBU as BuType, toMonth as MonthType, Math.round(gap));
+          addedCount++;
+        }
+      }
+      toast.success(`${addedCount} redistribuições adicionadas`);
+    }
     // Reset "para" fields
     setToBU('');
     setToMonth('');
     setAmount('');
-    toast.success('Redistribuição adicionada');
   };
 
   // Save
@@ -206,7 +316,7 @@ export function MetaRedistributionPanel({
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="gap">Gaps</TabsTrigger>
               <TabsTrigger value="redistribute">
                 Redistribuir
@@ -215,6 +325,10 @@ export function MetaRedistributionPanel({
                     {pendingChanges.length}
                   </Badge>
                 )}
+              </TabsTrigger>
+              <TabsTrigger value="bu-transfer">
+                <Repeat className="h-4 w-4 mr-1" />
+                BU Inteira
               </TabsTrigger>
               <TabsTrigger value="history">
                 <History className="h-4 w-4 mr-1" />
@@ -256,7 +370,7 @@ export function MetaRedistributionPanel({
                               const gap = meta - dre;
                               buTotal += meta;
                               buDreTotal += dre;
-                              const hasGap = gap > 0 && dre > 0;
+                              const hasGap = gap > 0 && meta > 0;
                               return (
                                 <TableCell
                                   key={month}
@@ -269,7 +383,7 @@ export function MetaRedistributionPanel({
                                   <div className="font-mono text-[10px]">
                                     {formatCurrency(meta)}
                                   </div>
-                                  {dre > 0 && (
+                                  {(dre > 0 || (meta > 0 && gap > 0)) && (
                                     <div className={`font-mono text-[10px] ${hasGap ? 'text-destructive font-semibold' : 'text-emerald-600'}`}>
                                       Gap: {formatCurrency(gap)}
                                     </div>
@@ -317,37 +431,119 @@ export function MetaRedistributionPanel({
                       <h4 className="font-semibold text-sm flex items-center gap-1 text-destructive">
                         De (Reduzir)
                       </h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Select value={fromBU} onValueChange={(v) => setFromBU(v as BuType)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="BU" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {BUS.map((bu) => (
-                              <SelectItem key={bu} value={bu}>
-                                {BU_LABELS[bu]}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select value={fromMonth} onValueChange={(v) => setFromMonth(v as MonthType)}>
+                      <Select value={fromBU} onValueChange={(v) => setFromBU(v as BuType)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="BU" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BUS.map((bu) => (
+                            <SelectItem key={bu} value={bu}>
+                              {BU_LABELS[bu]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <RadioGroup
+                        value={fromMode}
+                        onValueChange={(v) => {
+                          setFromMode(v as 'single' | 'quarter' | 'range');
+                          setFromMonth('');
+                          setFromMonthEnd('');
+                          setFromQuarter('');
+                          setAmount('');
+                        }}
+                        className="flex gap-3"
+                      >
+                        <div className="flex items-center gap-1">
+                          <RadioGroupItem value="single" id="mode-single" />
+                          <Label htmlFor="mode-single" className="text-xs cursor-pointer">Mês único</Label>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <RadioGroupItem value="quarter" id="mode-quarter" />
+                          <Label htmlFor="mode-quarter" className="text-xs cursor-pointer">Trimestre</Label>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <RadioGroupItem value="range" id="mode-range" />
+                          <Label htmlFor="mode-range" className="text-xs cursor-pointer">Personalizado</Label>
+                        </div>
+                      </RadioGroup>
+
+                      {fromMode === 'single' && (
+                        <Select value={fromMonth} onValueChange={(v) => {
+                          setFromMonth(v as MonthType);
+                          if (fromBU) {
+                            const meta = currentGrid[fromBU]?.[v] || 0;
+                            const dre = dreByBU[fromBU]?.[v] || 0;
+                            const gap = meta - dre;
+                            if (gap > 0) setAmount(String(Math.round(gap)));
+                          }
+                        }}>
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue placeholder="Mês" />
                           </SelectTrigger>
                           <SelectContent>
                             {MONTHS.map((m) => (
-                              <SelectItem key={m} value={m}>
-                                {m}
-                              </SelectItem>
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                      {fromBU && fromMonth && (
-                        <p className="text-xs text-muted-foreground">
-                          Meta atual: {formatCurrency(currentGrid[fromBU]?.[fromMonth] || 0)}
-                          {' | '}Campo: {isPontualOnlyBU(fromBU as BuType) ? 'pontual' : 'faturamento'}
-                        </p>
+                      )}
+
+                      {fromMode === 'quarter' && (
+                        <Select value={fromQuarter} onValueChange={(v) => setFromQuarter(v)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Trimestre" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+                            <SelectItem value="Q2">Q2 (Abr-Jun)</SelectItem>
+                            <SelectItem value="Q3">Q3 (Jul-Set)</SelectItem>
+                            <SelectItem value="Q4">Q4 (Out-Dez)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+
+                      {fromMode === 'range' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select value={fromMonth} onValueChange={(v) => setFromMonth(v as MonthType)}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="De Mês" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MONTHS.map((m) => (
+                                <SelectItem key={m} value={m}>{m}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select value={fromMonthEnd} onValueChange={(v) => setFromMonthEnd(v as MonthType)}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Até Mês" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MONTHS.map((m) => (
+                                <SelectItem key={m} value={m}>{m}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {fromBU && selectedFromMonths.length > 0 && (
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p>
+                            Meses: {selectedFromMonths.join(', ')}
+                            {' | '}Campo: {isPontualOnlyBU(fromBU as BuType) ? 'pontual' : 'faturamento'}
+                          </p>
+                          {fromMode !== 'single' && (
+                            <p className="font-semibold text-destructive">
+                              Gap total: {formatCurrency(totalSelectedGap)}
+                            </p>
+                          )}
+                          {fromMode === 'single' && fromMonth && (
+                            <p>Meta atual: {formatCurrency(currentGrid[fromBU]?.[fromMonth] || 0)}</p>
+                          )}
+                        </div>
                       )}
                     </div>
 
@@ -521,6 +717,103 @@ export function MetaRedistributionPanel({
                       <ArrowRightLeft className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">Nenhuma redistribuição pendente.</p>
                       <p className="text-xs">Vá para a aba Gaps e clique em uma célula para iniciar.</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* BU Transfer Tab (Improvement 3) */}
+            <TabsContent value="bu-transfer" className="flex-1 overflow-hidden">
+              <ScrollArea className="h-[60vh]">
+                <div className="space-y-4 pr-4">
+                  <p className="text-sm text-muted-foreground">
+                    Redistribua todos os gaps de uma BU inteira para outra. Para cada mês onde meta {'>'} realizado (DRE), o gap será transferido.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border rounded-lg bg-muted/20">
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-destructive">De BU (Origem)</h4>
+                      <Select value={buRedistFromBU} onValueChange={(v) => setBuRedistFromBU(v as BuType)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Selecionar BU" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BUS.map((bu) => (
+                            <SelectItem key={bu} value={bu}>{BU_LABELS[bu]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-semibold text-sm text-emerald-600">Para BU (Destino)</h4>
+                      <Select value={buRedistToBU} onValueChange={(v) => setBuRedistToBU(v as BuType)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Selecionar BU" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BUS.filter((bu) => bu !== buRedistFromBU).map((bu) => (
+                            <SelectItem key={bu} value={bu}>{BU_LABELS[bu]}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {buRedistFromBU && buRedistPreview.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm">Prévia da Transferência</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="text-xs">Mês</TableHead>
+                            <TableHead className="text-xs text-right">Meta</TableHead>
+                            <TableHead className="text-xs text-right">DRE (Realizado)</TableHead>
+                            <TableHead className="text-xs text-right">Gap a Transferir</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {buRedistPreview.map((row) => (
+                            <TableRow key={row.month}>
+                              <TableCell className="text-xs">{row.month}</TableCell>
+                              <TableCell className="text-xs text-right font-mono">{formatCurrency(row.meta)}</TableCell>
+                              <TableCell className="text-xs text-right font-mono">{formatCurrency(row.dre)}</TableCell>
+                              <TableCell className="text-xs text-right font-mono text-destructive font-semibold">
+                                {formatCurrency(row.gap)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="border-t-2 font-bold">
+                            <TableCell className="text-xs">TOTAL</TableCell>
+                            <TableCell className="text-xs text-right font-mono">
+                              {formatCurrency(buRedistPreview.reduce((s, r) => s + r.meta, 0))}
+                            </TableCell>
+                            <TableCell className="text-xs text-right font-mono">
+                              {formatCurrency(buRedistPreview.reduce((s, r) => s + r.dre, 0))}
+                            </TableCell>
+                            <TableCell className="text-xs text-right font-mono text-destructive font-semibold">
+                              {formatCurrency(buRedistTotal)}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+
+                      <Button
+                        size="sm"
+                        onClick={handleBuRedist}
+                        disabled={!buRedistToBU}
+                        className="w-full"
+                      >
+                        <Repeat className="h-4 w-4 mr-1" />
+                        Adicionar {buRedistPreview.length} Redistribuições ({formatCurrency(buRedistTotal)})
+                      </Button>
+                    </div>
+                  )}
+
+                  {buRedistFromBU && buRedistPreview.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <p className="text-sm">Nenhum gap encontrado para {BU_LABELS[buRedistFromBU as BuType]}.</p>
+                      <p className="text-xs">Todos os meses têm DRE {'≥'} Meta.</p>
                     </div>
                   )}
                 </div>
