@@ -1,33 +1,41 @@
 
 
-## Investigação: 2 reuniões realizadas da Amanda faltando no dashboard (63 na planilha vs 61 no dash)
+## Investigação: 8 cards faltando no indicador de Reunião Realizada
 
-### Análise da planilha
-A planilha tem **63 cards** onde Amanda é SDR e que tiveram movimento de "Reunião Realizada". As colunas são: Título, Fase Atual (onde o card está AGORA), Criador, Data de criação.
+### Diagnóstico do problema
 
-### Possíveis causas (3 hipóteses)
+Após analisar o código, identifiquei a **causa raiz provável**: a ação de diagnóstico `rr_sdr_diagnosis` só consulta a tabela `pipefy_moviment_cfos` (pipeline principal Modelo Atual). Porém, esses 8 cards pertencem à **pipeline de Expansão** (`pipefy_cards_movements_expansao`), que tem uma tabela separada.
 
-**Hipótese 1 — Campo "SDR responsável" diferente no Pipefy**
-O dashboard filtra por `card.responsavel` que vem do campo `SDR responsável` do Pipefy. Se 2 cards têm um valor diferente nesse campo (ex: vazio, ou outro nome), o filtro por "Amanda" não os captura. A planilha pode ter sido exportada usando outro critério (ex: pelo campo "Criador").
+Os cards fornecidos são:
+1. Kalléu Barbosa — `1309926926`
+2. Rafael B Rodrigues — `1298234954`
+3. Everton Lima — `1297811297`
+4. Ely Guimarães — `1298042880`
+5. Rafael Meireles Aguiar — `1309904589`
+6. Vera — `1298234933`
+7. Ruan Couto — `1297858136`
+8. Nathan — `1278224326`
 
-**Hipótese 2 — Deduplicação mensal**
-O dashboard usa a chave `cardId + fase + mês` para deduplicar. Se um card entrou em "Reunião Realizada" **duas vezes no mesmo mês**, só conta uma vez. A planilha pode estar mostrando as duas entradas.
+### O que vou fazer
 
-**Hipótese 3 — Data de entrada fora do período**
-O dashboard usa `dataEntrada` (data de entrada na fase RR) para verificar se cai no período selecionado. Se 2 cards têm a data de entrada em RR fora do período do filtro do dashboard, não aparecem.
+**Passo 1 — Consultar o banco externo** diretamente via a edge function `query-external-db` usando a ação `query_card_history` na tabela `pipefy_cards_movements_expansao` com os 8 card IDs. Isso retorna **todo o histórico de movimentações** de cada card.
 
-### Plano de ação
+**Passo 2 — Analisar** para cada card:
+- Se existe uma linha com `Fase = "Reunião Realizada"`
+- Qual a data de `Entrada` nessa fase
+- Se a data cai dentro do período selecionado no dashboard (Março/2026)
+- Qual o valor de `Produtos` (Franquia vs Oxy Hacker)
+- Qual o `SDR responsável` e `Closer responsável`
 
-Para identificar exatamente quais 2 cards estão faltando, vou:
-
-1. **Consultar o banco externo** via `query-external-db` buscando todos os movimentos de "Reunião Realizada" e "1° Reunião Realizada - Apresentação" no período onde `SDR responsável` contém "Amanda"
-2. **Cruzar com a planilha** — comparar os 63 títulos da planilha com os resultados do banco
-3. **Identificar os 2 faltantes** — verificar se é por:
-   - Campo SDR vazio/diferente
-   - Deduplicação (mesmo card ID entrando 2x na mesma fase no mesmo mês)
-   - Data fora do período
-4. **Reportar** os cards específicos e a causa
+**Passo 3 — Reportar** a causa exata de cada card não aparecer (sync ausente, data fora do período, produto errado, SDR diferente, etc.)
 
 ### Alteração de código
-Nenhuma alteração de código é necessária neste momento — primeiro preciso fazer a investigação de dados para confirmar a causa raiz. Se for um bug de lógica, proponho a correção depois.
+
+Nenhuma alteração de código — esta é uma investigação de dados que executarei via script consultando o banco diretamente com `psql` ou invocando a edge function.
+
+### Execução
+
+Vou rodar um script que:
+1. Invoca `query-external-db` com `action: query_card_history` + `table: pipefy_cards_movements_expansao` + os 8 cardIds
+2. Analisa o resultado e gera um relatório detalhado
 
