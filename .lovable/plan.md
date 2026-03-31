@@ -1,41 +1,45 @@
 
 
-## Investigação: 8 cards faltando no indicador de Reunião Realizada
+## Diagnóstico: Por que os 8 cards não aparecem em Março no indicador RR
 
-### Diagnóstico do problema
+### Causa raiz identificada
 
-Após analisar o código, identifiquei a **causa raiz provável**: a ação de diagnóstico `rr_sdr_diagnosis` só consulta a tabela `pipefy_moviment_cfos` (pipeline principal Modelo Atual). Porém, esses 8 cards pertencem à **pipeline de Expansão** (`pipefy_cards_movements_expansao`), que tem uma tabela separada.
+Analisei os dados da planilha cruzando com a lógica do código em `useExpansaoAnalytics.ts` (linhas 272-367). O problema é um **bug na lógica de deduplicação**.
 
-Os cards fornecidos são:
-1. Kalléu Barbosa — `1309926926`
-2. Rafael B Rodrigues — `1298234954`
-3. Everton Lima — `1297811297`
-4. Ely Guimarães — `1298042880`
-5. Rafael Meireles Aguiar — `1309904589`
-6. Vera — `1298234933`
-7. Ruan Couto — `1297858136`
-8. Nathan — `1278224326`
+O código atual usa **FIRST ENTRY global** — ou seja, para cada card, guarda apenas a **primeira vez na vida** que ele entrou em "Reunião Realizada", independente do mês. Quando o filtro é Março, só aparecem cards cuja primeira RR foi em Março.
 
-### O que vou fazer
+### Análise card a card
 
-**Passo 1 — Consultar o banco externo** diretamente via a edge function `query-external-db` usando a ação `query_card_history` na tabela `pipefy_cards_movements_expansao` com os 8 card IDs. Isso retorna **todo o histórico de movimentações** de cada card.
+| Card | Produto | 1ª RR (global) | 2ª RR (Março) | Aparece em Março? | Motivo |
+|------|---------|----------------|---------------|-------------------|--------|
+| **Nathan** | Franquia | 21/01 | — | Não | 1ª RR em Janeiro, sem reentrada em Março |
+| **Ruan** | Franquia | 18/02 | 11/03 | **Não (BUG)** | 1ª RR em Fev, reentrou em Mar mas código ignora |
+| **Everton** | Franquia | 19/02 | 27/03 | **Não (BUG)** | 1ª RR em Fev, reentrou em Mar mas código ignora |
+| **Ely** | Franquia | 18/02 | 13/03 | **Não (BUG)** | 1ª RR em Fev, reentrou em Mar mas código ignora |
+| **Rafael B** | Franquia | 21/02 | 27/03 | **Não (BUG)** | 1ª RR em Fev, reentrou em Mar mas código ignora |
+| **Kalléu** | Oxy Hacker | 11/03 | — | Sim (no Oxy Hacker) | 1ª RR em Março, aparece no Oxy Hacker |
+| **Rafael Meireles** | Oxy Hacker | 18/03 | — | Sim (no Oxy Hacker) | 1ª RR em Março, aparece no Oxy Hacker |
+| **Vera** | Oxy Hacker | 02/03 | — | Sim (no Oxy Hacker) | 1ª RR em Março, aparece no Oxy Hacker |
 
-**Passo 2 — Analisar** para cada card:
-- Se existe uma linha com `Fase = "Reunião Realizada"`
-- Qual a data de `Entrada` nessa fase
-- Se a data cai dentro do período selecionado no dashboard (Março/2026)
-- Qual o valor de `Produtos` (Franquia vs Oxy Hacker)
-- Qual o `SDR responsável` e `Closer responsável`
+### Resumo
 
-**Passo 3 — Reportar** a causa exata de cada card não aparecer (sync ausente, data fora do período, produto errado, SDR diferente, etc.)
+- **4 cards (Ruan, Everton, Ely, Rafael B)**: São Franquia e reentraram em RR em Março, mas o código usa a data da 1ª entrada (Fevereiro) e ignora a reentrada. **Este é o bug.**
+- **3 cards (Kalléu, Rafael Meireles, Vera)**: São **Oxy Hacker**, não Franquia. Aparecem no tab Oxy Hacker mas não no Franquia.
+- **1 card (Nathan)**: 1ª RR em Janeiro e sem reentrada em Março. Corretamente não aparece.
 
-### Alteração de código
+### Correção proposta
 
-Nenhuma alteração de código — esta é uma investigação de dados que executarei via script consultando o banco diretamente com `psql` ou invocando a edge function.
+Alterar `firstEntryByCardAndIndicator` em `useExpansaoAnalytics.ts` para usar **deduplicação mensal** em vez de first-entry global:
 
-### Execução
+- Chave de dedup: `cardId + indicator + mês calendário`
+- Para cada card+indicador+mês, guardar apenas a primeira entrada daquele mês
+- Quando filtrar por período, incluir qualquer entrada mensal que caia no período
 
-Vou rodar um script que:
-1. Invoca `query-external-db` com `action: query_card_history` + `table: pipefy_cards_movements_expansao` + os 8 cardIds
-2. Analisa o resultado e gera um relatório detalhado
+Isso alinha com a regra já documentada: *"um card é contabilizado no máximo uma vez por fase dentro do mesmo mês calendário. Se um card reentrar na mesma fase em meses distintos, ele será contado em ambos os períodos."*
+
+### Arquivo afetado
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useExpansaoAnalytics.ts` | Trocar `firstEntryByCardAndIndicator` de first-entry global para dedup mensal (linhas 272-296 e 356-368) |
 
