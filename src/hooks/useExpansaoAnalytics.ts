@@ -352,15 +352,20 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
           }
         }
       } else {
-        // rm, rr, proposta, venda: contar apenas FIRST ENTRY no periodo
-        // Alinha com o Pipefy "First time enter: current month"
-        for (const [cardId, indicatorMap] of firstEntryByCardAndIndicator) {
-          const firstEntry = indicatorMap.get(indicator);
-          if (!firstEntry) continue;
+        // rm, rr, proposta, venda: monthly dedup — first entry per card+indicator+month
+        const seenCardIds = new Set<string>();
+        for (const [dedupKey, entry] of monthlyFirstEntries) {
+          const parts = dedupKey.split('__');
+          const entryIndicator = parts[1] as IndicatorType;
+          if (entryIndicator !== indicator) continue;
 
-          const entryTime = firstEntry.dataEntrada.getTime();
+          const entryTime = entry.dataEntrada.getTime();
           if (entryTime >= startTime && entryTime <= endTime) {
-            result.push(firstEntry);
+            const cardId = parts[0];
+            if (!seenCardIds.has(cardId)) {
+              seenCardIds.add(cardId);
+              result.push(entry);
+            }
           }
         }
       }
