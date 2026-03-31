@@ -121,6 +121,7 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
     if (!isOpen) {
       setSortState({ column: null, direction: 'none' });
       setAnalyticsExpanded(true);
+      setCriteriaExpanded(false);
     }
     onOpenChange(isOpen);
   };
