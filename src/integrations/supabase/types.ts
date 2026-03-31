@@ -221,6 +221,86 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_redistribution_changes: {
+        Row: {
+          bu: string
+          created_at: string
+          delta: number
+          field: string
+          id: string
+          month: string
+          session_id: string
+          value_after: number
+          value_before: number
+          year: number
+        }
+        Insert: {
+          bu: string
+          created_at?: string
+          delta?: number
+          field: string
+          id?: string
+          month: string
+          session_id: string
+          value_after?: number
+          value_before?: number
+          year?: number
+        }
+        Update: {
+          bu?: string
+          created_at?: string
+          delta?: number
+          field?: string
+          id?: string
+          month?: string
+          session_id?: string
+          value_after?: number
+          value_before?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meta_redistribution_changes_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "meta_redistribution_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meta_redistribution_sessions: {
+        Row: {
+          changes_count: number
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          total_after: number
+          total_before: number
+          user_id: string
+        }
+        Insert: {
+          changes_count?: number
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          total_after?: number
+          total_before?: number
+          user_id: string
+        }
+        Update: {
+          changes_count?: number
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          total_after?: number
+          total_before?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       monetary_metas: {
         Row: {
           bu: string
