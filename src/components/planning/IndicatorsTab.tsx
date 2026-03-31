@@ -2242,6 +2242,7 @@ export function IndicatorsTab() {
       ]);
       // Sort by SLA descending (worst first = coaching)
       setDetailSheetItems(tentativasCards.sort((a, b) => (b.sla || 0) - (a.sla || 0)));
+      setDetailSheetFilterCriteria([]);
       setDetailSheetOpen(true);
       return;
     }
