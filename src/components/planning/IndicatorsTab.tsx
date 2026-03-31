@@ -1409,7 +1409,9 @@ export function IndicatorsTab() {
           mqlCriteria.push({
             title: '▸ Oxy Hacker',
             items: [
-              'MQL = Todos os Leads com base no investimento disponível informado',
+              'MQL = Leads filtrados pelo investimento disponível informado no Pipefy',
+              'Faixas de investimento aceitas: Menos de R$ 54k, Menos de R$ 100k, Menos de R$ 140k, Menos de R$ 250k, Menos de R$ 360k, Menos de R$ 400k, Menos de R$ 500k, Mais de R$ 500k',
+              'Ou seja: qualquer lead com investimento informado é considerado MQL',
               'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
               'Data de criação do lead dentro do período selecionado',
             ],
@@ -1419,7 +1421,9 @@ export function IndicatorsTab() {
           mqlCriteria.push({
             title: '▸ Franquia',
             items: [
-              'MQL = Todos os Leads com base no investimento disponível informado',
+              'MQL = Leads filtrados pelo investimento disponível informado no Pipefy',
+              'Faixas de investimento aceitas: Menos de R$ 140k, Menos de R$ 250k, Menos de R$ 360k, Menos de R$ 400k, Menos de R$ 500k, Mais de R$ 500k',
+              'Ou seja: qualquer lead com investimento informado é considerado MQL',
               'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
               'Data de criação do lead dentro do período selecionado',
             ],
