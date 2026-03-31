@@ -1661,6 +1661,15 @@ export function IndicatorsTab() {
         ]);
         // Sort by aging descending (oldest first = action needed)
         setDetailSheetItems(itemsWithAging.sort((a, b) => (b.diasEmProposta || 0) - (a.diasEmProposta || 0)));
+        setDetailSheetFilterCriteria([
+          { title: '▸ Proposta Enviada', items: [
+            'Card está na fase "Proposta Enviada" ou "Negociação" no período selecionado',
+            'Inclui propostas ativas (ainda não ganhas nem perdidas)',
+            'O "aging" mostra quantos dias o card está nesta fase',
+            'Propostas com mais de 14 dias são marcadas como "envelhecidas" (⚠️ em risco)',
+          ]},
+          { title: '▸ Filtros ativos', items: buildActiveFilters() },
+        ]);
         setDetailSheetOpen(true);
         return;
       }
