@@ -29,7 +29,7 @@ import { MeetingsScheduledChart } from "./MeetingsScheduledChart";
 import { ClickableFunnelChart } from "./ClickableFunnelChart";
 import { RevenueChartComparison } from "./RevenueChartComparison";
 import { FunnelConversionByTierWidget } from "./indicators/FunnelConversionByTierWidget";
-import { DetailSheet, DetailItem, columnFormatters } from "./indicators/DetailSheet";
+import { DetailSheet, DetailItem, columnFormatters, FilterCriteriaGroup } from "./indicators/DetailSheet";
 import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
