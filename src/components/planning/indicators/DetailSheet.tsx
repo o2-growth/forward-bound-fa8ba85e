@@ -63,6 +63,7 @@ interface DetailSheetProps {
   }[];
   kpis?: KpiItem[];
   charts?: ChartConfig[];
+  filterCriteria?: FilterCriteriaGroup[];
 }
 
 const formatCurrency = (value: number) =>
