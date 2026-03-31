@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
-      const allowedColumns = ['Título', 'ID', 'Empresa', 'Nome', 'Fase', 'Fase Atual', 'Campanha', 'Conjunto/grupo', 'Fonte', 'Origem do lead'];
+      const allowedColumns = ['Título', 'ID', 'Empresa', 'Nome', 'Fase', 'Fase Atual', 'Campanha', 'Conjunto/grupo', 'Fonte', 'Origem do lead', 'SDR responsável', 'Closer responsável'];
       if (!allowedColumns.includes(searchColumn)) {
         await client.end();
         return new Response(
