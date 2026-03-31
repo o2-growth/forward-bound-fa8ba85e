@@ -404,6 +404,20 @@ export type Database = {
         }
         Returns: boolean
       }
+      rollback_redistribution_session: {
+        Args: { p_session_id: string }
+        Returns: boolean
+      }
+      save_redistribution_session: {
+        Args: {
+          p_changes: Json
+          p_description: string
+          p_total_after: number
+          p_total_before: number
+          p_user_id: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "user"
