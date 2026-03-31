@@ -1568,6 +1568,16 @@ export function IndicatorsTab() {
           { key: 'date', label: 'Data', format: columnFormatters.date },
         ]);
         setDetailSheetItems(items);
+        setDetailSheetFilterCriteria([
+          { title: '▸ Reunião Realizada (RR)', items: [
+            'Card entrou na fase "Reunião Realizada" ou "1ª Reunião Realizada - Apresentação" dentro do período',
+            'Conta a primeira vez que o card aparece nesta fase (evita duplicação)',
+            'A data considerada é a data da primeira movimentação para esta fase',
+            'Para Modelo Atual e O2 TAX: fase "Reunião Realizada" no Pipefy',
+            'Para Oxy Hacker e Franquia: fase equivalente no pipe de Expansão',
+          ]},
+          { title: '▸ Filtros ativos', items: buildActiveFilters() },
+        ]);
         setDetailSheetOpen(true);
         return;
       }
