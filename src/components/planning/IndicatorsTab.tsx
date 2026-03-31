@@ -1833,6 +1833,15 @@ export function IndicatorsTab() {
         ]);
         // Sort by TCV descending
         setDetailSheetItems(itemsWithTCV.sort((a, b) => (b.value || 0) - (a.value || 0)));
+        setDetailSheetFilterCriteria([
+          { title: '▸ Venda Fechada', items: [
+            'Card chegou na fase "Ganho" / "Contrato Assinado" dentro do período selecionado',
+            'A data considerada é a data de assinatura do contrato (quando disponível)',
+            'TCV = (MRR × 12) + Setup + Pontual',
+            'Inclui todas as BUs selecionadas com seus respectivos valores',
+          ]},
+          { title: '▸ Filtros ativos', items: buildActiveFilters() },
+        ]);
         setDetailSheetOpen(true);
         return;
       }
