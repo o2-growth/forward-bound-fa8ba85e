@@ -401,6 +401,7 @@ export function IndicatorsTab() {
   const [detailSheetColumns, setDetailSheetColumns] = useState<{ key: keyof DetailItem; label: string; format?: (value: any) => React.ReactNode }[]>([]);
   const [detailSheetKpis, setDetailSheetKpis] = useState<KpiItem[]>([]);
   const [detailSheetCharts, setDetailSheetCharts] = useState<ChartConfig[]>([]);
+  const [detailSheetFilterCriteria, setDetailSheetFilterCriteria] = useState<FilterCriteriaGroup[]>([]);
   
 
   const handleSync = () => {
