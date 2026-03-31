@@ -187,8 +187,8 @@ export function useMetaRedistribution(year = 2026) {
         body: {
           action: 'save_session',
           description,
-          total_before: currentTotal,
-          total_after: calculateNewTotal(),
+          total_before: currentTotals.overall,
+          total_after: validation.newTotal,
           changes: dbChanges,
         },
       });
