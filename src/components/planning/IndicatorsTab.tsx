@@ -2915,6 +2915,7 @@ export function IndicatorsTab() {
         columns={detailSheetColumns}
         kpis={detailSheetKpis}
         charts={detailSheetCharts}
+        filterCriteria={detailSheetFilterCriteria}
       />
     </div>
   );
