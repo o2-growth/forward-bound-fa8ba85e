@@ -17,6 +17,11 @@ interface SortState {
   direction: SortDirection;
 }
 
+export interface FilterCriteriaGroup {
+  title: string;
+  items: string[];
+}
+
 export interface DetailItem {
   id: string;
   name: string;
