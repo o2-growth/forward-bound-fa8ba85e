@@ -161,6 +161,51 @@ export type Database = {
         }
         Relationships: []
       }
+      funnel_metas: {
+        Row: {
+          bu: string
+          created_at: string
+          id: string
+          leads: number
+          month: string
+          mqls: number
+          propostas: number
+          rms: number
+          rrs: number
+          updated_at: string
+          vendas: number
+          year: number
+        }
+        Insert: {
+          bu: string
+          created_at?: string
+          id?: string
+          leads?: number
+          month: string
+          mqls?: number
+          propostas?: number
+          rms?: number
+          rrs?: number
+          updated_at?: string
+          vendas?: number
+          year?: number
+        }
+        Update: {
+          bu?: string
+          created_at?: string
+          id?: string
+          leads?: number
+          month?: string
+          mqls?: number
+          propostas?: number
+          rms?: number
+          rrs?: number
+          updated_at?: string
+          vendas?: number
+          year?: number
+        }
+        Relationships: []
+      }
       funnel_realized: {
         Row: {
           bu: string
