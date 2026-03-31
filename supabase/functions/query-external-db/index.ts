@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
-      const allowedColumns = ['Título', 'ID', 'Empresa', 'Nome', 'Fase', 'Fase Atual', 'Campanha', 'Conjunto/grupo', 'Fonte', 'Origem do lead'];
+      const allowedColumns = ['Título', 'ID', 'Empresa', 'Nome', 'Fase', 'Fase Atual', 'Campanha', 'Conjunto/grupo', 'Fonte', 'Origem do lead', 'SDR responsável', 'Closer responsável'];
       if (!allowedColumns.includes(searchColumn)) {
         await client.end();
         return new Response(
@@ -491,6 +491,125 @@ Deno.serve(async (req) => {
         cards,
       };
       console.log(`Proposta diagnosis: ${filtered.length} movements, ${deduplicated.length} after dedup, ${cards.length} unique cards`);
+    } else if (action === 'rr_sdr_diagnosis') {
+      const { startDate, endDate, sdrName, sheetTitles } = body;
+      const invalid = await validateTable(table);
+      if (invalid) return invalid;
+
+      console.log(`RR SDR diagnosis: ${table}, sdr=${sdrName}, period=${startDate} to ${endDate}`);
+
+      // Get ALL movements in period
+      const dataQuery = `
+        SELECT "ID", "Título", "Fase", "Fase Atual", "Entrada", "SDR responsável", "Closer responsável", "Data Criação"
+        FROM ${table}
+        WHERE "Entrada" >= $1::timestamp AND "Entrada" <= $2::timestamp
+        ORDER BY "Entrada" ASC
+      `;
+      const rawResult = await client.query(dataQuery, [startDate, endDate]);
+
+      const rrPhases = new Set(['Reunião Realizada', '1° Reunião Realizada - Apresentação']);
+      const allRR = rawResult.rows.filter((r: Record<string, unknown>) => rrPhases.has(r['Fase'] as string));
+
+      // Filter by SDR
+      const sdrNorm = (sdrName as string).trim().toLowerCase();
+      const rrBySdr = allRR.filter((r: Record<string, unknown>) => {
+        const sdr = String(r['SDR responsável'] || '').trim().toLowerCase();
+        return sdr.includes(sdrNorm);
+      });
+
+      // Deduplicate: key = ID|Fase|Month
+      const seen2 = new Set<string>();
+      const deduped2 = rrBySdr.filter((r: Record<string, unknown>) => {
+        const entrada = String(r['Entrada'] || '');
+        const month = entrada.slice(0, 7);
+        const key = `${r['ID']}|${r['Fase']}|${month}`;
+        if (seen2.has(key)) return false;
+        seen2.add(key);
+        return true;
+      });
+
+      // Also find by Closer (not SDR)
+      const rrByCloser = allRR.filter((r: Record<string, unknown>) => {
+        const closer = String(r['Closer responsável'] || '').trim().toLowerCase();
+        const sdr = String(r['SDR responsável'] || '').trim().toLowerCase();
+        return closer.includes(sdrNorm) && !sdr.includes(sdrNorm);
+      });
+
+      // Cross-reference with sheet titles
+      const normalize = (s: string) => s.trim().toLowerCase();
+      const dbTitles = new Set(deduped2.map((r: Record<string, unknown>) => normalize(String(r['Título'] || ''))));
+
+      let comparison = null;
+      if (sheetTitles && Array.isArray(sheetTitles)) {
+        const sheetSet = new Set(sheetTitles.map((t: string) => normalize(t)));
+        const onlySheet = sheetTitles.filter((t: string) => !dbTitles.has(normalize(t)));
+        const onlyDb = deduped2.filter((r: Record<string, unknown>) => !sheetSet.has(normalize(String(r['Título'] || ''))));
+
+        // For titles only in sheet, check if they appear with Closer
+        const closerMap: Record<string, Record<string, unknown>> = {};
+        for (const r of rrByCloser) {
+          closerMap[normalize(String(r['Título'] || ''))] = r;
+        }
+        // Also check all RR (any SDR) for those missing titles
+        const allRRMap: Record<string, Record<string, unknown>[]> = {};
+        for (const r of allRR) {
+          const nt = normalize(String(r['Título'] || ''));
+          if (!allRRMap[nt]) allRRMap[nt] = [];
+          allRRMap[nt].push(r);
+        }
+
+        const missingAnalysis = onlySheet.map((t: string) => {
+          const nt = normalize(t);
+          const closerMatch = closerMap[nt];
+          const allMatches = allRRMap[nt] || [];
+          return {
+            titulo: t,
+            foundViaCloser: !!closerMatch,
+            closerSdr: closerMatch ? String(closerMatch['SDR responsável'] || '') : null,
+            closerCloser: closerMatch ? String(closerMatch['Closer responsável'] || '') : null,
+            allRRCount: allMatches.length,
+            allRRDetails: allMatches.map((m: Record<string, unknown>) => ({
+              id: m['ID'],
+              fase: m['Fase'],
+              entrada: m['Entrada'],
+              sdr: m['SDR responsável'],
+              closer: m['Closer responsável'],
+            })),
+          };
+        });
+
+        comparison = {
+          onlyInSheet: missingAnalysis,
+          onlyInDb: onlyDb.map((r: Record<string, unknown>) => ({
+            id: r['ID'],
+            titulo: r['Título'],
+            sdr: r['SDR responsável'],
+            entrada: r['Entrada'],
+          })),
+        };
+      }
+
+      // Check for deduplication removals
+      const dupesRemoved = rrBySdr.length - deduped2.length;
+
+      result = {
+        action: 'rr_sdr_diagnosis',
+        totalRRInPeriod: allRR.length,
+        rrBySdrCount: rrBySdr.length,
+        afterDedup: deduped2.length,
+        dupesRemoved,
+        rrByCloserNotSdr: rrByCloser.length,
+        uniqueTitlesDb: dbTitles.size,
+        comparison,
+        dedupedEntries: deduped2.map((r: Record<string, unknown>) => ({
+          id: r['ID'],
+          titulo: r['Título'],
+          fase: r['Fase'],
+          entrada: r['Entrada'],
+          sdr: r['SDR responsável'],
+        })),
+      };
+      console.log(`RR SDR diagnosis: ${allRR.length} total RR, ${rrBySdr.length} by SDR, ${deduped2.length} deduped, ${dupesRemoved} dupes removed`);
     } else {
       await client.end();
       return new Response(
