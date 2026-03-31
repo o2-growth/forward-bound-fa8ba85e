@@ -2316,6 +2316,7 @@ export function IndicatorsTab() {
         { key: 'responsible', label: 'Closer' },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.value || 0) - (a.value || 0)));
+      setDetailSheetFilterCriteria([]);
       setDetailSheetOpen(true);
       return;
     }
