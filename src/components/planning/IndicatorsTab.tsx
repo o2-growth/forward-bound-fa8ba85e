@@ -2386,6 +2386,7 @@ export function IndicatorsTab() {
         { key: 'date', label: 'Data', format: columnFormatters.date },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.mrr || 0) - (a.mrr || 0)));
+      setDetailSheetFilterCriteria([]);
       setDetailSheetOpen(true);
       return;
     }
