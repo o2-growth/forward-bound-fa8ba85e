@@ -1,68 +1,33 @@
 
 
-## Corrigir explicações de MQL com valores exatos do código
+## Investigação: 2 reuniões realizadas da Amanda faltando no dashboard (63 na planilha vs 61 no dash)
 
-### Problema
-As explicações de MQL para Oxy Hacker e Franquia estão genéricas ("com base no investimento disponível informado") — o usuário quer ver os valores exatos usados no filtro.
+### Análise da planilha
+A planilha tem **63 cards** onde Amanda é SDR e que tiveram movimento de "Reunião Realizada". As colunas são: Título, Fase Atual (onde o card está AGORA), Criador, Data de criação.
 
-### Valores reais extraídos do código
+### Possíveis causas (3 hipóteses)
 
-**Modelo Atual** — `MQL_QUALIFYING_TIERS` (faturamento mensal):
-- Entre R$ 200 mil e R$ 350 mil
-- Entre R$ 350 mil e R$ 500 mil
-- Entre R$ 500 mil e R$ 1 milhão
-- Entre R$ 1 milhão e R$ 5 milhões
-- Acima de R$ 5 milhões
+**Hipótese 1 — Campo "SDR responsável" diferente no Pipefy**
+O dashboard filtra por `card.responsavel` que vem do campo `SDR responsável` do Pipefy. Se 2 cards têm um valor diferente nesse campo (ex: vazio, ou outro nome), o filtro por "Amanda" não os captura. A planilha pode ter sido exportada usando outro critério (ex: pelo campo "Criador").
 
-**O2 TAX** — `O2_TAX_MQL_QUALIFYING_TIERS` (faturamento mensal):
-- Entre R$ 500 mil e R$ 1 milhão
-- Entre R$ 1 milhão e R$ 5 milhões
-- Acima de R$ 5 milhões
+**Hipótese 2 — Deduplicação mensal**
+O dashboard usa a chave `cardId + fase + mês` para deduplicar. Se um card entrou em "Reunião Realizada" **duas vezes no mesmo mês**, só conta uma vez. A planilha pode estar mostrando as duas entradas.
 
-**Oxy Hacker** — `OXY_HACKER_MQL_QUALIFYING_TIERS` (investimento disponível):
-- Menos de 54 mil reais
-- Menos de 100 mil reais
-- Menos de 140 mil reais
-- Menos de 250 mil reais
-- Menos de 360 mil reais
-- Menos de 400 mil reais
-- Menos de 500 mil reais
-- Mais de 500 mil reais
+**Hipótese 3 — Data de entrada fora do período**
+O dashboard usa `dataEntrada` (data de entrada na fase RR) para verificar se cai no período selecionado. Se 2 cards têm a data de entrada em RR fora do período do filtro do dashboard, não aparecem.
 
-**Franquia** — `FRANQUIA_MQL_QUALIFYING_TIERS` (investimento disponível):
-- Menos de 140 mil reais
-- Menos de 250 mil reais
-- Menos de 360 mil reais
-- Menos de 400 mil reais
-- Menos de 500 mil reais
-- Mais de 500 mil reais
+### Plano de ação
 
-### Alteração
+Para identificar exatamente quais 2 cards estão faltando, vou:
 
-**Arquivo**: `src/components/planning/IndicatorsTab.tsx` (linhas 1408-1426)
+1. **Consultar o banco externo** via `query-external-db` buscando todos os movimentos de "Reunião Realizada" e "1° Reunião Realizada - Apresentação" no período onde `SDR responsável` contém "Amanda"
+2. **Cruzar com a planilha** — comparar os 63 títulos da planilha com os resultados do banco
+3. **Identificar os 2 faltantes** — verificar se é por:
+   - Campo SDR vazio/diferente
+   - Deduplicação (mesmo card ID entrando 2x na mesma fase no mesmo mês)
+   - Data fora do período
+4. **Reportar** os cards específicos e a causa
 
-Substituir os textos genéricos por:
-
-**Oxy Hacker:**
-```
-'MQL = Leads filtrados pelo investimento disponível informado no Pipefy',
-'Faixas de investimento aceitas: Menos de R$ 54k, Menos de R$ 100k, Menos de R$ 140k, Menos de R$ 250k, Menos de R$ 360k, Menos de R$ 400k, Menos de R$ 500k, Mais de R$ 500k',
-'Ou seja: qualquer lead com investimento informado é considerado MQL',
-'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
-'Data de criação do lead dentro do período selecionado',
-```
-
-**Franquia:**
-```
-'MQL = Leads filtrados pelo investimento disponível informado no Pipefy',
-'Faixas de investimento aceitas: Menos de R$ 140k, Menos de R$ 250k, Menos de R$ 360k, Menos de R$ 400k, Menos de R$ 500k, Mais de R$ 500k',
-'Ou seja: qualquer lead com investimento informado é considerado MQL',
-'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
-'Data de criação do lead dentro do período selecionado',
-```
-
-### Arquivos afetados
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/components/planning/IndicatorsTab.tsx` | Atualizar textos de Oxy Hacker (linhas ~1408-1416) e Franquia (linhas ~1418-1426) com faixas exatas |
+### Alteração de código
+Nenhuma alteração de código é necessária neste momento — primeiro preciso fazer a investigação de dados para confirmar a causa raiz. Se for um bug de lógica, proponho a correção depois.
 
