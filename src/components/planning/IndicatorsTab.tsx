@@ -1409,7 +1409,7 @@ export function IndicatorsTab() {
           mqlCriteria.push({
             title: '▸ Oxy Hacker',
             items: [
-              'MQL = Todos os Leads (incluindo "Start form")',
+              'MQL = Todos os Leads com base no investimento disponível informado',
               'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
               'Data de criação do lead dentro do período selecionado',
             ],
@@ -1419,10 +1419,9 @@ export function IndicatorsTab() {
           mqlCriteria.push({
             title: '▸ Franquia',
             items: [
-              'MQL = Todos os Leads (incluindo "Start form")',
+              'MQL = Todos os Leads com base no investimento disponível informado',
               'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
               'Data de criação do lead dentro do período selecionado',
-              'Faixas de investimento próprias da BU',
             ],
           });
         }
