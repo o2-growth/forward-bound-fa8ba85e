@@ -20,7 +20,7 @@ interface AnalyticsSource {
       closer: string | null;
       sdr?: string | null;
       responsavel?: string | null;
-      produto: string;
+      produto?: string;
       dataEntrada: Date;
     }>;
   };
