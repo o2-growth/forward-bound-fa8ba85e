@@ -1382,6 +1382,52 @@ export function IndicatorsTab() {
           { key: 'date', label: 'Data', format: columnFormatters.date },
         ]);
         setDetailSheetItems(items);
+        // Filter criteria for MQL
+        const mqlCriteria: FilterCriteriaGroup[] = [];
+        if (selectedBUs.includes('modelo_atual')) {
+          mqlCriteria.push({
+            title: '▸ Modelo Atual',
+            items: [
+              'Faturamento da empresa ≥ R$ 200 mil (faixas aceitas: R$200-350k, R$350-500k, R$500k-1M, R$1-5M, acima de R$5M)',
+              'Data de criação do lead dentro do período selecionado',
+              'Exclui cards de teste',
+              'Exclui leads com motivo de perda: Duplicado, Pessoa física/fora do ICP, Não é demanda real, Buscando parceria, Quer soluções para cliente, Não é MQL mas entrou como MQL, Email/Telefone Inválido',
+            ],
+          });
+        }
+        if (selectedBUs.includes('o2_tax')) {
+          mqlCriteria.push({
+            title: '▸ O2 TAX',
+            items: [
+              'Faturamento da empresa ≥ R$ 500 mil',
+              'Data de criação do lead dentro do período selecionado',
+              'Mesma lógica de exclusão por motivo de perda do Modelo Atual',
+            ],
+          });
+        }
+        if (selectedBUs.includes('oxy_hacker')) {
+          mqlCriteria.push({
+            title: '▸ Oxy Hacker',
+            items: [
+              'MQL = Todos os Leads (incluindo "Start form")',
+              'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
+              'Data de criação do lead dentro do período selecionado',
+            ],
+          });
+        }
+        if (selectedBUs.includes('franquia')) {
+          mqlCriteria.push({
+            title: '▸ Franquia',
+            items: [
+              'MQL = Todos os Leads (incluindo "Start form")',
+              'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
+              'Data de criação do lead dentro do período selecionado',
+              'Faixas de investimento próprias da BU',
+            ],
+          });
+        }
+        mqlCriteria.push({ title: '▸ Filtros ativos', items: buildActiveFilters() });
+        setDetailSheetFilterCriteria(mqlCriteria);
         setDetailSheetOpen(true);
         return;
       }
