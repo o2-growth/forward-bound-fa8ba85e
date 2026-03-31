@@ -14,13 +14,13 @@ interface AnalyticsSource {
       id: string;
       titulo: string;
       fase: string;
-      faseAtual: string;
+      faseAtual?: string;
       valor: number;
-      motivoPerda: string | null;
-      closer: string | null;
+      motivoPerda?: string | null;
+      closer?: string | null;
       sdr?: string | null;
       responsavel?: string | null;
-      produto: string;
+      produto?: string;
       dataEntrada: Date;
     }>;
   };
