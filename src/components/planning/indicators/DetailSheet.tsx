@@ -69,9 +69,10 @@ interface DetailSheetProps {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
 
-export function DetailSheet({ open, onOpenChange, title, description, items, columns, kpis, charts }: DetailSheetProps) {
+export function DetailSheet({ open, onOpenChange, title, description, items, columns, kpis, charts, filterCriteria }: DetailSheetProps) {
   const [sortState, setSortState] = useState<SortState>({ column: null, direction: 'none' });
   const [analyticsExpanded, setAnalyticsExpanded] = useState(true);
+  const [criteriaExpanded, setCriteriaExpanded] = useState(false);
   
   const hasAnalytics = (kpis && kpis.length > 0) || (charts && charts.length > 0);
 
