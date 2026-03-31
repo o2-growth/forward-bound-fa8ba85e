@@ -1,39 +1,28 @@
 
 
-## Fixar metas de funil (MQL, RM, RR, etc.) independentes do faturamento
+## Correção: Filtro de SDR não funciona para Oxy Hacker e Franquia
 
 ### Problema
-Quando o faturamento do Modelo Atual é redistribuído entre meses, o funil reverso recalcula automaticamente as metas de MQL, RM, RR, Proposta e Venda — o usuário quer que essas metas permaneçam fixas.
+Na seção de **acelerômetros (gauges)** da aba Indicadores, o filtro de SDR para Oxy Hacker e Franquia usa `card.responsible` em vez de `card.sdr || card.responsible`. O campo `responsible` nas cards de Expansão contém o **Closer** (não o SDR), porque é preenchido como `Closer responsável || SDR responsável`. Isso faz com que a filtragem por SDR não encontre correspondência.
 
-### Solução
-Criar uma tabela `funnel_metas` no banco de dados para armazenar as metas de funil fixas. O sistema usará esses valores quando existirem, em vez de recalcular via funil reverso.
-
-### Alterações
-
-**1. Nova tabela `funnel_metas`** (migração SQL)
-- Colunas: `bu`, `month`, `year`, `leads`, `mqls`, `rms`, `rrs`, `propostas`, `vendas`
-- RLS: leitura para autenticados, escrita para admins
-- Constraint unique em `(bu, month, year)`
-
-**2. Seed inicial** — Inserir os valores atuais calculados pelo funil reverso como snapshot fixo (via script ou edge function), para que a tabela já tenha dados antes de qualquer redistribuição.
-
-**3. `src/hooks/usePlanGrowthData.ts`** — Modificar o hook para:
-- Buscar `funnel_metas` do banco para o Modelo Atual
-- Se existirem valores na tabela, usá-los diretamente em vez de chamar `calculateReverseFunnel`
-- Manter o funil reverso como fallback caso a tabela esteja vazia
-
-**4. Painel Admin (opcional)** — Adicionar uma seção na aba Admin para editar as metas de funil manualmente, caso o usuário queira ajustá-las no futuro.
-
-### Fluxo após implementação
-```text
-Antes:  faturamento muda → funil reverso recalcula MQL → metas de MQL mudam
-Depois: faturamento muda → sistema busca funnel_metas → MQL permanece fixo
+### Causa raiz
+Nas linhas ~827-858 (O2 Tax, Oxy Hacker, Franquia — seção de gauges), o código faz:
+```
+matchesSdrFilter(card.responsible)  // ← usa o Closer, não o SDR
+```
+Enquanto em outras seções (drill-down, chart data), o código já usa corretamente:
+```
+matchesSdrFilter(item.sdr || item.responsible)  // ← correto
 ```
 
-### Arquivos afetados
-| Arquivo | Alteração |
-|---------|-----------|
-| Nova migração SQL | Criar tabela `funnel_metas` + seed com valores atuais |
-| `src/hooks/usePlanGrowthData.ts` | Buscar `funnel_metas` e usar como fonte primária para Modelo Atual |
-| `src/hooks/useFunnelMetas.ts` (novo) | Hook para CRUD da tabela `funnel_metas` |
+### Solução
+Alterar as 3 ocorrências na seção de cálculo dos gauges (~linhas 829, 857, 885) para usar `card.sdr || card.responsible` em vez de apenas `card.responsible`:
+
+**Arquivo**: `src/components/planning/IndicatorsTab.tsx`
+
+1. **Linha ~829** (O2 Tax gauge): `matchesSdrFilter(card.sdr || card.responsible)`
+2. **Linha ~857** (Oxy Hacker gauge): `matchesSdrFilter(card.sdr || card.responsible)`
+3. **Linha ~885** (Franquia gauge): `matchesSdrFilter(card.sdr || card.responsible)`
+
+São 3 substituições simples no mesmo arquivo — sem impacto em outras funcionalidades.
 
