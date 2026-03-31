@@ -1,6 +1,7 @@
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { useMediaMetas } from "@/contexts/MediaMetasContext";
 import { useMonetaryMetas, BuType, isPontualOnlyBU } from "./useMonetaryMetas";
+import { useFunnelMetas } from "./useFunnelMetas";
 
 // Indicadores de 2025 (base para projeção)
 const indicators2025 = {
