@@ -29,7 +29,7 @@ import { MeetingsScheduledChart } from "./MeetingsScheduledChart";
 import { ClickableFunnelChart } from "./ClickableFunnelChart";
 import { RevenueChartComparison } from "./RevenueChartComparison";
 import { FunnelConversionByTierWidget } from "./indicators/FunnelConversionByTierWidget";
-import { DetailSheet, DetailItem, columnFormatters } from "./indicators/DetailSheet";
+import { DetailSheet, DetailItem, columnFormatters, FilterCriteriaGroup } from "./indicators/DetailSheet";
 import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
@@ -401,6 +401,7 @@ export function IndicatorsTab() {
   const [detailSheetColumns, setDetailSheetColumns] = useState<{ key: keyof DetailItem; label: string; format?: (value: any) => React.ReactNode }[]>([]);
   const [detailSheetKpis, setDetailSheetKpis] = useState<KpiItem[]>([]);
   const [detailSheetCharts, setDetailSheetCharts] = useState<ChartConfig[]>([]);
+  const [detailSheetFilterCriteria, setDetailSheetFilterCriteria] = useState<FilterCriteriaGroup[]>([]);
   
 
   const handleSync = () => {
@@ -1325,6 +1326,17 @@ export function IndicatorsTab() {
 
   // === STRATEGIC DRILL-DOWN HANDLERS ===
   
+  // Build active filters description
+  const buildActiveFilters = (): string[] => {
+    const filters: string[] = [];
+    const buLabels = selectedBUs.map(bu => buOptions.find(o => o.value === bu)?.label || bu).join(', ');
+    filters.push(`BUs selecionadas: ${buLabels}`);
+    if (effectiveSelectedClosers.length > 0) filters.push(`Closers: ${effectiveSelectedClosers.join(', ')}`);
+    if (effectiveSelectedSDRs.length > 0) filters.push(`SDRs: ${effectiveSelectedSDRs.join(', ')}`);
+    filters.push(`Período: ${format(startDate, 'dd/MM/yyyy')} a ${format(endDate, 'dd/MM/yyyy')}`);
+    return filters;
+  };
+
   // Handle radial card click with strategic narratives
   const handleRadialCardClick = (indicator: IndicatorConfig) => {
     const items = getItemsForIndicator(indicator.key);
@@ -1370,6 +1382,52 @@ export function IndicatorsTab() {
           { key: 'date', label: 'Data', format: columnFormatters.date },
         ]);
         setDetailSheetItems(items);
+        // Filter criteria for MQL
+        const mqlCriteria: FilterCriteriaGroup[] = [];
+        if (selectedBUs.includes('modelo_atual')) {
+          mqlCriteria.push({
+            title: '▸ Modelo Atual',
+            items: [
+              'Faturamento da empresa ≥ R$ 200 mil (faixas aceitas: R$200-350k, R$350-500k, R$500k-1M, R$1-5M, acima de R$5M)',
+              'Data de criação do lead dentro do período selecionado',
+              'Exclui cards de teste',
+              'Exclui leads com motivo de perda: Duplicado, Pessoa física/fora do ICP, Não é demanda real, Buscando parceria, Quer soluções para cliente, Não é MQL mas entrou como MQL, Email/Telefone Inválido',
+            ],
+          });
+        }
+        if (selectedBUs.includes('o2_tax')) {
+          mqlCriteria.push({
+            title: '▸ O2 TAX',
+            items: [
+              'Faturamento da empresa ≥ R$ 500 mil',
+              'Data de criação do lead dentro do período selecionado',
+              'Mesma lógica de exclusão por motivo de perda do Modelo Atual',
+            ],
+          });
+        }
+        if (selectedBUs.includes('oxy_hacker')) {
+          mqlCriteria.push({
+            title: '▸ Oxy Hacker',
+            items: [
+              'MQL = Todos os Leads (incluindo "Start form")',
+              'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
+              'Data de criação do lead dentro do período selecionado',
+            ],
+          });
+        }
+        if (selectedBUs.includes('franquia')) {
+          mqlCriteria.push({
+            title: '▸ Franquia',
+            items: [
+              'MQL = Todos os Leads (incluindo "Start form")',
+              'Funil cumulativo: cards em fases avançadas sem histórico de Lead também são contados',
+              'Data de criação do lead dentro do período selecionado',
+              'Faixas de investimento próprias da BU',
+            ],
+          });
+        }
+        mqlCriteria.push({ title: '▸ Filtros ativos', items: buildActiveFilters() });
+        setDetailSheetFilterCriteria(mqlCriteria);
         setDetailSheetOpen(true);
         return;
       }
@@ -1436,6 +1494,16 @@ export function IndicatorsTab() {
           { key: 'date', label: 'Data', format: columnFormatters.date },
         ]);
         setDetailSheetItems(itemsWithCalcs);
+        setDetailSheetFilterCriteria([
+          { title: '▸ Reunião Agendada (RM)', items: [
+            'Card entrou na fase "Reunião agendada" ou "Qualificado" dentro do período selecionado',
+            'Conta a primeira vez que o card aparece nesta fase (evita duplicação)',
+            'A data considerada é a data da primeira movimentação para esta fase',
+            'Para Modelo Atual e O2 TAX: fase "Reunião agendada / Qualificado" no Pipefy',
+            'Para Oxy Hacker e Franquia: fase equivalente no pipe de Expansão',
+          ]},
+          { title: '▸ Filtros ativos', items: buildActiveFilters() },
+        ]);
         setDetailSheetOpen(true);
         return;
       }
@@ -1500,6 +1568,16 @@ export function IndicatorsTab() {
           { key: 'date', label: 'Data', format: columnFormatters.date },
         ]);
         setDetailSheetItems(items);
+        setDetailSheetFilterCriteria([
+          { title: '▸ Reunião Realizada (RR)', items: [
+            'Card entrou na fase "Reunião Realizada" ou "1ª Reunião Realizada - Apresentação" dentro do período',
+            'Conta a primeira vez que o card aparece nesta fase (evita duplicação)',
+            'A data considerada é a data da primeira movimentação para esta fase',
+            'Para Modelo Atual e O2 TAX: fase "Reunião Realizada" no Pipefy',
+            'Para Oxy Hacker e Franquia: fase equivalente no pipe de Expansão',
+          ]},
+          { title: '▸ Filtros ativos', items: buildActiveFilters() },
+        ]);
         setDetailSheetOpen(true);
         return;
       }
@@ -1583,6 +1661,15 @@ export function IndicatorsTab() {
         ]);
         // Sort by aging descending (oldest first = action needed)
         setDetailSheetItems(itemsWithAging.sort((a, b) => (b.diasEmProposta || 0) - (a.diasEmProposta || 0)));
+        setDetailSheetFilterCriteria([
+          { title: '▸ Proposta Enviada', items: [
+            'Card está na fase "Proposta Enviada" ou "Negociação" no período selecionado',
+            'Inclui propostas ativas (ainda não ganhas nem perdidas)',
+            'O "aging" mostra quantos dias o card está nesta fase',
+            'Propostas com mais de 14 dias são marcadas como "envelhecidas" (⚠️ em risco)',
+          ]},
+          { title: '▸ Filtros ativos', items: buildActiveFilters() },
+        ]);
         setDetailSheetOpen(true);
         return;
       }
@@ -1746,6 +1833,15 @@ export function IndicatorsTab() {
         ]);
         // Sort by TCV descending
         setDetailSheetItems(itemsWithTCV.sort((a, b) => (b.value || 0) - (a.value || 0)));
+        setDetailSheetFilterCriteria([
+          { title: '▸ Venda Fechada', items: [
+            'Card chegou na fase "Ganho" / "Contrato Assinado" dentro do período selecionado',
+            'A data considerada é a data de assinatura do contrato (quando disponível)',
+            'TCV = (MRR × 12) + Setup + Pontual',
+            'Inclui todas as BUs selecionadas com seus respectivos valores',
+          ]},
+          { title: '▸ Filtros ativos', items: buildActiveFilters() },
+        ]);
         setDetailSheetOpen(true);
         return;
       }
@@ -1759,6 +1855,7 @@ export function IndicatorsTab() {
         setDetailSheetCharts([]);
         setDetailSheetItems(items);
         setDetailSheetColumns(columns);
+        setDetailSheetFilterCriteria([]);
         setDetailSheetOpen(true);
       }
     }
@@ -2145,6 +2242,7 @@ export function IndicatorsTab() {
       ]);
       // Sort by SLA descending (worst first = coaching)
       setDetailSheetItems(tentativasCards.sort((a, b) => (b.sla || 0) - (a.sla || 0)));
+      setDetailSheetFilterCriteria([]);
       setDetailSheetOpen(true);
       return;
     }
@@ -2218,6 +2316,7 @@ export function IndicatorsTab() {
         { key: 'responsible', label: 'Closer' },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.value || 0) - (a.value || 0)));
+      setDetailSheetFilterCriteria([]);
       setDetailSheetOpen(true);
       return;
     }
@@ -2287,6 +2386,7 @@ export function IndicatorsTab() {
         { key: 'date', label: 'Data', format: columnFormatters.date },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.mrr || 0) - (a.mrr || 0)));
+      setDetailSheetFilterCriteria([]);
       setDetailSheetOpen(true);
       return;
     }
@@ -2346,6 +2446,7 @@ export function IndicatorsTab() {
         { key: 'date', label: 'Data', format: columnFormatters.date },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.setup || 0) - (a.setup || 0)));
+      setDetailSheetFilterCriteria([]);
       setDetailSheetOpen(true);
       return;
     }
@@ -2405,6 +2506,7 @@ export function IndicatorsTab() {
         { key: 'date', label: 'Data', format: columnFormatters.date },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.pontual || 0) - (a.pontual || 0)));
+      setDetailSheetFilterCriteria([]);
       setDetailSheetOpen(true);
       return;
     }
@@ -2819,6 +2921,7 @@ export function IndicatorsTab() {
         columns={detailSheetColumns}
         kpis={detailSheetKpis}
         charts={detailSheetCharts}
+        filterCriteria={detailSheetFilterCriteria}
       />
     </div>
   );

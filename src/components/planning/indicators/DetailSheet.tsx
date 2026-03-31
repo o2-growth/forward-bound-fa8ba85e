@@ -17,6 +17,11 @@ interface SortState {
   direction: SortDirection;
 }
 
+export interface FilterCriteriaGroup {
+  title: string;
+  items: string[];
+}
+
 export interface DetailItem {
   id: string;
   name: string;
@@ -58,14 +63,16 @@ interface DetailSheetProps {
   }[];
   kpis?: KpiItem[];
   charts?: ChartConfig[];
+  filterCriteria?: FilterCriteriaGroup[];
 }
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
 
-export function DetailSheet({ open, onOpenChange, title, description, items, columns, kpis, charts }: DetailSheetProps) {
+export function DetailSheet({ open, onOpenChange, title, description, items, columns, kpis, charts, filterCriteria }: DetailSheetProps) {
   const [sortState, setSortState] = useState<SortState>({ column: null, direction: 'none' });
   const [analyticsExpanded, setAnalyticsExpanded] = useState(true);
+  const [criteriaExpanded, setCriteriaExpanded] = useState(false);
   
   const hasAnalytics = (kpis && kpis.length > 0) || (charts && charts.length > 0);
 
@@ -114,6 +121,7 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
     if (!isOpen) {
       setSortState({ column: null, direction: 'none' });
       setAnalyticsExpanded(true);
+      setCriteriaExpanded(false);
     }
     onOpenChange(isOpen);
   };
@@ -138,6 +146,36 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
           )}
         </DialogHeader>
         <div className="flex-1 overflow-y-auto mt-4 pr-2">
+          {filterCriteria && filterCriteria.length > 0 && (
+            <Collapsible open={criteriaExpanded} onOpenChange={setCriteriaExpanded} className="mb-4">
+              <div className="flex items-center justify-between">
+                <CollapsibleTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1 text-sm font-medium -ml-2 text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200">
+                    {criteriaExpanded ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    ℹ️ Como este número é calculado
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent>
+                <div className="mt-2 p-4 rounded-lg bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-sm space-y-3">
+                  {filterCriteria.map((group, gi) => (
+                    <div key={gi}>
+                      <p className="font-semibold text-blue-800 dark:text-blue-200 mb-1">{group.title}</p>
+                      <ul className="list-disc list-inside space-y-0.5 text-blue-700 dark:text-blue-300">
+                        {group.items.map((item, ii) => (
+                          <li key={ii}>{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
           {hasAnalytics && (
             <Collapsible open={analyticsExpanded} onOpenChange={setAnalyticsExpanded} className="flex-shrink-0">
               <div className="flex items-center justify-between mb-2">
