@@ -1326,6 +1326,17 @@ export function IndicatorsTab() {
 
   // === STRATEGIC DRILL-DOWN HANDLERS ===
   
+  // Build active filters description
+  const buildActiveFilters = (): string[] => {
+    const filters: string[] = [];
+    const buLabels = selectedBUs.map(bu => buOptions.find(o => o.value === bu)?.label || bu).join(', ');
+    filters.push(`BUs selecionadas: ${buLabels}`);
+    if (effectiveSelectedClosers.length > 0) filters.push(`Closers: ${effectiveSelectedClosers.join(', ')}`);
+    if (effectiveSelectedSDRs.length > 0) filters.push(`SDRs: ${effectiveSelectedSDRs.join(', ')}`);
+    filters.push(`Período: ${format(startDate, 'dd/MM/yyyy')} a ${format(endDate, 'dd/MM/yyyy')}`);
+    return filters;
+  };
+
   // Handle radial card click with strategic narratives
   const handleRadialCardClick = (indicator: IndicatorConfig) => {
     const items = getItemsForIndicator(indicator.key);
