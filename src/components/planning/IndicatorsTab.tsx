@@ -854,7 +854,7 @@ export function IndicatorsTab() {
           const cards = oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key);
           const filteredCards = cards.filter(card => {
             const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer || card.responsible);
-            const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.responsible);
+            const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
             return matchCloser && matchSdr;
           });
           total += filteredCards.length;
