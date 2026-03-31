@@ -318,6 +318,8 @@ function calculateReverseFunnel(
 export function usePlanGrowthData() {
   const { setMetasPorBU, setFunnelData, isLoaded } = useMediaMetas();
   const { metas, isLoading: isLoadingMetas } = useMonetaryMetas();
+  const { funnelMetas, isLoading: isLoadingFunnel, hasFunnelForBU, getFunnelForBU, bulkUpsert } = useFunnelMetas();
+  const hasSeeded = useRef(false);
   
   // Default values (same as MediaInvestmentTab)
   const mrrInicial = 700000;
@@ -390,8 +392,8 @@ export function usePlanGrowthData() {
     return calculateFromUnits(franquiaUnits, 140000);
   }, [metas]);
 
-  // Calculate funnel data for each BU
-  const modeloAtualFunnel = useMemo(() => 
+  // Calculate funnel data via reverse funnel (used as fallback and for initial seed)
+  const modeloAtualFunnelCalculated = useMemo(() => 
     calculateReverseFunnel(
       mrrDynamic.revenueToSell, 
       indicadoresPorBU.modeloAtual, 
@@ -417,8 +419,53 @@ export function usePlanGrowthData() {
     [franquiaMonthly]
   );
 
+  // Build the final Modelo Atual funnel: use fixed DB values for funnel stages if available,
+  // otherwise use the calculated reverse funnel values
+  const modeloAtualFunnel = useMemo(() => {
+    const hasFixedFunnel = hasFunnelForBU('modelo_atual');
+    if (!hasFixedFunnel) return modeloAtualFunnelCalculated;
+    
+    const fixedMetas = getFunnelForBU('modelo_atual');
+    // Merge: use fixed funnel stages (mqls, rms, etc.) but keep revenue data from calculated funnel
+    return modeloAtualFunnelCalculated.map(calc => {
+      const fixed = fixedMetas.find(f => f.month === calc.month);
+      if (!fixed) return calc;
+      return {
+        ...calc,
+        leads: fixed.leads,
+        mqls: fixed.mqls,
+        rms: fixed.rms,
+        rrs: fixed.rrs,
+        propostas: fixed.propostas,
+        vendas: fixed.vendas,
+        // Keep faturamentoMeta, faturamentoVender, mrrBase, investimento from calculated
+      };
+    });
+  }, [modeloAtualFunnelCalculated, funnelMetas]);
+
+  // Auto-seed funnel_metas on first load if table is empty
+  useEffect(() => {
+    if (isLoadingFunnel || isLoadingMetas || hasSeeded.current) return;
+    if (hasFunnelForBU('modelo_atual')) return;
+    if (modeloAtualFunnelCalculated.length === 0) return;
+    
+    hasSeeded.current = true;
+    const seedData = modeloAtualFunnelCalculated.map(d => ({
+      bu: 'modelo_atual',
+      month: d.month,
+      year: 2026,
+      leads: Math.round(d.leads),
+      mqls: Math.round(d.mqls),
+      rms: Math.round(d.rms),
+      rrs: Math.round(d.rrs),
+      propostas: Math.round(d.propostas),
+      vendas: Math.round(d.vendas),
+    }));
+    
+    bulkUpsert.mutate(seedData);
+  }, [isLoadingFunnel, isLoadingMetas, modeloAtualFunnelCalculated, funnelMetas]);
+
   // Publish data to context whenever funnel data changes
-  // (allows Admin Metas edits to propagate to Controle Metas)
   useEffect(() => {
     
     setMetasPorBU({
@@ -453,7 +500,6 @@ export function usePlanGrowthData() {
         investimento: Math.round(d.investimento),
         faturamento: Math.round(d.faturamentoVender),
       })),
-      // Use operational targets for O2 TAX (42 MQL/mo, 15 RM/mo, etc.)
       o2Tax: o2TaxOperationalMetas.map((metas, index) => ({
         month: metas.month,
         leads: Math.round(metas.mqls / indicadoresPorBU.o2Tax.leadToMql),
@@ -465,7 +511,6 @@ export function usePlanGrowthData() {
         investimento: Math.round(o2TaxFunnel[index]?.investimento || 0),
         faturamento: Math.round(o2TaxMonthly[metas.month] || 0),
       })),
-      // Use operational targets for Oxy Hacker (25 MQL/mo, 10 RM/mo, etc.)
       oxyHacker: oxyHackerOperationalMetas.map((metas, index) => ({
         month: metas.month,
         leads: Math.round(metas.mqls / indicadoresPorBU.oxyHacker.leadToMql),
@@ -477,7 +522,6 @@ export function usePlanGrowthData() {
         investimento: Math.round(oxyHackerFunnel[index]?.investimento || 0),
         faturamento: Math.round(oxyHackerMonthly[metas.month] || 0),
       })),
-      // Use operational targets for Franquia (30 MQL/mo, 12 RM/mo, etc.)
       franquia: franquiaOperationalMetas.map((metas, index) => ({
         month: metas.month,
         leads: Math.round(metas.mqls / indicadoresPorBU.franquia.leadToMql),
