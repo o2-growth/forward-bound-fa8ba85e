@@ -1855,6 +1855,7 @@ export function IndicatorsTab() {
         setDetailSheetCharts([]);
         setDetailSheetItems(items);
         setDetailSheetColumns(columns);
+        setDetailSheetFilterCriteria([]);
         setDetailSheetOpen(true);
       }
     }
