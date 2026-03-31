@@ -1494,6 +1494,16 @@ export function IndicatorsTab() {
           { key: 'date', label: 'Data', format: columnFormatters.date },
         ]);
         setDetailSheetItems(itemsWithCalcs);
+        setDetailSheetFilterCriteria([
+          { title: '▸ Reunião Agendada (RM)', items: [
+            'Card entrou na fase "Reunião agendada" ou "Qualificado" dentro do período selecionado',
+            'Conta a primeira vez que o card aparece nesta fase (evita duplicação)',
+            'A data considerada é a data da primeira movimentação para esta fase',
+            'Para Modelo Atual e O2 TAX: fase "Reunião agendada / Qualificado" no Pipefy',
+            'Para Oxy Hacker e Franquia: fase equivalente no pipe de Expansão',
+          ]},
+          { title: '▸ Filtros ativos', items: buildActiveFilters() },
+        ]);
         setDetailSheetOpen(true);
         return;
       }
