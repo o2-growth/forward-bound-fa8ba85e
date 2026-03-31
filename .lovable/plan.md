@@ -1,28 +1,78 @@
 
 
-## Correção: Filtro de SDR não funciona para Oxy Hacker e Franquia
+## Adicionar painel de "Critérios de Filtro" nos drill-downs dos acelerômetros (MQL, RM, RR)
 
-### Problema
-Na seção de **acelerômetros (gauges)** da aba Indicadores, o filtro de SDR para Oxy Hacker e Franquia usa `card.responsible` em vez de `card.sdr || card.responsible`. O campo `responsible` nas cards de Expansão contém o **Closer** (não o SDR), porque é preenchido como `Closer responsável || SDR responsável`. Isso faz com que a filtragem por SDR não encontre correspondência.
+### O que muda
+Quando o usuário clicar no acelerômetro de MQL, Reunião Agendada ou Reunião Realizada, o modal de detalhes exibirá um bloco informativo no topo (antes dos KPIs) explicando **em linguagem simples** quais critérios foram usados para gerar aquele número.
 
-### Causa raiz
-Nas linhas ~827-858 (O2 Tax, Oxy Hacker, Franquia — seção de gauges), o código faz:
+### Exemplo visual
+Ao clicar no acelerômetro de MQL, aparecerá algo como:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ ℹ️  Como este número é calculado                            │
+│                                                             │
+│ Fonte de dados: Cards do Pipefy (pipe de cada BU)           │
+│                                                             │
+│ ▸ Modelo Atual:                                             │
+│   • Faturamento ≥ R$ 200k (faixas: R$200-350k, R$350-500k, │
+│     R$500k-1M, R$1-5M, >R$5M)                              │
+│   • Data de criação do card dentro do período selecionado   │
+│   • Exclui cards de teste                                   │
+│   • Exclui cards com motivo de perda: Duplicado, Pessoa     │
+│     física/fora do ICP, Não é demanda real, etc.            │
+│                                                             │
+│ ▸ O2 TAX:                                                   │
+│   • Faturamento ≥ R$ 500k                                   │
+│   • Mesma lógica de exclusão por motivo de perda             │
+│                                                             │
+│ ▸ Oxy Hacker / Franquia:                                    │
+│   • MQL = todos os Leads (incluindo "Start form")           │
+│   • Funil cumulativo: cards em fases avançadas sem           │
+│     histórico em Leads também contam                         │
+│                                                             │
+│ Filtros ativos: BU Modelo Atual, Período Jan-Mar 2026       │
+└─────────────────────────────────────────────────────────────┘
 ```
-matchesSdrFilter(card.responsible)  // ← usa o Closer, não o SDR
-```
-Enquanto em outras seções (drill-down, chart data), o código já usa corretamente:
-```
-matchesSdrFilter(item.sdr || item.responsible)  // ← correto
-```
 
-### Solução
-Alterar as 3 ocorrências na seção de cálculo dos gauges (~linhas 829, 857, 885) para usar `card.sdr || card.responsible` em vez de apenas `card.responsible`:
+### Alterações
 
-**Arquivo**: `src/components/planning/IndicatorsTab.tsx`
+**1. `src/components/planning/indicators/DetailSheet.tsx`**
+- Adicionar nova prop opcional `filterCriteria?: string[]` — array de linhas de texto explicativo
+- Renderizar um bloco colapsável `<Collapsible>` com ícone ℹ️ e título "Como este número é calculado" logo acima dos KPIs/tabela
+- Estilo: fundo `bg-blue-50 dark:bg-blue-950`, borda `border-blue-200`, texto `text-sm`
+- Cada linha do array será um bullet point com formatação simples
 
-1. **Linha ~829** (O2 Tax gauge): `matchesSdrFilter(card.sdr || card.responsible)`
-2. **Linha ~857** (Oxy Hacker gauge): `matchesSdrFilter(card.sdr || card.responsible)`
-3. **Linha ~885** (Franquia gauge): `matchesSdrFilter(card.sdr || card.responsible)`
+**2. `src/components/planning/IndicatorsTab.tsx`** — No `handleRadialCardClick`:
 
-São 3 substituições simples no mesmo arquivo — sem impacto em outras funcionalidades.
+Para cada indicador, montar o array `filterCriteria` com textos descritivos:
+
+**MQL** — critérios por BU incluída:
+- Modelo Atual: "Faturamento da empresa ≥ R$ 200 mil", "Data de criação do lead dentro do período", "Exclui cards de teste", "Exclui leads com motivo de perda: Duplicado, Pessoa física/fora do ICP, Não é demanda real, Buscando parceria, Quer soluções para cliente, Não é MQL mas entrou como MQL, Email/Telefone Inválido"
+- O2 TAX: "Faturamento da empresa ≥ R$ 500 mil", mesmas exclusões
+- Oxy Hacker: "Todos os leads contam como MQL (incluindo Start form)", "Cards em fases avançadas sem histórico de Lead também são contados"
+- Franquia: Idem Oxy Hacker, com faixas de investimento próprias
+- Filtros ativos: BUs selecionadas, Closer, SDR, Período
+
+**RM (Reunião Agendada):**
+- "Card entrou na fase 'Reunião agendada / Qualificado' dentro do período"
+- "Conta a primeira vez que o card aparece nesta fase (evita duplicação)"
+- Filtros ativos de Closer/SDR
+
+**RR (Reunião Realizada):**
+- "Card entrou na fase 'Reunião Realizada' ou '1ª Reunião Realizada - Apresentação' dentro do período"
+- "Conta a primeira vez que o card aparece nesta fase"
+- Filtros ativos de Closer/SDR
+
+Também adicionar para **Proposta** e **Venda** com a mesma lógica.
+
+**3. Estado novo em `IndicatorsTab.tsx`:**
+- `const [detailSheetFilterCriteria, setDetailSheetFilterCriteria] = useState<string[]>([])`
+- Passar para `<DetailSheet filterCriteria={detailSheetFilterCriteria} />`
+
+### Arquivos afetados
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/planning/indicators/DetailSheet.tsx` | Nova prop `filterCriteria`, bloco colapsável informativo |
+| `src/components/planning/IndicatorsTab.tsx` | Montar e passar `filterCriteria` para cada indicador no `handleRadialCardClick` |
 
