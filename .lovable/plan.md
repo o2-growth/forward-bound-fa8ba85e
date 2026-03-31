@@ -1,24 +1,13 @@
 
 
-## Correção: "currentTotal is not defined"
+## Correção: Edge Function "manage-redistribution" não deployada
 
 ### Problema
-Em `useMetaRedistribution.ts` linhas 190-191, há referências a variáveis inexistentes:
-- `currentTotal` → deveria ser `currentTotals.overall`
-- `calculateNewTotal()` → deveria ser `validateTotal().newTotal`
+O erro "Failed to send a request to the Edge Function" indica que a função `manage-redistribution` não está deployada no backend. Confirmado pela ausência total de logs.
 
 ### Plano
-Editar `src/hooks/useMetaRedistribution.ts`, linhas 190-191:
+1. **Deploy da edge function** `manage-redistribution` usando a ferramenta de deploy
+2. **Testar** a função após o deploy para confirmar que está respondendo
 
-```typescript
-// DE:
-total_before: currentTotal,
-total_after: calculateNewTotal(),
-
-// PARA:
-total_before: currentTotals.overall,
-total_after: validation.newTotal,
-```
-
-Uma única edição de 2 linhas resolve o erro.
+Uma única ação resolve o problema — não há erro no código, apenas falta o deploy.
 
