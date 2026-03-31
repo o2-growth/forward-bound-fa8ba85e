@@ -610,6 +610,52 @@ Deno.serve(async (req) => {
         })),
       };
       console.log(`RR SDR diagnosis: ${allRR.length} total RR, ${rrBySdr.length} by SDR, ${deduped2.length} deduped, ${dupesRemoved} dupes removed`);
+    } else if (action === 'update_field') {
+      const { cardId, field, value } = body;
+
+      // Only allow specific safe fields
+      const allowedFields = ['SDR responsável', 'Closer responsável'];
+      if (!allowedFields.includes(field)) {
+        await client.end();
+        return new Response(
+          JSON.stringify({ error: `Field not allowed. Allowed: ${allowedFields.join(', ')}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const invalid = await validateTable(table);
+      if (invalid) return invalid;
+
+      // Check admin role
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+
+      if (!roleData) {
+        await client.end();
+        return new Response(
+          JSON.stringify({ error: 'Admin access required' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`UPDATE ${table} SET "${field}" = '${value}' WHERE "ID" = ${cardId}`);
+
+      const updateQuery = `UPDATE ${table} SET "${field}" = $1 WHERE "ID" = $2`;
+      const updateResult = await client.query(updateQuery, [value, cardId]);
+
+      result = {
+        action: 'update_field',
+        table,
+        cardId,
+        field,
+        value,
+        rowsAffected: updateResult.rowCount,
+      };
+      console.log(`Update result: ${updateResult.rowCount} rows affected`);
     } else {
       await client.end();
       return new Response(
