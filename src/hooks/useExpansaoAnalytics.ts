@@ -372,7 +372,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
 
       return result;
     };
-  }, [cards, fullHistory, cardInvestimentoMap, firstEntryByCardAndIndicator, startTime, endTime, produto]);
+  }, [cards, fullHistory, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto]);
 
   // Helper function to convert ExpansaoCard to DetailItem
   const toDetailItem = (card: ExpansaoCard): DetailItem => ({
