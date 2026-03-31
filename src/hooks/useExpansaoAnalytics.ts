@@ -269,30 +269,28 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
   const cards = data?.cards ?? [];
   const fullHistory = data?.fullHistory ?? [];
 
-  // Build a map of FIRST entry for EACH indicator per card (using full history)
-  const firstEntryByCardAndIndicator = useMemo(() => {
-    const firstEntries = new Map<string, Map<IndicatorType, ExpansaoCard>>();
+  // Build a map of FIRST entry per card+indicator+calendar_month (monthly dedup)
+  // Key: `cardId__indicator__YYYY-MM` → earliest ExpansaoCard in that month
+  const monthlyFirstEntries = useMemo(() => {
+    const entries = new Map<string, ExpansaoCard>();
     const historyToUse = fullHistory.length > 0 ? fullHistory : cards;
     
     for (const card of historyToUse) {
       const indicator = PHASE_TO_INDICATOR[card.fase];
       if (!indicator) continue;
       
-      if (!firstEntries.has(card.id)) {
-        firstEntries.set(card.id, new Map());
-      }
+      const monthKey = `${card.dataEntrada.getFullYear()}-${String(card.dataEntrada.getMonth() + 1).padStart(2, '0')}`;
+      const dedupKey = `${card.id}__${indicator}__${monthKey}`;
       
-      const cardMap = firstEntries.get(card.id)!;
-      const existing = cardMap.get(indicator);
-      
-      // Keep the EARLIEST entry for this indicator
+      const existing = entries.get(dedupKey);
+      // Keep the EARLIEST entry for this card+indicator within this calendar month
       if (!existing || card.dataEntrada < existing.dataEntrada) {
-        cardMap.set(indicator, card);
+        entries.set(dedupKey, card);
       }
     }
     
-    console.log(`[${produto} Analytics] Built first entry map for ${firstEntries.size} cards`);
-    return firstEntries;
+    console.log(`[${produto} Analytics] Built monthly dedup map with ${entries.size} entries`);
+    return entries;
   }, [cards, fullHistory, produto]);
 
   // Get cards for a specific indicator (EVERY ENTRY logic)
@@ -354,22 +352,27 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
           }
         }
       } else {
-        // rm, rr, proposta, venda: contar apenas FIRST ENTRY no periodo
-        // Alinha com o Pipefy "First time enter: current month"
-        for (const [cardId, indicatorMap] of firstEntryByCardAndIndicator) {
-          const firstEntry = indicatorMap.get(indicator);
-          if (!firstEntry) continue;
+        // rm, rr, proposta, venda: monthly dedup — first entry per card+indicator+month
+        const seenCardIds = new Set<string>();
+        for (const [dedupKey, entry] of monthlyFirstEntries) {
+          const parts = dedupKey.split('__');
+          const entryIndicator = parts[1] as IndicatorType;
+          if (entryIndicator !== indicator) continue;
 
-          const entryTime = firstEntry.dataEntrada.getTime();
+          const entryTime = entry.dataEntrada.getTime();
           if (entryTime >= startTime && entryTime <= endTime) {
-            result.push(firstEntry);
+            const cardId = parts[0];
+            if (!seenCardIds.has(cardId)) {
+              seenCardIds.add(cardId);
+              result.push(entry);
+            }
           }
         }
       }
 
       return result;
     };
-  }, [cards, fullHistory, cardInvestimentoMap, firstEntryByCardAndIndicator, startTime, endTime, produto]);
+  }, [cards, fullHistory, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto]);
 
   // Helper function to convert ExpansaoCard to DetailItem
   const toDetailItem = (card: ExpansaoCard): DetailItem => ({
