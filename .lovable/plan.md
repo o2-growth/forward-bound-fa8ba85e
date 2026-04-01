@@ -1,21 +1,24 @@
 
 
-## Fix: Balburdia still appearing 2x after merge
+## Atualizar MRR Base de Março/2026 para R$ 667.987
 
-### Root cause
+### Alteração
 
-The previous merge uses `(campaignId || resolvedName).toLowerCase()` as key. When the CRM has both a numeric ID (e.g. `120213456789`) and a text name (e.g. `Balbúrdia Cervejeira`):
+Atualização de dados no banco — sem alteração de código.
 
-- Numeric ID resolves via API/namesMap → merge key = `120213456789::meta_ads`
-- Text name may NOT resolve (campaign archived/not in API for that period) → merge key = `balbúrdia cervejeira::meta_ads`
+| Tabela | Registro | Campo | Valor atual | Novo valor |
+|--------|----------|-------|-------------|------------|
+| `mrr_base_monthly` | Mar / 2026 | `value` | 755.000 | 667.987 |
 
-These are different keys, so both survive as separate rows with the same display name.
+### SQL
 
-### Fix
+```sql
+UPDATE mrr_base_monthly 
+SET value = 667987, updated_at = now() 
+WHERE month = 'Mar' AND year = 2026;
+```
 
-Add a **second merge pass** after the first one: collapse entries in `mergedMap` that share the same `normalizeName(campaignName)::channel`. When two entries collapse, union their Sets and prefer the one that has a `campaignId`.
+### Impacto
 
-| File | Change |
-|------|--------|
-| `src/hooks/useMarketingAttribution.ts` | After the existing mergedMap loop (line ~306), add a second pass that re-groups by `normalizeName(campaignName)::channel`, merging Sets/metrics for entries that resolved to the same display name but different keys |
+O Plan Growth recalculará automaticamente o "A Vender" de Março e os meses seguintes (cascata via churn/retenção), atualizando metas de funil reverso em todas as abas dependentes.
 
