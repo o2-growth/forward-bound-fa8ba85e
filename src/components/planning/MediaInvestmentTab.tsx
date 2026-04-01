@@ -1094,6 +1094,32 @@ export function MediaInvestmentTab() {
 
   const [configOpen, setConfigOpen] = useState(false);
   const [selectedBUTab, setSelectedBUTab] = useState("modeloAtual");
+  const [configLoadedFromDb, setConfigLoadedFromDb] = useState(false);
+
+  // Load indicators from DB when available
+  useEffect(() => {
+    if (configLoadedFromDb || isLoadingConfig) return;
+    const dbMap = getIndicatorsMap();
+    if (!dbMap) return;
+    
+    const buKeyMap: Record<string, 'modeloAtual' | 'o2Tax' | 'oxyHacker' | 'franquia'> = {
+      modelo_atual: 'modeloAtual',
+      o2_tax: 'o2Tax',
+      oxy_hacker: 'oxyHacker',
+      franquia: 'franquia',
+    };
+    
+    setIndicadoresPorBU(prev => {
+      const next = { ...prev };
+      for (const [dbKey, stateKey] of Object.entries(buKeyMap)) {
+        if (dbMap[dbKey]) {
+          next[stateKey] = dbMap[dbKey];
+        }
+      }
+      return next;
+    });
+    setConfigLoadedFromDb(true);
+  }, [isLoadingConfig, getIndicatorsMap, configLoadedFromDb]);
 
   // Pending A Vender changes: bu -> month -> newAVenderValue
   const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, number>>>({});
