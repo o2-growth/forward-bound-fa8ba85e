@@ -1,28 +1,23 @@
 
 
-## Corrigir meta de faturamento da Franquia (Mar e Jan zerados)
+## Bug: "Balburdia" aparece 2x na atribuição por canal (Meta Ads)
 
-### Diagnóstico
+### Causa raiz
 
-No banco de dados (`monetary_metas`), a Franquia tem:
-- **Jan**: faturamento = 0, pontual = 0, vendas = 0 → OK (zero vendas)
-- **Mar**: faturamento = 0, pontual = 0, **vendas = 1** → **BUG** — deveria ser R$ 140k
+No `useMarketingAttribution.ts`, o agrupamento de campanhas usa a chave **raw** do CRM: `${info.campaign}::${info.channel}` (linha 241).
 
-Março foi zerado acidentalmente na última edição (30/03 às 22:09). Como o `useConsolidatedMetas` prioriza o banco e o valor é 0, ele não faz fallback para o Plan Growth.
+Alguns cards do CRM têm o campo `campanha` preenchido com o **ID numérico** da campanha Meta (ex: `120213456789`), enquanto outros têm o **nome** da campanha (ex: `Balburdia`). Isso gera duas entradas separadas no `campaignMap`:
+
+- `120213456789::meta_ads` → resolve para nome "Balburdia" via API
+- `Balburdia::meta_ads` → já tem o nome "Balburdia" diretamente
+
+Ambas aparecem na tabela com o mesmo nome "Balburdia", mas com leads/métricas divididas entre elas.
 
 ### Correção
 
-Atualizar o registro de Março no banco:
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useMarketingAttribution.ts` | Após construir o `campaignMap` e resolver nomes via API, **mergear entradas** que resolvem para o mesmo `campaignId` ou mesmo `campaignName` + `channel` |
 
-```sql
-UPDATE monetary_metas 
-SET faturamento = 140000, pontual = 140000 
-WHERE bu = 'franquia' AND month = 'Mar' AND year = 2026;
-```
-
-Isso é uma correção de dados, sem alteração de código.
-
-### Resultado esperado
-
-O indicador Fat Incremento da Franquia em Março passará a mostrar R$ 140.000 (1 venda × R$ 140k).
+**Abordagem**: Adicionar um passo de merge no loop de construção dos `funnels` (linhas 260-288). Ao invés de emitir diretamente um funnel por entrada do `campaignMap`, agrupar por `(resolvedCampaignId || resolvedCampaignName)::resolvedChannel`. Quando duas entradas colapsam na mesma chave, unir os Sets de leads/mqls/etc. e somar receita/tcv/investimento.
 
