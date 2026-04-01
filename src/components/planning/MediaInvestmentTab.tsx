@@ -928,6 +928,9 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
 }
 
 export function MediaInvestmentTab() {
+  // Fetch BU indicators config from database
+  const { getIndicatorsMap, isLoading: isLoadingConfig, saveIndicators, isSaving } = useBUIndicatorsConfig();
+
   // Fetch monetary metas from database
   const { metas, isLoading: isLoadingMetas, bulkUpdateMetas, getMeta } = useMonetaryMetas();
   
