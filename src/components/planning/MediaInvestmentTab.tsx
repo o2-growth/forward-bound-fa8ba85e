@@ -1938,7 +1938,33 @@ export function MediaInvestmentTab() {
                   </TabsContent>
                 </Tabs>
               </div>
-            </CardContent>
+
+              {/* Botão Salvar Configurações */}
+              {isAdmin && (
+                <div className="border-t pt-6 flex justify-end">
+                  <Button
+                    onClick={async () => {
+                      const buKeyMap: { stateKey: 'modeloAtual' | 'o2Tax' | 'oxyHacker' | 'franquia'; dbKey: string }[] = [
+                        { stateKey: 'modeloAtual', dbKey: 'modelo_atual' },
+                        { stateKey: 'o2Tax', dbKey: 'o2_tax' },
+                        { stateKey: 'oxyHacker', dbKey: 'oxy_hacker' },
+                        { stateKey: 'franquia', dbKey: 'franquia' },
+                      ];
+                      await saveIndicators(
+                        buKeyMap.map(({ stateKey, dbKey }) => ({
+                          bu: dbKey,
+                          indicators: indicadoresPorBU[stateKey],
+                        }))
+                      );
+                    }}
+                    disabled={isSaving}
+                    className="gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+                  </Button>
+                </div>
+              )}
           </CollapsibleContent>
         </Card>
       </Collapsible>
