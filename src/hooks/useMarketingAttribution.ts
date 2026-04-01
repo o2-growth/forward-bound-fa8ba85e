@@ -257,7 +257,14 @@ export function useMarketingAttribution(
       }
     }
     
-    const funnels: CampaignFunnel[] = [];
+    // Merge entries that resolve to the same campaign identity
+    const mergedMap = new Map<string, {
+      campaignName: string; campaignId?: string; channel: ChannelId;
+      leads: Set<string>; mqls: Set<string>; rms: Set<string>;
+      rrs: Set<string>; propostas: Set<string>; vendas: Set<string>;
+      receita: number; tcv: number; investimento: number;
+    }>();
+
     for (const [compositeKey, data] of campaignMap) {
       const name = compositeKey.split('::')[0];
       const { apiCampaign, campaignId } = resolveApiCampaign(name);
@@ -269,18 +276,44 @@ export function useMarketingAttribution(
         else if (apiChannel.includes('google')) resolvedChannel = 'google_ads';
       }
       
+      const resolvedName = apiCampaign?.name || name;
+      const mergeKey = `${(campaignId || resolvedName).toLowerCase()}::${resolvedChannel}`;
       const investimento = resolvedChannel === 'organico' ? 0 : (apiCampaign?.investment || 0);
-      const receita = data.receita;
-      
+
+      if (!mergedMap.has(mergeKey)) {
+        mergedMap.set(mergeKey, {
+          campaignName: resolvedName, campaignId, channel: resolvedChannel,
+          leads: new Set(data.leads), mqls: new Set(data.mqls), rms: new Set(data.rms),
+          rrs: new Set(data.rrs), propostas: new Set(data.propostas), vendas: new Set(data.vendas),
+          receita: data.receita, tcv: data.tcv, investimento,
+        });
+      } else {
+        const existing = mergedMap.get(mergeKey)!;
+        for (const id of data.leads) existing.leads.add(id);
+        for (const id of data.mqls) existing.mqls.add(id);
+        for (const id of data.rms) existing.rms.add(id);
+        for (const id of data.rrs) existing.rrs.add(id);
+        for (const id of data.propostas) existing.propostas.add(id);
+        for (const id of data.vendas) existing.vendas.add(id);
+        existing.receita += data.receita;
+        existing.tcv += data.tcv;
+        // Keep the higher investment (avoid double-counting from the same API campaign)
+        if (investimento > existing.investimento) existing.investimento = investimento;
+        // Prefer the resolved name that came from the API
+        if (apiCampaign?.name) existing.campaignName = apiCampaign.name;
+        if (campaignId && !existing.campaignId) existing.campaignId = campaignId;
+      }
+    }
+
+    const funnels: CampaignFunnel[] = [];
+    for (const [, m] of mergedMap) {
       funnels.push({
-        campaignName: apiCampaign?.name || name,
-        campaignId,
-        channel: resolvedChannel,
-        leads: data.leads.size, mqls: data.mqls.size, rms: data.rms.size,
-        rrs: data.rrs.size, propostas: data.propostas.size, vendas: data.vendas.size,
-        receita, investimento,
-        roi: investimento > 0 ? receita / investimento : 0,
-        tcv: data.tcv,
+        campaignName: m.campaignName, campaignId: m.campaignId, channel: m.channel,
+        leads: m.leads.size, mqls: m.mqls.size, rms: m.rms.size,
+        rrs: m.rrs.size, propostas: m.propostas.size, vendas: m.vendas.size,
+        receita: m.receita, investimento: m.investimento,
+        roi: m.investimento > 0 ? m.receita / m.investimento : 0,
+        tcv: m.tcv,
       });
     }
     
