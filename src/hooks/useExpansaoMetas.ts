@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
+import { fixPossibleDateInversion } from "./dateUtils";
 
 export type ExpansaoIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -57,6 +58,15 @@ function parseDate(dateValue: string | null): Date | null {
   return isNaN(date.getTime()) ? null : date;
 }
 
+// Parse YYYY-MM-DD without timezone shift
+function parseDateOnly(dateValue: string | null): Date | null {
+  if (!dateValue) return null;
+  const match = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['expansao-metas-movements', startDate?.toISOString(), endDate?.toISOString()],
@@ -86,12 +96,22 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         // Filter only "Franquia" products for this hook
         if (produto !== 'Franquia') continue;
         
+        let dataEntrada = parseDate(row['Entrada']) || new Date();
+        
+        // For "Contrato assinado", use signature date like other hooks
+        if ((row['Fase'] || '') === 'Contrato assinado') {
+          const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
+          if (dataAssinatura) {
+            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+          }
+        }
+
         const movement: ExpansaoMovement = {
           id: String(row.ID),
           titulo: row['Título'] || '',
-          fase: row['Fase'] || '',  // This is the phase name from movement
-          faseAtual: row['Fase Atual'] || '', // Current phase of the card
-          dataEntrada: parseDate(row['Entrada']) || new Date(),
+          fase: row['Fase'] || '',
+          faseAtual: row['Fase Atual'] || '',
+          dataEntrada,
           dataSaida: parseDate(row['Saída']),
           valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
           valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
