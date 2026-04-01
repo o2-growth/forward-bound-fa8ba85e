@@ -36,7 +36,7 @@ const TAB_CONFIG: { key: TabKey; label: string; icon: React.ComponentType<{ clas
   { key: 'admin', label: 'Admin', icon: Settings },
 ];
 
-const HIDDEN_TABS: TabKey[] = ['marketing', 'structure'];
+const HIDDEN_TABS: TabKey[] = ['context', 'goals', 'financial', 'marketing', 'structure'];
 
 export default function Planning2026() {
   const { user, signOut } = useAuth();
