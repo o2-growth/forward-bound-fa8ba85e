@@ -1,23 +1,21 @@
 
 
-## Bug: "Balburdia" aparece 2x na atribuição por canal (Meta Ads)
+## Fix: Balburdia still appearing 2x after merge
 
-### Causa raiz
+### Root cause
 
-No `useMarketingAttribution.ts`, o agrupamento de campanhas usa a chave **raw** do CRM: `${info.campaign}::${info.channel}` (linha 241).
+The previous merge uses `(campaignId || resolvedName).toLowerCase()` as key. When the CRM has both a numeric ID (e.g. `120213456789`) and a text name (e.g. `Balbúrdia Cervejeira`):
 
-Alguns cards do CRM têm o campo `campanha` preenchido com o **ID numérico** da campanha Meta (ex: `120213456789`), enquanto outros têm o **nome** da campanha (ex: `Balburdia`). Isso gera duas entradas separadas no `campaignMap`:
+- Numeric ID resolves via API/namesMap → merge key = `120213456789::meta_ads`
+- Text name may NOT resolve (campaign archived/not in API for that period) → merge key = `balbúrdia cervejeira::meta_ads`
 
-- `120213456789::meta_ads` → resolve para nome "Balburdia" via API
-- `Balburdia::meta_ads` → já tem o nome "Balburdia" diretamente
+These are different keys, so both survive as separate rows with the same display name.
 
-Ambas aparecem na tabela com o mesmo nome "Balburdia", mas com leads/métricas divididas entre elas.
+### Fix
 
-### Correção
+Add a **second merge pass** after the first one: collapse entries in `mergedMap` that share the same `normalizeName(campaignName)::channel`. When two entries collapse, union their Sets and prefer the one that has a `campaignId`.
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useMarketingAttribution.ts` | Após construir o `campaignMap` e resolver nomes via API, **mergear entradas** que resolvem para o mesmo `campaignId` ou mesmo `campaignName` + `channel` |
-
-**Abordagem**: Adicionar um passo de merge no loop de construção dos `funnels` (linhas 260-288). Ao invés de emitir diretamente um funnel por entrada do `campaignMap`, agrupar por `(resolvedCampaignId || resolvedCampaignName)::resolvedChannel`. Quando duas entradas colapsam na mesma chave, unir os Sets de leads/mqls/etc. e somar receita/tcv/investimento.
+| File | Change |
+|------|--------|
+| `src/hooks/useMarketingAttribution.ts` | After the existing mergedMap loop (line ~306), add a second pass that re-groups by `normalizeName(campaignName)::channel`, merging Sets/metrics for entries that resolved to the same display name but different keys |
 
