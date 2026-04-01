@@ -24,6 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { MetaRedistributionPanel } from "./MetaRedistributionPanel";
 import { ArrowRightLeft } from "lucide-react";
+import { useBUIndicatorsConfig } from "@/hooks/useBUIndicatorsConfig";
 
 // Indicadores de 2025 (base para projeção)
 const indicators2025 = {
@@ -927,6 +928,9 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
 }
 
 export function MediaInvestmentTab() {
+  // Fetch BU indicators config from database
+  const { getIndicatorsMap, isLoading: isLoadingConfig, saveIndicators, isSaving } = useBUIndicatorsConfig();
+
   // Fetch monetary metas from database
   const { metas, isLoading: isLoadingMetas, bulkUpdateMetas, getMeta } = useMonetaryMetas();
   
@@ -1090,6 +1094,32 @@ export function MediaInvestmentTab() {
 
   const [configOpen, setConfigOpen] = useState(false);
   const [selectedBUTab, setSelectedBUTab] = useState("modeloAtual");
+  const [configLoadedFromDb, setConfigLoadedFromDb] = useState(false);
+
+  // Load indicators from DB when available
+  useEffect(() => {
+    if (configLoadedFromDb || isLoadingConfig) return;
+    const dbMap = getIndicatorsMap();
+    if (!dbMap) return;
+    
+    const buKeyMap: Record<string, 'modeloAtual' | 'o2Tax' | 'oxyHacker' | 'franquia'> = {
+      modelo_atual: 'modeloAtual',
+      o2_tax: 'o2Tax',
+      oxy_hacker: 'oxyHacker',
+      franquia: 'franquia',
+    };
+    
+    setIndicadoresPorBU(prev => {
+      const next = { ...prev };
+      for (const [dbKey, stateKey] of Object.entries(buKeyMap)) {
+        if (dbMap[dbKey]) {
+          next[stateKey] = dbMap[dbKey];
+        }
+      }
+      return next;
+    });
+    setConfigLoadedFromDb(true);
+  }, [isLoadingConfig, getIndicatorsMap, configLoadedFromDb]);
 
   // Pending A Vender changes: bu -> month -> newAVenderValue
   const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, number>>>({});
@@ -1908,6 +1938,33 @@ export function MediaInvestmentTab() {
                   </TabsContent>
                 </Tabs>
               </div>
+
+              {/* Botão Salvar Configurações */}
+              {isAdmin && (
+                <div className="border-t pt-6 flex justify-end">
+                  <Button
+                    onClick={async () => {
+                      const buKeyMap: { stateKey: 'modeloAtual' | 'o2Tax' | 'oxyHacker' | 'franquia'; dbKey: string }[] = [
+                        { stateKey: 'modeloAtual', dbKey: 'modelo_atual' },
+                        { stateKey: 'o2Tax', dbKey: 'o2_tax' },
+                        { stateKey: 'oxyHacker', dbKey: 'oxy_hacker' },
+                        { stateKey: 'franquia', dbKey: 'franquia' },
+                      ];
+                      await saveIndicators(
+                        buKeyMap.map(({ stateKey, dbKey }) => ({
+                          bu: dbKey,
+                          indicators: indicadoresPorBU[stateKey],
+                        }))
+                      );
+                    }}
+                    disabled={isSaving}
+                    className="gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </CollapsibleContent>
         </Card>

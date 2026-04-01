@@ -44,6 +44,48 @@ export type Database = {
         }
         Relationships: []
       }
+      bu_indicators_config: {
+        Row: {
+          bu: string
+          cpmql: number
+          cpv: number
+          created_at: string
+          id: string
+          mql_to_rm: number
+          prop_to_venda: number
+          rm_to_rr: number
+          rr_to_prop: number
+          ticket_medio: number
+          updated_at: string
+        }
+        Insert: {
+          bu: string
+          cpmql?: number
+          cpv?: number
+          created_at?: string
+          id?: string
+          mql_to_rm?: number
+          prop_to_venda?: number
+          rm_to_rr?: number
+          rr_to_prop?: number
+          ticket_medio?: number
+          updated_at?: string
+        }
+        Update: {
+          bu?: string
+          cpmql?: number
+          cpv?: number
+          created_at?: string
+          id?: string
+          mql_to_rm?: number
+          prop_to_venda?: number
+          rm_to_rr?: number
+          rr_to_prop?: number
+          ticket_medio?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       closer_metas: {
         Row: {
           bu: string
