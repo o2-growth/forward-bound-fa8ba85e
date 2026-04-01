@@ -1,23 +1,19 @@
 
 
-## Bug: "Balburdia" aparece 2x na atribuição por canal (Meta Ads)
+## Ajustar MRR Base de Abril/2026 para R$ 667.987
 
-### Causa raiz
+### Situação atual
 
-No `useMarketingAttribution.ts`, o agrupamento de campanhas usa a chave **raw** do CRM: `${info.campaign}::${info.channel}` (linha 241).
-
-Alguns cards do CRM têm o campo `campanha` preenchido com o **ID numérico** da campanha Meta (ex: `120213456789`), enquanto outros têm o **nome** da campanha (ex: `Balburdia`). Isso gera duas entradas separadas no `campaignMap`:
-
-- `120213456789::meta_ads` → resolve para nome "Balburdia" via API
-- `Balburdia::meta_ads` → já tem o nome "Balburdia" diretamente
-
-Ambas aparecem na tabela com o mesmo nome "Balburdia", mas com leads/métricas divididas entre elas.
+A tabela `mrr_base_monthly` tem registros para Jan, Fev e Mar de 2026. **Abril não existe ainda.** O usuário quer que o MRR base de Abril seja R$ 667.987 (mesmo valor de Março).
 
 ### Correção
 
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/hooks/useMarketingAttribution.ts` | Após construir o `campaignMap` e resolver nomes via API, **mergear entradas** que resolvem para o mesmo `campaignId` ou mesmo `campaignName` + `channel` |
+Inserir um novo registro na tabela:
 
-**Abordagem**: Adicionar um passo de merge no loop de construção dos `funnels` (linhas 260-288). Ao invés de emitir diretamente um funnel por entrada do `campaignMap`, agrupar por `(resolvedCampaignId || resolvedCampaignName)::resolvedChannel`. Quando duas entradas colapsam na mesma chave, unir os Sets de leads/mqls/etc. e somar receita/tcv/investimento.
+```sql
+INSERT INTO mrr_base_monthly (month, year, value, is_total_override)
+VALUES ('Abr', 2026, 667987, true);
+```
+
+Isso fará o Plan Growth usar R$ 667.987 como ponto de partida do MRR para Abril, afetando o cálculo de "A Vender" e funil reverso desse mês em diante.
 
