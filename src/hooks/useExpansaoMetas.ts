@@ -96,12 +96,22 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         // Filter only "Franquia" products for this hook
         if (produto !== 'Franquia') continue;
         
+        let dataEntrada = parseDate(row['Entrada']) || new Date();
+        
+        // For "Contrato assinado", use signature date like other hooks
+        if ((row['Fase'] || '') === 'Contrato assinado') {
+          const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
+          if (dataAssinatura) {
+            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+          }
+        }
+
         const movement: ExpansaoMovement = {
           id: String(row.ID),
           titulo: row['Título'] || '',
-          fase: row['Fase'] || '',  // This is the phase name from movement
-          faseAtual: row['Fase Atual'] || '', // Current phase of the card
-          dataEntrada: parseDate(row['Entrada']) || new Date(),
+          fase: row['Fase'] || '',
+          faseAtual: row['Fase Atual'] || '',
+          dataEntrada,
           dataSaida: parseDate(row['Saída']),
           valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
           valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
