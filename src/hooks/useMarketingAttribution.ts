@@ -305,32 +305,8 @@ export function useMarketingAttribution(
       }
     }
 
-    // Second merge pass: collapse entries that share the same display name + channel
-    // (handles cases where one entry has a campaignId and the other only has the name)
-    const finalMap = new Map<string, typeof mergedMap extends Map<string, infer V> ? V : never>();
-    for (const [, m] of mergedMap) {
-      const nameKey = `${normalizeName(m.campaignName)}::${m.channel}`;
-      if (!finalMap.has(nameKey)) {
-        finalMap.set(nameKey, { ...m });
-      } else {
-        const existing = finalMap.get(nameKey)!;
-        for (const id of m.leads) existing.leads.add(id);
-        for (const id of m.mqls) existing.mqls.add(id);
-        for (const id of m.rms) existing.rms.add(id);
-        for (const id of m.rrs) existing.rrs.add(id);
-        for (const id of m.propostas) existing.propostas.add(id);
-        for (const id of m.vendas) existing.vendas.add(id);
-        existing.receita += m.receita;
-        existing.tcv += m.tcv;
-        if (m.investimento > existing.investimento) existing.investimento = m.investimento;
-        if (m.campaignId && !existing.campaignId) existing.campaignId = m.campaignId;
-        // Prefer the name from the entry that has a campaignId (API-resolved)
-        if (m.campaignId) existing.campaignName = m.campaignName;
-      }
-    }
-
     const funnels: CampaignFunnel[] = [];
-    for (const [, m] of finalMap) {
+    for (const [, m] of mergedMap) {
       funnels.push({
         campaignName: m.campaignName, campaignId: m.campaignId, channel: m.channel,
         leads: m.leads.size, mqls: m.mqls.size, rms: m.rms.size,

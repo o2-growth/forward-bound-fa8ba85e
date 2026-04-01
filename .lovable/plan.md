@@ -1,24 +1,23 @@
 
 
-## Atualizar MRR Base de Março/2026 para R$ 667.987
+## Bug: "Balburdia" aparece 2x na atribuição por canal (Meta Ads)
 
-### Alteração
+### Causa raiz
 
-Atualização de dados no banco — sem alteração de código.
+No `useMarketingAttribution.ts`, o agrupamento de campanhas usa a chave **raw** do CRM: `${info.campaign}::${info.channel}` (linha 241).
 
-| Tabela | Registro | Campo | Valor atual | Novo valor |
-|--------|----------|-------|-------------|------------|
-| `mrr_base_monthly` | Mar / 2026 | `value` | 755.000 | 667.987 |
+Alguns cards do CRM têm o campo `campanha` preenchido com o **ID numérico** da campanha Meta (ex: `120213456789`), enquanto outros têm o **nome** da campanha (ex: `Balburdia`). Isso gera duas entradas separadas no `campaignMap`:
 
-### SQL
+- `120213456789::meta_ads` → resolve para nome "Balburdia" via API
+- `Balburdia::meta_ads` → já tem o nome "Balburdia" diretamente
 
-```sql
-UPDATE mrr_base_monthly 
-SET value = 667987, updated_at = now() 
-WHERE month = 'Mar' AND year = 2026;
-```
+Ambas aparecem na tabela com o mesmo nome "Balburdia", mas com leads/métricas divididas entre elas.
 
-### Impacto
+### Correção
 
-O Plan Growth recalculará automaticamente o "A Vender" de Março e os meses seguintes (cascata via churn/retenção), atualizando metas de funil reverso em todas as abas dependentes.
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/hooks/useMarketingAttribution.ts` | Após construir o `campaignMap` e resolver nomes via API, **mergear entradas** que resolvem para o mesmo `campaignId` ou mesmo `campaignName` + `channel` |
+
+**Abordagem**: Adicionar um passo de merge no loop de construção dos `funnels` (linhas 260-288). Ao invés de emitir diretamente um funnel por entrada do `campaignMap`, agrupar por `(resolvedCampaignId || resolvedCampaignName)::resolvedChannel`. Quando duas entradas colapsam na mesma chave, unir os Sets de leads/mqls/etc. e somar receita/tcv/investimento.
 
