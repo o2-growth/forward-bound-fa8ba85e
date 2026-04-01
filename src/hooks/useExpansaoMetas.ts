@@ -58,6 +58,15 @@ function parseDate(dateValue: string | null): Date | null {
   return isNaN(date.getTime()) ? null : date;
 }
 
+// Parse YYYY-MM-DD without timezone shift
+function parseDateOnly(dateValue: string | null): Date | null {
+  if (!dateValue) return null;
+  const match = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['expansao-metas-movements', startDate?.toISOString(), endDate?.toISOString()],
