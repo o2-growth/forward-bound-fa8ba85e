@@ -1,30 +1,27 @@
 
 
-## Atualizar SDR do card da Vera para Carolina Boeira
+## Bug: Fat Incremento não mostra valor com período 01/03-31/03 para Franquia
 
-### Situação atual
-A edge function `query-external-db` só possui ações de leitura (preview, search, schema, count, query_period). Não existe ação de UPDATE no banco externo.
+### Causa raiz
 
-### Plano
+O hook `useExpansaoMetas.ts` (Franquia) **não aplica a lógica de `dataAssinatura`** para vendas. Ele usa apenas `dataEntrada` (timestamp do movimento no Pipefy), que pode cair em abril dependendo do horário UTC.
 
-1. **Adicionar ação `update_field` na edge function `query-external-db`**
-   - Nova ação restrita a admins
-   - Aceita parâmetros: `table`, `cardId`, `field`, `value`
-   - Executa `UPDATE {table} SET "{field}" = $1 WHERE "ID" = $2`
-   - Validação: só permite campos seguros (`SDR responsável`, `Closer responsável`) e tabelas válidas
+Os outros hooks já estão corretos:
+- `useExpansaoAnalytics.ts` — usa `dataAssinatura` para vendas (por isso o volume gauge mostra 3 vendas)
+- `useOxyHackerMetas.ts` — usa `dataAssinatura` para vendas
 
-2. **Executar a atualização via chamada à edge function**
-   - Tabela: `pipefy_cards_movements_expansao`
-   - Card ID: `1298234933`
-   - Campo: `SDR responsável`
-   - Valor: `Carolina Boeira`
+Resultado: o gauge de volume (3 vendas) vem do analytics hook (que usa a data de assinatura em março), mas o Fat Incremento vem do metas hook (que usa `dataEntrada` raw, que cai fora do período 01/03-31/03). Quando o usuário estende para 01/04, o `dataEntrada` raw é capturado.
 
-### Risco
-O usuário do banco externo pode não ter permissão de UPDATE. Se falhar, será necessário atualizar diretamente no Pipefy ou ajustar as credenciais do banco externo.
-
-### Arquivo afetado
+### Correção
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `supabase/functions/query-external-db/index.ts` | Adicionar ação `update_field` com validação de campo e admin-only |
+| `src/hooks/useExpansaoMetas.ts` | Adicionar parsing de `Data de assinatura do contrato` e usar `fixPossibleDateInversion` para sobrescrever `dataEntrada` quando a fase é `Contrato assinado`, idêntico ao que já existe em `useOxyHackerMetas.ts` |
+
+### Detalhes técnicos
+
+1. Importar `fixPossibleDateInversion` de `./dateUtils`
+2. Adicionar função `parseDateOnly` (parse YYYY-MM-DD sem shift de timezone)
+3. No loop de parsing dos movements (linhas 83-104), para a fase `Contrato assinado`, ler `row['Data de assinatura do contrato']` e aplicar `fixPossibleDateInversion(dataAssinatura, dataEntrada)` antes de criar o objeto movement
+4. Isso alinha o `useExpansaoMetas` com os outros hooks e garante que as datas de venda sejam consistentes entre volume e valor monetário
 
