@@ -1965,6 +1965,7 @@ export function MediaInvestmentTab() {
                   </Button>
                 </div>
               )}
+            </CardContent>
           </CollapsibleContent>
         </Card>
       </Collapsible>
