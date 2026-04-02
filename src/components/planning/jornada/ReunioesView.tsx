@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -93,7 +93,7 @@ function normalizeMonth(mesRef: string): string {
 export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
   const [filterCfo, setFilterCfo] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterMonth, setFilterMonth] = useState<string>(getCurrentMonthLabel());
+  const [filterMonth, setFilterMonth] = useState<string>('');
   const [sortCol, setSortCol] = useState<'titulo' | 'cfo' | 'progress'>('progress');
   const [sortAsc, setSortAsc] = useState(true);
 
@@ -115,9 +115,21 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
     });
   }, [reunioes]);
 
+  // Auto-select last available month when data loads
+  useEffect(() => {
+    if (filterMonth === '' && availableMonths.length > 0) {
+      const currentMonth = getCurrentMonthLabel();
+      if (availableMonths.includes(currentMonth)) {
+        setFilterMonth(currentMonth);
+      } else {
+        setFilterMonth(availableMonths[availableMonths.length - 1]);
+      }
+    }
+  }, [availableMonths, filterMonth]);
+
   // Filter reunioes by selected month
   const monthFiltered = useMemo(() => {
-    if (filterMonth === 'all') return reunioes;
+    if (filterMonth === '' || filterMonth === 'all') return reunioes;
     return reunioes.filter(r => normalizeMonth(r.mesReferencia) === filterMonth);
   }, [reunioes, filterMonth]);
 
@@ -130,7 +142,7 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
       const progress = done;
       return { ...r, statuses, done, late, progress };
     });
-  }, [reunioes, now]);
+  }, [monthFiltered, now]);
 
   const filtered = useMemo(() => {
     let list = enriched;
@@ -258,8 +270,8 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
             <SelectItem value="sem_reuniao">Sem Reunião</SelectItem>
           </SelectContent>
         </Select>
-        {(filterCfo !== 'all' || filterStatus !== 'all' || filterMonth !== getCurrentMonthLabel()) && (
-          <Button variant="ghost" size="sm" onClick={() => { setFilterCfo('all'); setFilterStatus('all'); setFilterMonth(getCurrentMonthLabel()); }}>
+        {(filterCfo !== 'all' || filterStatus !== 'all' || filterMonth === 'all') && (
+          <Button variant="ghost" size="sm" onClick={() => { setFilterCfo('all'); setFilterStatus('all'); setFilterMonth(availableMonths.includes(getCurrentMonthLabel()) ? getCurrentMonthLabel() : availableMonths[availableMonths.length - 1] || ''); }}>
             Limpar filtros
           </Button>
         )}
