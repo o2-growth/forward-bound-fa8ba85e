@@ -270,8 +270,8 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
             <SelectItem value="sem_reuniao">Sem Reunião</SelectItem>
           </SelectContent>
         </Select>
-        {(filterCfo !== 'all' || filterStatus !== 'all' || filterMonth !== getCurrentMonthLabel()) && (
-          <Button variant="ghost" size="sm" onClick={() => { setFilterCfo('all'); setFilterStatus('all'); setFilterMonth(getCurrentMonthLabel()); }}>
+        {(filterCfo !== 'all' || filterStatus !== 'all' || filterMonth === 'all') && (
+          <Button variant="ghost" size="sm" onClick={() => { setFilterCfo('all'); setFilterStatus('all'); setFilterMonth(availableMonths.includes(getCurrentMonthLabel()) ? getCurrentMonthLabel() : availableMonths[availableMonths.length - 1] || ''); }}>
             Limpar filtros
           </Button>
         )}
