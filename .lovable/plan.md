@@ -1,65 +1,30 @@
 
 
-## Persistir Configurações do Plan Growth (Ticket Médio, CPMQL, CPV, Taxas)
+## Bug: Reuniões zeradas na aba Jornada
 
-### Problema
+### Causa raiz
 
-Os indicadores por BU (ticket médio, CPMQL, CPV, taxas de conversão) são armazenados apenas em `useState` com valores hardcoded. Qualquer alteração é perdida ao recarregar a página.
+Dois problemas combinados:
 
-### Solução
+1. **Filtro padrão = mês atual (Abril/2026)**: O componente `ReunioesView` inicia com o filtro de mês definido como `Abr/2026` (mês atual). Se ainda não existem rotinas de reuniões cadastradas para Abril no banco externo (Pipefy), a lista fica vazia e todos os KPIs mostram zero.
 
-Criar uma tabela no banco para persistir esses indicadores e adicionar lógica de load/save no componente.
+2. **Dependência errada no `useMemo`**: O memo `enriched` (linha 133) declara `[reunioes, now]` como dependências, mas usa `monthFiltered` internamente. Isso pode causar inconsistências quando o filtro de mês muda.
 
-### Etapas
+### Correção
 
-**1. Criar tabela `bu_indicators_config`**
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/planning/jornada/ReunioesView.tsx` | 1. Corrigir dependência do `useMemo` de `enriched`: trocar `[reunioes, now]` para `[monthFiltered, now]` |
+| `src/components/planning/jornada/ReunioesView.tsx` | 2. Alterar o estado inicial de `filterMonth`: ao invés de sempre usar o mês atual, usar o último mês disponível nos dados (fallback para mês atual se não houver dados). Isso garante que ao abrir a aba, o usuário veja o mês mais recente com dados |
 
-```sql
-CREATE TABLE bu_indicators_config (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  bu text NOT NULL,
-  ticket_medio numeric NOT NULL DEFAULT 0,
-  cpmql numeric NOT NULL DEFAULT 0,
-  cpv numeric NOT NULL DEFAULT 0,
-  mql_to_rm numeric NOT NULL DEFAULT 0,
-  rm_to_rr numeric NOT NULL DEFAULT 0,
-  rr_to_prop numeric NOT NULL DEFAULT 0,
-  prop_to_venda numeric NOT NULL DEFAULT 0,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(bu)
-);
+### Implementação
 
-ALTER TABLE bu_indicators_config ENABLE ROW LEVEL SECURITY;
+No `ReunioesView`:
+- Calcular `availableMonths` antes do estado (ou usar `useEffect` para ajustar)
+- Inicializar `filterMonth` com `''` (placeholder) e usar `useEffect` para setar o último mês disponível quando os dados carregarem
+- Corrigir a linha 133: `}, [monthFiltered, now]);`
 
-CREATE POLICY "Authenticated can read" ON bu_indicators_config FOR SELECT TO authenticated USING (auth.uid() IS NOT NULL);
-CREATE POLICY "Admins can insert" ON bu_indicators_config FOR INSERT TO authenticated WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
-CREATE POLICY "Admins can update" ON bu_indicators_config FOR UPDATE TO authenticated USING (has_role(auth.uid(), 'admin'::app_role));
-CREATE POLICY "Admins can delete" ON bu_indicators_config FOR DELETE TO authenticated USING (has_role(auth.uid(), 'admin'::app_role));
+### Resultado esperado
 
--- Seed com valores default atuais
-INSERT INTO bu_indicators_config (bu, ticket_medio, cpmql, cpv, mql_to_rm, rm_to_rr, rr_to_prop, prop_to_venda) VALUES
-  ('modelo_atual', 17000, 472.72, 6517.05, 0.49, 0.72, 0.88, 0.24),
-  ('o2_tax', 15000, 600, 2500, 0.45, 0.65, 0.80, 0.20),
-  ('oxy_hacker', 54000, 800, 5000, 0.40, 0.60, 0.75, 0.15),
-  ('franquia', 140000, 1200, 12000, 0.35, 0.55, 0.70, 0.12);
-```
-
-**2. Criar hook `useBUIndicatorsConfig`**
-
-Novo arquivo `src/hooks/useBUIndicatorsConfig.ts`:
-- Fetch dos 4 registros da tabela ao montar
-- Função `saveIndicators(bu, indicators)` que faz upsert
-- Retorna `{ data, isLoading, saveIndicators }`
-
-**3. Modificar `MediaInvestmentTab.tsx`**
-
-- Importar e usar `useBUIndicatorsConfig`
-- Inicializar `indicadoresPorBU` com dados do banco (fallback para hardcoded)
-- Adicionar botão "Salvar Configurações" dentro do collapsible de configurações
-- No clique, chamar `saveIndicators` para cada BU alterada e exibir toast de confirmação
-
-### Resultado
-
-As configurações serão persistidas no banco. Ao alterar ticket médio, taxas, etc., o usuário clica em "Salvar" e os valores ficam disponíveis entre sessões.
+Ao abrir a aba Reuniões, o filtro selecionará automaticamente o último mês com dados (provavelmente Março/2026), mostrando as reuniões cadastradas.
 
