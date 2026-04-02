@@ -115,9 +115,21 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
     });
   }, [reunioes]);
 
+  // Auto-select last available month when data loads
+  useEffect(() => {
+    if (filterMonth === '' && availableMonths.length > 0) {
+      const currentMonth = getCurrentMonthLabel();
+      if (availableMonths.includes(currentMonth)) {
+        setFilterMonth(currentMonth);
+      } else {
+        setFilterMonth(availableMonths[availableMonths.length - 1]);
+      }
+    }
+  }, [availableMonths, filterMonth]);
+
   // Filter reunioes by selected month
   const monthFiltered = useMemo(() => {
-    if (filterMonth === 'all') return reunioes;
+    if (filterMonth === '' || filterMonth === 'all') return reunioes;
     return reunioes.filter(r => normalizeMonth(r.mesReferencia) === filterMonth);
   }, [reunioes, filterMonth]);
 
