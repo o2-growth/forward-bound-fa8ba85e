@@ -93,7 +93,7 @@ function normalizeMonth(mesRef: string): string {
 export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
   const [filterCfo, setFilterCfo] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterMonth, setFilterMonth] = useState<string>(getCurrentMonthLabel());
+  const [filterMonth, setFilterMonth] = useState<string>('');
   const [sortCol, setSortCol] = useState<'titulo' | 'cfo' | 'progress'>('progress');
   const [sortAsc, setSortAsc] = useState(true);
 
