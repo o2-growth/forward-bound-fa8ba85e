@@ -142,7 +142,7 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
       const progress = done;
       return { ...r, statuses, done, late, progress };
     });
-  }, [reunioes, now]);
+  }, [monthFiltered, now]);
 
   const filtered = useMemo(() => {
     let list = enriched;
