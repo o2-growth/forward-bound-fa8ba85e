@@ -1,28 +1,15 @@
 
 
-## Fix: Tela branca causada por erros de compilação
+## Fix: Tela branca — redeclaração de `funnelData`
 
-### Causa raiz
-
-Há uma variável `funnelData` declarada **duas vezes** no `IndicatorsTab.tsx`:
-
-1. **Linha 412**: `const { data: funnelData, ... } = useFunnelRealized(...)` → tipo `FunnelRealizedRecord[]`
-2. **Linha 434**: `const { funnelData, ... } = useMediaMetas()` → tipo `FunnelDataByBU`
-
-Isso causa erro de redeclaração (`TS2451`) e todos os acessos como `funnelData.modeloAtual` falham porque o TypeScript resolve o tipo errado.
-
-Há também um erro no edge function `query-external-db` com `npm:pg@8.13.1`, mas esse não afeta o build do frontend.
+O último diff reverteu o fix anterior, trazendo de volta a duplicação da variável `funnelData` (linha 412 e linha 434).
 
 ### Correção
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/planning/IndicatorsTab.tsx` | Renomear `data: funnelData` na linha 412 para `data: funnelRawData` (ou `rawFunnelData`). Atualizar a referência no `lastUpdated` useMemo (linhas 415-420) para usar `funnelRawData` |
+| `src/components/planning/IndicatorsTab.tsx` | Linha 412: renomear `data: funnelData` → `data: funnelRawData` |
+| `src/components/planning/IndicatorsTab.tsx` | Linhas 415-421: trocar todas as referências de `funnelData` para `funnelRawData` dentro do `lastUpdated` useMemo |
 
-Apenas 2 linhas precisam mudar:
-- Linha 412: `{ data: funnelRawData, getTotal, ...}`  
-- Linha 415: `if (!funnelRawData || funnelRawData.length === 0) return null;`
-- Linhas 416-419: usar `funnelRawData` no reduce
-
-O `funnelData` da linha 434 (MediaMetasContext) permanece intacto — é o que todo o resto do componente usa corretamente.
+A linha 434 (`const { funnelData, metasPorBU } = useMediaMetas()`) permanece intacta — é a variável usada no resto do componente para acessar `.modeloAtual`, `.o2Tax`, etc.
 
