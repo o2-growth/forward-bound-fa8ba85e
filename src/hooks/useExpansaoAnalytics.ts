@@ -38,21 +38,10 @@ export interface ExpansaoCard {
   investimentoDisponivel?: string;
 }
 
-// Faixas de investimento que qualificam como MQL por produto
-const FRANQUIA_MQL_TIERS = [
-  'Menos de 140 mil reais', 'Menos de 250 mil reais', 'Menos de 360 mil reais',
-  'Menos de 400 mil reais', 'Menos de 500 mil reais', 'Mais de 500 mil reais',
-];
-const OXY_HACKER_MQL_TIERS = [
-  'Menos de  54 mil reais', 'Menos de 100 mil reais', 'Menos de 140 mil reais',
-  'Menos de 250 mil reais', 'Menos de 360 mil reais', 'Menos de 400 mil reais',
-  'Menos de 500 mil reais', 'Mais de 500 mil reais',
-];
-
-function isExpansaoMqlQualified(investimento: string | undefined, produto: string): boolean {
-  if (!investimento) return false;
-  const tiers = produto === 'Franquia' ? FRANQUIA_MQL_TIERS : OXY_HACKER_MQL_TIERS;
-  return tiers.includes(investimento);
+// MQL Expansão (Franquia e Oxy Hacker): investimento disponível >= R$ 15k
+// Todas as faixas do Pipefy já são >= 15k, então qualquer investimento preenchido qualifica
+function isExpansaoMqlQualified(investimento: string | undefined, _produto: string): boolean {
+  return !!investimento && investimento.trim().length > 0;
 }
 
 // Map Pipefy phase names to indicator keys
