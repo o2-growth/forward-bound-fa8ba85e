@@ -409,16 +409,16 @@ export function IndicatorsTab() {
     syncWithPipefy(startDate.getFullYear());
   };
 
-  const { data: funnelData, getTotal, syncWithPipefy, isSyncing, isLoading } = useFunnelRealized(startDate, endDate);
+  const { data: funnelRawData, getTotal, syncWithPipefy, isSyncing, isLoading } = useFunnelRealized(startDate, endDate);
 
   const lastUpdated = useMemo(() => {
-    if (!funnelData || funnelData.length === 0) return null;
-    const maxDate = funnelData.reduce((max, r) => {
+    if (!funnelRawData || funnelRawData.length === 0) return null;
+    const maxDate = funnelRawData.reduce((max, r) => {
       const d = r.updated_at;
       return d > max ? d : max;
-    }, funnelData[0].updated_at);
+    }, funnelRawData[0].updated_at);
     return new Date(maxDate);
-  }, [funnelData]);
+  }, [funnelRawData]);
   const { getQtyForPeriod: getModeloAtualQty, getValueForPeriod: getModeloAtualValue, getMrrForPeriod, getSetupForPeriod, getPontualForPeriod, getGroupedData: getModeloAtualGroupedData, isLoading: isLoadingModeloAtual } = useModeloAtualMetas(startDate, endDate);
   const { getQtyForPeriod: getExpansaoQty, getValueForPeriod: getExpansaoValue, getGroupedData: getExpansaoGroupedData, isLoading: isLoadingExpansao, refetch: refetchExpansao } = useExpansaoMetas(startDate, endDate);
   const { getQtyForPeriod: getO2TaxQty, getValueForPeriod: getO2TaxValue, getMrrForPeriod: getO2TaxMrr, getSetupForPeriod: getO2TaxSetup, getPontualForPeriod: getO2TaxPontual, getGroupedData: getO2TaxGroupedData, isLoading: isLoadingO2Tax } = useO2TaxMetas(startDate, endDate);
