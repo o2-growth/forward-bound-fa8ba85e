@@ -1,45 +1,26 @@
 
-Objetivo: destravar o build corrigindo os 2 erros reais que estão impedindo o preview de subir.
 
-1. Corrigir a redeclaração em `src/components/planning/IndicatorsTab.tsx`
-- No hook `useFunnelRealized(...)`, renomear o destructuring de:
-  - `data: funnelData`
-  para:
-  - `data: funnelRawData`
-- Atualizar o `useMemo` de `lastUpdated` para usar `funnelRawData`.
-- Manter intacto o `const { funnelData, metasPorBU } = useMediaMetas();` porque esse é o objeto usado no restante do componente (`modeloAtual`, `o2Tax`, `oxyHacker`, `franquia`).
+## Ajuste MQL Expansão: investimento disponível ≥ R$ 15k (separado por BU)
 
-2. Garantir que o restante do componente continue apontando para o `funnelData` correto
-- Não trocar os acessos da faixa ~718+ (`funnelData.modeloAtual`, `funnelData.o2Tax`, etc.).
-- Esses acessos devem continuar usando apenas o `funnelData` vindo de `useMediaMetas()`.
-- Isso elimina os erros de tipo como:
-  - `Property 'modeloAtual' does not exist on type 'FunnelRealizedRecord[]'`
+O critério MQL para **ambas** as BUs de Expansão (Franquia e Oxy Hacker) passa a ser: lead com campo "Investimento disponível" preenchido e ≥ R$ 15k. Como todas as faixas existentes no Pipefy ("Menos de 54 mil reais" em diante) representam valores acima de R$ 15k, **qualquer faixa preenchida já qualifica**. A lógica continua separada por BU (cada hook trata seu produto).
 
-3. Corrigir o erro de CSS que também quebra o build
-- Em `src/index.css`, mover o `@import url(...)` para o topo absoluto do arquivo.
-- A ordem deve ficar:
-```text
-@import ...
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+### Alterações
+
+| Arquivo | O que muda |
+|---------|-----------|
+| `src/hooks/useOxyHackerMetas.ts` | Atualizar comentário para "≥ R$ 15k". Simplificar `isOxyHackerMqlQualified`: retorna `true` se investimento preenchido (qualquer faixa ≥ 15k). |
+| `src/hooks/useExpansaoMetas.ts` | Atualizar comentário Franquia para "≥ R$ 15k" (era ≥ 140k). Simplificar `isFranquiaMqlQualified`: retorna `true` se investimento preenchido. |
+| `src/hooks/useExpansaoAnalytics.ts` | Unificar threshold nos comentários para "≥ R$ 15k". Simplificar `isExpansaoMqlQualified`: `return !!investimento` (ambos os produtos usam o mesmo critério agora). Manter a separação por `produto` no filtro de dados. |
+
+### Lógica resultante (nos 3 arquivos)
+
+```typescript
+// MQL Expansão: investimento disponível >= R$ 15k
+// Todas as faixas do Pipefy já são >= 15k, então qualquer investimento preenchido qualifica
+function isMqlQualified(investimento: string | null): boolean {
+  return !!investimento && investimento.trim().length > 0;
+}
 ```
-- O Vite está falhando porque `@import` não pode vir depois dos `@tailwind`.
 
-4. Resultado esperado
-- O erro `Cannot redeclare block-scoped variable 'funnelData'` desaparece.
-- Os erros de `funnelData.modeloAtual/o2Tax/...` desaparecem.
-- O erro de CSS do `@import must precede all other statements` desaparece.
-- O preview volta a compilar e a tela branca some.
+A separação por BU continua existindo nos hooks — cada um filtra por `produto === 'Franquia'` ou `produto === 'Oxy Hacker'` respectivamente. Apenas o critério de qualificação MQL (faixa de investimento) é unificado.
 
-Detalhes técnicos
-- Causa principal do TS:
-  - `useFunnelRealized` retorna `FunnelRealizedRecord[]`
-  - `useMediaMetas` retorna `FunnelDataByBU`
-  - ambas estavam usando o mesmo nome local `funnelData`
-- Causa do CSS:
-  - o parser do Vite/PostCSS exige `@import` antes de qualquer outra regra não permitida
-
-Arquivos a ajustar
-- `src/components/planning/IndicatorsTab.tsx`
-- `src/index.css`
