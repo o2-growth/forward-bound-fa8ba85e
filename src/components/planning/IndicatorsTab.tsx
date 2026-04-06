@@ -82,17 +82,17 @@ const buOptions: MultiSelectOption[] = [
 
 // SDR mapping by BU
 const BU_SDRS: Record<BuType, string[]> = {
-  modelo_atual: ['Amanda', 'Carol'],
+  modelo_atual: ['Carlos', 'Erica', 'Amanda'],
   o2_tax: ['Carlos'],
-  oxy_hacker: ['Amanda', 'Carol'],
-  franquia: ['Amanda', 'Carol'],
+  oxy_hacker: ['Carlos'],
+  franquia: ['Carlos'],
 };
 
 // SDR options for MultiSelect
 const sdrOptions: MultiSelectOption[] = [
-  { value: 'Amanda', label: 'Amanda' },
-  { value: 'Carol', label: 'Carol' },
   { value: 'Carlos', label: 'Carlos' },
+  { value: 'Erica', label: 'Erica' },
+  { value: 'Amanda', label: 'Amanda' },
 ];
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -409,16 +409,16 @@ export function IndicatorsTab() {
     syncWithPipefy(startDate.getFullYear());
   };
 
-  const { data: funnelRawData, getTotal, syncWithPipefy, isSyncing, isLoading } = useFunnelRealized(startDate, endDate);
+  const { data: funnelData, getTotal, syncWithPipefy, isSyncing, isLoading } = useFunnelRealized(startDate, endDate);
 
   const lastUpdated = useMemo(() => {
-    if (!funnelRawData || funnelRawData.length === 0) return null;
-    const maxDate = funnelRawData.reduce((max, r) => {
+    if (!funnelData || funnelData.length === 0) return null;
+    const maxDate = funnelData.reduce((max, r) => {
       const d = r.updated_at;
       return d > max ? d : max;
-    }, funnelRawData[0].updated_at);
+    }, funnelData[0].updated_at);
     return new Date(maxDate);
-  }, [funnelRawData]);
+  }, [funnelData]);
   const { getQtyForPeriod: getModeloAtualQty, getValueForPeriod: getModeloAtualValue, getMrrForPeriod, getSetupForPeriod, getPontualForPeriod, getGroupedData: getModeloAtualGroupedData, isLoading: isLoadingModeloAtual } = useModeloAtualMetas(startDate, endDate);
   const { getQtyForPeriod: getExpansaoQty, getValueForPeriod: getExpansaoValue, getGroupedData: getExpansaoGroupedData, isLoading: isLoadingExpansao, refetch: refetchExpansao } = useExpansaoMetas(startDate, endDate);
   const { getQtyForPeriod: getO2TaxQty, getValueForPeriod: getO2TaxValue, getMrrForPeriod: getO2TaxMrr, getSetupForPeriod: getO2TaxSetup, getPontualForPeriod: getO2TaxPontual, getGroupedData: getO2TaxGroupedData, isLoading: isLoadingO2Tax } = useO2TaxMetas(startDate, endDate);
