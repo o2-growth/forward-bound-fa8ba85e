@@ -21,19 +21,10 @@ interface ExpansaoMovement {
   produto: string;
 }
 
-// Faixas de investimento que qualificam como MQL para Franquia (>= R$ 140k)
-const FRANQUIA_MQL_QUALIFYING_TIERS = [
-  'Menos de 140 mil reais',
-  'Menos de 250 mil reais',
-  'Menos de 360 mil reais',
-  'Menos de 400 mil reais',
-  'Menos de 500 mil reais',
-  'Mais de 500 mil reais',
-];
-
+// MQL Expansão Franquia: investimento disponível >= R$ 15k
+// Todas as faixas do Pipefy já são >= 15k, então qualquer investimento preenchido qualifica
 function isFranquiaMqlQualified(investimento: string | null): boolean {
-  if (!investimento) return false;
-  return FRANQUIA_MQL_QUALIFYING_TIERS.includes(investimento);
+  return !!investimento && investimento.trim().length > 0;
 }
 
 interface ExpansaoMetasResult {
