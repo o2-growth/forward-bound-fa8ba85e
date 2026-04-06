@@ -1,30 +1,28 @@
 
 
-## Bug: Reuniões zeradas na aba Jornada
+## Fix: Tela branca causada por erros de compilação
 
 ### Causa raiz
 
-Dois problemas combinados:
+Há uma variável `funnelData` declarada **duas vezes** no `IndicatorsTab.tsx`:
 
-1. **Filtro padrão = mês atual (Abril/2026)**: O componente `ReunioesView` inicia com o filtro de mês definido como `Abr/2026` (mês atual). Se ainda não existem rotinas de reuniões cadastradas para Abril no banco externo (Pipefy), a lista fica vazia e todos os KPIs mostram zero.
+1. **Linha 412**: `const { data: funnelData, ... } = useFunnelRealized(...)` → tipo `FunnelRealizedRecord[]`
+2. **Linha 434**: `const { funnelData, ... } = useMediaMetas()` → tipo `FunnelDataByBU`
 
-2. **Dependência errada no `useMemo`**: O memo `enriched` (linha 133) declara `[reunioes, now]` como dependências, mas usa `monthFiltered` internamente. Isso pode causar inconsistências quando o filtro de mês muda.
+Isso causa erro de redeclaração (`TS2451`) e todos os acessos como `funnelData.modeloAtual` falham porque o TypeScript resolve o tipo errado.
+
+Há também um erro no edge function `query-external-db` com `npm:pg@8.13.1`, mas esse não afeta o build do frontend.
 
 ### Correção
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `src/components/planning/jornada/ReunioesView.tsx` | 1. Corrigir dependência do `useMemo` de `enriched`: trocar `[reunioes, now]` para `[monthFiltered, now]` |
-| `src/components/planning/jornada/ReunioesView.tsx` | 2. Alterar o estado inicial de `filterMonth`: ao invés de sempre usar o mês atual, usar o último mês disponível nos dados (fallback para mês atual se não houver dados). Isso garante que ao abrir a aba, o usuário veja o mês mais recente com dados |
+| `src/components/planning/IndicatorsTab.tsx` | Renomear `data: funnelData` na linha 412 para `data: funnelRawData` (ou `rawFunnelData`). Atualizar a referência no `lastUpdated` useMemo (linhas 415-420) para usar `funnelRawData` |
 
-### Implementação
+Apenas 2 linhas precisam mudar:
+- Linha 412: `{ data: funnelRawData, getTotal, ...}`  
+- Linha 415: `if (!funnelRawData || funnelRawData.length === 0) return null;`
+- Linhas 416-419: usar `funnelRawData` no reduce
 
-No `ReunioesView`:
-- Calcular `availableMonths` antes do estado (ou usar `useEffect` para ajustar)
-- Inicializar `filterMonth` com `''` (placeholder) e usar `useEffect` para setar o último mês disponível quando os dados carregarem
-- Corrigir a linha 133: `}, [monthFiltered, now]);`
-
-### Resultado esperado
-
-Ao abrir a aba Reuniões, o filtro selecionará automaticamente o último mês com dados (provavelmente Março/2026), mostrando as reuniões cadastradas.
+O `funnelData` da linha 434 (MediaMetasContext) permanece intacto — é o que todo o resto do componente usa corretamente.
 
