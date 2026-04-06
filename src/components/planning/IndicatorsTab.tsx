@@ -409,7 +409,16 @@ export function IndicatorsTab() {
     syncWithPipefy(startDate.getFullYear());
   };
 
-  const { getTotal, syncWithPipefy, isSyncing, isLoading } = useFunnelRealized(startDate, endDate);
+  const { data: funnelData, getTotal, syncWithPipefy, isSyncing, isLoading } = useFunnelRealized(startDate, endDate);
+
+  const lastUpdated = useMemo(() => {
+    if (!funnelData || funnelData.length === 0) return null;
+    const maxDate = funnelData.reduce((max, r) => {
+      const d = r.updated_at;
+      return d > max ? d : max;
+    }, funnelData[0].updated_at);
+    return new Date(maxDate);
+  }, [funnelData]);
   const { getQtyForPeriod: getModeloAtualQty, getValueForPeriod: getModeloAtualValue, getMrrForPeriod, getSetupForPeriod, getPontualForPeriod, getGroupedData: getModeloAtualGroupedData, isLoading: isLoadingModeloAtual } = useModeloAtualMetas(startDate, endDate);
   const { getQtyForPeriod: getExpansaoQty, getValueForPeriod: getExpansaoValue, getGroupedData: getExpansaoGroupedData, isLoading: isLoadingExpansao, refetch: refetchExpansao } = useExpansaoMetas(startDate, endDate);
   const { getQtyForPeriod: getO2TaxQty, getValueForPeriod: getO2TaxValue, getMrrForPeriod: getO2TaxMrr, getSetupForPeriod: getO2TaxSetup, getPontualForPeriod: getO2TaxPontual, getGroupedData: getO2TaxGroupedData, isLoading: isLoadingO2Tax } = useO2TaxMetas(startDate, endDate);
@@ -2559,7 +2568,12 @@ export function IndicatorsTab() {
               onDateChange={handleDateRangeChange}
             />
 
-            <Button onClick={handleSync} disabled={isSyncing} variant="outline" className="gap-2" title="Sincronizar Pipefy">
+            {lastUpdated && (
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                Atualizado em {lastUpdated.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às {lastUpdated.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <Button onClick={handleSync} disabled={isSyncing} variant="outline" className="gap-2" title="Sincronizar dados">
               {isSyncing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -2568,7 +2582,7 @@ export function IndicatorsTab() {
               ) : (
                 <>
                   <RefreshCw className="h-4 w-4" />
-                  <span className="hidden sm:inline">Sincronizar</span>
+                  <span className="hidden sm:inline">Atualizar</span>
                 </>
               )}
             </Button>

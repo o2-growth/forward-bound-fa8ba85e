@@ -123,6 +123,42 @@ export function useFunnelRealized(startDate?: Date, endDate?: Date) {
     }), {} as Record<IndicatorType, number>);
   };
 
+  const triggerPipefySyncMutation = useMutation({
+    mutationFn: async () => {
+      const syncUrl = 'https://o2-pipefy-sync-production.up.railway.app/api/sync/trigger';
+      const apiKey = import.meta.env.VITE_PIPEFY_SYNC_API_KEY;
+
+      if (!apiKey) {
+        console.warn('VITE_PIPEFY_SYNC_API_KEY not configured, skipping Pipefy sync trigger');
+        return null;
+      }
+
+      const response = await fetch(syncUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || `Sync trigger failed: ${response.status}`);
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data) {
+        toast.success('Sincronização Pipefy disparada com sucesso!');
+      }
+    },
+    onError: (error: Error) => {
+      console.error('Pipefy sync trigger error:', error);
+      // Don't show error toast - this is a secondary sync, the primary (sheets) already ran
+    },
+  });
+
   const syncMutation = useMutation({
     mutationFn: async (year?: number) => {
       // Use sync-from-sheets (faster, 2-5s) instead of sync-pipefy-funnel (slow, 3-5min)
@@ -168,7 +204,10 @@ export function useFunnelRealized(startDate?: Date, endDate?: Date) {
     getChartGrouping,
     getChartLabels,
     getGroupedData,
-    syncWithPipefy: syncMutation.mutate,
-    isSyncing: syncMutation.isPending,
+    syncWithPipefy: (year?: number) => {
+      syncMutation.mutate(year);
+      triggerPipefySyncMutation.mutate();
+    },
+    isSyncing: syncMutation.isPending || triggerPipefySyncMutation.isPending,
   };
 }
