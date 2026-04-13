@@ -7,61 +7,64 @@ interface CountRow {
 }
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     // Parse request body
     const body = await req.json();
-    const { table, action = 'preview', limit = 100, offset = 0 } = body;
-    
+    const { table, action = "preview", limit = 100, offset = 0 } = body;
+
     // Verify user is authenticated (any authenticated user can read expansão data)
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      console.error('No authorization header provided');
-      return new Response(
-        JSON.stringify({ error: 'Authorization header required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("No authorization header provided");
+      return new Response(JSON.stringify({ error: "Authorization header required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
+    const token = authHeader.replace("Bearer ", "");
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
     if (authError || !user) {
-      console.error('Auth error:', authError);
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("Auth error:", authError);
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`User ${user.email} - Action: ${action}, Table: ${table}, Limit: ${limit}`);
 
     // Get external database credentials
-    const host = Deno.env.get('EXTERNAL_PG_HOST');
-    const port = Deno.env.get('EXTERNAL_PG_PORT');
-    const database = Deno.env.get('EXTERNAL_PG_DATABASE');
-    const dbUser = Deno.env.get('EXTERNAL_PG_USER');
-    const password = Deno.env.get('EXTERNAL_PG_PASSWORD');
+    const host = Deno.env.get("EXTERNAL_PG_HOST");
+    const port = Deno.env.get("EXTERNAL_PG_PORT");
+    const database = Deno.env.get("EXTERNAL_PG_DATABASE");
+    const dbUser = Deno.env.get("EXTERNAL_PG_USER");
+    const password = Deno.env.get("EXTERNAL_PG_PASSWORD");
 
     if (!host || !port || !database || !dbUser || !password) {
-      console.error('Missing external database credentials');
-      return new Response(
-        JSON.stringify({ error: 'External database credentials not configured' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error("Missing external database credentials");
+      return new Response(JSON.stringify({ error: "External database credentials not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     console.log(`Connecting to external database: ${host}:${port}/${database}`);
@@ -77,24 +80,38 @@ Deno.serve(async (req) => {
     });
 
     await client.connect();
-    console.log('Connected to external database successfully');
+    console.log("Connected to external database successfully");
 
     let result: Record<string, unknown>;
 
-    const validTables = ['pipefy_cards', 'pipefy_cards_expansao', 'pipefy_cards_movements', 'pipefy_cards_movements_expansao', 'pipefy_moviment_cfos', 'pipefy_central_projetos', 'pipefy_moviment_tratativas', 'pipefy_db_clientes', 'pipefy_db_pessoas', 'pipefy_moviment_nps', 'pipefy_moviment_setup', 'pipefy_moviment_rotinas', 'pipefy_card_connections'];
+    const validTables = [
+      "pipefy_cards",
+      "pipefy_cards_expansao",
+      "pipefy_cards_movements",
+      "pipefy_cards_movements_expansao",
+      "pipefy_moviment_cfos",
+      "pipefy_central_projetos",
+      "pipefy_moviment_tratativas",
+      "pipefy_db_clientes",
+      "pipefy_db_pessoas",
+      "pipefy_moviment_nps",
+      "pipefy_moviment_setup",
+      "pipefy_moviment_rotinas",
+      "pipefy_card_connections",
+    ];
 
     const validateTable = async (tbl: string) => {
       if (!validTables.includes(tbl)) {
         await client.end();
-        return new Response(
-          JSON.stringify({ error: 'Invalid table name' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: "Invalid table name" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
       return null;
     };
 
-    if (action === 'schema') {
+    if (action === "schema") {
       const schemaQuery = `
         SELECT column_name, data_type, is_nullable, column_default
         FROM information_schema.columns
@@ -103,43 +120,43 @@ Deno.serve(async (req) => {
       `;
       const schemaResult = await client.query(schemaQuery, [table]);
       result = {
-        action: 'schema',
+        action: "schema",
         table,
         columns: schemaResult.rows,
       };
       console.log(`Schema for ${table}:`, result.columns);
-    } else if (action === 'preview') {
+    } else if (action === "preview") {
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
       const dataQuery = `SELECT * FROM ${table} LIMIT $1`;
       const dataResult = await client.query(dataQuery, [limit]);
-      
+
       const countQuery = `SELECT COUNT(*) as total FROM ${table}`;
       const countResult = await client.query(countQuery);
-      
+
       result = {
-        action: 'preview',
+        action: "preview",
         table,
         totalRows: countResult.rows[0]?.total,
         previewRows: dataResult.rows.length,
         data: dataResult.rows,
       };
       console.log(`Preview for ${table}: ${result.previewRows} rows of ${result.totalRows} total`);
-    } else if (action === 'count') {
+    } else if (action === "count") {
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
       const countQuery = `SELECT COUNT(*) as total FROM ${table}`;
       const countResult = await client.query(countQuery);
-      
+
       result = {
-        action: 'count',
+        action: "count",
         table,
         totalRows: countResult.rows[0]?.total,
       };
       console.log(`Count for ${table}: ${result.totalRows}`);
-    } else if (action === 'query_period') {
+    } else if (action === "query_period") {
       const { startDate, endDate } = body;
       const invalid = await validateTable(table);
       if (invalid) return invalid;
@@ -154,16 +171,16 @@ Deno.serve(async (req) => {
         LIMIT $3 OFFSET $4
       `;
       const dataResult = await client.query(dataQuery, [startDate, endDate, limit, offset]);
-      
+
       const countQuery = `
         SELECT COUNT(*) as total FROM ${table} 
         WHERE "Entrada" >= $1::timestamp 
         AND "Entrada" <= $2::timestamp
       `;
       const countResult = await client.query(countQuery, [startDate, endDate]);
-      
+
       result = {
-        action: 'query_period',
+        action: "query_period",
         table,
         startDate,
         endDate,
@@ -172,26 +189,39 @@ Deno.serve(async (req) => {
         data: dataResult.rows,
       };
       console.log(`Period query for ${table}: ${result.previewRows} rows of ${result.totalRows} total in period`);
-    } else if (action === 'search') {
-      const { searchTerm, searchColumn = 'Título' } = body;
+    } else if (action === "search") {
+      const { searchTerm, searchColumn = "Título" } = body;
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
-      const allowedColumns = ['Título', 'ID', 'Empresa', 'Nome', 'Fase', 'Fase Atual', 'Campanha', 'Conjunto/grupo', 'Fonte', 'Origem do lead', 'SDR responsável', 'Closer responsável'];
+      const allowedColumns = [
+        "Título",
+        "ID",
+        "Empresa",
+        "Nome",
+        "Fase",
+        "Fase Atual",
+        "Campanha",
+        "Conjunto/grupo",
+        "Fonte",
+        "Origem do lead",
+        "SDR responsável",
+        "Closer responsável",
+      ];
       if (!allowedColumns.includes(searchColumn)) {
         await client.end();
-        return new Response(
-          JSON.stringify({ error: `Invalid search column. Allowed: ${allowedColumns.join(', ')}` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: `Invalid search column. Allowed: ${allowedColumns.join(", ")}` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       console.log(`Searching ${table} for term: ${searchTerm} in column: ${searchColumn}`);
 
       let searchQuery: string;
       let searchPattern: string;
-      
-      if (searchColumn === 'ID') {
+
+      if (searchColumn === "ID") {
         searchQuery = `
           SELECT * FROM ${table} 
           WHERE "ID" = $1
@@ -208,11 +238,11 @@ Deno.serve(async (req) => {
         `;
         searchPattern = `%${searchTerm}%`;
       }
-      
+
       const dataResult = await client.query(searchQuery, [searchPattern, limit]);
-      
+
       result = {
-        action: 'search',
+        action: "search",
         table,
         searchTerm,
         searchColumn,
@@ -220,7 +250,7 @@ Deno.serve(async (req) => {
         data: dataResult.rows,
       };
       console.log(`Search for "${searchTerm}" in column "${searchColumn}" of ${table}: ${result.totalRows} rows found`);
-    } else if (action === 'stats') {
+    } else if (action === "stats") {
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
@@ -233,49 +263,49 @@ Deno.serve(async (req) => {
         FROM ${table}
       `;
       const statsResult = await client.query(statsQuery);
-      
+
       result = {
-        action: 'stats',
+        action: "stats",
         table,
         stats: statsResult.rows[0],
       };
       console.log(`Stats for ${table}:`, result.stats);
-    } else if (action === 'query_card_history') {
+    } else if (action === "query_card_history") {
       const { cardIds } = body;
-      
+
       if (!Array.isArray(cardIds) || cardIds.length === 0) {
         await client.end();
-        return new Response(
-          JSON.stringify({ error: 'cardIds array required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: "cardIds array required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
-      
+
       const invalid = await validateTable(table);
       if (invalid) return invalid;
-      
+
       const limitedIds = cardIds.slice(0, 500);
-      
+
       console.log(`Querying full history for ${limitedIds.length} card IDs in ${table}`);
-      
-      const placeholders = limitedIds.map((_: string, i: number) => `$${i + 1}`).join(', ');
+
+      const placeholders = limitedIds.map((_: string, i: number) => `$${i + 1}`).join(", ");
       const dataQuery = `
         SELECT * FROM ${table} 
         WHERE "ID" IN (${placeholders})
         ORDER BY "Entrada" ASC
       `;
-      
+
       const dataResult = await client.query(dataQuery, limitedIds);
-      
+
       result = {
-        action: 'query_card_history',
+        action: "query_card_history",
         table,
         cardIds: limitedIds,
         totalRows: dataResult.rows.length,
         data: dataResult.rows,
       };
       console.log(`Card history query: ${result.totalRows} total movements for ${limitedIds.length} cards`);
-    } else if (action === 'query_period_by_signature') {
+    } else if (action === "query_period_by_signature") {
       const { startDate, endDate } = body;
       const invalid = await validateTable(table);
       if (invalid) return invalid;
@@ -290,16 +320,16 @@ Deno.serve(async (req) => {
         LIMIT $3 OFFSET $4
       `;
       const dataResult = await client.query(dataQuery, [startDate, endDate, limit, offset]);
-      
+
       const countQuery = `
         SELECT COUNT(*) as total FROM ${table} 
         WHERE "Data de assinatura do contrato" >= $1::timestamp 
         AND "Data de assinatura do contrato" <= $2::timestamp
       `;
       const countResult = await client.query(countQuery, [startDate, endDate]);
-      
+
       result = {
-        action: 'query_period_by_signature',
+        action: "query_period_by_signature",
         table,
         startDate,
         endDate,
@@ -307,8 +337,10 @@ Deno.serve(async (req) => {
         previewRows: dataResult.rows.length,
         data: dataResult.rows,
       };
-      console.log(`Signature date query for ${table}: ${result.previewRows} rows of ${result.totalRows} total in period`);
-    } else if (action === 'query_period_by_creation') {
+      console.log(
+        `Signature date query for ${table}: ${result.previewRows} rows of ${result.totalRows} total in period`,
+      );
+    } else if (action === "query_period_by_creation") {
       const { startDate, endDate } = body;
       const invalid = await validateTable(table);
       if (invalid) return invalid;
@@ -323,16 +355,16 @@ Deno.serve(async (req) => {
         LIMIT $3 OFFSET $4
       `;
       const dataResult = await client.query(dataQuery, [startDate, endDate, limit, offset]);
-      
+
       const countQuery = `
         SELECT COUNT(*) as total FROM ${table} 
         WHERE "Data Criação" >= $1::timestamp 
         AND "Data Criação" <= $2::timestamp
       `;
       const countResult = await client.query(countQuery, [startDate, endDate]);
-      
+
       result = {
-        action: 'query_period_by_creation',
+        action: "query_period_by_creation",
         table,
         startDate,
         endDate,
@@ -340,20 +372,40 @@ Deno.serve(async (req) => {
         previewRows: dataResult.rows.length,
         data: dataResult.rows,
       };
-      console.log(`Creation date query for ${table}: ${result.previewRows} rows of ${result.totalRows} total in period`);
-    } else if (action === 'mql_diagnosis') {
+      console.log(
+        `Creation date query for ${table}: ${result.previewRows} rows of ${result.totalRows} total in period`,
+      );
+    } else if (action === "mql_diagnosis") {
       const { startDate, endDate, pipefyTitles } = body;
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
-      const testIds = ['1320546949', '1320177174', '1308003007', '1320175421'];
-      const excludedLosses = ['Duplicado', 'Pessoa física, fora do ICP', 'Não é uma demanda real',
-        'Buscando parceria', 'Quer soluções para cliente', 'Não é MQL, mas entrou como MQL', 'Email/Telefone Inválido'];
-      const qualifyingFaixas = ['Entre R$ 200 mil e R$ 350 mil', 'Entre R$ 350 mil e R$ 500 mil',
-        'Entre R$ 500 mil e R$ 1 milhão', 'Entre R$ 1 milhão e R$ 5 milhões', 'Acima de R$ 5 milhões'];
+      const testIds = ["1320546949", "1320177174", "1308003007", "1320175421"];
+      const excludedLosses = [
+        "Duplicado",
+        "Pessoa física, fora do ICP",
+        "Não é uma demanda real",
+        "Buscando parceria",
+        "Quer soluções para cliente",
+        "Não é MQL, mas entrou como MQL",
+        "Email/Telefone Inválido",
+      ];
+      const qualifyingFaixas = [
+        "Entre R$ 200 mil e R$ 350 mil",
+        "Entre R$ 350 mil e R$ 500 mil",
+        "Entre R$ 500 mil e R$ 1 milhão",
+        "Entre R$ 1 milhão e R$ 5 milhões",
+        "Acima de R$ 5 milhões",
+      ];
 
       // Normalize: trim, lowercase, remove accents, collapse whitespace (same as system)
-      const normalize = (s: string) => s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
+      const normalize = (s: string) =>
+        s
+          .trim()
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/\s+/g, " ");
       const normalizedExcludedLosses = excludedLosses.map(normalize);
 
       const dataQuery = `
@@ -368,51 +420,68 @@ Deno.serve(async (req) => {
       `;
       const dataResult = await client.query(dataQuery, [startDate, endDate]);
 
-      const allCards = dataResult.rows as Array<{ID: string; titulo: string; faixas: string[] | null; motivos_perda: string[] | null; fase_atual: string}>;
-      
-      const qualified = allCards.filter(c => (c.faixas || []).some(f => qualifyingFaixas.includes(f)));
-      const testExcluded = qualified.filter(c => testIds.includes(c.ID));
+      const allCards = dataResult.rows as Array<{
+        ID: string;
+        titulo: string;
+        faixas: string[] | null;
+        motivos_perda: string[] | null;
+        fase_atual: string;
+      }>;
+
+      const qualified = allCards.filter((c) => (c.faixas || []).some((f) => qualifyingFaixas.includes(f)));
+      const testExcluded = qualified.filter((c) => testIds.includes(c.ID));
       // Use normalized comparison for loss reasons (same as system)
-      const isExcludedByLoss = (motivos: string[] | null) => (motivos || []).some(m => normalizedExcludedLosses.includes(normalize(m)));
-      const lossExcluded = qualified.filter(c => !testIds.includes(c.ID) && isExcludedByLoss(c.motivos_perda));
-      const netMqls = qualified.filter(c => !testIds.includes(c.ID) && !isExcludedByLoss(c.motivos_perda));
+      const isExcludedByLoss = (motivos: string[] | null) =>
+        (motivos || []).some((m) => normalizedExcludedLosses.includes(normalize(m)));
+      const lossExcluded = qualified.filter((c) => !testIds.includes(c.ID) && isExcludedByLoss(c.motivos_perda));
+      const netMqls = qualified.filter((c) => !testIds.includes(c.ID) && !isExcludedByLoss(c.motivos_perda));
 
       // Compare with Pipefy titles if provided - use normalized comparison
       let comparison = null;
       if (pipefyTitles && Array.isArray(pipefyTitles)) {
         const pipefySet = new Set(pipefyTitles.map((t: string) => normalize(t)));
-        const systemSet = new Set(netMqls.map(c => normalize(c.titulo || '')));
-        
-        const onlySystem = netMqls.filter(c => !pipefySet.has(normalize(c.titulo || '')));
+        const systemSet = new Set(netMqls.map((c) => normalize(c.titulo || "")));
+
+        const onlySystem = netMqls.filter((c) => !pipefySet.has(normalize(c.titulo || "")));
         const onlyPipefy = pipefyTitles.filter((t: string) => !systemSet.has(normalize(t)));
-        
+
         comparison = {
-          onlyInSystem: onlySystem.map(c => ({ id: c.ID, titulo: (c.titulo || '').trim(), faixas: c.faixas, motivos: c.motivos_perda, fase: c.fase_atual })),
+          onlyInSystem: onlySystem.map((c) => ({
+            id: c.ID,
+            titulo: (c.titulo || "").trim(),
+            faixas: c.faixas,
+            motivos: c.motivos_perda,
+            fase: c.fase_atual,
+          })),
           onlyInPipefy: onlyPipefy,
         };
       }
 
       result = {
-        action: 'mql_diagnosis',
+        action: "mql_diagnosis",
         totalUniqueCards: allCards.length,
         qualifiedCount: qualified.length,
-        testExcluded: testExcluded.map(c => ({ id: c.ID, titulo: c.titulo })),
-        lossExcluded: lossExcluded.map(c => ({ id: c.ID, titulo: c.titulo, motivos: c.motivos_perda })),
+        testExcluded: testExcluded.map((c) => ({ id: c.ID, titulo: c.titulo })),
+        lossExcluded: lossExcluded.map((c) => ({ id: c.ID, titulo: c.titulo, motivos: c.motivos_perda })),
         netMqlCount: netMqls.length,
         comparison,
       };
-      console.log(`MQL diagnosis: ${allCards.length} total, ${qualified.length} qualified, ${testExcluded.length} test, ${lossExcluded.length} loss-excluded, ${netMqls.length} net`);
-    } else if (action === 'proposta_diagnosis') {
+      console.log(
+        `MQL diagnosis: ${allCards.length} total, ${qualified.length} qualified, ${testExcluded.length} test, ${lossExcluded.length} loss-excluded, ${netMqls.length} net`,
+      );
+    } else if (action === "proposta_diagnosis") {
       const { startDate, endDate, produto, fases } = body;
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
-      const targetFases = fases || ['Proposta enviada / Follow Up', 'Enviar proposta', 'Enviar para assinatura'];
-      const targetProduto = produto || 'Franquia';
+      const targetFases = fases || ["Proposta enviada / Follow Up", "Enviar proposta", "Enviar para assinatura"];
+      const targetProduto = produto || "Franquia";
 
-      console.log(`Proposta diagnosis: ${table}, produto=${targetProduto}, fases=${targetFases.join(',')}, period=${startDate} to ${endDate}`);
+      console.log(
+        `Proposta diagnosis: ${table}, produto=${targetProduto}, fases=${targetFases.join(",")}, period=${startDate} to ${endDate}`,
+      );
 
-      const fasePlaceholders = targetFases.map((_: string, i: number) => `$${i + 3}`).join(', ');
+      const fasePlaceholders = targetFases.map((_: string, i: number) => `$${i + 3}`).join(", ");
       const dataQuery = `
         SELECT "ID", "Título", "Fase", "Fase Atual", "Entrada", "Saída", "Produtos",
                "Taxa de franquia", "Valor MRR", "Valor Pontual", "Valor Setup",
@@ -438,17 +507,17 @@ Deno.serve(async (req) => {
         ORDER BY "Entrada" ASC
       `;
       const rawResult = await client.query(simpleQuery, [targetProduto, startDate, endDate]);
-      
+
       // Filter by fases in code (cleaner than dynamic placeholders)
       const faseSet = new Set(targetFases);
-      const filtered = rawResult.rows.filter((r: Record<string, unknown>) => faseSet.has(r['Fase'] as string));
+      const filtered = rawResult.rows.filter((r: Record<string, unknown>) => faseSet.has(r["Fase"] as string));
 
       // Deduplicate: key = ID|Fase|Month (same as system)
       const seen = new Set<string>();
       const deduplicated = filtered.filter((r: Record<string, unknown>) => {
-        const entrada = new Date(r['Entrada'] as string);
-        const monthKey = `${entrada.getFullYear()}-${String(entrada.getMonth() + 1).padStart(2, '0')}`;
-        const key = `${r['ID']}|${r['Fase']}|${monthKey}`;
+        const entrada = new Date(r["Entrada"] as string);
+        const monthKey = `${entrada.getFullYear()}-${String(entrada.getMonth() + 1).padStart(2, "0")}`;
+        const key = `${r["ID"]}|${r["Fase"]}|${monthKey}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -457,30 +526,30 @@ Deno.serve(async (req) => {
       // Group by unique card ID to show summary
       const cardMap = new Map<string, Record<string, unknown>[]>();
       for (const row of deduplicated) {
-        const id = row['ID'] as string;
+        const id = row["ID"] as string;
         if (!cardMap.has(id)) cardMap.set(id, []);
         cardMap.get(id)!.push(row);
       }
 
       const cards = Array.from(cardMap.entries()).map(([id, rows]) => ({
         id,
-        titulo: rows[0]['Título'],
-        faseAtual: rows[0]['Fase Atual'],
-        closer: rows[0]['Closer responsável'],
-        motivoPerda: rows[0]['Motivo da perda'],
-        taxaFranquia: rows[0]['Taxa de franquia'],
-        valorMRR: rows[0]['Valor MRR'],
-        valorPontual: rows[0]['Valor Pontual'],
-        valorSetup: rows[0]['Valor Setup'],
-        movements: rows.map(r => ({
-          fase: r['Fase'],
-          entrada: r['Entrada'],
-          saida: r['Saída'],
+        titulo: rows[0]["Título"],
+        faseAtual: rows[0]["Fase Atual"],
+        closer: rows[0]["Closer responsável"],
+        motivoPerda: rows[0]["Motivo da perda"],
+        taxaFranquia: rows[0]["Taxa de franquia"],
+        valorMRR: rows[0]["Valor MRR"],
+        valorPontual: rows[0]["Valor Pontual"],
+        valorSetup: rows[0]["Valor Setup"],
+        movements: rows.map((r) => ({
+          fase: r["Fase"],
+          entrada: r["Entrada"],
+          saida: r["Saída"],
         })),
       }));
 
       result = {
-        action: 'proposta_diagnosis',
+        action: "proposta_diagnosis",
         produto: targetProduto,
         fases: targetFases,
         startDate,
@@ -490,8 +559,10 @@ Deno.serve(async (req) => {
         uniqueCards: cards.length,
         cards,
       };
-      console.log(`Proposta diagnosis: ${filtered.length} movements, ${deduplicated.length} after dedup, ${cards.length} unique cards`);
-    } else if (action === 'rr_sdr_diagnosis') {
+      console.log(
+        `Proposta diagnosis: ${filtered.length} movements, ${deduplicated.length} after dedup, ${cards.length} unique cards`,
+      );
+    } else if (action === "rr_sdr_diagnosis") {
       const { startDate, endDate, sdrName, sheetTitles } = body;
       const invalid = await validateTable(table);
       if (invalid) return invalid;
@@ -507,22 +578,24 @@ Deno.serve(async (req) => {
       `;
       const rawResult = await client.query(dataQuery, [startDate, endDate]);
 
-      const rrPhases = new Set(['Reunião Realizada', '1° Reunião Realizada - Apresentação']);
-      const allRR = rawResult.rows.filter((r: Record<string, unknown>) => rrPhases.has(r['Fase'] as string));
+      const rrPhases = new Set(["Reunião Realizada", "1° Reunião Realizada - Apresentação"]);
+      const allRR = rawResult.rows.filter((r: Record<string, unknown>) => rrPhases.has(r["Fase"] as string));
 
       // Filter by SDR
       const sdrNorm = (sdrName as string).trim().toLowerCase();
       const rrBySdr = allRR.filter((r: Record<string, unknown>) => {
-        const sdr = String(r['SDR responsável'] || '').trim().toLowerCase();
+        const sdr = String(r["SDR responsável"] || "")
+          .trim()
+          .toLowerCase();
         return sdr.includes(sdrNorm);
       });
 
       // Deduplicate: key = ID|Fase|Month
       const seen2 = new Set<string>();
       const deduped2 = rrBySdr.filter((r: Record<string, unknown>) => {
-        const entrada = String(r['Entrada'] || '');
+        const entrada = String(r["Entrada"] || "");
         const month = entrada.slice(0, 7);
-        const key = `${r['ID']}|${r['Fase']}|${month}`;
+        const key = `${r["ID"]}|${r["Fase"]}|${month}`;
         if (seen2.has(key)) return false;
         seen2.add(key);
         return true;
@@ -530,30 +603,36 @@ Deno.serve(async (req) => {
 
       // Also find by Closer (not SDR)
       const rrByCloser = allRR.filter((r: Record<string, unknown>) => {
-        const closer = String(r['Closer responsável'] || '').trim().toLowerCase();
-        const sdr = String(r['SDR responsável'] || '').trim().toLowerCase();
+        const closer = String(r["Closer responsável"] || "")
+          .trim()
+          .toLowerCase();
+        const sdr = String(r["SDR responsável"] || "")
+          .trim()
+          .toLowerCase();
         return closer.includes(sdrNorm) && !sdr.includes(sdrNorm);
       });
 
       // Cross-reference with sheet titles
       const normalize = (s: string) => s.trim().toLowerCase();
-      const dbTitles = new Set(deduped2.map((r: Record<string, unknown>) => normalize(String(r['Título'] || ''))));
+      const dbTitles = new Set(deduped2.map((r: Record<string, unknown>) => normalize(String(r["Título"] || ""))));
 
       let comparison = null;
       if (sheetTitles && Array.isArray(sheetTitles)) {
         const sheetSet = new Set(sheetTitles.map((t: string) => normalize(t)));
         const onlySheet = sheetTitles.filter((t: string) => !dbTitles.has(normalize(t)));
-        const onlyDb = deduped2.filter((r: Record<string, unknown>) => !sheetSet.has(normalize(String(r['Título'] || ''))));
+        const onlyDb = deduped2.filter(
+          (r: Record<string, unknown>) => !sheetSet.has(normalize(String(r["Título"] || ""))),
+        );
 
         // For titles only in sheet, check if they appear with Closer
         const closerMap: Record<string, Record<string, unknown>> = {};
         for (const r of rrByCloser) {
-          closerMap[normalize(String(r['Título'] || ''))] = r;
+          closerMap[normalize(String(r["Título"] || ""))] = r;
         }
         // Also check all RR (any SDR) for those missing titles
         const allRRMap: Record<string, Record<string, unknown>[]> = {};
         for (const r of allRR) {
-          const nt = normalize(String(r['Título'] || ''));
+          const nt = normalize(String(r["Título"] || ""));
           if (!allRRMap[nt]) allRRMap[nt] = [];
           allRRMap[nt].push(r);
         }
@@ -565,15 +644,15 @@ Deno.serve(async (req) => {
           return {
             titulo: t,
             foundViaCloser: !!closerMatch,
-            closerSdr: closerMatch ? String(closerMatch['SDR responsável'] || '') : null,
-            closerCloser: closerMatch ? String(closerMatch['Closer responsável'] || '') : null,
+            closerSdr: closerMatch ? String(closerMatch["SDR responsável"] || "") : null,
+            closerCloser: closerMatch ? String(closerMatch["Closer responsável"] || "") : null,
             allRRCount: allMatches.length,
             allRRDetails: allMatches.map((m: Record<string, unknown>) => ({
-              id: m['ID'],
-              fase: m['Fase'],
-              entrada: m['Entrada'],
-              sdr: m['SDR responsável'],
-              closer: m['Closer responsável'],
+              id: m["ID"],
+              fase: m["Fase"],
+              entrada: m["Entrada"],
+              sdr: m["SDR responsável"],
+              closer: m["Closer responsável"],
             })),
           };
         });
@@ -581,10 +660,10 @@ Deno.serve(async (req) => {
         comparison = {
           onlyInSheet: missingAnalysis,
           onlyInDb: onlyDb.map((r: Record<string, unknown>) => ({
-            id: r['ID'],
-            titulo: r['Título'],
-            sdr: r['SDR responsável'],
-            entrada: r['Entrada'],
+            id: r["ID"],
+            titulo: r["Título"],
+            sdr: r["SDR responsável"],
+            entrada: r["Entrada"],
           })),
         };
       }
@@ -593,7 +672,7 @@ Deno.serve(async (req) => {
       const dupesRemoved = rrBySdr.length - deduped2.length;
 
       result = {
-        action: 'rr_sdr_diagnosis',
+        action: "rr_sdr_diagnosis",
         totalRRInPeriod: allRR.length,
         rrBySdrCount: rrBySdr.length,
         afterDedup: deduped2.length,
@@ -602,25 +681,81 @@ Deno.serve(async (req) => {
         uniqueTitlesDb: dbTitles.size,
         comparison,
         dedupedEntries: deduped2.map((r: Record<string, unknown>) => ({
-          id: r['ID'],
-          titulo: r['Título'],
-          fase: r['Fase'],
-          entrada: r['Entrada'],
-          sdr: r['SDR responsável'],
+          id: r["ID"],
+          titulo: r["Título"],
+          fase: r["Fase"],
+          entrada: r["Entrada"],
+          sdr: r["SDR responsável"],
         })),
       };
-      console.log(`RR SDR diagnosis: ${allRR.length} total RR, ${rrBySdr.length} by SDR, ${deduped2.length} deduped, ${dupesRemoved} dupes removed`);
-    } else if (action === 'update_field') {
+      console.log(
+        `RR SDR diagnosis: ${allRR.length} total RR, ${rrBySdr.length} by SDR, ${deduped2.length} deduped, ${dupesRemoved} dupes removed`,
+      );
+    } else if (action === "aggregate") {
+      const { startDate, endDate } = body;
+      const invalid = await validateTable(table);
+      if (invalid) return invalid;
+
+      if (!startDate || !endDate) {
+        await client.end();
+        return new Response(JSON.stringify({ error: "startDate and endDate are required for aggregate action" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      console.log(`Aggregating ${table} for period: ${startDate} to ${endDate}`);
+
+      const byPhaseQuery = `
+        SELECT
+          TO_CHAR("Entrada", 'YYYY-MM') as month,
+          "Fase" as fase,
+          COUNT(*) as count,
+          COUNT(DISTINCT "ID") as unique_cards,
+          ROUND(AVG(NULLIF("Duração (s)", 0)) / 3600.0, 1) as avg_duration_hours
+        FROM ${table}
+        WHERE "Entrada" >= $1::timestamp
+          AND "Entrada" <= $2::timestamp
+        GROUP BY TO_CHAR("Entrada", 'YYYY-MM'), "Fase"
+        ORDER BY month, count DESC
+      `;
+      const byPhaseResult = await client.query(byPhaseQuery, [startDate, endDate]);
+
+      const byMonthQuery = `
+        SELECT
+          TO_CHAR("Entrada", 'YYYY-MM') as month,
+          COUNT(*) as total_movements,
+          COUNT(DISTINCT "ID") as unique_cards
+        FROM ${table}
+        WHERE "Entrada" >= $1::timestamp
+          AND "Entrada" <= $2::timestamp
+        GROUP BY TO_CHAR("Entrada", 'YYYY-MM')
+        ORDER BY month
+      `;
+      const byMonthResult = await client.query(byMonthQuery, [startDate, endDate]);
+
+      result = {
+        action: "aggregate",
+        table,
+        startDate,
+        endDate,
+        byPhase: byPhaseResult.rows,
+        byMonth: byMonthResult.rows,
+      };
+      console.log(
+        `Aggregate for ${table}: ${byPhaseResult.rows.length} phase groups, ${byMonthResult.rows.length} months`,
+      );
+    } else if (action === "update_field") {
       const { cardId, field, value } = body;
 
       // Only allow specific safe fields
-      const allowedFields = ['SDR responsável', 'Closer responsável'];
+      const allowedFields = ["SDR responsável", "Closer responsável"];
       if (!allowedFields.includes(field)) {
         await client.end();
-        return new Response(
-          JSON.stringify({ error: `Field not allowed. Allowed: ${allowedFields.join(', ')}` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: `Field not allowed. Allowed: ${allowedFields.join(", ")}` }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       const invalid = await validateTable(table);
@@ -628,18 +763,18 @@ Deno.serve(async (req) => {
 
       // Check admin role
       const { data: roleData } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
         .maybeSingle();
 
       if (!roleData) {
         await client.end();
-        return new Response(
-          JSON.stringify({ error: 'Admin access required' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: "Admin access required" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       console.log(`UPDATE ${table} SET "${field}" = '${value}' WHERE "ID" = ${cardId}`);
@@ -648,7 +783,7 @@ Deno.serve(async (req) => {
       const updateResult = await client.query(updateQuery, [value, cardId]);
 
       result = {
-        action: 'update_field',
+        action: "update_field",
         table,
         cardId,
         field,
@@ -658,31 +793,25 @@ Deno.serve(async (req) => {
       console.log(`Update result: ${updateResult.rowCount} rows affected`);
     } else {
       await client.end();
-      return new Response(
-        JSON.stringify({ error: 'Invalid action' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "Invalid action" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     await client.end();
-    console.log('Disconnected from external database');
+    console.log("Disconnected from external database");
 
     // Handle BigInt serialization
-    const jsonString = JSON.stringify(result, (_, value) =>
-      typeof value === 'bigint' ? value.toString() : value
-    );
+    const jsonString = JSON.stringify(result, (_, value) => (typeof value === "bigint" ? value.toString() : value));
 
-    return new Response(
-      jsonString,
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
+    return new Response(jsonString, { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
-    console.error('Error in query-external-db:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error in query-external-db:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
