@@ -5,6 +5,21 @@ import { BUS, MONTHS, BuType, MonthType, isPontualOnlyBU } from './useMonetaryMe
 
 export const ANNUAL_TARGET = 33360736;
 
+/**
+ * Compute the annual target dynamically from the current grid.
+ * This equals the sum of all BU/month cells so that any redistribution
+ * that moves value between cells keeps the total unchanged.
+ */
+export function computeAnnualTarget(grid: Record<string, Record<string, number>>): number {
+  let total = 0;
+  for (const bu of BUS) {
+    for (const month of MONTHS) {
+      total += grid[bu]?.[month] || 0;
+    }
+  }
+  return total;
+}
+
 export interface RedistributionChange {
   fromBU: BuType;
   fromMonth: MonthType;
@@ -26,15 +41,23 @@ export interface RedistributionSession {
 export interface RedistributionChangeRow {
   id: string;
   session_id: string;
-  from_bu: string;
-  from_month: string;
-  to_bu: string;
-  to_month: string;
-  amount: number;
-  value_before_from: number;
-  value_before_to: number;
-  value_after_from: number;
-  value_after_to: number;
+  /** New schema fields */
+  bu: string;
+  month: string;
+  field: 'faturamento' | 'pontual';
+  value_before: number;
+  value_after: number;
+  delta: number;
+  /** Legacy fields kept for backward-compat with old sessions */
+  from_bu?: string;
+  from_month?: string;
+  to_bu?: string;
+  to_month?: string;
+  amount?: number;
+  value_before_from?: number;
+  value_before_to?: number;
+  value_after_from?: number;
+  value_after_to?: number;
   created_at: string;
 }
 
@@ -81,6 +104,9 @@ export function useMetaRedistribution(year = 2026) {
     }
     return grid;
   }, [metas]);
+
+  // Dynamically computed annual target (sum of all cells)
+  const annualTarget = useMemo(() => computeAnnualTarget(currentGrid), [currentGrid]);
 
   // Calculate current annual total per BU and overall
   const currentTotals = useMemo(() => {
@@ -131,7 +157,9 @@ export function useMetaRedistribution(year = 2026) {
     return grid;
   }, [currentGrid, pendingChanges]);
 
-  // Validate that total equals ANNUAL_TARGET
+  // Validate that total equals the dynamic annual target (sum of current grid).
+  // Using annualTarget instead of the hardcoded ANNUAL_TARGET ensures that
+  // zero-sum redistributions are always valid, even when DB data drifts.
   const validateTotal = useCallback((): { valid: boolean; diff: number; newTotal: number } => {
     const newGrid = calculateNewTotals();
     let total = 0;
@@ -141,11 +169,11 @@ export function useMetaRedistribution(year = 2026) {
       }
     }
     return {
-      valid: Math.abs(total - ANNUAL_TARGET) < 1,
-      diff: total - ANNUAL_TARGET,
+      valid: Math.abs(total - annualTarget) < 1,
+      diff: total - annualTarget,
       newTotal: total,
     };
-  }, [calculateNewTotals]);
+  }, [calculateNewTotals, annualTarget]);
 
   // Save session mutation
   const saveSessionMutation = useMutation({
@@ -249,6 +277,7 @@ export function useMetaRedistribution(year = 2026) {
     isLoadingMetas,
     currentGrid,
     currentTotals,
+    annualTarget,
     pendingChanges,
     addChange,
     removeChange,

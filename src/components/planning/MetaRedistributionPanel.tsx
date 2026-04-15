@@ -37,6 +37,7 @@ import { toast } from 'sonner';
 import {
   useMetaRedistribution,
   ANNUAL_TARGET,
+  computeAnnualTarget,
   type RedistributionChangeRow,
 } from '@/hooks/useMetaRedistribution';
 import { BUS, MONTHS, BU_LABELS, type BuType, type MonthType, isPontualOnlyBU } from '@/hooks/useMonetaryMetas';
@@ -68,6 +69,7 @@ export function MetaRedistributionPanel({
   const {
     currentGrid,
     currentTotals,
+    annualTarget,
     pendingChanges,
     addChange,
     removeChange,
@@ -98,6 +100,15 @@ export function MetaRedistributionPanel({
   const [fromMode, setFromMode] = useState<'single' | 'quarter' | 'range'>('single');
   const [fromQuarter, setFromQuarter] = useState<string>('');
   const [fromMonthEnd, setFromMonthEnd] = useState<MonthType | ''>('');
+
+  // Destination multi-month state
+  const [toMode, setToMode] = useState<'single' | 'quarter' | 'range'>('single');
+  const [toQuarter, setToQuarter] = useState<string>('');
+  const [toMonthEnd, setToMonthEnd] = useState<MonthType | ''>('');
+  const [toDistMethod, setToDistMethod] = useState<'equal' | 'proportional'>('equal');
+
+  // Clear-all confirmation
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // BU-to-BU redistribution state (Improvement 3)
   const [buRedistFromBU, setBuRedistFromBU] = useState<BuType | ''>('');
@@ -142,6 +153,61 @@ export function MetaRedistributionPanel({
       return sum + (gap > 0 ? gap : 0);
     }, 0);
   }, [fromBU, selectedFromMonths, currentGrid, dreByBU]);
+
+  // Get selected "to" months based on toMode
+  const selectedToMonths = useMemo((): MonthType[] => {
+    if (toMode === 'single') {
+      return toMonth ? [toMonth as MonthType] : [];
+    }
+    if (toMode === 'quarter') {
+      return toQuarter ? (QUARTER_MONTHS[toQuarter] || []) : [];
+    }
+    if (toMode === 'range' && toMonth && toMonthEnd) {
+      const startIdx = MONTHS.indexOf(toMonth as MonthType);
+      const endIdx = MONTHS.indexOf(toMonthEnd as MonthType);
+      if (startIdx >= 0 && endIdx >= 0 && endIdx >= startIdx) {
+        return MONTHS.slice(startIdx, endIdx + 1);
+      }
+    }
+    return [];
+  }, [toMode, toMonth, toQuarter, toMonthEnd]);
+
+  // Distribute a total amount across destination months
+  const distributeToMonthsFn = (totalAmount: number, destMonths: MonthType[], method: 'equal' | 'proportional'): { month: MonthType; amount: number }[] => {
+    if (destMonths.length === 0) return [];
+    if (method === 'equal') {
+      const perMonth = Math.round(totalAmount / destMonths.length);
+      const remainder = totalAmount - perMonth * destMonths.length;
+      return destMonths.map((m, i) => ({
+        month: m,
+        amount: perMonth + (i === 0 ? remainder : 0),
+      }));
+    }
+    // Proportional: distribute based on existing meta values in destination
+    if (!toBU) return destMonths.map((m) => ({ month: m, amount: Math.round(totalAmount / destMonths.length) }));
+    const destMetas = destMonths.map((m) => currentGrid[toBU]?.[m] || 0);
+    const destTotal = destMetas.reduce((s, v) => s + v, 0);
+    if (destTotal === 0) {
+      // fallback to equal
+      const perMonth = Math.round(totalAmount / destMonths.length);
+      return destMonths.map((m) => ({ month: m, amount: perMonth }));
+    }
+    let allocated = 0;
+    return destMonths.map((m, i) => {
+      const meta = currentGrid[toBU]?.[m] || 0;
+      const share = i === destMonths.length - 1
+        ? totalAmount - allocated
+        : Math.round((meta / destTotal) * totalAmount);
+      allocated += share;
+      return { month: m, amount: share };
+    });
+  };
+
+  // Cross-field warning: warn when from and to BU use different fields
+  const crossFieldWarning = useMemo(() => {
+    if (!fromBU || !toBU) return false;
+    return isPontualOnlyBU(fromBU as BuType) !== isPontualOnlyBU(toBU as BuType);
+  }, [fromBU, toBU]);
 
   // BU-to-BU redistribution preview
   const buRedistPreview = useMemo(() => {
@@ -190,9 +256,9 @@ export function MetaRedistributionPanel({
     setActiveTab('redistribute');
   };
 
-  // Add pending change (supports multi-month)
+  // Add pending change (supports multi-month source AND multi-month destination)
   const handleAddChange = () => {
-    if (!fromBU || !toBU || !toMonth) {
+    if (!fromBU || !toBU) {
       toast.error('Preencha todos os campos');
       return;
     }
@@ -200,8 +266,13 @@ export function MetaRedistributionPanel({
       toast.error('Selecione o(s) mês(es) de origem');
       return;
     }
+    if (selectedToMonths.length === 0) {
+      toast.error('Selecione o(s) mês(es) de destino');
+      return;
+    }
 
-    if (fromMode === 'single') {
+    if (fromMode === 'single' && toMode === 'single') {
+      // Simple case: single from -> single to
       const numAmount = parseFloat(amount);
       if (isNaN(numAmount) || numAmount <= 0) {
         toast.error('Valor deve ser maior que zero');
@@ -209,8 +280,24 @@ export function MetaRedistributionPanel({
       }
       addChange(fromBU as BuType, fromMonth as MonthType, toBU as BuType, toMonth as MonthType, numAmount);
       toast.success('Redistribuição adicionada');
+    } else if (fromMode === 'single' && toMode !== 'single') {
+      // Single source -> multiple destinations
+      const numAmount = parseFloat(amount);
+      if (isNaN(numAmount) || numAmount <= 0) {
+        toast.error('Valor deve ser maior que zero');
+        return;
+      }
+      const distribution = distributeToMonthsFn(numAmount, selectedToMonths, toDistMethod);
+      let addedCount = 0;
+      for (const dest of distribution) {
+        if (dest.amount > 0) {
+          addChange(fromBU as BuType, fromMonth as MonthType, toBU as BuType, dest.month, dest.amount);
+          addedCount++;
+        }
+      }
+      toast.success(`${addedCount} redistribuições adicionadas`);
     } else {
-      // Multi-month: distribute proportionally
+      // Multi-month source: distribute each gap to destination months
       const totalGap = totalSelectedGap;
       if (totalGap <= 0) {
         toast.error('Nenhum gap nos meses selecionados');
@@ -222,8 +309,18 @@ export function MetaRedistributionPanel({
         const dre = dreByBU[fromBU]?.[m] || 0;
         const gap = meta - dre;
         if (gap > 0) {
-          addChange(fromBU as BuType, m, toBU as BuType, toMonth as MonthType, Math.round(gap));
-          addedCount++;
+          if (selectedToMonths.length === 1) {
+            addChange(fromBU as BuType, m, toBU as BuType, selectedToMonths[0], Math.round(gap));
+            addedCount++;
+          } else {
+            const distribution = distributeToMonthsFn(Math.round(gap), selectedToMonths, toDistMethod);
+            for (const dest of distribution) {
+              if (dest.amount > 0) {
+                addChange(fromBU as BuType, m, toBU as BuType, dest.month, dest.amount);
+                addedCount++;
+              }
+            }
+          }
         }
       }
       toast.success(`${addedCount} redistribuições adicionadas`);
@@ -231,6 +328,9 @@ export function MetaRedistributionPanel({
     // Reset "para" fields
     setToBU('');
     setToMonth('');
+    setToMonthEnd('');
+    setToQuarter('');
+    setToMode('single');
     setAmount('');
   };
 
@@ -551,37 +651,129 @@ export function MetaRedistributionPanel({
                       <h4 className="font-semibold text-sm flex items-center gap-1 text-emerald-600">
                         Para (Aumentar)
                       </h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Select value={toBU} onValueChange={(v) => setToBU(v as BuType)}>
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="BU" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {BUS.map((bu) => (
-                              <SelectItem key={bu} value={bu}>
-                                {BU_LABELS[bu]}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <Select value={toBU} onValueChange={(v) => setToBU(v as BuType)}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="BU" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {BUS.map((bu) => (
+                            <SelectItem key={bu} value={bu}>
+                              {BU_LABELS[bu]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      <RadioGroup
+                        value={toMode}
+                        onValueChange={(v) => {
+                          setToMode(v as 'single' | 'quarter' | 'range');
+                          setToMonth('');
+                          setToMonthEnd('');
+                          setToQuarter('');
+                        }}
+                        className="flex gap-3"
+                      >
+                        <div className="flex items-center gap-1">
+                          <RadioGroupItem value="single" id="to-mode-single" />
+                          <Label htmlFor="to-mode-single" className="text-xs cursor-pointer">Mês único</Label>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <RadioGroupItem value="quarter" id="to-mode-quarter" />
+                          <Label htmlFor="to-mode-quarter" className="text-xs cursor-pointer">Trimestre</Label>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <RadioGroupItem value="range" id="to-mode-range" />
+                          <Label htmlFor="to-mode-range" className="text-xs cursor-pointer">Personalizado</Label>
+                        </div>
+                      </RadioGroup>
+
+                      {toMode === 'single' && (
                         <Select value={toMonth} onValueChange={(v) => setToMonth(v as MonthType)}>
                           <SelectTrigger className="h-8 text-xs">
                             <SelectValue placeholder="Mês" />
                           </SelectTrigger>
                           <SelectContent>
                             {MONTHS.map((m) => (
-                              <SelectItem key={m} value={m}>
-                                {m}
-                              </SelectItem>
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                      {toBU && toMonth && (
+                      )}
+
+                      {toMode === 'quarter' && (
+                        <Select value={toQuarter} onValueChange={(v) => setToQuarter(v)}>
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue placeholder="Trimestre" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Q1">Q1 (Jan-Mar)</SelectItem>
+                            <SelectItem value="Q2">Q2 (Abr-Jun)</SelectItem>
+                            <SelectItem value="Q3">Q3 (Jul-Set)</SelectItem>
+                            <SelectItem value="Q4">Q4 (Out-Dez)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+
+                      {toMode === 'range' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Select value={toMonth} onValueChange={(v) => setToMonth(v as MonthType)}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="De Mês" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MONTHS.map((m) => (
+                                <SelectItem key={m} value={m}>{m}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Select value={toMonthEnd} onValueChange={(v) => setToMonthEnd(v as MonthType)}>
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Até Mês" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {MONTHS.map((m) => (
+                                <SelectItem key={m} value={m}>{m}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {toMode !== 'single' && selectedToMonths.length > 1 && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Distribuição:</p>
+                          <RadioGroup
+                            value={toDistMethod}
+                            onValueChange={(v) => setToDistMethod(v as 'equal' | 'proportional')}
+                            className="flex gap-3"
+                          >
+                            <div className="flex items-center gap-1">
+                              <RadioGroupItem value="equal" id="dist-equal" />
+                              <Label htmlFor="dist-equal" className="text-xs cursor-pointer">Igual</Label>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <RadioGroupItem value="proportional" id="dist-proportional" />
+                              <Label htmlFor="dist-proportional" className="text-xs cursor-pointer">Proporcional</Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
+                      )}
+
+                      {toBU && selectedToMonths.length > 0 && (
                         <p className="text-xs text-muted-foreground">
-                          Meta atual: {formatCurrency(currentGrid[toBU]?.[toMonth] || 0)}
+                          Meses: {selectedToMonths.join(', ')}
                           {' | '}Campo: {isPontualOnlyBU(toBU as BuType) ? 'pontual' : 'faturamento'}
                         </p>
+                      )}
+
+                      {crossFieldWarning && (
+                        <Alert variant="destructive" className="py-2">
+                          <AlertTriangle className="h-3 w-3" />
+                          <AlertDescription className="text-xs">
+                            Atenção: BUs de origem e destino usam campos diferentes (faturamento vs pontual).
+                          </AlertDescription>
+                        </Alert>
                       )}
                     </div>
 
@@ -608,7 +800,7 @@ export function MetaRedistributionPanel({
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold text-sm">Mudanças Pendentes ({pendingChanges.length})</h4>
-                        <Button variant="ghost" size="sm" onClick={clearChanges} className="text-xs h-7">
+                        <Button variant="ghost" size="sm" onClick={() => setShowClearConfirm(true)} className="text-xs h-7">
                           Limpar Todas
                         </Button>
                       </div>
@@ -647,6 +839,52 @@ export function MetaRedistributionPanel({
                           ))}
                         </TableBody>
                       </Table>
+
+                      {/* Preview: affected cells */}
+                      {pendingChanges.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-sm text-muted-foreground">Prévia das Células Afetadas</h4>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs">BU</TableHead>
+                                <TableHead className="text-xs">Mês</TableHead>
+                                <TableHead className="text-xs">Campo</TableHead>
+                                <TableHead className="text-xs text-right">Antes</TableHead>
+                                <TableHead className="text-xs text-right">Depois</TableHead>
+                                <TableHead className="text-xs text-right">Delta</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(() => {
+                                const affected = new Map<string, { bu: BuType; month: MonthType }>();
+                                for (const c of pendingChanges) {
+                                  affected.set(`${c.fromBU}-${c.fromMonth}`, { bu: c.fromBU, month: c.fromMonth });
+                                  affected.set(`${c.toBU}-${c.toMonth}`, { bu: c.toBU, month: c.toMonth });
+                                }
+                                return Array.from(affected.values()).map(({ bu, month }) => {
+                                  const before = currentGrid[bu]?.[month] || 0;
+                                  const after = newGrid[bu]?.[month] || 0;
+                                  const delta = after - before;
+                                  const field = isPontualOnlyBU(bu) ? 'pontual' : 'faturamento';
+                                  return (
+                                    <TableRow key={`${bu}-${month}`}>
+                                      <TableCell className="text-xs">{BU_LABELS[bu]}</TableCell>
+                                      <TableCell className="text-xs">{month}</TableCell>
+                                      <TableCell className="text-xs">{field}</TableCell>
+                                      <TableCell className="text-xs text-right font-mono">{formatCurrency(before)}</TableCell>
+                                      <TableCell className="text-xs text-right font-mono">{formatCurrency(after)}</TableCell>
+                                      <TableCell className={`text-xs text-right font-mono ${delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-destructive' : ''}`}>
+                                        {delta > 0 ? '+' : ''}{formatCurrency(delta)}
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                });
+                              })()}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      )}
 
                       {/* Running totals */}
                       <div className="grid grid-cols-3 gap-2 text-center p-3 bg-muted/30 rounded-lg">
@@ -885,38 +1123,34 @@ export function MetaRedistributionPanel({
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead className="text-xs">De</TableHead>
-                                <TableHead className="text-xs">Para</TableHead>
-                                <TableHead className="text-xs text-right">Valor</TableHead>
-                                <TableHead className="text-xs text-right">Antes (De)</TableHead>
-                                <TableHead className="text-xs text-right">Depois (De)</TableHead>
-                                <TableHead className="text-xs text-right">Antes (Para)</TableHead>
-                                <TableHead className="text-xs text-right">Depois (Para)</TableHead>
+                                <TableHead className="text-xs">BU</TableHead>
+                                <TableHead className="text-xs">Mês</TableHead>
+                                <TableHead className="text-xs">Campo</TableHead>
+                                <TableHead className="text-xs text-right">Antes</TableHead>
+                                <TableHead className="text-xs text-right">Depois</TableHead>
+                                <TableHead className="text-xs text-right">Delta</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
                               {sessionChanges[session.id].map((change) => (
                                 <TableRow key={change.id}>
                                   <TableCell className="text-xs">
-                                    {BU_LABELS[change.from_bu as BuType] || change.from_bu} / {change.from_month}
+                                    {BU_LABELS[change.bu as BuType] || change.bu}
                                   </TableCell>
                                   <TableCell className="text-xs">
-                                    {BU_LABELS[change.to_bu as BuType] || change.to_bu} / {change.to_month}
+                                    {change.month}
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {change.field}
                                   </TableCell>
                                   <TableCell className="text-xs text-right font-mono">
-                                    {formatCurrency(change.amount)}
+                                    {formatCurrency(change.value_before)}
                                   </TableCell>
                                   <TableCell className="text-xs text-right font-mono">
-                                    {formatCurrency(change.value_before_from)}
+                                    {formatCurrency(change.value_after)}
                                   </TableCell>
-                                  <TableCell className="text-xs text-right font-mono">
-                                    {formatCurrency(change.value_after_from)}
-                                  </TableCell>
-                                  <TableCell className="text-xs text-right font-mono">
-                                    {formatCurrency(change.value_before_to)}
-                                  </TableCell>
-                                  <TableCell className="text-xs text-right font-mono">
-                                    {formatCurrency(change.value_after_to)}
+                                  <TableCell className={`text-xs text-right font-mono ${change.delta > 0 ? 'text-emerald-600' : change.delta < 0 ? 'text-destructive' : ''}`}>
+                                    {change.delta > 0 ? '+' : ''}{formatCurrency(change.delta)}
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -932,6 +1166,24 @@ export function MetaRedistributionPanel({
           </Tabs>
         </DialogContent>
       </Dialog>
+
+      {/* Clear-all confirmation dialog */}
+      <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Limpar Todas as Mudanças</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover todas as {pendingChanges.length} redistribuições pendentes? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { clearChanges(); setShowClearConfirm(false); }}>
+              Confirmar Limpeza
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Rollback confirmation dialog */}
       <AlertDialog open={!!rollbackId} onOpenChange={(open) => !open && setRollbackId(null)}>
