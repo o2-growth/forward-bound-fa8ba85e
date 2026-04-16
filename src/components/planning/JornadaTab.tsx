@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Filter, X } from "lucide-react";
-import { format } from "date-fns";
 import { useJornadaData } from "@/hooks/useJornadaData";
 import { PipelineView } from "./jornada/PipelineView";
 import { ClientesView } from "./jornada/ClientesView";
@@ -66,7 +65,7 @@ export function JornadaTab() {
 
   const filteredReunioes = useMemo(() => {
     if (filters.cfo.length === 0) return reunioes;
-    return reunioes.filter((r: any) => filters.cfo.includes(r.cfo));
+    return reunioes.filter(r => filters.cfo.includes(r.cfo));
   }, [reunioes, filters.cfo]);
 
   if (isLoading) {
@@ -91,9 +90,6 @@ export function JornadaTab() {
       {/* Filter Bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <Filter className="h-4 w-4 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground ml-auto order-last">
-          {lastSync ? `Ultima atualizacao: ${format(lastSync, 'dd/MM HH:mm')}` : ''}
-        </span>
 
         {/* CFO Select */}
         <Select
@@ -169,6 +165,12 @@ export function JornadaTab() {
               Limpar
             </Button>
           </>
+        )}
+
+        {lastSync && (
+          <span className="text-xs text-muted-foreground ml-auto">
+            Atualizado: {new Date(lastSync).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às {new Date(lastSync).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          </span>
         )}
       </div>
 

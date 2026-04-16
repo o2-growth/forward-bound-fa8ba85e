@@ -35,14 +35,22 @@ function monthsBetween(a: Date, b: Date): number {
   return Math.max(0, Math.round(daysBetween(a, b) / 30.44));
 }
 
-// CFO name normalization to merge duplicates
+// CFO name normalization map
 const CFO_NAME_NORMALIZE: Record<string, string> = {
   'Douglas Pinheiro Schossler': 'Douglas Schossler',
   'Gustavo Ferreira Cochlar': 'Gustavo Cochlar',
-  'Luis Eduardo Dagostini': 'Eduardo D\'Agostini',
+  'Luis Eduardo Dagostini': "Eduardo D'Agostini",
   'Rafael Marchioretto Bokorni': 'Rafael Marchioretto',
   'Adivilso Souza de Oliveira Junior': 'Oliveira',
 };
+
+function normalizeCfoName(raw: string): string {
+  const trimmed = raw.trim();
+  return CFO_NAME_NORMALIZE[trimmed] || trimmed;
+}
+
+// Inactive phases for filtering
+const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
 
 // Terminal phases for setup
 const SETUP_TERMINAL = ['Concluído', 'Churnou', 'Desistência', 'Arquivado', 'Arquivo'];
@@ -82,7 +90,7 @@ export function useJornadaData() {
   });
 
   const result = useMemo(() => {
-    if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: null as Date | null };
+    if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '' };
 
     const { projetos, setup, tratativas, nps, rotinas, clientes, connections } = data;
     const now = new Date();
@@ -160,7 +168,8 @@ export function useJornadaData() {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const fase = row['Fase Atual'] || '';
       if (ROTINA_TERMINAL.some(t => fase.includes(t))) continue;
-      const cfo = (row['CFO Responsavel'] || row['CFO responsável'] || '').trim();
+      const rawCfoRotina = (row['CFO Responsavel'] || row['CFO responsável'] || '').trim();
+      const cfo = normalizeCfoName(rawCfoRotina);
       const titulo = (row['Título'] || '').trim().toLowerCase();
       const isOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
       const dataPrevista = parseDate(row['Data Prevista Entrega']);
@@ -216,7 +225,7 @@ export function useJornadaData() {
       const tituloLower = titulo.toLowerCase();
       const faseAtual = row['Fase Atual'] || '';
       const rawCfo = (row['CFO Responsavel'] || row['Responsavel'] || '').trim();
-      const cfo = CFO_NAME_NORMALIZE[rawCfo] || rawCfo;
+      const cfo = normalizeCfoName(rawCfo);
       const produto = (row['Produtos'] || '').trim();
       // Check if product is pontual-only (no recurring component)
       const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico Estratégico', 'Turnaround', 'Valuation', 'Educação', 'Educação – Dono CFO', 'Educação – Engenheiro de Negócios', 'Educação – Financeiro Raiz'];
@@ -420,7 +429,7 @@ export function useJornadaData() {
 
     const allCfos = [...new Set(
       allClientes
-        .filter(c => !['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'].includes(c.faseAtual))
+        .filter(c => !INACTIVE_PHASES.includes(c.faseAtual))
         .map(c => c.cfo)
         .filter(Boolean)
     )].sort();
@@ -439,13 +448,13 @@ export function useJornadaData() {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const tipo = row['Tipo de Entrega'] || '';
       if (tipo !== 'Reuniões com Cliente') continue;
-      // NOTE: Do NOT filter out terminal phases here — completed reunions
-      // contain the actual R1-R4 date data we need to display.
+      const faseRotina = row['Fase Atual'] || '';
+      if (ROTINA_TERMINAL.some(t => faseRotina.includes(t))) continue;
 
       reunioes.push({
         id: String(row.ID || ''),
         titulo: (row['Título'] || '').trim(),
-        cfo: CFO_NAME_NORMALIZE[(row['CFO Responsavel'] || '').trim()] || (row['CFO Responsavel'] || '').trim(),
+        cfo: normalizeCfoName((row['CFO Responsavel'] || '').trim()),
         faseAtual: row['Fase Atual'] || '',
         mesReferencia: (row['Mes Referencia'] || '').trim(),
         selecaoReuniao: row['Selecao Reuniao'] || null,
@@ -463,10 +472,13 @@ export function useJornadaData() {
       });
     }
 
-    // Capture last sync timestamp from rotinas
+    // Find latest updated_at from rotinas
     const lastSync = rotinas.length > 0
-      ? new Date(Math.max(...rotinas.map((r: any) => new Date(r.updated_at || 0).getTime())))
-      : null;
+      ? rotinas.reduce((max, r) => {
+          const d = r.updated_at || r['updated_at'] || '';
+          return d > max ? d : max;
+        }, '')
+      : '';
 
     return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync };
   }, [data]);
