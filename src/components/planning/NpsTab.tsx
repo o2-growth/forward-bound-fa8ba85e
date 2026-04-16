@@ -162,7 +162,12 @@ export function NpsTab() {
 
         {churnOpen && (
           <div className="animate-in fade-in-0 slide-in-from-top-2 duration-300">
-            <ChurnDossierSection data={opsData?.churnDossier || []} />
+            <ChurnDossierSection
+              data={opsData?.churnDossier || []}
+              selectedProdutos={selectedProdutos}
+              globalDateRange={dateRange}
+              globalCfos={selectedCfos}
+            />
           </div>
         )}
       </div>

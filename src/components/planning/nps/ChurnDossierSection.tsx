@@ -47,27 +47,32 @@ const CHART_COLORS = [
 
 interface Props {
   data: ChurnDossierCard[];
+  selectedProdutos?: string[];
+  globalDateRange?: { from?: Date; to?: Date };
+  globalCfos?: string[];
 }
 
-export function ChurnDossierSection({ data }: Props) {
+export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [] }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
-  const [filterCfo, setFilterCfo] = useState<string>('all');
-  const [filterMes, setFilterMes] = useState<string>('all');
 
   /* ─── derived data ─── */
   const motivos = useMemo(() => [...new Set(data.map(d => d.motivoPrincipal).filter(Boolean))], [data]);
-  const cfos = useMemo(() => [...new Set(data.map(d => d.cfo).filter(Boolean))].sort(), [data]);
-  const meses = useMemo(() => [...new Set(data.map(d => d.mesChurn).filter(Boolean))].sort(), [data]);
 
   const filtered = useMemo(() => {
     return data.filter(d => {
       if (filterMotivo !== 'all' && d.motivoPrincipal !== filterMotivo) return false;
-      if (filterCfo !== 'all' && d.cfo !== filterCfo) return false;
-      if (filterMes !== 'all' && d.mesChurn !== filterMes) return false;
+      if (globalCfos.length > 0 && !globalCfos.includes(d.cfo)) return false;
+      if (selectedProdutos.length > 0 && !selectedProdutos.some(p => (d.produto || '').includes(p))) return false;
+      if (globalDateRange?.from) {
+        const churnDate = d.dataEncerramento ? new Date(d.dataEncerramento) : null;
+        if (!churnDate || isNaN(churnDate.getTime())) return false;
+        const end = globalDateRange.to || globalDateRange.from;
+        if (churnDate < globalDateRange.from || churnDate > end) return false;
+      }
       return true;
     });
-  }, [data, filterMotivo, filterCfo, filterMes]);
+  }, [data, filterMotivo, globalCfos, selectedProdutos, globalDateRange]);
 
   const totalMrrPerdido = useMemo(() => filtered.reduce((s, d) => s + (d.mrr || 0), 0), [filtered]);
   
@@ -121,7 +126,7 @@ export function ChurnDossierSection({ data }: Props) {
     );
   }
 
-  const hasFilters = filterMotivo !== 'all' || filterCfo !== 'all' || filterMes !== 'all';
+  const hasFilters = filterMotivo !== 'all' || globalCfos.length > 0 || selectedProdutos.length > 0 || !!globalDateRange?.from;
 
   return (
     <div className="space-y-6">
@@ -242,15 +247,6 @@ export function ChurnDossierSection({ data }: Props) {
               <Badge variant="secondary" className="text-xs">{filtered.length} registros</Badge>
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
-              <Select value={filterMes} onValueChange={setFilterMes}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <SelectValue placeholder="Mês" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os meses</SelectItem>
-                  {meses.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                </SelectContent>
-              </Select>
               <Select value={filterMotivo} onValueChange={setFilterMotivo}>
                 <SelectTrigger className="w-[150px] h-8 text-xs">
                   <SelectValue placeholder="Motivo" />
@@ -260,18 +256,9 @@ export function ChurnDossierSection({ data }: Props) {
                   {motivos.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Select value={filterCfo} onValueChange={setFilterCfo}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <SelectValue placeholder="CFO" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos CFOs</SelectItem>
-                  {cfos.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {hasFilters && (
-                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setFilterMotivo('all'); setFilterCfo('all'); setFilterMes('all'); }}>
-                  Limpar filtros
+              {filterMotivo !== 'all' && (
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setFilterMotivo('all')}>
+                  Limpar
                 </Button>
               )}
             </div>

@@ -142,24 +142,26 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     }
   });
 
-  // Build title → CFO reverse lookup for fallback matching
+  // Build reverse lookup: project title (lowercased) → CFO
   const projetoCfoByTitle: Record<string, string> = {};
-  Object.entries(projetoTitleMap).forEach(([projId, title]) => {
-    const cfo = projetoCfoMap[projId];
-    if (cfo && title) {
-      projetoCfoByTitle[title.trim().toLowerCase()] = cfo;
+  projetos.forEach(p => {
+    if (p['Fase'] === p['Fase Atual'] && p['CFO Responsavel'] && p['Título']) {
+      const key = p['Título'].trim().toLowerCase();
+      if (key) projetoCfoByTitle[key] = p['CFO Responsavel'];
     }
   });
 
   // Product connections: project card → DB Produtos (individual product names)
   const productConnections = connections.filter(c => c.connected_pipe_name === 'DB Produtos');
-  const projetoProductsMap: Record<string, Set<string>> = {};
+  const projetoProductsMap: Record<string, string[]> = {};
   productConnections.forEach(conn => {
     const projId = conn.card_id;
     const productName = conn.connected_card_title;
     if (projId && productName) {
-      if (!projetoProductsMap[projId]) projetoProductsMap[projId] = new Set();
-      projetoProductsMap[projId].add(productName);
+      if (!projetoProductsMap[projId]) projetoProductsMap[projId] = [];
+      if (!projetoProductsMap[projId].includes(productName)) {
+        projetoProductsMap[projId].push(productName);
+      }
     }
   });
 
@@ -173,7 +175,7 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     const title = projetoTitleMap[conn.card_id];
     if (title) titleMap[conn.connected_card_id] = title;
     const products = projetoProductsMap[conn.card_id];
-    if (products && products.size > 0) {
+    if (products && products.length > 0) {
       produtoMap[conn.connected_card_id] = [...products];
     }
   });
