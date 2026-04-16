@@ -449,7 +449,9 @@ export function useJornadaData() {
       const tipo = row['Tipo de Entrega'] || '';
       if (tipo !== 'Reuniões com Cliente') continue;
       const faseRotina = row['Fase Atual'] || '';
-      if (ROTINA_TERMINAL.some(t => faseRotina.includes(t))) continue;
+      // Only exclude truly cancelled/archived — keep "Entregue"/"Concluído" as they have R1-R4 dates filled
+      const REUNIAO_EXCLUDE = ['Cancelado', 'Cancelada', 'Arquivado', 'Arquivo'];
+      if (REUNIAO_EXCLUDE.some(t => faseRotina.includes(t))) continue;
 
       reunioes.push({
         id: String(row.ID || ''),
