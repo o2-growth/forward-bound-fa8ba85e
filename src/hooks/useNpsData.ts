@@ -142,6 +142,15 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     }
   });
 
+  // Build title → CFO reverse lookup for fallback matching
+  const projetoCfoByTitle: Record<string, string> = {};
+  Object.entries(projetoTitleMap).forEach(([projId, title]) => {
+    const cfo = projetoCfoMap[projId];
+    if (cfo && title) {
+      projetoCfoByTitle[title.trim().toLowerCase()] = cfo;
+    }
+  });
+
   // Product connections: project card → DB Produtos (individual product names)
   const productConnections = connections.filter(c => c.connected_pipe_name === 'DB Produtos');
   const projetoProductsMap: Record<string, Set<string>> = {};
