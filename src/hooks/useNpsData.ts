@@ -124,26 +124,26 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     c.connected_pipe_name === '5.2 Pesquisa de Satisfação NPS'
   );
 
-  // Product connections: project card → DB Produtos
-  const productConnections = connections.filter(c =>
-    c.connected_pipe_name === 'DB Produtos'
-  );
-
   const npsPipeId = npsConnections[0]?.connected_pipe_id || '';
 
-  // Build projeto CFO and title lookups
+  // Build projeto CFO, title, and produto lookups
   const projetoCfoMap: Record<string, string> = {};
   const projetoTitleMap: Record<string, string> = {};
+  const projetoProdutoMap: Record<string, string> = {};
   projetos.forEach(p => {
     if (p['Fase'] === p['Fase Atual'] && p['CFO Responsavel']) {
       projetoCfoMap[p.ID] = p['CFO Responsavel'];
     }
     if (p['Fase'] === p['Fase Atual']) {
       projetoTitleMap[p.ID] = p['Título'] || '';
+      if (p['Produtos']) {
+        projetoProdutoMap[p.ID] = p['Produtos'];
+      }
     }
   });
 
-  // Build map: project card ID → set of product names from DB Produtos
+  // Product connections: project card → DB Produtos (individual product names)
+  const productConnections = connections.filter(c => c.connected_pipe_name === 'DB Produtos');
   const projetoProductsMap: Record<string, Set<string>> = {};
   productConnections.forEach(conn => {
     const projId = conn.card_id;
@@ -154,7 +154,7 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     }
   });
 
-  // Map NPS card ID → CFO, title, and produtos from connected project
+  // Map NPS card ID → CFO, title, and produtos from DB Produtos
   const cfoMap: Record<string, string> = {};
   const titleMap: Record<string, string> = {};
   const produtoMap: Record<string, string[]> = {};
@@ -163,24 +163,27 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     if (cfo) cfoMap[conn.connected_card_id] = cfo;
     const title = projetoTitleMap[conn.card_id];
     if (title) titleMap[conn.connected_card_id] = title;
-    const projectProducts = projetoProductsMap[conn.card_id];
-    if (projectProducts && projectProducts.size > 0) {
-      produtoMap[conn.connected_card_id] = [...projectProducts];
+    const products = projetoProductsMap[conn.card_id];
+    if (products && products.size > 0) {
+      produtoMap[conn.connected_card_id] = [...products];
     }
   });
 
-  // Title fallback: for NPS cards without product connections, try matching by title
+  // Title fallback for CFO and produtos
   npsRows.forEach(nps => {
     const id = nps.ID;
-    if (!produtoMap[id]) {
-      const titulo = (nps['Título'] || '').trim().toLowerCase();
-      if (titulo) {
-        for (const [projId, products] of Object.entries(projetoProductsMap)) {
-          const projTitle = (projetoTitleMap[projId] || '').trim().toLowerCase();
-          if (projTitle === titulo) {
-            produtoMap[id] = [...products];
-            break;
-          }
+    const titulo = (nps['Título'] || '').trim().toLowerCase();
+    if (!cfoMap[id] && titulo) {
+      const cfo = projetoCfoByTitle[titulo];
+      if (cfo) cfoMap[id] = cfo;
+    }
+    if (!produtoMap[id] && titulo) {
+      // Find project by title and get its DB Produtos
+      for (const [projId, products] of Object.entries(projetoProductsMap)) {
+        const projTitle = (projetoTitleMap[projId] || '').trim().toLowerCase();
+        if (projTitle === titulo) {
+          produtoMap[id] = [...products];
+          break;
         }
       }
     }
