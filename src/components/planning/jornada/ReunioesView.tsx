@@ -5,8 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpDown, ExternalLink } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Calendar, CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpDown, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import type { JornadaCliente } from "./types";
 
 const MONTH_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -33,6 +33,7 @@ interface ReuniaoData {
 interface ReunioesViewProps {
   reunioes: ReuniaoData[];
   allCfos: string[];
+  clientes?: JornadaCliente[];
 }
 
 // Deadlines: R1=7, R2=14, R3=21, R4=28
@@ -93,12 +94,81 @@ function normalizeMonth(mesRef: string): string {
   return s;
 }
 
-export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
+function buildClientSummary(cliente: JornadaCliente): string[] {
+  const lines: string[] = [];
+
+  // Lifetime
+  if (cliente.lifetimeMonths) {
+    lines.push(`Cliente há ${cliente.lifetimeMonths} meses`);
+  }
+
+  // Setup
+  if (cliente.setupStatus === 'concluido') {
+    lines.push('Setup concluído');
+  } else if (cliente.setupStatus === 'em_andamento') {
+    lines.push(`Setup em andamento${cliente.setupFase ? ` (${cliente.setupFase})` : ''}${cliente.setupDias ? `, ${cliente.setupDias}d` : ''}`);
+  } else if (cliente.setupStatus === 'atrasado') {
+    lines.push(`⚠️ Setup atrasado${cliente.setupDias ? ` (${cliente.setupDias}d)` : ''}`);
+  }
+
+  // NPS
+  if (cliente.ultimoNps !== null && cliente.ultimoNps !== undefined) {
+    const cat = cliente.npsClassificacao === 'promotor' ? '🟢 Promotor' : cliente.npsClassificacao === 'detrator' ? '🔴 Detrator' : '🟡 Neutro';
+    lines.push(`NPS: ${cliente.ultimoNps} (${cat})`);
+  } else {
+    lines.push('Sem pesquisa NPS');
+  }
+
+  // CSAT
+  if (cliente.ultimoCsat !== null && cliente.ultimoCsat !== undefined) {
+    lines.push(`CSAT: ${cliente.ultimoCsat}/5`);
+  }
+
+  // Tratativa
+  if (cliente.tratativaAtiva) {
+    lines.push(`🔴 Tratativa ativa: ${cliente.tratativaMotivo || 'sem motivo'}${cliente.tratativaDias ? `, ${cliente.tratativaDias}d` : ''}`);
+  }
+
+  // Reuniões
+  lines.push(`Reuniões: ${cliente.reunioesFeitas}/4 realizadas`);
+
+  // Tarefas
+  if (cliente.tarefasAtrasadas > 0) {
+    lines.push(`⚠️ ${cliente.tarefasAtrasadas} tarefas atrasadas de ${cliente.tarefasAtivas}`);
+  } else if (cliente.tarefasAtivas > 0) {
+    lines.push(`${cliente.tarefasAtivas} tarefas ativas, nenhuma atrasada`);
+  }
+
+  return lines;
+}
+
+function buildClientAlerts(cliente: JornadaCliente): string[] {
+  const alerts: string[] = [];
+  if (cliente.setupStatus === 'atrasado') {
+    alerts.push(`Setup atrasado${cliente.setupDias ? ` (${cliente.setupDias} dias)` : ''}`);
+  }
+  if (cliente.npsClassificacao === 'detrator') {
+    alerts.push(`NPS Detrator (${cliente.ultimoNps})`);
+  }
+  if (cliente.tratativaAtiva) {
+    alerts.push(`Tratativa ativa: ${cliente.tratativaMotivo || 'sem motivo'}`);
+  }
+  if (cliente.tarefasAtrasadas > 0) {
+    alerts.push(`${cliente.tarefasAtrasadas} tarefas atrasadas`);
+  }
+  if (cliente.ultimoNps === null) {
+    alerts.push('Sem pesquisa NPS');
+  }
+  return alerts;
+}
+
+export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps) {
   const [filterCfo, setFilterCfo] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('');
   const [sortCol, setSortCol] = useState<'titulo' | 'cfo' | 'progress'>('progress');
   const [sortAsc, setSortAsc] = useState(true);
+  const [expandedClient, setExpandedClient] = useState<string | null>(null);
 
   const now = new Date();
 
@@ -162,6 +232,20 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
     return list;
   }, [enriched, filterCfo, filterStatus, sortCol, sortAsc]);
 
+  // Build a lookup map for clientes by lowercase trimmed titulo
+  const clienteMap = useMemo(() => {
+    if (!clientes) return new Map<string, JornadaCliente>();
+    const map = new Map<string, JornadaCliente>();
+    for (const c of clientes) {
+      map.set(c.titulo.toLowerCase().trim(), c);
+    }
+    return map;
+  }, [clientes]);
+
+  function findMatchedCliente(titulo: string): JornadaCliente | undefined {
+    return clienteMap.get(titulo.toLowerCase().trim());
+  }
+
   // KPIs
   const totalClientes = enriched.length;
   const totalDone = enriched.reduce((s, r) => s + r.done, 0);
@@ -190,7 +274,6 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
   }, [enriched]);
 
   return (
-    <TooltipProvider delayDuration={200}>
     <div className="space-y-6">
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -287,6 +370,7 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8"></TableHead>
               <TableHead>
                 <Button variant="ghost" size="sm" className="gap-1 -ml-3" onClick={() => { setSortCol('titulo'); setSortAsc(!sortAsc); }}>
                   Cliente <ArrowUpDown className="h-3 w-3" />
@@ -313,99 +397,179 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
             {filtered.map(r => {
               const dates = [r.r1, r.r2, r.r3, r.r4];
               const temps = [r.t1, r.t2, r.t3, r.t4];
+              const isExpanded = expandedClient === r.id;
+              const matchedCliente = clientes ? findMatchedCliente(r.titulo) : undefined;
+              const hasClienteData = !!matchedCliente;
               return (
-                <TableRow key={r.id} className={r.late > 0 ? 'bg-red-500/5' : ''}>
-                  <TableCell className="font-medium max-w-[180px]">
-                    <span className="inline-flex items-center gap-1 truncate">
-                      {r.titulo}
-                      <a href={`https://app.pipefy.com/open-cards/${r.id}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                        <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground hover:text-primary" />
-                      </a>
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-sm max-w-[140px] truncate">{r.cfo}</TableCell>
-                  {[0, 1, 2, 3].map(i => {
-                    const status = r.statuses[i];
-                    const temp = temps[i];
-                    const date = dates[i];
-                    const deadlineDay = DEADLINES[i];
-                    const dateLabel = date ? `${String(date.getDate()).padStart(2, '0')}/${MONTH_ABBR[date.getMonth()]}` : null;
-                    const isLate = date ? date.getDate() > deadlineDay : false;
-                    const daysLate = date ? date.getDate() - deadlineDay : 0;
-                    const fullDate = date ? `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}` : null;
-                    const tooltipText = date
-                      ? `Realizada: ${fullDate}\nPrazo: dia ${deadlineDay} do mês\n${isLate ? `${daysLate} dias de atraso` : 'No prazo'}`
-                      : `Prazo: dia ${deadlineDay} do mês\n${status === 'late' ? 'Não realizada — em atraso' : status === 'upcoming' ? 'Próxima' : 'Pendente'}`;
+                <>
+                  <TableRow
+                    key={r.id}
+                    className={`${r.late > 0 ? 'bg-red-500/5' : ''} ${hasClienteData ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                    onClick={() => {
+                      if (hasClienteData) {
+                        setExpandedClient(isExpanded ? null : r.id);
+                      }
+                    }}
+                  >
+                    <TableCell className="w-8 px-2">
+                      {hasClienteData && (
+                        isExpanded
+                          ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          : <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[180px]">
+                      <span className="inline-flex items-center gap-1 truncate">
+                        {r.titulo}
+                        <a href={`https://app.pipefy.com/open-cards/${r.id}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                          <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground hover:text-primary" />
+                        </a>
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-sm max-w-[140px] truncate">{r.cfo}</TableCell>
+                    {[0, 1, 2, 3].map(i => {
+                      const status = r.statuses[i];
+                      const temp = temps[i];
+                      const date = dates[i];
+                      const dateLabel = date ? `${String(date.getDate()).padStart(2, '0')}/${MONTH_ABBR[date.getMonth()]}` : null;
 
-                    return (
-                      <TableCell key={i} className="text-center">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="inline-flex flex-col items-center gap-0.5 cursor-default">
-                              {status === 'done' ? (
-                                <>
-                                  <div className={`flex items-center justify-center w-7 h-7 rounded-full ${temp ? '' : isLate ? 'bg-amber-500/20' : 'bg-green-500/20'}`}>
-                                    {temp ? (
-                                      <span className="text-base">{tempEmoji(temp)}</span>
-                                    ) : (
-                                      <CheckCircle2 className={`h-4 w-4 ${isLate ? 'text-amber-500' : 'text-green-500'}`} />
-                                    )}
-                                  </div>
-                                  <span className="text-[9px] text-muted-foreground">{dateLabel}</span>
-                                  {isLate ? (
-                                    <span className="text-[8px] text-red-500 font-medium">+{daysLate}d</span>
-                                  ) : (
-                                    <span className="text-[8px] text-green-600 font-medium">no prazo</span>
-                                  )}
-                                </>
-                              ) : status === 'late' ? (
-                                <>
-                                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15">
-                                    <XCircle className="h-4 w-4 text-red-500" />
-                                  </div>
-                                  <span className="text-[9px] text-red-400">atraso</span>
-                                </>
-                              ) : status === 'upcoming' ? (
-                                <>
-                                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15">
-                                    <Clock className="h-4 w-4 text-amber-500" />
-                                  </div>
-                                  <span className="text-[9px] text-amber-400">breve</span>
-                                </>
-                              ) : (
-                                <div className="flex items-center justify-center w-7 h-7">
-                                  <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/20" />
-                                </div>
-                              )}
+                      return (
+                        <TableCell key={i} className="text-center">
+                          {status === 'done' ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <div className={`flex items-center justify-center w-7 h-7 rounded-full ${temp ? '' : 'bg-green-500/20'}`}>
+                                {temp ? (
+                                  <span className="text-base">{tempEmoji(temp)}</span>
+                                ) : (
+                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                )}
+                              </div>
+                              <span className="text-[9px] text-muted-foreground">{dateLabel}</span>
                             </div>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="whitespace-pre-line text-xs">
-                            {tooltipText}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TableCell>
-                    );
-                  })}
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-green-500 rounded-full" style={{ width: `${(r.done / 4) * 100}%` }} />
+                          ) : status === 'late' ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15">
+                                <XCircle className="h-4 w-4 text-red-500" />
+                              </div>
+                              <span className="text-[9px] text-red-400">atraso</span>
+                            </div>
+                          ) : status === 'upcoming' ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15">
+                                <Clock className="h-4 w-4 text-amber-500" />
+                              </div>
+                              <span className="text-[9px] text-amber-400">breve</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center w-7 h-7">
+                              <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/20" />
+                            </div>
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-green-500 rounded-full" style={{ width: `${(r.done / 4) * 100}%` }} />
+                        </div>
+                        <span className="text-xs font-medium">{r.done}/4</span>
                       </div>
-                      <span className="text-xs font-medium">{r.done}/4</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {r.clienteParticipou === 'Sim' ? <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" /> :
-                     r.clienteParticipou === 'Não' ? <XCircle className="h-4 w-4 text-red-500 mx-auto" /> :
-                     <span className="text-xs text-muted-foreground">—</span>}
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {r.clienteParticipou === 'Sim' ? <CheckCircle2 className="h-4 w-4 text-green-500 mx-auto" /> :
+                       r.clienteParticipou === 'Não' ? <XCircle className="h-4 w-4 text-red-500 mx-auto" /> :
+                       <span className="text-xs text-muted-foreground">—</span>}
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded && matchedCliente && (
+                    <TableRow key={`${r.id}-expanded`}>
+                      <TableCell colSpan={10} className="bg-muted/30 p-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Situação do Cliente */}
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2">Situação do Cliente</h4>
+                            <ul className="space-y-1">
+                              {buildClientSummary(matchedCliente).map((line, i) => (
+                                <li key={i} className="text-xs text-muted-foreground">{line}</li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          {/* Health Score Breakdown */}
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2">
+                              Health Score:{' '}
+                              <span className={
+                                matchedCliente.healthLevel === 'green' ? 'text-green-600' :
+                                matchedCliente.healthLevel === 'yellow' ? 'text-yellow-600' :
+                                'text-red-600'
+                              }>
+                                {matchedCliente.healthScore}/100
+                              </span>
+                            </h4>
+                            <div className="space-y-1.5 text-xs">
+                              <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">NPS</span>
+                                <span className="font-medium">{matchedCliente.healthBreakdown.nps}/30</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(matchedCliente.healthBreakdown.nps / 30) * 100}%` }} />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Reuniões</span>
+                                <span className="font-medium">{matchedCliente.healthBreakdown.reunioes}/30</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(matchedCliente.healthBreakdown.reunioes / 30) * 100}%` }} />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Tratativa</span>
+                                <span className="font-medium">{matchedCliente.healthBreakdown.tratativa}/20</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(matchedCliente.healthBreakdown.tratativa / 20) * 100}%` }} />
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-muted-foreground">Setup</span>
+                                <span className="font-medium">{matchedCliente.healthBreakdown.setup}/20</span>
+                              </div>
+                              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(matchedCliente.healthBreakdown.setup / 20) * 100}%` }} />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Alertas */}
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2">Alertas</h4>
+                            {(() => {
+                              const alerts = buildClientAlerts(matchedCliente);
+                              if (alerts.length === 0) {
+                                return <p className="text-xs text-muted-foreground">Nenhum alerta ativo</p>;
+                              }
+                              return (
+                                <ul className="space-y-1">
+                                  {alerts.map((alert, i) => (
+                                    <li key={i} className="text-xs text-red-500 flex items-start gap-1">
+                                      <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                                      {alert}
+                                    </li>
+                                  ))}
+                                </ul>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               );
             })}
           </TableBody>
         </Table>
       </ScrollArea>
     </div>
-    </TooltipProvider>
   );
 }

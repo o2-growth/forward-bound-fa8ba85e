@@ -200,7 +200,7 @@ export function JornadaTab() {
         </TabsContent>
 
         <TabsContent value="reunioes" className="mt-4">
-          <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} />
+          <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} />
         </TabsContent>
 
         <TabsContent value="cfos" className="mt-4">
