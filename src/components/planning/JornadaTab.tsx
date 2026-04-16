@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Filter, X } from "lucide-react";
+import { format } from "date-fns";
 import { useJornadaData } from "@/hooks/useJornadaData";
 import { PipelineView } from "./jornada/PipelineView";
 import { ClientesView } from "./jornada/ClientesView";
@@ -13,7 +14,7 @@ import { ReunioesView } from "./jornada/ReunioesView";
 import type { JornadaFilter, JornadaCliente, JornadaCfo, PipelineFase } from "./jornada/types";
 
 export function JornadaTab() {
-  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading, error } = useJornadaData();
+  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, isLoading, error } = useJornadaData();
 
   const [filters, setFilters] = useState<JornadaFilter>({ cfo: [], produto: [], healthLevel: [] });
 
@@ -63,6 +64,11 @@ export function JornadaTab() {
     return alertas.filter(a => ids.has(a.clienteId));
   }, [alertas, filteredClientes, hasFilters]);
 
+  const filteredReunioes = useMemo(() => {
+    if (filters.cfo.length === 0) return reunioes;
+    return reunioes.filter((r: any) => filters.cfo.includes(r.cfo));
+  }, [reunioes, filters.cfo]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -85,6 +91,9 @@ export function JornadaTab() {
       {/* Filter Bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <Filter className="h-4 w-4 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground ml-auto order-last">
+          {lastSync ? `Ultima atualizacao: ${format(lastSync, 'dd/MM HH:mm')}` : ''}
+        </span>
 
         {/* CFO Select */}
         <Select
@@ -189,7 +198,7 @@ export function JornadaTab() {
         </TabsContent>
 
         <TabsContent value="reunioes" className="mt-4">
-          <ReunioesView reunioes={reunioes} allCfos={allCfos} />
+          <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} />
         </TabsContent>
 
         <TabsContent value="cfos" className="mt-4">

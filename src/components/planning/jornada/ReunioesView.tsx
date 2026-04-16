@@ -6,6 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpDown, ExternalLink } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { format } from "date-fns";
 
 interface ReuniaoData {
   id: string;
@@ -324,40 +326,66 @@ export function ReunioesView({ reunioes, allCfos }: ReunioesViewProps) {
                     const status = r.statuses[i];
                     const temp = temps[i];
                     const date = dates[i];
-                    const dateLabel = date ? `${date.getDate()}/${date.getMonth() + 1}` : null;
+                    const MONTH_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+                    const dateLabel = date ? `${String(date.getDate()).padStart(2, '0')}/${MONTH_ABBR[date.getMonth()]}` : null;
+                    const deadlineDay = DEADLINES[i];
+                    const isLate = date ? date.getDate() > deadlineDay : false;
+                    const daysLate = date ? date.getDate() - deadlineDay : 0;
 
                     return (
                       <TableCell key={i} className="text-center">
-                        {status === 'done' ? (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <div className={`flex items-center justify-center w-7 h-7 rounded-full ${temp ? '' : 'bg-green-500/20'}`}>
-                              {temp ? (
-                                <span className="text-base">{tempEmoji(temp)}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              {status === 'done' ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <div className={`flex items-center justify-center w-7 h-7 rounded-full ${temp ? '' : 'bg-green-500/20'}`}>
+                                    {temp ? (
+                                      <span className="text-base">{tempEmoji(temp)}</span>
+                                    ) : (
+                                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                    )}
+                                  </div>
+                                  <span className="text-[9px] text-muted-foreground">{dateLabel}</span>
+                                  {isLate && <span className="text-[8px] text-destructive">atraso</span>}
+                                  {!isLate && date && <span className="text-[8px] text-green-600">no prazo</span>}
+                                </div>
+                              ) : status === 'late' ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15">
+                                    <XCircle className="h-4 w-4 text-red-500" />
+                                  </div>
+                                  <span className="text-[9px] text-red-400">atraso</span>
+                                </div>
+                              ) : status === 'upcoming' ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15">
+                                    <Clock className="h-4 w-4 text-amber-500" />
+                                  </div>
+                                  <span className="text-[9px] text-amber-400">breve</span>
+                                </div>
                               ) : (
-                                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                <div className="flex items-center justify-center w-7 h-7">
+                                  <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/20" />
+                                </div>
                               )}
                             </div>
-                            <span className="text-[9px] text-muted-foreground">{dateLabel}</span>
-                          </div>
-                        ) : status === 'late' ? (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15">
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            </div>
-                            <span className="text-[9px] text-red-400">atraso</span>
-                          </div>
-                        ) : status === 'upcoming' ? (
-                          <div className="flex flex-col items-center gap-0.5">
-                            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15">
-                              <Clock className="h-4 w-4 text-amber-500" />
-                            </div>
-                            <span className="text-[9px] text-amber-400">breve</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center w-7 h-7">
-                            <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/20" />
-                          </div>
-                        )}
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {date ? (
+                              <>
+                                Realizada: {format(date, 'dd/MM/yyyy')}
+                                {isLate ? ` (${daysLate}d de atraso)` : ' (no prazo)'}
+                                <br/>
+                                Prazo: dia {deadlineDay} do m&#234;s
+                              </>
+                            ) : status === 'late' ? (
+                              <>N&#227;o realizada - prazo era dia {deadlineDay}</>
+                            ) : (
+                              <>Prazo: dia {deadlineDay} do m&#234;s</>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableCell>
                     );
                   })}
