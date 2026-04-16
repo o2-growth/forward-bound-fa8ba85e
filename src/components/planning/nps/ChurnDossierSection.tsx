@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChurnDossierCard } from '@/hooks/useOperationsData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -303,9 +303,8 @@ export function ChurnDossierSection({ data }: Props) {
                   const isExpanded = expandedRow === row.id;
                   const highMrr = row.mrr >= 5000;
                   return (
-                    <>
+                    <React.Fragment key={row.id}>
                       <TableRow
-                        key={row.id}
                         className={`cursor-pointer transition-colors ${highMrr ? 'bg-destructive/5 hover:bg-destructive/10' : 'hover:bg-muted/50'}`}
                         onClick={() => setExpandedRow(isExpanded ? null : row.id)}
                       >
@@ -379,7 +378,7 @@ export function ChurnDossierSection({ data }: Props) {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </React.Fragment>
                   );
                 })}
               </TableBody>
