@@ -437,12 +437,8 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                         <TableCell key={i} className="text-center">
                           {status === 'done' ? (
                             <div className="flex flex-col items-center gap-0.5">
-                              <div className={`flex items-center justify-center w-7 h-7 rounded-full ${temp ? '' : 'bg-green-500/20'}`}>
-                                {temp ? (
-                                  <span className="text-base">{tempEmoji(temp)}</span>
-                                ) : (
-                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                )}
+                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/20">
+                                <CheckCircle2 className="h-4 w-4 text-green-500" />
                               </div>
                               <span className="text-[9px] text-muted-foreground">{dateLabel}</span>
                             </div>
