@@ -155,6 +155,30 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     if (produto) produtoMap[conn.connected_card_id] = produto;
   });
 
+  // Fallback: match NPS cards without CFO by exact title against Central de Projetos
+  const projetoCfoByTitle: Record<string, string> = {};
+  const projetoProdutoByTitle: Record<string, string> = {};
+  projetos.forEach(p => {
+    if (p['Fase'] === p['Fase Atual']) {
+      const t = (p['Título'] || '').trim().toLowerCase();
+      if (t && p['CFO Responsavel']) projetoCfoByTitle[t] = p['CFO Responsavel'];
+      if (t && p['Produtos']) projetoProdutoByTitle[t] = p['Produtos'];
+    }
+  });
+
+  npsRows.forEach(nps => {
+    const id = nps.ID;
+    const titulo = (nps['Título'] || '').trim().toLowerCase();
+    if (!cfoMap[id] && titulo) {
+      const cfo = projetoCfoByTitle[titulo];
+      if (cfo) cfoMap[id] = cfo;
+    }
+    if (!produtoMap[id] && titulo) {
+      const produto = projetoProdutoByTitle[titulo];
+      if (produto) produtoMap[id] = produto;
+    }
+  });
+
   return { npsRows, cfoMap, npsPipeId, titleMap, produtoMap };
 }
 
@@ -166,8 +190,17 @@ function parseNpsScore(val: string | null): number | null {
 
 function parseCsatScore(val: string | null): number | null {
   if (!val) return null;
-  const match = String(val).match(/^(\d)/);
-  return match ? parseInt(match[1], 10) : null;
+  const s = String(val).toLowerCase();
+  // Try numeric prefix: "2: 🔴 Insatisfeito", "4: 🟢 Satisfeito"
+  const match = s.match(/^(\d)/);
+  if (match) return parseInt(match[1], 10);
+  // Fallback: match by emoji/text (order matters — check "extremamente" before generic)
+  if (s.includes('extremamente insatisfeito') || s.includes('⚫')) return 1;
+  if (s.includes('insatisfeito') || s.includes('🔴')) return 2;
+  if (s.includes('neutro') || s.includes('🟡')) return 3;
+  if (s.includes('extremamente satisfeito') || s.includes('💚')) return 5;
+  if (s.includes('satisfeito') || s.includes('🟢')) return 4;
+  return null;
 }
 
 function classifySeanEllis(val: string | null): 'muito_desapontado' | 'certa_forma' | 'nao_desapontado' | null {
@@ -202,7 +235,15 @@ function getNpsLabel(score: number): string {
 
 export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, string>, externalTitleMap: Record<string, string>, npsPipeId: string) {
   // Only current phase cards (unique)
-  const currentCards = rows.filter(r => r['Fase'] === r['Fase Atual']);
+  // Get the latest row per card (most recent Entrada) — handles renamed phases like Q4/2025
+  const latestByCard = new Map<string, NpsCard>();
+  rows.forEach(r => {
+    const existing = latestByCard.get(r.ID);
+    if (!existing || r['Entrada'] > existing['Entrada']) {
+      latestByCard.set(r.ID, r);
+    }
+  });
+  const currentCards = Array.from(latestByCard.values());
   
   // All cards (for total pesquisados)
   const allUniqueIds = new Set(rows.map(r => r.ID));
