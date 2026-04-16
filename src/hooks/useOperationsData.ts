@@ -305,7 +305,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       mesChurn,
       cliente: card['Título'] || '',
       setup: parseNumber(card['Valor Setup']),
-      mrr: parseNumber(card['Valor CFOaaS']),
+      mrr: parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']),
       motivoPrincipal: trat?.['Motivo'] || card['Motivo Principal do Churn'] || '',
       motivosCancelamento: trat?.['Motivo Churn'] || card['Motivos cancelamento'] || '',
       cfo: card['CFO Responsavel'] || card['Responsavel'] || '',
