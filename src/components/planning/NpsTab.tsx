@@ -55,7 +55,7 @@ export function NpsTab() {
     });
 
     return {
-      produtos: [...new Set(Object.values(produtoMap))].filter(Boolean).sort(),
+      produtos: [...new Set(Object.values(produtoMap).flat())].filter(Boolean).sort(),
       cfos: [...allCfos].filter(Boolean).sort(),
     };
   }, [npsData?.raw]);
@@ -71,7 +71,7 @@ export function NpsTab() {
     if (selectedProdutos.length > 0) {
       const matchingIds = new Set(
         Object.entries(produtoMap)
-          .filter(([, p]) => selectedProdutos.includes(p))
+          .filter(([, products]) => products.some(p => selectedProdutos.includes(p)))
           .map(([id]) => id)
       );
       filtered = filtered.filter(c => matchingIds.has(c.ID));

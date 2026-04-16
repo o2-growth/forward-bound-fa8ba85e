@@ -98,7 +98,7 @@ interface CentralProjeto {
   'Produtos': string | null;
 }
 
-async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<string, string>; npsPipeId: string; titleMap: Record<string, string>; produtoMap: Record<string, string> }> {
+async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<string, string>; npsPipeId: string; titleMap: Record<string, string>; produtoMap: Record<string, string[]> }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
@@ -124,58 +124,65 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     c.connected_pipe_name === '5.2 Pesquisa de Satisfação NPS'
   );
 
+  // Product connections: project card → DB Produtos
+  const productConnections = connections.filter(c =>
+    c.connected_pipe_name === 'DB Produtos'
+  );
+
   const npsPipeId = npsConnections[0]?.connected_pipe_id || '';
 
-  // Build projeto CFO, title, and produto lookups
+  // Build projeto CFO and title lookups
   const projetoCfoMap: Record<string, string> = {};
   const projetoTitleMap: Record<string, string> = {};
-  const projetoProdutoMap: Record<string, string> = {};
   projetos.forEach(p => {
     if (p['Fase'] === p['Fase Atual'] && p['CFO Responsavel']) {
       projetoCfoMap[p.ID] = p['CFO Responsavel'];
     }
     if (p['Fase'] === p['Fase Atual']) {
       projetoTitleMap[p.ID] = p['Título'] || '';
-      if (p['Produtos']) {
-        projetoProdutoMap[p.ID] = p['Produtos'];
-      }
     }
   });
 
-  // Map NPS card ID → CFO, title, and produto from connected project
+  // Build map: project card ID → set of product names from DB Produtos
+  const projetoProductsMap: Record<string, Set<string>> = {};
+  productConnections.forEach(conn => {
+    const projId = conn.card_id;
+    const productName = conn.connected_card_title;
+    if (projId && productName) {
+      if (!projetoProductsMap[projId]) projetoProductsMap[projId] = new Set();
+      projetoProductsMap[projId].add(productName);
+    }
+  });
+
+  // Map NPS card ID → CFO, title, and produtos from connected project
   const cfoMap: Record<string, string> = {};
   const titleMap: Record<string, string> = {};
-  const produtoMap: Record<string, string> = {};
+  const produtoMap: Record<string, string[]> = {};
   npsConnections.forEach(conn => {
     const cfo = projetoCfoMap[conn.card_id];
     if (cfo) cfoMap[conn.connected_card_id] = cfo;
     const title = projetoTitleMap[conn.card_id];
     if (title) titleMap[conn.connected_card_id] = title;
-    const produto = projetoProdutoMap[conn.card_id];
-    if (produto) produtoMap[conn.connected_card_id] = produto;
-  });
-
-  // Fallback: match NPS cards without CFO by exact title against Central de Projetos
-  const projetoCfoByTitle: Record<string, string> = {};
-  const projetoProdutoByTitle: Record<string, string> = {};
-  projetos.forEach(p => {
-    if (p['Fase'] === p['Fase Atual']) {
-      const t = (p['Título'] || '').trim().toLowerCase();
-      if (t && p['CFO Responsavel']) projetoCfoByTitle[t] = p['CFO Responsavel'];
-      if (t && p['Produtos']) projetoProdutoByTitle[t] = p['Produtos'];
+    const projectProducts = projetoProductsMap[conn.card_id];
+    if (projectProducts && projectProducts.size > 0) {
+      produtoMap[conn.connected_card_id] = [...projectProducts];
     }
   });
 
+  // Title fallback: for NPS cards without product connections, try matching by title
   npsRows.forEach(nps => {
     const id = nps.ID;
-    const titulo = (nps['Título'] || '').trim().toLowerCase();
-    if (!cfoMap[id] && titulo) {
-      const cfo = projetoCfoByTitle[titulo];
-      if (cfo) cfoMap[id] = cfo;
-    }
-    if (!produtoMap[id] && titulo) {
-      const produto = projetoProdutoByTitle[titulo];
-      if (produto) produtoMap[id] = produto;
+    if (!produtoMap[id]) {
+      const titulo = (nps['Título'] || '').trim().toLowerCase();
+      if (titulo) {
+        for (const [projId, products] of Object.entries(projetoProductsMap)) {
+          const projTitle = (projetoTitleMap[projId] || '').trim().toLowerCase();
+          if (projTitle === titulo) {
+            produtoMap[id] = [...products];
+            break;
+          }
+        }
+      }
     }
   });
 
@@ -190,17 +197,8 @@ function parseNpsScore(val: string | null): number | null {
 
 function parseCsatScore(val: string | null): number | null {
   if (!val) return null;
-  const s = String(val).toLowerCase();
-  // Try numeric prefix: "2: 🔴 Insatisfeito", "4: 🟢 Satisfeito"
-  const match = s.match(/^(\d)/);
-  if (match) return parseInt(match[1], 10);
-  // Fallback: match by emoji/text (order matters — check "extremamente" before generic)
-  if (s.includes('extremamente insatisfeito') || s.includes('⚫')) return 1;
-  if (s.includes('insatisfeito') || s.includes('🔴')) return 2;
-  if (s.includes('neutro') || s.includes('🟡')) return 3;
-  if (s.includes('extremamente satisfeito') || s.includes('💚')) return 5;
-  if (s.includes('satisfeito') || s.includes('🟢')) return 4;
-  return null;
+  const match = String(val).match(/^(\d)/);
+  return match ? parseInt(match[1], 10) : null;
 }
 
 function classifySeanEllis(val: string | null): 'muito_desapontado' | 'certa_forma' | 'nao_desapontado' | null {
@@ -235,15 +233,7 @@ function getNpsLabel(score: number): string {
 
 export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, string>, externalTitleMap: Record<string, string>, npsPipeId: string) {
   // Only current phase cards (unique)
-  // Get the latest row per card (most recent Entrada) — handles renamed phases like Q4/2025
-  const latestByCard = new Map<string, NpsCard>();
-  rows.forEach(r => {
-    const existing = latestByCard.get(r.ID);
-    if (!existing || r['Entrada'] > existing['Entrada']) {
-      latestByCard.set(r.ID, r);
-    }
-  });
-  const currentCards = Array.from(latestByCard.values());
+  const currentCards = rows.filter(r => r['Fase'] === r['Fase Atual']);
   
   // All cards (for total pesquisados)
   const allUniqueIds = new Set(rows.map(r => r.ID));
