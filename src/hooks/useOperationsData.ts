@@ -305,7 +305,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       mesChurn,
       cliente: card['Título'] || '',
       setup: parseNumber(card['Valor Setup']),
-      mrr: parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']),
+      mrr: parseNumber(card['Valor CFOaaS']),
       motivoPrincipal: trat?.['Motivo'] || card['Motivo Principal do Churn'] || '',
       motivosCancelamento: trat?.['Motivo Churn'] || card['Motivos cancelamento'] || '',
       cfo: card['CFO Responsavel'] || card['Responsavel'] || '',
@@ -414,7 +414,7 @@ function processSetup(rows: SetupCard[], projetos: ProjectCard[]) {
     return {
       id: card.ID,
       empresa: card['Título'] || card['Nome Empresa'] || '',
-      responsavel: card['Nome - Interlocução O2'] || card['CFO Responsavel'] || 'N/A',
+      responsavel: card['Implantador Oxy'] || 'N/A',
       faseAtual: card['Fase Atual'] || '',
       diasEmSetup: dias,
       atrasado: dias > 90,
