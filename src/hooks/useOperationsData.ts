@@ -53,7 +53,6 @@ export interface CfoClient {
   mrr: number;
   cardId: string;
   fase: string;
-  produto: string;
 }
 
 export interface CfoDistribution {
@@ -244,7 +243,6 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
         mrr,
         cardId: card.ID,
         fase,
-        produto: card['Produtos'] || '',
       });
       mrrTotal += mrr;
     }
