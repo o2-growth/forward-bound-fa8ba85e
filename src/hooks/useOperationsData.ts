@@ -414,7 +414,7 @@ function processSetup(rows: SetupCard[], projetos: ProjectCard[]) {
     return {
       id: card.ID,
       empresa: card['Título'] || card['Nome Empresa'] || '',
-      responsavel: card['Implantador Oxy'] || 'N/A',
+      responsavel: card['CFO Responsavel'] || 'N/A',
       faseAtual: card['Fase Atual'] || '',
       diasEmSetup: dias,
       atrasado: dias > 90,
