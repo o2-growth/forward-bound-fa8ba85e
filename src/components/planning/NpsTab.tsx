@@ -94,10 +94,20 @@ export function NpsTab() {
         if (!d) return false;
         return isWithinInterval(d, { start, end });
       });
+    } else if (selectedYear !== 'all') {
+      // Year-only filter fallback when dateRange is not set
+      const y = parseInt(selectedYear);
+      if (!isNaN(y)) {
+        filtered = filtered.filter(c => {
+          const d = parseEntradaDate(c['Entrada']);
+          if (!d) return false;
+          return d.getFullYear() === y;
+        });
+      }
     }
 
     return processNpsData(filtered, cfoMap, titleMap, npsPipeId);
-  }, [npsData?.raw, selectedProdutos, selectedCfos, dateRange]);
+  }, [npsData?.raw, selectedProdutos, selectedCfos, dateRange, selectedYear, selectedPeriod]);
 
   const handlePeriodChange = (period: string, range?: DateRange) => {
     setSelectedPeriod(period);
@@ -114,8 +124,9 @@ export function NpsTab() {
 
   // Use filtered data when filters are active, otherwise use original
   const hasDateFilter = Boolean(dateRange?.from && dateRange?.to);
-  const hasFilters = selectedProdutos.length > 0 || selectedCfos.length > 0 || hasDateFilter || selectedYear !== 'all';
-  const displayData = hasFilters ? filteredNpsData : npsData;
+  const hasFilters = selectedProdutos.length > 0 || selectedCfos.length > 0 || hasDateFilter || selectedYear !== 'all' || (selectedPeriod !== 'all');
+  // Always use filteredNpsData when available — it already returns full data when no filters match
+  const displayData = filteredNpsData ?? npsData;
 
   return (
     <div className="space-y-8">
@@ -162,12 +173,7 @@ export function NpsTab() {
 
         {churnOpen && (
           <div className="animate-in fade-in-0 slide-in-from-top-2 duration-300">
-            <ChurnDossierSection
-              data={opsData?.churnDossier || []}
-              selectedProdutos={selectedProdutos}
-              globalDateRange={dateRange}
-              globalCfos={selectedCfos}
-            />
+            <ChurnDossierSection data={opsData?.churnDossier || []} />
           </div>
         )}
       </div>
