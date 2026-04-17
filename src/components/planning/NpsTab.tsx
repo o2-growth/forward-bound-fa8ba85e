@@ -85,8 +85,34 @@ export function NpsTab() {
       });
     }
 
-    // Filter by date range (only when both from and to are set)
-    if (dateRange?.from && dateRange?.to) {
+    // Filter by quarter (Q1-Q4) using Fase Atual, NOT date range
+    // Q1 = "Entrada" phase, Q4 = "Q4/2025" phase, etc.
+    const isQuarterFilter = selectedPeriod && ['q1','q2','q3','q4'].includes(selectedPeriod);
+    if (isQuarterFilter) {
+      const qNumber = selectedPeriod.replace('q', '');
+      // Get latest row per card to check Fase Atual
+      const latestPerCard = new Map<string, NpsCard>();
+      filtered.forEach(r => {
+        const existing = latestPerCard.get(r.ID);
+        if (!existing || r['Entrada'] > existing['Entrada']) {
+          latestPerCard.set(r.ID, r);
+        }
+      });
+      const matchingIds = new Set<string>();
+      latestPerCard.forEach((card, id) => {
+        const faseAtual = (card['Fase Atual'] || '').toLowerCase();
+        // Match Q-phase: "q4/2025", "q1/2026", etc.
+        if (faseAtual.startsWith(`q${qNumber}`)) {
+          matchingIds.add(id);
+        }
+        // "Entrada" = current active survey round = Q1
+        if (faseAtual === 'entrada' && qNumber === '1') {
+          matchingIds.add(id);
+        }
+      });
+      filtered = filtered.filter(c => matchingIds.has(c.ID));
+    } else if (dateRange?.from && dateRange?.to) {
+      // Custom date range filter
       const start = startOfDay(dateRange.from);
       const end = endOfDay(dateRange.to);
       filtered = filtered.filter(c => {
@@ -95,7 +121,6 @@ export function NpsTab() {
         return isWithinInterval(d, { start, end });
       });
     } else if (selectedYear !== 'all') {
-      // Year-only filter fallback when dateRange is not set
       const y = parseInt(selectedYear);
       if (!isNaN(y)) {
         filtered = filtered.filter(c => {
@@ -106,8 +131,10 @@ export function NpsTab() {
       }
     }
 
-    const totalEligible = npsData.raw.totalEligible;
-    const cfoEligibleMap = npsData.raw.cfoEligibleMap;
+    // When a filter is active, don't use totalEligible (it's the CURRENT count, not historical)
+    const hasActiveFilter = isQuarterFilter || (dateRange?.from && dateRange?.to) || selectedProdutos.length > 0 || selectedCfos.length > 0 || selectedYear !== 'all';
+    const totalEligible = hasActiveFilter ? undefined : npsData.raw.totalEligible;
+    const cfoEligibleMap = hasActiveFilter ? undefined : npsData.raw.cfoEligibleMap;
     return processNpsData(filtered, cfoMap, titleMap, npsPipeId, totalEligible, cfoEligibleMap);
   }, [npsData?.raw, selectedProdutos, selectedCfos, dateRange, selectedYear, selectedPeriod]);
 
