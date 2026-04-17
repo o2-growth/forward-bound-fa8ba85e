@@ -130,9 +130,12 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
   const projetoCfoMap: Record<string, string> = {};
   const projetoTitleMap: Record<string, string> = {};
   const projetoProdutoMap: Record<string, string> = {};
+  const projetoCfoByTitle: Record<string, string> = {};
   projetos.forEach(p => {
     if (p['Fase'] === p['Fase Atual'] && p['CFO Responsavel']) {
       projetoCfoMap[p.ID] = p['CFO Responsavel'];
+      const t = (p['Título'] || '').trim().toLowerCase();
+      if (t) projetoCfoByTitle[t] = p['CFO Responsavel'];
     }
     if (p['Fase'] === p['Fase Atual']) {
       projetoTitleMap[p.ID] = p['Título'] || '';
@@ -142,26 +145,15 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     }
   });
 
-  // Build reverse lookup: project title (lowercased) → CFO
-  const projetoCfoByTitle: Record<string, string> = {};
-  projetos.forEach(p => {
-    if (p['Fase'] === p['Fase Atual'] && p['CFO Responsavel'] && p['Título']) {
-      const key = p['Título'].trim().toLowerCase();
-      if (key) projetoCfoByTitle[key] = p['CFO Responsavel'];
-    }
-  });
-
   // Product connections: project card → DB Produtos (individual product names)
   const productConnections = connections.filter(c => c.connected_pipe_name === 'DB Produtos');
-  const projetoProductsMap: Record<string, string[]> = {};
+  const projetoProductsMap: Record<string, Set<string>> = {};
   productConnections.forEach(conn => {
     const projId = conn.card_id;
     const productName = conn.connected_card_title;
     if (projId && productName) {
-      if (!projetoProductsMap[projId]) projetoProductsMap[projId] = [];
-      if (!projetoProductsMap[projId].includes(productName)) {
-        projetoProductsMap[projId].push(productName);
-      }
+      if (!projetoProductsMap[projId]) projetoProductsMap[projId] = new Set();
+      projetoProductsMap[projId].add(productName);
     }
   });
 
@@ -175,7 +167,7 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     const title = projetoTitleMap[conn.card_id];
     if (title) titleMap[conn.connected_card_id] = title;
     const products = projetoProductsMap[conn.card_id];
-    if (products && products.length > 0) {
+    if (products && products.size > 0) {
       produtoMap[conn.connected_card_id] = [...products];
     }
   });
