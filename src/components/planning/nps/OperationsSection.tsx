@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useOperationsData, CfoDistribution, CfoTaskSummary } from '@/hooks/useOperationsData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Users, UserCheck, AlertTriangle, UserMinus, DollarSign, ClipboardList, ChevronRight, Settings, Clock, ListChecks, ShieldCheck, TrendingDown, ShieldAlert } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
+import { DateRange } from 'react-day-picker';
 
 const COLORS = [
   'hsl(var(--primary))',
@@ -31,10 +32,118 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
 }
 
-export function OperationsSection() {
+interface OperationsSectionProps {
+  selectedProdutos?: string[];
+  selectedCfos?: string[];
+  dateRange?: DateRange;
+}
+
+export function OperationsSection({ selectedProdutos = [], selectedCfos = [], dateRange }: OperationsSectionProps) {
   const { data, isLoading, error } = useOperationsData();
   const [selectedCfo, setSelectedCfo] = useState<CfoDistribution | null>(null);
   const [selectedCfoTasks, setSelectedCfoTasks] = useState<CfoTaskSummary | null>(null);
+  const [expandedKpi, setExpandedKpi] = useState<string | null>(null);
+
+  // Filter data based on selected filters
+  const filteredData = useMemo(() => {
+    if (!data) return null;
+
+    const hasProductFilter = selectedProdutos.length > 0;
+    const hasCfoFilter = selectedCfos.length > 0;
+
+    if (!hasProductFilter && !hasCfoFilter) return data;
+
+    // Filter cfoDistribution by product and/or CFO
+    let filteredCfoDistribution = data.cfoDistribution.map(cfo => {
+      let clients = cfo.clients;
+
+      if (hasProductFilter) {
+        clients = clients.filter(client =>
+          selectedProdutos.some(p =>
+            (client.produto || '').toLowerCase().includes(p.toLowerCase())
+          )
+        );
+      }
+
+      return {
+        ...cfo,
+        clientes: clients.length,
+        mrr: clients.reduce((sum, c) => sum + c.mrr, 0),
+        clients,
+      };
+    }).filter(cfo => cfo.clientes > 0);
+
+    if (hasCfoFilter) {
+      filteredCfoDistribution = filteredCfoDistribution.filter(cfo =>
+        selectedCfos.includes(cfo.cfo)
+      );
+    }
+
+    // Filter tratativasAtivas by CFO
+    let filteredTratativas = data.tratativasAtivas || [];
+    if (hasCfoFilter) {
+      filteredTratativas = filteredTratativas.filter(t =>
+        selectedCfos.includes(t.cfo)
+      );
+    }
+
+    // Filter setupAtivos by responsavel (CFO filter)
+    let filteredSetup = data.setupAtivos || [];
+    if (hasCfoFilter) {
+      filteredSetup = filteredSetup.filter(s =>
+        selectedCfos.includes(s.responsavel)
+      );
+    }
+
+    // Filter cfoTaskSummary by CFO
+    let filteredTaskSummary = data.cfoTaskSummary || [];
+    if (hasCfoFilter) {
+      filteredTaskSummary = filteredTaskSummary.filter(t =>
+        selectedCfos.includes(t.cfo)
+      );
+    }
+
+    // Recompute KPIs from filtered data
+    const totalAtivos = filteredCfoDistribution.reduce((sum, c) => sum + c.clientes, 0);
+    const emOnboarding = filteredCfoDistribution.reduce((sum, c) =>
+      sum + c.clients.filter(cl => cl.fase === 'Onboarding').length, 0);
+    const emOperacao = filteredCfoDistribution.reduce((sum, c) =>
+      sum + c.clients.filter(cl => cl.fase === 'Em Operação Recorrente').length, 0);
+    const mrrTotal = filteredCfoDistribution.reduce((sum, c) => sum + c.mrr, 0);
+    const tratativasAtivas = filteredTratativas.length;
+    const emSetup = filteredSetup.length;
+    const setupAtrasados = filteredSetup.filter(s => s.atrasado).length;
+    const tarefasAtrasadas = filteredTaskSummary.reduce((sum, c) => sum + c.atrasadas, 0);
+
+    // For churn and rates, if CFO filter is active, we can't precisely filter churn count
+    // so we keep the original values when no filter applies to churn
+    const churn = data.kpis.churn;
+    const churnRate = (totalAtivos + churn) > 0 ? (churn / (totalAtivos + churn)) * 100 : 0;
+    const mrrEmRisco = data.kpis.mrrEmRisco;
+
+    const kpis = {
+      ...data.kpis,
+      totalAtivos,
+      emOnboarding,
+      emOperacao,
+      mrrTotal,
+      tratativasAtivas,
+      emSetup,
+      setupAtrasados,
+      tarefasAtrasadas,
+      churnRate,
+      retencaoRate: 100 - churnRate,
+    };
+
+    return {
+      ...data,
+      kpis,
+      cfoDistribution: filteredCfoDistribution,
+      tratativasAtivas: filteredTratativas,
+      setupAtivos: filteredSetup,
+      cfoTaskSummary: filteredTaskSummary,
+    };
+  }, [data, selectedProdutos, selectedCfos]);
 
   if (isLoading) {
     return (
@@ -50,7 +159,7 @@ export function OperationsSection() {
     );
   }
 
-  if (error || !data) {
+  if (error || !filteredData) {
     return (
       <Card className="border-destructive/50">
         <CardContent className="p-6 text-center text-destructive">
@@ -64,7 +173,7 @@ export function OperationsSection() {
     kpis, cfoDistribution, tratativasAtivas = [], motivoChurnCount = {},
     motivoCount = {}, setupAtivos = [], cfoTaskSummary = [],
     setupByErp = [], satisfacaoDistribution = [],
-  } = data;
+  } = filteredData;
 
   const kpiCards = [
     { icon: Users, label: 'Clientes Ativos', value: kpis.totalAtivos, color: 'text-primary' },
@@ -89,6 +198,304 @@ export function OperationsSection() {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
+  function renderKpiDetail(kpi: string) {
+    switch (kpi) {
+      case 'Clientes Ativos':
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>CFO</TableHead>
+                  <TableHead className="text-right">Clientes</TableHead>
+                  <TableHead className="text-right">MRR</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cfoDistribution.map(cfo => (
+                  <TableRow key={cfo.cfo}>
+                    <TableCell className="font-medium">{cfo.cfo}</TableCell>
+                    <TableCell className="text-right">{cfo.clientes}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(cfo.mrr)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        );
+      case 'Em Operação':
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>CFO</TableHead>
+                  <TableHead className="text-right">Clientes</TableHead>
+                  <TableHead className="text-right">MRR</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cfoDistribution.map(cfo => {
+                  const opClients = cfo.clients.filter(c => c.fase === 'Em Operação Recorrente');
+                  if (opClients.length === 0) return null;
+                  return (
+                    <TableRow key={cfo.cfo}>
+                      <TableCell className="font-medium">{cfo.cfo}</TableCell>
+                      <TableCell className="text-right">{opClients.length}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(opClients.reduce((s, c) => s + c.mrr, 0))}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        );
+      case 'Onboarding':
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>CFO</TableHead>
+                  <TableHead className="text-right">Clientes</TableHead>
+                  <TableHead className="text-right">MRR</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {cfoDistribution.map(cfo => {
+                  const obClients = cfo.clients.filter(c => c.fase === 'Onboarding');
+                  if (obClients.length === 0) return null;
+                  return (
+                    <TableRow key={cfo.cfo}>
+                      <TableCell className="font-medium">{cfo.cfo}</TableCell>
+                      <TableCell className="text-right">{obClients.length}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(obClients.reduce((s, c) => s + c.mrr, 0))}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        );
+      case 'Em Setup':
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Responsável</TableHead>
+                  <TableHead>Fase</TableHead>
+                  <TableHead className="text-right">Dias</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {setupAtivos.map(s => (
+                  <TableRow key={s.id} className={s.atrasado ? 'bg-destructive/5' : ''}>
+                    <TableCell className="font-medium">{s.empresa}</TableCell>
+                    <TableCell>{s.responsavel}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{s.faseAtual}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      <span className={s.atrasado ? 'text-destructive font-bold' : ''}>{s.diasEmSetup}d</span>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        );
+      case 'Setup >90d':
+        const atrasados = setupAtivos.filter(s => s.atrasado);
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            {atrasados.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum setup com mais de 90 dias.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>Responsável</TableHead>
+                    <TableHead>Fase</TableHead>
+                    <TableHead className="text-right">Dias</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {atrasados.map(s => (
+                    <TableRow key={s.id} className="bg-destructive/5">
+                      <TableCell className="font-medium">{s.empresa}</TableCell>
+                      <TableCell>{s.responsavel}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{s.faseAtual}</TableCell>
+                      <TableCell className="text-right font-mono text-destructive font-bold">{s.diasEmSetup}d</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        );
+      case 'Tarefas Atrasadas':
+        const allOverdue = cfoTaskSummary.flatMap(c =>
+          c.tarefas.map(t => ({ ...t, cfo: c.cfo }))
+        ).sort((a, b) => b.diasAtraso - a.diasAtraso);
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            {allOverdue.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma tarefa atrasada.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>CFO</TableHead>
+                    <TableHead>Tipo Entrega</TableHead>
+                    <TableHead className="text-right">Dias Atraso</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allOverdue.map(t => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium">{t.empresa}</TableCell>
+                      <TableCell>{t.cfo}</TableCell>
+                      <TableCell className="text-xs">{t.tipoEntrega}</TableCell>
+                      <TableCell className="text-right font-mono text-destructive font-bold">{t.diasAtraso}d</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        );
+      case 'Em Tratativa':
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            {tratativasAtivas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma tratativa ativa.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>Motivo</TableHead>
+                    <TableHead>CFO</TableHead>
+                    <TableHead>Fase</TableHead>
+                    <TableHead className="text-right">Dias</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tratativasAtivas.map(t => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium">{t.empresa}</TableCell>
+                      <TableCell><Badge variant="outline">{t.motivo}</Badge></TableCell>
+                      <TableCell>{t.cfo}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{t.faseAtual}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        <span className={t.diasEmTratativa > 30 ? 'text-destructive font-bold' : ''}>{t.diasEmTratativa}d</span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        );
+      case 'Churn':
+        return (
+          <div className="text-center py-4">
+            <p className="text-3xl font-bold text-destructive">{kpis.churn}</p>
+            <p className="text-sm text-muted-foreground mt-2">clientes em churn no período</p>
+            <p className="text-xs text-muted-foreground mt-1">Veja detalhes no Dossiê de Churn acima.</p>
+          </div>
+        );
+      case 'MRR Total':
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>CFO</TableHead>
+                  <TableHead className="text-right">Clientes</TableHead>
+                  <TableHead className="text-right">MRR</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...cfoDistribution].sort((a, b) => b.mrr - a.mrr).map(cfo => (
+                  <TableRow key={cfo.cfo}>
+                    <TableCell className="font-medium">{cfo.cfo}</TableCell>
+                    <TableCell className="text-right">{cfo.clientes}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(cfo.mrr)}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="font-bold border-t-2">
+                  <TableCell>Total</TableCell>
+                  <TableCell className="text-right">{cfoDistribution.reduce((s, c) => s + c.clientes, 0)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(kpis.mrrTotal)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        );
+      case 'Retenção':
+      case 'Tx Churn':
+        return (
+          <div className="space-y-3 py-4">
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Fórmula:</p>
+              <p className="text-sm font-mono mt-1">Tx Churn = Churns / (Ativos + Churns) x 100</p>
+              <p className="text-sm font-mono">Retenção = 100 - Tx Churn</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-xs text-muted-foreground">Ativos</p>
+                <p className="text-lg font-bold">{kpis.totalAtivos}</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-xs text-muted-foreground">Churns</p>
+                <p className="text-lg font-bold text-destructive">{kpis.churn}</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-xs text-muted-foreground">Tx Churn</p>
+                <p className="text-lg font-bold">{(kpis.churnRate ?? 0).toFixed(1)}%</p>
+              </div>
+            </div>
+          </div>
+        );
+      case 'MRR em Risco':
+        return (
+          <div className="max-h-[300px] overflow-auto">
+            {tratativasAtivas.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum MRR em risco.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Empresa</TableHead>
+                    <TableHead>CFO</TableHead>
+                    <TableHead>Motivo</TableHead>
+                    <TableHead className="text-right">Dias</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tratativasAtivas.map(t => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium">{t.empresa}</TableCell>
+                      <TableCell>{t.cfo}</TableCell>
+                      <TableCell><Badge variant="outline">{t.motivo}</Badge></TableCell>
+                      <TableCell className="text-right font-mono">
+                        <span className={t.diasEmTratativa > 30 ? 'text-destructive font-bold' : ''}>{t.diasEmTratativa}d</span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        );
+      default:
+        return <p className="text-sm text-muted-foreground text-center py-4">Sem detalhamento disponível.</p>;
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* KPI Cards */}
@@ -96,7 +503,11 @@ export function OperationsSection() {
         {kpiCards.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <div key={kpi.label} className="flex items-center gap-3 rounded-lg border bg-card p-4 shadow-sm">
+            <div
+              key={kpi.label}
+              className="flex items-center gap-3 rounded-lg border bg-card p-4 shadow-sm cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setExpandedKpi(expandedKpi === kpi.label ? null : kpi.label)}
+            >
               <div className="rounded-full bg-muted p-2.5">
                 <Icon className={`h-5 w-5 ${kpi.color}`} />
               </div>
@@ -108,6 +519,18 @@ export function OperationsSection() {
           );
         })}
       </div>
+
+      {/* Expanded KPI Detail */}
+      {expandedKpi && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{expandedKpi} — Detalhamento</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {renderKpiDetail(expandedKpi)}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CFO Distribution Table */}

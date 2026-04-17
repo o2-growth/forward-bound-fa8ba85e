@@ -222,7 +222,11 @@ export function NpsTab() {
 
         {opsOpen && (
           <div className="animate-in fade-in-0 slide-in-from-top-2 duration-300">
-            <OperationsSection />
+            <OperationsSection
+              selectedProdutos={selectedProdutos}
+              selectedCfos={selectedCfos}
+              dateRange={dateRange}
+            />
           </div>
         )}
       </div>
