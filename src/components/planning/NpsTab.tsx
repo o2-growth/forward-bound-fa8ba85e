@@ -106,7 +106,9 @@ export function NpsTab() {
       }
     }
 
-    return processNpsData(filtered, cfoMap, titleMap, npsPipeId);
+    const totalEligible = npsData.raw.totalEligible;
+    const cfoEligibleMap = npsData.raw.cfoEligibleMap;
+    return processNpsData(filtered, cfoMap, titleMap, npsPipeId, totalEligible, cfoEligibleMap);
   }, [npsData?.raw, selectedProdutos, selectedCfos, dateRange, selectedYear, selectedPeriod]);
 
   const handlePeriodChange = (period: string, range?: DateRange) => {

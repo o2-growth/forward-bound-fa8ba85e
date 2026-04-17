@@ -98,7 +98,7 @@ interface CentralProjeto {
   'Produtos': string | null;
 }
 
-async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<string, string>; npsPipeId: string; titleMap: Record<string, string>; produtoMap: Record<string, string[]> }> {
+async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<string, string>; npsPipeId: string; titleMap: Record<string, string>; produtoMap: Record<string, string[]>; totalEligible: number; cfoEligibleMap: Record<string, number> }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
@@ -192,7 +192,21 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
     }
   });
 
-  return { npsRows, cfoMap, npsPipeId, titleMap, produtoMap };
+  // Count eligible clients (active at time of survey)
+  const eligibleClients = projetos.filter(p =>
+    p['Fase'] === p['Fase Atual'] &&
+    ['Onboarding', 'Em Operação Recorrente'].includes(p['Fase Atual'] || '')
+  );
+  const totalEligible = new Set(eligibleClients.map(p => p.ID)).size;
+
+  // Build CFO eligible map from central_projetos
+  const cfoEligibleMap: Record<string, number> = {};
+  eligibleClients.forEach(p => {
+    const cfo = p['CFO Responsavel'] || '';
+    if (cfo) cfoEligibleMap[cfo] = (cfoEligibleMap[cfo] || 0) + 1;
+  });
+
+  return { npsRows, cfoMap, npsPipeId, titleMap, produtoMap, totalEligible, cfoEligibleMap };
 }
 
 function parseNpsScore(val: string | null): number | null {
@@ -203,8 +217,15 @@ function parseNpsScore(val: string | null): number | null {
 
 function parseCsatScore(val: string | null): number | null {
   if (!val) return null;
-  const match = String(val).match(/^(\d)/);
-  return match ? parseInt(match[1], 10) : null;
+  const s = String(val).toLowerCase();
+  const match = s.match(/^(\d)/);
+  if (match) return parseInt(match[1], 10);
+  if (s.includes('extremamente insatisfeito') || s.includes('⚫')) return 1;
+  if (s.includes('insatisfeito') || s.includes('🔴')) return 2;
+  if (s.includes('neutro') || s.includes('🟡')) return 3;
+  if (s.includes('extremamente satisfeito') || s.includes('💚')) return 5;
+  if (s.includes('satisfeito') || s.includes('🟢')) return 4;
+  return null;
 }
 
 function classifySeanEllis(val: string | null): 'muito_desapontado' | 'certa_forma' | 'nao_desapontado' | null {
@@ -237,17 +258,23 @@ function getNpsLabel(score: number): string {
   return 'Crítico';
 }
 
-export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, string>, externalTitleMap: Record<string, string>, npsPipeId: string) {
-  // Only current phase cards (unique)
-  const currentCards = rows.filter(r => r['Fase'] === r['Fase Atual']);
-  
-  // All cards (for total pesquisados)
-  const allUniqueIds = new Set(rows.map(r => r.ID));
-  const totalPesquisados = allUniqueIds.size;
+export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, string>, externalTitleMap: Record<string, string>, npsPipeId: string, totalEligible?: number, cfoEligibleMap?: Record<string, number>) {
+  // Get the latest row per card (most recent Entrada) — handles renamed phases like Q4/2025
+  const latestByCard = new Map<string, NpsCard>();
+  rows.forEach(r => {
+    const existing = latestByCard.get(r.ID);
+    if (!existing || r['Entrada'] > existing['Entrada']) {
+      latestByCard.set(r.ID, r);
+    }
+  });
+  const currentCards = Array.from(latestByCard.values());
 
   // Cards with NPS response
   const withNps = currentCards.filter(c => parseNpsScore(c['Nota NPS']) !== null);
   const respostas = withNps.length;
+
+  // Use eligible clients count if available, fallback to card count
+  const totalPesquisados = totalEligible || new Set(rows.map(r => r.ID)).size;
   const taxaResposta = totalPesquisados > 0 ? Math.round((respostas / totalPesquisados) * 100) : 0;
 
   // Unique CFOs (prefer external map, fallback to card fields)
@@ -354,6 +381,22 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
     if (se !== null) cfoAggMap[cfo].seClassifications.push(se);
   });
 
+  // Override enviados with eligible count from central_projetos
+  if (cfoEligibleMap) {
+    Object.keys(cfoAggMap).forEach(cfo => {
+      if (cfoEligibleMap[cfo]) {
+        cfoAggMap[cfo].enviados = cfoEligibleMap[cfo];
+      }
+    });
+
+    // Also add CFOs that have eligible clients but zero NPS responses
+    Object.entries(cfoEligibleMap).forEach(([cfo, count]) => {
+      if (!cfoAggMap[cfo]) {
+        cfoAggMap[cfo] = { enviados: count, withNps: [], csatScores: [], seClassifications: [] };
+      }
+    });
+  }
+
   const cfoPerformance: CfoPerformance[] = Object.entries(cfoAggMap).map(([name, data]) => {
     const resp = data.withNps.length;
     const taxa = data.enviados > 0 ? Math.round((resp / data.enviados) * 100) : 0;
@@ -436,9 +479,9 @@ export function useNpsData() {
   return useQuery({
     queryKey: ['nps-data'],
     queryFn: async () => {
-      const { npsRows, cfoMap, npsPipeId, titleMap, produtoMap } = await fetchNpsData();
-      const processed = processNpsData(npsRows, cfoMap, titleMap, npsPipeId);
-      return { ...processed, raw: { npsRows, cfoMap, titleMap, produtoMap, npsPipeId } };
+      const { npsRows, cfoMap, npsPipeId, titleMap, produtoMap, totalEligible, cfoEligibleMap } = await fetchNpsData();
+      const processed = processNpsData(npsRows, cfoMap, titleMap, npsPipeId, totalEligible, cfoEligibleMap);
+      return { ...processed, raw: { npsRows, cfoMap, titleMap, produtoMap, npsPipeId, totalEligible, cfoEligibleMap } };
     },
     staleTime: 5 * 60 * 1000,
   });
