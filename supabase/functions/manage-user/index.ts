@@ -30,10 +30,17 @@ const deleteUserSchema = z.object({
   userId: z.string().uuid(),
 });
 
+const resetPasswordSchema = z.object({
+  action: z.literal('reset_password'),
+  userId: z.string().uuid(),
+  newPassword: z.string().min(6).max(100),
+});
+
 const requestSchema = z.discriminatedUnion('action', [
   createUserSchema,
   updateUserSchema,
   deleteUserSchema,
+  resetPasswordSchema,
 ]);
 
 Deno.serve(async (req) => {
