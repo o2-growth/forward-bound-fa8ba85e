@@ -107,12 +107,24 @@ export function useJornadaData() {
 
     // Card connections: projectId → clienteId
     const projectToCliente = new Map<string, string>();
+    // DB Produtos connections: projectId → array of product names
+    const projectToProducts = new Map<string, string[]>();
     for (const conn of connections) {
       const cardId = String(conn.card_id || '');
       const connId = String(conn.connected_card_id || '');
       const relName = (conn.relation_name || '').toLowerCase();
       if (relName.includes('cliente') || relName.includes('client')) {
         projectToCliente.set(cardId, connId);
+      }
+      if (conn.connected_pipe_name === 'DB Produtos') {
+        const productName = (conn.connected_card_title || '').trim();
+        if (cardId && productName) {
+          const existing = projectToProducts.get(cardId) || [];
+          if (!existing.includes(productName)) {
+            existing.push(productName);
+          }
+          projectToProducts.set(cardId, existing);
+        }
       }
     }
 
@@ -226,10 +238,13 @@ export function useJornadaData() {
       const faseAtual = row['Fase Atual'] || '';
       const rawCfo = (row['CFO Responsavel'] || row['Responsavel'] || '').trim();
       const cfo = normalizeCfoName(rawCfo);
-      const produto = (row['Produtos'] || '').trim();
+      // Products from DB Produtos connections (like NPS does)
+      const dbProdutos = projectToProducts.get(id) || [];
+      const produto = dbProdutos.length > 0 ? dbProdutos[0] : (row['Produtos'] || '').trim();
+      const produtos = dbProdutos.length > 0 ? dbProdutos : (row['Produtos'] || '').split(',').map((p: string) => p.trim()).filter(Boolean);
       // Check if product is pontual-only (no recurring component)
       const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico Estratégico', 'Turnaround', 'Valuation', 'Educação', 'Educação – Dono CFO', 'Educação – Engenheiro de Negócios', 'Educação – Financeiro Raiz'];
-      const produtoParts = produto.split(',').map(p => p.trim());
+      const produtoParts = produtos;
       const isPontualOnly = produtoParts.length > 0 && produtoParts.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
 
       const valorCfoaas = parseNum(row['Valor CFOaaS']);
@@ -297,6 +312,7 @@ export function useJornadaData() {
         faseAtual,
         cfo,
         produto,
+        produtos,
         mrr,
         pontual,
         valorSetup: parseNum(row['Valor Setup']),
@@ -433,7 +449,7 @@ export function useJornadaData() {
         .map(c => c.cfo)
         .filter(Boolean)
     )].sort();
-    const allProdutos = [...new Set(allClientes.map(c => c.produto).filter(Boolean))].sort();
+    const allProdutos = [...new Set(allClientes.flatMap(c => c.produtos).filter(Boolean))].sort();
 
     // === 6. Build Reunioes ===
     const reunioes: Array<{
@@ -444,6 +460,8 @@ export function useJornadaData() {
       t1: string | null; t2: string | null; t3: string | null; t4: string | null;
     }> = [];
 
+    // Deduplicate reunioes by client name (titulo) per month — keep the entry with the most R1-R4 data
+    const reuniaoDedup = new Map<string, { row: any; filledCount: number }>();
     for (const row of data.rotinas) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const tipo = row['Tipo de Entrega'] || '';
@@ -453,6 +471,22 @@ export function useJornadaData() {
       const REUNIAO_EXCLUDE = ['Cancelado', 'Cancelada', 'Arquivado', 'Arquivo'];
       if (REUNIAO_EXCLUDE.some(t => faseRotina.includes(t))) continue;
 
+      const titulo = (row['Título'] || '').trim();
+      const mesRef = (row['Mes Referencia'] || '').trim();
+      const dedupKey = `${titulo.toLowerCase()}||${mesRef.toLowerCase()}`;
+      const r1 = parseDate(row['Data Reuniao 1']);
+      const r2 = parseDate(row['Data Reuniao 2']);
+      const r3 = parseDate(row['Data Reuniao 3']);
+      const r4 = parseDate(row['Data Mensal']);
+      const filledCount = [r1, r2, r3, r4].filter(d => d !== null).length;
+
+      const existing = reuniaoDedup.get(dedupKey);
+      if (!existing || filledCount > existing.filledCount) {
+        reuniaoDedup.set(dedupKey, { row, filledCount });
+      }
+    }
+
+    for (const { row } of reuniaoDedup.values()) {
       reunioes.push({
         id: String(row.ID || ''),
         titulo: (row['Título'] || '').trim(),

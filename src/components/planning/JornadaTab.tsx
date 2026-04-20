@@ -37,7 +37,7 @@ export function JornadaTab() {
     if (!hasFilters) return activeOnly;
     return activeOnly.filter(c => {
       if (filters.cfo.length > 0 && !filters.cfo.includes(c.cfo)) return false;
-      if (filters.produto.length > 0 && !filters.produto.includes(c.produto)) return false;
+      if (filters.produto.length > 0 && !c.produtos.some(p => filters.produto.includes(p))) return false;
       if (filters.healthLevel.length > 0 && !filters.healthLevel.includes(c.healthLevel)) return false;
       return true;
     });

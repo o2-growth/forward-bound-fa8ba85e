@@ -4,6 +4,7 @@ export interface JornadaCliente {
   faseAtual: string;
   cfo: string;
   produto: string;
+  produtos: string[];    // All products from DB Produtos
   mrr: number;           // Recorrente: CFOaaS + OXY
   pontual: number;       // Servicos especiais: Diagnostico + Turnaround + Valuation + Educacao
   valorSetup: number;    // Implantacao (one-time)
