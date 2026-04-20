@@ -52,9 +52,13 @@ interface Props {
   globalCfos?: string[];
 }
 
+const CHURN_OPERACIONAL = ['Atendimento O2', 'Cliente Omisso'];
+const CHURN_COMERCIAL = ['Comercial O2', 'Financeiro', 'Replanejamento do Cliente', 'Serviço Finalizado'];
+
 export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [] }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
+  const [filterTipoChurn, setFilterTipoChurn] = useState<'all' | 'operacional' | 'comercial'>('all');
 
   /* ─── derived data ─── */
   const motivos = useMemo(() => [...new Set(data.map(d => d.motivoPrincipal).filter(Boolean))], [data]);
@@ -62,6 +66,12 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   const filtered = useMemo(() => {
     return data.filter(d => {
       if (filterMotivo !== 'all' && d.motivoPrincipal !== filterMotivo) return false;
+      if (filterTipoChurn === 'operacional') {
+        if (!CHURN_OPERACIONAL.some(m => (d.motivosCancelamento || '').includes(m) || (d.motivoPrincipal || '').includes(m))) return false;
+      }
+      if (filterTipoChurn === 'comercial') {
+        if (!CHURN_COMERCIAL.some(m => (d.motivosCancelamento || '').includes(m) || (d.motivoPrincipal || '').includes(m))) return false;
+      }
       if (globalCfos.length > 0 && !globalCfos.includes(d.cfo)) return false;
       if (selectedProdutos.length > 0 && !selectedProdutos.some(p => (d.produto || '').includes(p))) return false;
       if (globalDateRange?.from) {
@@ -72,7 +82,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
       }
       return true;
     });
-  }, [data, filterMotivo, globalCfos, selectedProdutos, globalDateRange]);
+  }, [data, filterMotivo, filterTipoChurn, globalCfos, selectedProdutos, globalDateRange]);
 
   const totalMrrPerdido = useMemo(() => filtered.reduce((s, d) => s + (d.mrr || 0), 0), [filtered]);
   
@@ -126,7 +136,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
     );
   }
 
-  const hasFilters = filterMotivo !== 'all' || globalCfos.length > 0 || selectedProdutos.length > 0 || !!globalDateRange?.from;
+  const hasFilters = filterMotivo !== 'all' || filterTipoChurn !== 'all' || globalCfos.length > 0 || selectedProdutos.length > 0 || !!globalDateRange?.from;
 
   return (
     <div className="space-y-6">
@@ -256,8 +266,18 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                   {motivos.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {filterMotivo !== 'all' && (
-                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setFilterMotivo('all')}>
+              <Select value={filterTipoChurn} onValueChange={(v) => setFilterTipoChurn(v as 'all' | 'operacional' | 'comercial')}>
+                <SelectTrigger className="w-[160px] h-8 text-xs">
+                  <SelectValue placeholder="Tipo Churn" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  <SelectItem value="operacional">Churn Operacional</SelectItem>
+                  <SelectItem value="comercial">Churn Comercial</SelectItem>
+                </SelectContent>
+              </Select>
+              {(filterMotivo !== 'all' || filterTipoChurn !== 'all') && (
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setFilterMotivo('all'); setFilterTipoChurn('all'); }}>
                   Limpar
                 </Button>
               )}

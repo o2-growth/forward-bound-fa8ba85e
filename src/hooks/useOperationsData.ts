@@ -227,13 +227,16 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   let mrrEmRisco = 0;
 
   const fasesAtivas = ['Onboarding', 'Em Operação Recorrente'];
+  const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico Estratégico', 'Turnaround', 'Valuation', 'Educação', 'Educação – Dono CFO', 'Educação – Engenheiro de Negócios', 'Educação – Financeiro Raiz'];
 
   currentPhase.forEach(card => {
     const fase = card['Fase Atual'] || 'Desconhecida';
     phaseCount[fase] = (phaseCount[fase] || 0) + 1;
 
     const cfo = card['CFO Responsavel'] || card['Responsavel'] || 'Sem CFO';
-    const mrr = parseNumber(card['Valor CFOaaS']);
+    const produtos = (card['Produtos'] || '').split(',').map(p => p.trim()).filter(Boolean);
+    const isPontualOnly = produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+    const mrr = isPontualOnly ? 0 : (parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']));
 
     if (fasesAtivas.includes(fase)) {
       if (!cfoMapAtivos[cfo]) cfoMapAtivos[cfo] = { clientes: 0, mrr: 0, clients: [] };
@@ -307,8 +310,12 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       mesChurn,
       cliente: card['Título'] || '',
       setup: parseNumber(card['Valor Setup']),
-      mrr: parseNumber(card['Valor CFOaaS']),
-      motivoPrincipal: trat?.['Motivo'] || card['Motivo Principal do Churn'] || '',
+      mrr: (() => {
+        const prods = (card['Produtos'] || '').split(',').map(p => p.trim()).filter(Boolean);
+        const pontual = prods.length > 0 && prods.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+        return pontual ? 0 : (parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']));
+      })(),
+      motivoPrincipal: trat?.['Motivo Churn'] || trat?.['Motivo'] || card['Motivo Principal do Churn'] || '',
       motivosCancelamento: trat?.['Motivo Churn'] || card['Motivos cancelamento'] || '',
       cfo: card['CFO Responsavel'] || card['Responsavel'] || '',
       produto: card['Produtos'] || '',
