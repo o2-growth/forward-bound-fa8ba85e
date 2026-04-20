@@ -1,21 +1,26 @@
 
 
-User vê 2.048 Leads no funil Modelo Atual de Abril/2026. Suspeita de erro. Preciso investigar.
+User aprovou: ajustar `useModeloAtualMetas` para remover contaminação de "Start form" (Expansão) do indicador Leads do Modelo Atual.
 
-## Investigação
+## Ajuste do funil Leads — Modelo Atual
 
-Vou:
-1. Ler `useModeloAtualMetas` (especificamente `getQtyForPeriod('leads')`) para entender a lógica.
-2. Ler `useFunnelRealized`/`PeriodFunnelChart` para confirmar de onde vem o `leadsQty`.
-3. Comparar com a memória `mem://logic/indicators/leads-definition-modelo-atual` (Leads = união de cards que entraram em 'Novos Leads' OU 'MQLs').
-4. Consultar o banco direto contando cards distintos no pipe Modelo Atual com fase 'Novos Leads' ou 'MQLs' em Abril/2026, para validar o número 2.048.
-5. Cruzar com MQL=274 (esperado): se Leads inclui MQL, 2.048 - 274 = 1.774 cards "só lead". Faz sentido para Modelo Atual? Provavelmente sim — entrada bruta de leads é alta.
+### Problema
+O hook `useModeloAtualMetas` mapeia `'Start form': 'mql'` no `PHASE_TO_INDICATOR`. Como Leads = união de cards em fase Lead OU MQL, isso puxa 1.027 cards de Expansão/Franquia para o funil Modelo Atual, inflando Leads de ~1.030 para 2.048 em Abril/2026.
 
-Hipóteses prováveis de "erro":
-- A) Está somando MQLs também (por design, conforme memória), mas o user esperava só "Novos Leads".
-- B) Está sem dedup mensal correta (contando entradas múltiplas por card).
-- C) Está incluindo cards de outras BUs por engano.
-- D) Período errado (puxando ano todo / outros meses).
+### Mudança
+Em `src/hooks/useModeloAtualMetas.ts`:
+- Remover `'Start form': 'mql'` do mapa `PHASE_TO_INDICATOR`.
+- "Start form" não pertence ao pipe Modelo Atual — é fase de captura da Expansão.
 
-Apresento plano para diagnóstico, não mudança de código ainda.
+### Resultado esperado
+- Leads (Abril/2026) cai de ~2.048 para ~1.030.
+- MQL, RM, RR, Proposta, Venda do Modelo Atual permanecem inalterados (não dependem de Start form).
+- Funil Modelo Atual passa a refletir apenas cards do próprio pipe.
+
+### Validação pós-mudança
+Pedirei ao user para abrir Indicadores → Modelo Atual → Abril/2026 e confirmar que Leads ficou em ~1.030 e o funil agora está consistente (MQL ≤ Leads).
+
+### Não vou
+- Mexer em outras BUs (O2 TAX, Expansão, Oxy Hacker).
+- Alterar lógica de MQL, deduplicação ou faixa de qualificação.
 
