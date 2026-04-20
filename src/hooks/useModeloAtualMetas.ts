@@ -101,7 +101,8 @@ const PHASE_TO_INDICATOR: Record<string, ModeloAtualIndicator> = {
   'MQLs': 'mql',
   'Tentativas de contato': 'mql',
   'Material ISCA': 'mql',
-  'Start form': 'mql',
+  // 'Start form' removido: é fase do pipe Expansão/Franquia, não do Modelo Atual.
+  // Inclui-la inflava Leads do Modelo Atual com ~1.027 cards de outra BU.
   
   // RM - Reunião Marcada
   'Reunião agendada / Qualificado': 'rm',
