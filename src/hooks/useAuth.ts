@@ -52,8 +52,19 @@ export function useAuth() {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    // Limpa estado local imediatamente para garantir UX consistente
+    setUser(null);
+    setSession(null);
+    try {
+      // scope 'local' não exige sessão válida no servidor
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch (err) {
+      console.warn('signOut warning:', err);
+    }
+    // Força navegação para a tela de auth, garantindo logout mesmo se algum
+    // listener não disparar
+    window.location.href = '/auth';
+    return { error: null };
   };
 
   const resetPassword = async (email: string) => {
