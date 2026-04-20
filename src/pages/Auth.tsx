@@ -83,7 +83,7 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
-    if (user && mode !== 'reset') {
+    if (user && (mode === 'login' || mode === 'signup')) {
       navigate('/', { replace: true });
     }
   }, [user, navigate, mode]);
