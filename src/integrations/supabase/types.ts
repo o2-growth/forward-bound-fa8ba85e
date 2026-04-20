@@ -44,6 +44,42 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          record_id: string
+          table_name: string
+          user_email: string | null
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id: string
+          table_name: string
+          user_email?: string | null
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          record_id?: string
+          table_name?: string
+          user_email?: string | null
+        }
+        Relationships: []
+      }
       bu_indicators_config: {
         Row: {
           bu: string
@@ -51,6 +87,7 @@ export type Database = {
           cpv: number
           created_at: string
           id: string
+          month: string
           mql_to_rm: number
           prop_to_venda: number
           rm_to_rr: number
@@ -64,6 +101,7 @@ export type Database = {
           cpv?: number
           created_at?: string
           id?: string
+          month: string
           mql_to_rm?: number
           prop_to_venda?: number
           rm_to_rr?: number
@@ -77,6 +115,7 @@ export type Database = {
           cpv?: number
           created_at?: string
           id?: string
+          month?: string
           mql_to_rm?: number
           prop_to_venda?: number
           rm_to_rr?: number
