@@ -48,6 +48,7 @@ export function useBUIndicatorsConfig() {
           .from('bu_indicators_config')
           .upsert({
             bu,
+            month: 'global',
             ticket_medio: indicators.ticketMedio,
             cpmql: indicators.cpmql,
             cpv: indicators.cpv,
@@ -55,7 +56,7 @@ export function useBUIndicatorsConfig() {
             rm_to_rr: indicators.rmToRr,
             rr_to_prop: indicators.rrToProp,
             prop_to_venda: indicators.propToVenda,
-          }, { onConflict: 'bu' });
+          }, { onConflict: 'bu,month' });
         if (error) throw error;
       }
     },
