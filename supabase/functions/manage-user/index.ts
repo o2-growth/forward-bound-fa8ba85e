@@ -242,6 +242,30 @@ Deno.serve(async (req) => {
         );
       }
 
+      case 'reset_password': {
+        const { userId, newPassword } = validatedData;
+
+        const { error: pwError } = await supabaseAdmin.auth.admin.updateUserById(
+          userId,
+          { password: newPassword }
+        );
+
+        if (pwError) {
+          console.error('Error resetting password:', pwError);
+          return new Response(
+            JSON.stringify({ error: pwError.message }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        console.log('Password reset successfully for user:', userId);
+
+        return new Response(
+          JSON.stringify({ success: true }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       default:
         return new Response(
           JSON.stringify({ error: 'Invalid action' }),
@@ -249,6 +273,13 @@ Deno.serve(async (req) => {
         );
     }
   } catch (error) {
+    console.error('Unexpected error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});
     console.error('Unexpected error:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
