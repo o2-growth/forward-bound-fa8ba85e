@@ -1,26 +1,45 @@
 
 
-User aprovou: ajustar `useModeloAtualMetas` para remover contaminação de "Start form" (Expansão) do indicador Leads do Modelo Atual.
+Corrigir o campo de email da tela “Recuperar senha” para que o texto digitado não suma nem pareça “não entrar”.
 
-## Ajuste do funil Leads — Modelo Atual
+### O que vou ajustar
+1. Revisar `src/pages/Auth.tsx` e padronizar o binding do formulário de recuperação:
+   - garantir `value={field.value ?? ''}`
+   - passar `onChange`, `onBlur`, `name` e `ref` do `react-hook-form` diretamente para o `Input`
+   - evitar qualquer reset implícito no campo durante re-render
 
-### Problema
-O hook `useModeloAtualMetas` mapeia `'Start form': 'mql'` no `PHASE_TO_INDICATOR`. Como Leads = união de cards em fase Lead OU MQL, isso puxa 1.027 cards de Expansão/Franquia para o funil Modelo Atual, inflando Leads de ~1.030 para 2.048 em Abril/2026.
+2. Ajustar a estrutura dos campos dentro de `FormControl`:
+   - hoje alguns campos usam `FormControl` envolvendo um `div` com `Input` + botão
+   - vou reorganizar isso para o input continuar sendo o elemento principal do controle, evitando comportamento estranho de foco/ref
 
-### Mudança
-Em `src/hooks/useModeloAtualMetas.ts`:
-- Remover `'Start form': 'mql'` do mapa `PHASE_TO_INDICATOR`.
-- "Start form" não pertence ao pipe Modelo Atual — é fase de captura da Expansão.
+3. Eliminar a causa provável do comportamento de “digita e some”:
+   - reduzir remounts desnecessários entre modos (`login`, `forgot`, `reset`, `signup`)
+   - se necessário, separar melhor os formulários por modo para o campo de recuperação não herdar estado incorreto
+
+4. Conferir consistência visual e funcional:
+   - placeholder continua igual
+   - validação “Email inválido” só aparece corretamente sem apagar o valor digitado
+   - botão “Enviar link de recuperação” continua funcionando igual
+
+### Arquivos envolvidos
+- `src/pages/Auth.tsx`
+- possivelmente `src/components/ui/form.tsx` se eu precisar alinhar o uso de `FormControl`
 
 ### Resultado esperado
-- Leads (Abril/2026) cai de ~2.048 para ~1.030.
-- MQL, RM, RR, Proposta, Venda do Modelo Atual permanecem inalterados (não dependem de Start form).
-- Funil Modelo Atual passa a refletir apenas cards do próprio pipe.
+- você consegue clicar no campo de email em “Recuperar senha”
+- consegue digitar normalmente
+- o valor permanece visível
+- a validação não apaga o texto
+- o campo não perde foco a cada tecla
 
-### Validação pós-mudança
-Pedirei ao user para abrir Indicadores → Modelo Atual → Abril/2026 e confirmar que Leads ficou em ~1.030 e o funil agora está consistente (MQL ≤ Leads).
+### Validação depois da correção
+Vou considerar a correção pronta quando este fluxo estiver estável:
+1. abrir `/auth`
+2. clicar em “Esqueci minha senha”
+3. digitar um email completo
+4. ver o texto permanecendo no input
+5. enviar o formulário normalmente
 
-### Não vou
-- Mexer em outras BUs (O2 TAX, Expansão, Oxy Hacker).
-- Alterar lógica de MQL, deduplicação ou faixa de qualificação.
+### Observação técnica
+Pelos sinais atuais, o problema não parece ser de backend nem de envio de email. Está com cara de problema de renderização/binding do campo no frontend da tela de autenticação.
 
