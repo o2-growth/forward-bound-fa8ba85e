@@ -1,45 +1,30 @@
 
 
-Corrigir o campo de email da tela “Recuperar senha” para que o texto digitado não suma nem pareça “não entrar”.
+User reporta que ainda não consegue digitar email em "Recuperar senha". Console mostra avisos de "Function components cannot be given refs" em vários lugares, incluindo `FormField` no Auth. Esses warnings são ruído antigo (vindos de `Toaster`, `O2Logo`, `Navigate`, etc.) e não causam o bug do input — mas o aviso específico em `FormField` no formulário de recovery indica que o `Input` não está recebendo o `ref` corretamente, o que pode estar quebrando o registro do react-hook-form e fazendo o valor digitado não persistir.
 
-### O que vou ajustar
-1. Revisar `src/pages/Auth.tsx` e padronizar o binding do formulário de recuperação:
-   - garantir `value={field.value ?? ''}`
-   - passar `onChange`, `onBlur`, `name` e `ref` do `react-hook-form` diretamente para o `Input`
-   - evitar qualquer reset implícito no campo durante re-render
+Olhando o código atual de `Auth.tsx`, o campo de email do forgot já tem o binding explícito (`name`, `ref`, `onBlur`, `onChange`, `value`). Então o que pode estar acontecendo:
 
-2. Ajustar a estrutura dos campos dentro de `FormControl`:
-   - hoje alguns campos usam `FormControl` envolvendo um `div` com `Input` + botão
-   - vou reorganizar isso para o input continuar sendo o elemento principal do controle, evitando comportamento estranho de foco/ref
+1. O `Input` do shadcn pode não estar com `forwardRef` corretamente exportando o ref → testar lendo `src/components/ui/input.tsx`.
+2. O `useEffect` que processa recovery roda no mount e chama `setMode('forgot')` quando o token é inválido — mas se não há token, não roda. OK.
+3. **Causa mais provável**: o `useEffect` de redirect (`if (user && mode !== 'reset')`) — se houver uma sessão ativa qualquer (ex: o user logado tentando "esqueci minha senha" sem deslogar), o componente redireciona para `/` a cada render, fazendo o input perder estado/foco a cada keystroke. Mas a rota é `/auth`, então o user não está logado... a menos que esteja.
+4. Outra causa: o re-render ao digitar dispara validação do zod, que pode estar resetando o form se schema mudar. Improvável.
 
-3. Eliminar a causa provável do comportamento de “digita e some”:
-   - reduzir remounts desnecessários entre modos (`login`, `forgot`, `reset`, `signup`)
-   - se necessário, separar melhor os formulários por modo para o campo de recuperação não herdar estado incorreto
+Preciso investigar mais antes de mudar código.
 
-4. Conferir consistência visual e funcional:
-   - placeholder continua igual
-   - validação “Email inválido” só aparece corretamente sem apagar o valor digitado
-   - botão “Enviar link de recuperação” continua funcionando igual
+## Plano
 
-### Arquivos envolvidos
-- `src/pages/Auth.tsx`
-- possivelmente `src/components/ui/form.tsx` se eu precisar alinhar o uso de `FormControl`
+### Investigação
+1. Ler `src/components/ui/input.tsx` para confirmar `forwardRef`.
+2. Ler `src/components/ui/form.tsx` para ver como `FormField`/`FormControl` propagam ref.
+3. Ler `src/hooks/useAuth.ts` para ver se há sessão sendo restaurada que faz o redirect disparar.
 
-### Resultado esperado
-- você consegue clicar no campo de email em “Recuperar senha”
-- consegue digitar normalmente
-- o valor permanece visível
-- a validação não apaga o texto
-- o campo não perde foco a cada tecla
+### Correção provável
+Se o input estiver OK, o problema é o `useEffect` de redirect rodando enquanto o user está em `mode='forgot'` mas tem sessão ativa (ex: já logado). Vou:
+- Adicionar `mode === 'login' || mode === 'signup'` como única condição de redirect (não redirecionar em `forgot` nem `reset`).
+- Mover os `useForm` para fora do componente ou garantir que não sejam recriados.
 
-### Validação depois da correção
-Vou considerar a correção pronta quando este fluxo estiver estável:
-1. abrir `/auth`
-2. clicar em “Esqueci minha senha”
-3. digitar um email completo
-4. ver o texto permanecendo no input
-5. enviar o formulário normalmente
+Se o `Input` não tiver `forwardRef`, vou corrigir no `src/components/ui/input.tsx`.
 
-### Observação técnica
-Pelos sinais atuais, o problema não parece ser de backend nem de envio de email. Está com cara de problema de renderização/binding do campo no frontend da tela de autenticação.
+### Validação
+User abre `/auth` → "Esqueci minha senha" → digita email → texto permanece → envia link com sucesso.
 
