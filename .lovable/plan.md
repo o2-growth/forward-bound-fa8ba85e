@@ -1,32 +1,33 @@
 
 
-User quer a lista nominal dos cards divergentes com motivo. Já fiz a comparação antes mas entreguei só sumário. Preciso re-executar (modo padrão) lendo os 3 xlsx + cruzando com banco e listar card a card no chat.
+User quer lista nominal dos cards divergentes COM link do Pipefy, card a card. Já fiz comparação antes mas só entreguei sumário. Preciso re-executar em modo padrão.
 
-## Listar cards divergentes (nome + motivo) — RM, RR e MQL
+## Listar cards divergentes com link do Pipefy
 
 ### O que vou fazer
 
 1. Re-copiar os 3 xlsx de `user-uploads://` para `/tmp/`.
-2. Para cada arquivo, extrair lista de cards (ID, Título, Fase Atual, Faixa de faturamento, Created at).
-3. Consultar `pipefy_cards_movements_expansao` (RM/RR Franquia) e `pipefy_cards_movements` (MQL Modelo Atual) via edge function `query-external-db` para o mesmo período.
-4. Para cada card do export, verificar se está sendo contado pelo sistema e classificar o motivo da exclusão:
-   - **RM/RR Franquia**: `sem_movimento_para_fase` | `card_de_teste` | `mes_diferente_por_dedup` | `pulou_fase_direto`
-   - **MQL Modelo Atual**: `faixa_faturamento_abaixo_200k` | `motivo_perda_excluido` (Duplicado/ICP fora/Não é demanda) | `card_de_teste` | `criado_fora_periodo`
+2. Cruzar com banco via `query-external-db`:
+   - RM/RR Franquia → `pipefy_cards_movements_expansao` (pipe Expansão)
+   - MQL Modelo Atual → `pipefy_cards_movements` (pipe Modelo Atual)
+3. Identificar cards do export ausentes no sistema e classificar motivo:
+   - **RM/RR**: `sem_movimento_para_fase` | `pulou_fase_direto` | `card_de_teste` | `mes_diferente_dedup`
+   - **MQL**: `faixa_faturamento_abaixo_200k` | `motivo_perda_excluido` | `card_de_teste`
+4. Gerar link Pipefy: `https://app.pipefy.com/pipes/{pipeId}#cards/{cardId}` (preciso descobrir pipeId Modelo Atual e Expansão — já tenho NPS/Central/Tratativas, falta confirmar via consulta).
 
-### Output (no chat, sem CSV)
+### Output (no chat)
 
-Três tabelas, uma por indicador, formato:
+Três tabelas markdown, uma por indicador:
 ```
-Título                     | Fase Atual              | Motivo
-Empresa X                  | Lead/MQL                | sem_movimento_para_fase
-Empresa Y                  | Perdido                 | sem_movimento_para_fase
-...
+| Título | Fase Atual | Motivo | Link |
+|--------|------------|--------|------|
+| Empresa X | Lead | sem_movimento_para_fase | [#123](https://app.pipefy.com/pipes/.../cards/123) |
 ```
 
-Limite: até 50 cards por indicador. Se houver mais, aviso "+N cards adicionais com mesmo motivo".
+Limite 50 por indicador. Se exceder, agrupo o resto por motivo.
 
 ### Não vou
 - Alterar código.
-- Gerar arquivo/CSV.
-- Repetir o sumário estatístico.
+- Gerar arquivo CSV.
+- Repetir sumário estatístico.
 
