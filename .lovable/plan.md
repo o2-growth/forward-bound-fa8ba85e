@@ -1,30 +1,36 @@
 
 
-User reporta que ainda não consegue digitar email em "Recuperar senha". Console mostra avisos de "Function components cannot be given refs" em vários lugares, incluindo `FormField` no Auth. Esses warnings são ruído antigo (vindos de `Toaster`, `O2Logo`, `Navigate`, etc.) e não causam o bug do input — mas o aviso específico em `FormField` no formulário de recovery indica que o `Input` não está recebendo o `ref` corretamente, o que pode estar quebrando o registro do react-hook-form e fazendo o valor digitado não persistir.
+## Mover "Contratos por Faixa de Faturamento" para o drill-down de Vendas
 
-Olhando o código atual de `Auth.tsx`, o campo de email do forgot já tem o binding explícito (`name`, `ref`, `onBlur`, `onChange`, `value`). Então o que pode estar acontecendo:
+### O que muda
 
-1. O `Input` do shadcn pode não estar com `forwardRef` corretamente exportando o ref → testar lendo `src/components/ui/input.tsx`.
-2. O `useEffect` que processa recovery roda no mount e chama `setMode('forgot')` quando o token é inválido — mas se não há token, não roda. OK.
-3. **Causa mais provável**: o `useEffect` de redirect (`if (user && mode !== 'reset')`) — se houver uma sessão ativa qualquer (ex: o user logado tentando "esqueci minha senha" sem deslogar), o componente redireciona para `/` a cada render, fazendo o input perder estado/foco a cada keystroke. Mas a rota é `/auth`, então o user não está logado... a menos que esteja.
-4. Outra causa: o re-render ao digitar dispara validação do zod, que pode estar resetando o form se schema mudar. Improvável.
+**Remover** o card "Contratos por Faixa de Faturamento" da tela principal de Indicadores (logo abaixo dos gauges monetários).
 
-Preciso investigar mais antes de mudar código.
+**Adicionar** o mesmo widget dentro do modal de drill-down que abre ao clicar no acelerômetro **Vendas**, posicionado abaixo da seção "Composição do Faturamento" / charts (ainda dentro do bloco "Análise Visual"), antes da tabela de registros.
 
-## Plano
+### Arquivos afetados
 
-### Investigação
-1. Ler `src/components/ui/input.tsx` para confirmar `forwardRef`.
-2. Ler `src/components/ui/form.tsx` para ver como `FormField`/`FormControl` propagam ref.
-3. Ler `src/hooks/useAuth.ts` para ver se há sessão sendo restaurada que faz o redirect disparar.
+1. **`src/components/planning/indicators/DetailSheet.tsx`**
+   - Adicionar prop opcional `extraContent?: React.ReactNode` na interface `DetailSheetProps`.
+   - Renderizar `extraContent` dentro do `CollapsibleContent` de "Análise Visual", logo após `<DrillDownCharts />`.
+   - Resetar nada extra no close (é nó controlado pelo pai).
 
-### Correção provável
-Se o input estiver OK, o problema é o `useEffect` de redirect rodando enquanto o user está em `mode='forgot'` mas tem sessão ativa (ex: já logado). Vou:
-- Adicionar `mode === 'login' || mode === 'signup'` como única condição de redirect (não redirecionar em `forgot` nem `reset`).
-- Mover os `useForm` para fora do componente ou garantir que não sejam recriados.
+2. **`src/components/planning/IndicatorsTab.tsx`**
+   - Criar um novo estado `detailSheetExtraContent` (`React.ReactNode | null`) ao lado dos demais estados do DetailSheet.
+   - Extrair a lógica atual do bloco "Contratos por Faixa de Faturamento" (linhas 2631–2723) numa função/JSX reutilizável `renderTierBreakdown(vendaItems)` que recebe os items e retorna o `<Card>` com a grid de tiers.
+   - **Remover** o bloco JSX entre as linhas 2631–2723 da renderização principal.
+   - No `case 'venda':` do `handleRadialClick` (próximo da linha 1829), antes de `setDetailSheetOpen(true)`, chamar `setDetailSheetExtraContent(renderTierBreakdown(items))`.
+   - Em todos os outros `case`s e no `default`, chamar `setDetailSheetExtraContent(null)` para garantir limpeza entre cliques.
+   - Passar `extraContent={detailSheetExtraContent}` no JSX `<DetailSheet ... />`.
 
-Se o `Input` não tiver `forwardRef`, vou corrigir no `src/components/ui/input.tsx`.
+### Comportamento final
 
-### Validação
-User abre `/auth` → "Esqueci minha senha" → digita email → texto permanece → envia link com sucesso.
+- Tela principal de Indicadores: gauges monetários → (tier breakdown removido) → Loss Analysis → Revenue Pace.
+- Clicar no gauge "Vendas" abre o modal "Vendas - Análise de Valor (TCV)" com:
+  1. KPIs (Contratos, Setup, MRR, Pontual, TCV)
+  2. Charts (Composição, Conversão por Tier, TCV por Closer/SDR)
+  3. **Novo:** Card "Contratos por Faixa de Faturamento" (mesma aparência atual)
+  4. Tabela detalhada de contratos
+
+Sem mudança de schema, sem mudança de hooks, sem nova chamada à API — apenas reposicionamento.
 
