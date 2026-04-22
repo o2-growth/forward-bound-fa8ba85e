@@ -312,6 +312,7 @@ export function useJornadaData() {
         faseAtual,
         cfo,
         produto,
+        produtos: produtoParts,
         mrr,
         pontual,
         valorSetup: parseNum(row['Valor Setup']),
