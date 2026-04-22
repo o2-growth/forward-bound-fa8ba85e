@@ -71,8 +71,21 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
       if (globalCfos.length > 0 && !globalCfos.includes(d.cfo)) return false;
       if (selectedProdutos.length > 0 && !selectedProdutos.some(p => (d.produto || '').includes(p))) return false;
       if (globalDateRange?.from) {
-        const churnDate = d.dataEncerramento ? new Date(d.dataEncerramento) : null;
-        if (!churnDate || isNaN(churnDate.getTime())) return false;
+        let churnDate = d.dataEncerramento ? new Date(d.dataEncerramento) : null;
+        if (churnDate && isNaN(churnDate.getTime())) churnDate = null;
+        // Fallback: parse mesChurn (e.g. "Jan/2026") to get an approximate date
+        if (!churnDate && d.mesChurn) {
+          const meses: Record<string, number> = { 'Jan':0,'Fev':1,'Mar':2,'Abr':3,'Mai':4,'Jun':5,'Jul':6,'Ago':7,'Set':8,'Out':9,'Nov':10,'Dez':11 };
+          const parts = d.mesChurn.split('/');
+          if (parts.length === 2) {
+            const monthIdx = meses[parts[0]];
+            const year = parseInt(parts[1]);
+            if (monthIdx !== undefined && !isNaN(year)) {
+              churnDate = new Date(Date.UTC(year, monthIdx, 15)); // mid-month approximation
+            }
+          }
+        }
+        if (!churnDate) return false;
         const end = globalDateRange.to || globalDateRange.from;
         if (churnDate < globalDateRange.from || churnDate > end) return false;
       }
