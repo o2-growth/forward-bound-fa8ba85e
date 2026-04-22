@@ -1,11 +1,11 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, CheckCircle2, XCircle, Clock, AlertTriangle, ArrowUpDown, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { Calendar, CheckCircle2, XCircle, Circle, AlertTriangle, ArrowUpDown, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
 import type { JornadaCliente } from "./types";
 
 const MONTH_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -40,25 +40,21 @@ interface ReunioesViewProps {
 const DEADLINES = [7, 14, 21, 28];
 const REUNION_LABELS = ['R1', 'R2', 'R3', 'R4'];
 
-function getReunionStatus(data: Date | null, deadlineDay: number, now: Date): 'done_on_time' | 'done_late' | 'not_filled' | 'pending' | 'upcoming' {
-  const currentDay = now.getDate();
-  if (data) {
-    // Has date — check if on time or late
-    return data.getDate() <= deadlineDay ? 'done_on_time' : 'done_late';
+function getReunionStatus(data: Date | null, deadlineDay: number, now: Date): 'done' | 'late' | 'pending' | 'overdue' {
+  if (!data) {
+    // Não preencheu: verificar se já passou do prazo
+    return now.getDate() > deadlineDay ? 'overdue' : 'pending';
   }
-  // No date
-  if (currentDay > deadlineDay) return 'not_filled'; // deadline passed, not filled = RED
-  if (currentDay > deadlineDay - 3) return 'upcoming';
-  return 'pending';
+  // Preencheu: verificar se foi dentro do prazo
+  return data.getDate() <= deadlineDay ? 'done' : 'late';
 }
 
-function statusIcon(status: 'done_on_time' | 'done_late' | 'not_filled' | 'pending' | 'upcoming') {
+function statusIcon(status: 'done' | 'late' | 'pending' | 'overdue') {
   switch (status) {
-    case 'done_on_time': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    case 'done_late': return <CheckCircle2 className="h-4 w-4 text-amber-500" />;
-    case 'not_filled': return <XCircle className="h-4 w-4 text-red-500" />;
-    case 'upcoming': return <Clock className="h-4 w-4 text-amber-500" />;
-    case 'pending': return <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />;
+    case 'done': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    case 'late': return <XCircle className="h-4 w-4 text-red-500" />;
+    case 'overdue': return <XCircle className="h-4 w-4 text-orange-500" />;
+    case 'pending': return <Circle className="h-4 w-4 text-gray-400" />;
   }
 }
 
@@ -215,8 +211,8 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
     return monthFiltered.map(r => {
       const dates = [r.r1, r.r2, r.r3, r.r4];
       const statuses = dates.map((d, i) => getReunionStatus(d, DEADLINES[i], now));
-      const done = statuses.filter(s => s === 'done_on_time' || s === 'done_late').length;
-      const late = statuses.filter(s => s === 'not_filled').length;
+      const done = statuses.filter(s => s === 'done' || s === 'late').length;
+      const late = statuses.filter(s => s === 'late').length;
       const progress = done;
       return { ...r, statuses, done, late, progress };
     });
@@ -406,9 +402,8 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
               const matchedCliente = clientes ? findMatchedCliente(r.titulo) : undefined;
               const hasClienteData = !!matchedCliente;
               return (
-                <>
+                <React.Fragment key={r.id}>
                   <TableRow
-                    key={r.id}
                     className={`${r.late > 0 ? 'bg-red-500/5' : ''} ${hasClienteData ? 'cursor-pointer hover:bg-muted/50' : ''}`}
                     onClick={() => {
                       if (hasClienteData) {
@@ -440,37 +435,33 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
 
                       return (
                         <TableCell key={i} className="text-center">
-                          {status === 'done_on_time' ? (
+                          {status === 'done' ? (
                             <div className="flex flex-col items-center gap-0.5">
                               <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/20">
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                               </div>
-                              <span className="text-[9px] text-green-500">{dateLabel}</span>
+                              <span className="text-[9px] text-muted-foreground">{dateLabel}</span>
                             </div>
-                          ) : status === 'done_late' ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15">
-                                <CheckCircle2 className="h-4 w-4 text-amber-500" />
-                              </div>
-                              <span className="text-[9px] text-amber-500">{dateLabel}</span>
-                            </div>
-                          ) : status === 'not_filled' ? (
+                          ) : status === 'late' ? (
                             <div className="flex flex-col items-center gap-0.5">
                               <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15">
                                 <XCircle className="h-4 w-4 text-red-500" />
                               </div>
-                              <span className="text-[9px] text-red-400">pendente</span>
+                              <span className="text-[9px] text-red-400">{dateLabel || 'atraso'}</span>
                             </div>
-                          ) : status === 'upcoming' ? (
+                          ) : status === 'overdue' ? (
                             <div className="flex flex-col items-center gap-0.5">
-                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-amber-500/15">
-                                <Clock className="h-4 w-4 text-amber-500" />
+                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-orange-500/15">
+                                <XCircle className="h-4 w-4 text-orange-500" />
                               </div>
-                              <span className="text-[9px] text-amber-400">breve</span>
+                              <span className="text-[9px] text-orange-400">sem preench.</span>
                             </div>
                           ) : (
-                            <div className="flex items-center justify-center w-7 h-7">
-                              <div className="w-3 h-3 rounded-full border-2 border-muted-foreground/20" />
+                            <div className="flex flex-col items-center gap-0.5">
+                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-gray-400/15">
+                                <Circle className="h-4 w-4 text-gray-400" />
+                              </div>
+                              <span className="text-[9px] text-gray-400">pendente</span>
                             </div>
                           )}
                         </TableCell>
@@ -572,7 +563,7 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </React.Fragment>
               );
             })}
           </TableBody>

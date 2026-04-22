@@ -52,13 +52,10 @@ interface Props {
   globalCfos?: string[];
 }
 
-const CHURN_OPERACIONAL = ['Atendimento O2', 'Cliente Omisso'];
-const CHURN_COMERCIAL = ['Comercial O2', 'Financeiro', 'Replanejamento do Cliente', 'Serviço Finalizado'];
-
 export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [] }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
-  const [filterTipoChurn, setFilterTipoChurn] = useState<'all' | 'operacional' | 'comercial'>('all');
+  const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
 
   /* ─── derived data ─── */
   const motivos = useMemo(() => [...new Set(data.map(d => d.motivoPrincipal).filter(Boolean))], [data]);
@@ -66,11 +63,10 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   const filtered = useMemo(() => {
     return data.filter(d => {
       if (filterMotivo !== 'all' && d.motivoPrincipal !== filterMotivo) return false;
-      if (filterTipoChurn === 'operacional') {
-        if (!CHURN_OPERACIONAL.some(m => (d.motivosCancelamento || '').includes(m) || (d.motivoPrincipal || '').includes(m))) return false;
-      }
-      if (filterTipoChurn === 'comercial') {
-        if (!CHURN_COMERCIAL.some(m => (d.motivosCancelamento || '').includes(m) || (d.motivoPrincipal || '').includes(m))) return false;
+      if (filterTipoChurn !== 'all') {
+        const isDesistencia = d.faseAtual === 'Desistência';
+        if (filterTipoChurn === 'operacional' && isDesistencia) return false;
+        if (filterTipoChurn === 'comercial' && !isDesistencia) return false;
       }
       if (globalCfos.length > 0 && !globalCfos.includes(d.cfo)) return false;
       if (selectedProdutos.length > 0 && !selectedProdutos.some(p => (d.produto || '').includes(p))) return false;
@@ -257,6 +253,16 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
               <Badge variant="secondary" className="text-xs">{filtered.length} registros</Badge>
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
+              <Select value={filterTipoChurn} onValueChange={setFilterTipoChurn}>
+                <SelectTrigger className="w-[150px] h-8 text-xs">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos tipos</SelectItem>
+                  <SelectItem value="operacional">Operacional</SelectItem>
+                  <SelectItem value="comercial">Comercial</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={filterMotivo} onValueChange={setFilterMotivo}>
                 <SelectTrigger className="w-[150px] h-8 text-xs">
                   <SelectValue placeholder="Motivo" />
@@ -264,16 +270,6 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                 <SelectContent>
                   <SelectItem value="all">Todos motivos</SelectItem>
                   {motivos.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filterTipoChurn} onValueChange={(v) => setFilterTipoChurn(v as 'all' | 'operacional' | 'comercial')}>
-                <SelectTrigger className="w-[160px] h-8 text-xs">
-                  <SelectValue placeholder="Tipo Churn" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os tipos</SelectItem>
-                  <SelectItem value="operacional">Churn Operacional</SelectItem>
-                  <SelectItem value="comercial">Churn Comercial</SelectItem>
                 </SelectContent>
               </Select>
               {(filterMotivo !== 'all' || filterTipoChurn !== 'all') && (
@@ -306,11 +302,11 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((row) => {
+                {filtered.map((row, idx) => {
                   const isExpanded = expandedRow === row.id;
                   const highMrr = row.mrr >= 5000;
                   return (
-                    <React.Fragment key={row.id}>
+                    <React.Fragment key={`${row.id}-${idx}`}>
                       <TableRow
                         className={`cursor-pointer transition-colors ${highMrr ? 'bg-destructive/5 hover:bg-destructive/10' : 'hover:bg-muted/50'}`}
                         onClick={() => setExpandedRow(isExpanded ? null : row.id)}

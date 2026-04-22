@@ -2,11 +2,10 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { JornadaCliente, JornadaCfo, JornadaAlerta, PipelineFase, JornadaFilter } from "@/components/planning/jornada/types";
+import { parsePipefyDate, parsePipefyDateOnly } from "./dateUtils";
 
 function parseDate(val: string | null | undefined): Date | null {
-  if (!val) return null;
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? null : d;
+  return parsePipefyDate(val);
 }
 
 function parseNum(val: any): number {
@@ -105,10 +104,9 @@ export function useJornadaData() {
       if (id && dt) clienteAssinaturas.set(id, dt);
     }
 
-    // Card connections: projectId → clienteId
+    // Card connections: projectId → clienteId AND projectId → products from DB Produtos
     const projectToCliente = new Map<string, string>();
-    // DB Produtos connections: projectId → array of product names
-    const projectToProducts = new Map<string, string[]>();
+    const projectToProducts = new Map<string, Set<string>>();
     for (const conn of connections) {
       const cardId = String(conn.card_id || '');
       const connId = String(conn.connected_card_id || '');
@@ -116,14 +114,13 @@ export function useJornadaData() {
       if (relName.includes('cliente') || relName.includes('client')) {
         projectToCliente.set(cardId, connId);
       }
-      if (conn.connected_pipe_name === 'DB Produtos') {
+      // DB Produtos connections
+      const pipeName = (conn.connected_pipe_name || '').toLowerCase();
+      if (pipeName.includes('db produtos') || pipeName === 'db produtos') {
         const productName = (conn.connected_card_title || '').trim();
         if (cardId && productName) {
-          const existing = projectToProducts.get(cardId) || [];
-          if (!existing.includes(productName)) {
-            existing.push(productName);
-          }
-          projectToProducts.set(cardId, existing);
+          if (!projectToProducts.has(cardId)) projectToProducts.set(cardId, new Set());
+          projectToProducts.get(cardId)!.add(productName);
         }
       }
     }
@@ -184,7 +181,7 @@ export function useJornadaData() {
       const cfo = normalizeCfoName(rawCfoRotina);
       const titulo = (row['Título'] || '').trim().toLowerCase();
       const isOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
-      const dataPrevista = parseDate(row['Data Prevista Entrega']);
+      const dataPrevista = parsePipefyDateOnly(row['Data Prevista Entrega']);
       const atrasada = isOverdue || (dataPrevista && dataPrevista < now);
 
       if (cfo) {
@@ -217,10 +214,10 @@ export function useJornadaData() {
 
       const titulo = (row['Título'] || '').trim().toLowerCase();
       if (!titulo) continue;
-      const r1 = parseDate(row['Data Reuniao 1']);
-      const r2 = parseDate(row['Data Reuniao 2']);
-      const r3 = parseDate(row['Data Reuniao 3']);
-      const r4 = parseDate(row['Data Mensal']);
+      const r1 = parsePipefyDateOnly(row['Data Reuniao 1']);
+      const r2 = parsePipefyDateOnly(row['Data Reuniao 2']);
+      const r3 = parsePipefyDateOnly(row['Data Reuniao 3']);
+      const r4 = parsePipefyDateOnly(row['Data Mensal']);
       const feitas = [r1, r2, r3, r4].filter(d => d !== null).length;
       reunioesByTitulo.set(titulo, { feitas });
     }
@@ -238,13 +235,16 @@ export function useJornadaData() {
       const faseAtual = row['Fase Atual'] || '';
       const rawCfo = (row['CFO Responsavel'] || row['Responsavel'] || '').trim();
       const cfo = normalizeCfoName(rawCfo);
-      // Products from DB Produtos connections (like NPS does)
-      const dbProdutos = projectToProducts.get(id) || [];
-      const produto = dbProdutos.length > 0 ? dbProdutos[0] : (row['Produtos'] || '').trim();
-      const produtos = dbProdutos.length > 0 ? dbProdutos : (row['Produtos'] || '').split(',').map((p: string) => p.trim()).filter(Boolean);
+      // Products from DB Produtos connections (preferred) or fallback to text field
+      const dbProdutos = projectToProducts.get(id);
+      const produto = dbProdutos && dbProdutos.size > 0
+        ? [...dbProdutos].join(', ')
+        : (row['Produtos'] || '').trim();
       // Check if product is pontual-only (no recurring component)
       const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico Estratégico', 'Turnaround', 'Valuation', 'Educação', 'Educação – Dono CFO', 'Educação – Engenheiro de Negócios', 'Educação – Financeiro Raiz'];
-      const produtoParts = produtos;
+      const produtoParts = dbProdutos && dbProdutos.size > 0
+        ? [...dbProdutos]
+        : produto.split(',').map(p => p.trim());
       const isPontualOnly = produtoParts.length > 0 && produtoParts.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
 
       const valorCfoaas = parseNum(row['Valor CFOaaS']);
@@ -312,7 +312,6 @@ export function useJornadaData() {
         faseAtual,
         cfo,
         produto,
-        produtos,
         mrr,
         pontual,
         valorSetup: parseNum(row['Valor Setup']),
@@ -449,7 +448,7 @@ export function useJornadaData() {
         .map(c => c.cfo)
         .filter(Boolean)
     )].sort();
-    const allProdutos = [...new Set(allClientes.flatMap(c => c.produtos).filter(Boolean))].sort();
+    const allProdutos = [...new Set(allClientes.map(c => c.produto).filter(Boolean))].sort();
 
     // === 6. Build Reunioes ===
     const reunioes: Array<{
@@ -460,8 +459,7 @@ export function useJornadaData() {
       t1: string | null; t2: string | null; t3: string | null; t4: string | null;
     }> = [];
 
-    // Deduplicate reunioes by client name (titulo) per month — keep the entry with the most R1-R4 data
-    const reuniaoDedup = new Map<string, { row: any; filledCount: number }>();
+    const seenReunionIds = new Set<string>();
     for (const row of data.rotinas) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const tipo = row['Tipo de Entrega'] || '';
@@ -471,22 +469,11 @@ export function useJornadaData() {
       const REUNIAO_EXCLUDE = ['Cancelado', 'Cancelada', 'Arquivado', 'Arquivo'];
       if (REUNIAO_EXCLUDE.some(t => faseRotina.includes(t))) continue;
 
-      const titulo = (row['Título'] || '').trim();
-      const mesRef = (row['Mes Referencia'] || '').trim();
-      const dedupKey = `${titulo.toLowerCase()}||${mesRef.toLowerCase()}`;
-      const r1 = parseDate(row['Data Reuniao 1']);
-      const r2 = parseDate(row['Data Reuniao 2']);
-      const r3 = parseDate(row['Data Reuniao 3']);
-      const r4 = parseDate(row['Data Mensal']);
-      const filledCount = [r1, r2, r3, r4].filter(d => d !== null).length;
+      // Dedup by card ID
+      const reunionId = String(row.ID || '');
+      if (seenReunionIds.has(reunionId)) continue;
+      seenReunionIds.add(reunionId);
 
-      const existing = reuniaoDedup.get(dedupKey);
-      if (!existing || filledCount > existing.filledCount) {
-        reuniaoDedup.set(dedupKey, { row, filledCount });
-      }
-    }
-
-    for (const { row } of reuniaoDedup.values()) {
       reunioes.push({
         id: String(row.ID || ''),
         titulo: (row['Título'] || '').trim(),
@@ -495,12 +482,12 @@ export function useJornadaData() {
         mesReferencia: (row['Mes Referencia'] || '').trim(),
         selecaoReuniao: row['Selecao Reuniao'] || null,
         clienteParticipou: row['Cliente Participou'] || null,
-        dataPrevista: parseDate(row['Data Prevista Entrega']),
+        dataPrevista: parsePipefyDateOnly(row['Data Prevista Entrega']),
         overdue: row['Overdue'] === true || row['Overdue'] === 'true',
-        r1: parseDate(row['Data Reuniao 1']),
-        r2: parseDate(row['Data Reuniao 2']),
-        r3: parseDate(row['Data Reuniao 3']),
-        r4: parseDate(row['Data Mensal']),
+        r1: parsePipefyDateOnly(row['Data Reuniao 1']),
+        r2: parsePipefyDateOnly(row['Data Reuniao 2']),
+        r3: parsePipefyDateOnly(row['Data Reuniao 3']),
+        r4: parsePipefyDateOnly(row['Data Mensal']),
         t1: row['Temperatura 1'] || null,
         t2: row['Temperatura 2'] || null,
         t3: row['Temperatura 3'] || null,

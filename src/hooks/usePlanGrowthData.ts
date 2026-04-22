@@ -2,6 +2,7 @@ import { useMemo, useEffect, useRef } from "react";
 import { useMediaMetas } from "@/contexts/MediaMetasContext";
 import { useMonetaryMetas, BuType, isPontualOnlyBU } from "./useMonetaryMetas";
 import { useFunnelMetas } from "./useFunnelMetas";
+import { useBUIndicatorsConfig } from "./useBUIndicatorsConfig";
 
 // Indicadores de 2025 (base para projeção)
 const indicators2025 = {
@@ -55,7 +56,7 @@ interface BUIndicators {
   leadToMql: number;
 }
 
-const indicadoresPorBU: Record<string, BUIndicators> = {
+const DEFAULT_INDICADORES: Record<string, BUIndicators> = {
   modeloAtual: {
     ticketMedio: 17000,
     cpv: 6517.05,
@@ -319,13 +320,43 @@ export function usePlanGrowthData() {
   const { setMetasPorBU, setFunnelData, isLoaded } = useMediaMetas();
   const { metas, isLoading: isLoadingMetas } = useMonetaryMetas();
   const { funnelMetas, isLoading: isLoadingFunnel, hasFunnelForBU, getFunnelForBU, bulkUpsert } = useFunnelMetas();
+  const { getIndicatorsMap, isLoading: isLoadingIndicators } = useBUIndicatorsConfig();
   const hasSeeded = useRef(false);
-  
+
   // Default values (same as MediaInvestmentTab)
   const mrrInicial = 700000;
   const valorVenderInicial = 400000;
   const churnMensal = 0.06;
   const retencaoVendas = 0.25;
+
+  // Build indicadoresPorBU: DB values override hardcoded defaults
+  const indicadoresPorBU = useMemo(() => {
+    const dbMap = getIndicatorsMap();
+    const buKeyMap: Record<string, string> = {
+      modelo_atual: 'modeloAtual',
+      o2_tax: 'o2Tax',
+      oxy_hacker: 'oxyHacker',
+      franquia: 'franquia',
+    };
+    const result = { ...DEFAULT_INDICADORES };
+    if (dbMap) {
+      for (const [dbKey, stateKey] of Object.entries(buKeyMap)) {
+        if (dbMap[dbKey]) {
+          const db = dbMap[dbKey];
+          result[stateKey] = {
+            ...DEFAULT_INDICADORES[stateKey], // keep leadToMql fallback
+            ticketMedio: db.ticketMedio || DEFAULT_INDICADORES[stateKey].ticketMedio,
+            cpv: db.cpv || DEFAULT_INDICADORES[stateKey].cpv,
+            mqlToRm: db.mqlToRm || DEFAULT_INDICADORES[stateKey].mqlToRm,
+            rmToRr: db.rmToRr || DEFAULT_INDICADORES[stateKey].rmToRr,
+            rrToProp: db.rrToProp || DEFAULT_INDICADORES[stateKey].rrToProp,
+            propToVenda: db.propToVenda || DEFAULT_INDICADORES[stateKey].propToVenda,
+          };
+        }
+      }
+    }
+    return result;
+  }, [getIndicatorsMap]);
 
   // Helper: Get metas from database for a BU (original values only)
   const getMetasFromDb = (bu: BuType): Record<string, number> | null => {

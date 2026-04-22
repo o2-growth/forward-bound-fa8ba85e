@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { parsePipefyDate, parsePipefyDateOnly } from './dateUtils';
 
 export interface ProjectCard {
   ID: string;
@@ -203,17 +204,17 @@ interface NpsCard {
 
 function formatMonthYear(dateStr: string | null): string {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
+  const d = parsePipefyDate(dateStr);
+  if (!d) return '';
   const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   return `${months[d.getMonth()]}/${d.getFullYear()}`;
 }
 
 function diffInMonths(start: string | null, end: string | null): string {
   if (!start || !end) return '';
-  const s = new Date(start);
-  const e = new Date(end);
-  if (isNaN(s.getTime()) || isNaN(e.getTime())) return '';
+  const s = parsePipefyDate(start);
+  const e = parsePipefyDate(end);
+  if (!s || !e) return '';
   const months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
   return months > 0 ? String(months) : '';
 }
@@ -227,16 +228,13 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   let mrrEmRisco = 0;
 
   const fasesAtivas = ['Onboarding', 'Em Operação Recorrente'];
-  const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico Estratégico', 'Turnaround', 'Valuation', 'Educação', 'Educação – Dono CFO', 'Educação – Engenheiro de Negócios', 'Educação – Financeiro Raiz'];
 
   currentPhase.forEach(card => {
     const fase = card['Fase Atual'] || 'Desconhecida';
     phaseCount[fase] = (phaseCount[fase] || 0) + 1;
 
     const cfo = card['CFO Responsavel'] || card['Responsavel'] || 'Sem CFO';
-    const produtos = (card['Produtos'] || '').split(',').map(p => p.trim()).filter(Boolean);
-    const isPontualOnly = produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
-    const mrr = isPontualOnly ? 0 : (parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']));
+    const mrr = parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']);
 
     if (fasesAtivas.includes(fase)) {
       if (!cfoMapAtivos[cfo]) cfoMapAtivos[cfo] = { clientes: 0, mrr: 0, clients: [] };
@@ -296,25 +294,23 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     const nps = npsMap.get(key);
 
     const dataAssinatura = assinaturaMap.get(card.ID) || card['Data de assinatura do contrato'] || '';
-    const dataEncerramento = trat?.['Saída'] ? new Date(trat['Saída']).toISOString().split('T')[0] : trat?.['Entrada'] ? new Date(trat['Entrada']).toISOString().split('T')[0] : (card['Data encerramento'] || '');
+    const saidaDate = parsePipefyDate(trat?.['Saída']);
+    const tratEntradaDate = parsePipefyDate(trat?.['Entrada']);
+    const dataEncerramento = saidaDate ? saidaDate.toISOString().split('T')[0] : tratEntradaDate ? tratEntradaDate.toISOString().split('T')[0] : (card['Data encerramento'] || '');
     const mesChurn = trat ? formatMonthYear(trat['Entrada']) : (card['Mes do Churn'] || '');
     const ltMeses = diffInMonths(dataAssinatura, dataEncerramento) || (card['LT (meses)'] || '');
 
     const problemasOxy = nps?.['Comentarios'] || nps?.['Motivo da Nota'] || card['Problemas com a Oxy'] || '';
 
     // Determinar data de referência para filtro
-    const refDate = trat?.['Entrada'] ? new Date(trat['Entrada']).getTime() : (card['Entrada'] ? new Date(card['Entrada']).getTime() : 0);
+    const refDate = tratEntradaDate ? tratEntradaDate.getTime() : (parsePipefyDate(card['Entrada'])?.getTime() || 0);
 
     return {
       id: card.ID,
       mesChurn,
       cliente: card['Título'] || '',
       setup: parseNumber(card['Valor Setup']),
-      mrr: (() => {
-        const prods = (card['Produtos'] || '').split(',').map(p => p.trim()).filter(Boolean);
-        const pontual = prods.length > 0 && prods.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
-        return pontual ? 0 : (parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']));
-      })(),
+      mrr: parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']),
       motivoPrincipal: trat?.['Motivo Churn'] || trat?.['Motivo'] || card['Motivo Principal do Churn'] || '',
       motivosCancelamento: trat?.['Motivo Churn'] || card['Motivos cancelamento'] || '',
       cfo: card['CFO Responsavel'] || card['Responsavel'] || '',
@@ -355,7 +351,7 @@ function processTratativas(rows: TratativaCard[]) {
   const activeCards = currentPhase.filter(c => activeFases.includes(c['Fase Atual'] || ''));
 
   const tratativasAtivas: TratativaActive[] = activeCards.map(card => {
-    const entrada = new Date(card['Entrada']).getTime();
+    const entrada = parsePipefyDate(card['Entrada'])?.getTime() || now;
     const dias = Math.max(0, Math.round((now - entrada) / 86400000));
     return {
       id: card.ID,
@@ -418,7 +414,7 @@ function processSetup(rows: SetupCard[], projetos: ProjectCard[]) {
   const activeCards = currentPhase.filter(c => !SETUP_TERMINAL_PHASES.includes(c['Fase Atual'] || ''));
 
   const setupAtivos: SetupActive[] = activeCards.map(card => {
-    const entrada = new Date(card['Entrada']).getTime();
+    const entrada = parsePipefyDate(card['Entrada'])?.getTime() || now;
     const dias = Math.max(0, Math.round((now - entrada) / 86400000));
     return {
       id: card.ID,
@@ -451,8 +447,8 @@ function processSetup(rows: SetupCard[], projetos: ProjectCard[]) {
     if (card['Duração (s)'] && card['Duração (s)'] > 0) {
       dias = Math.round(card['Duração (s)'] / 86400);
     } else {
-      const entrada = new Date(card['Entrada']).getTime();
-      const saida = card['Saída'] ? new Date(card['Saída']).getTime() : now;
+      const entrada = parsePipefyDate(card['Entrada'])?.getTime() || now;
+      const saida = parsePipefyDate(card['Saída'])?.getTime() || now;
       dias = Math.max(0, Math.round((saida - entrada) / 86400000));
     }
 
@@ -509,10 +505,10 @@ function processRotinas(rows: RotinaCard[], projetos: ProjectCard[]): { cfoTaskS
 
     const isOverdue = card['Overdue'] === true || card['Overdue'] === 'true';
     const dataPrevista = card['Data Prevista Entrega'];
-    const isPastDue = dataPrevista ? new Date(dataPrevista).getTime() < now : false;
+    const isPastDue = dataPrevista ? (parsePipefyDateOnly(dataPrevista)?.getTime() || 0) < now : false;
 
     if (isOverdue || isPastDue) {
-      const entrada = dataPrevista ? new Date(dataPrevista).getTime() : new Date(card['Entrada']).getTime();
+      const entrada = dataPrevista ? (parsePipefyDateOnly(dataPrevista)?.getTime() || now) : (parsePipefyDate(card['Entrada'])?.getTime() || now);
       const diasAtraso = Math.max(0, Math.round((now - entrada) / 86400000));
       cfoMap[cfo].atrasadas += 1;
       cfoMap[cfo].tarefas.push({

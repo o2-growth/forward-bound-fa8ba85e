@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMediaMetas } from "@/contexts/MediaMetasContext";
 import { useMonetaryMetas, BuType, isPontualOnlyBU } from "@/hooks/useMonetaryMetas";
 import { useIndicatorsRealized, FunnelRealized } from "@/hooks/useIndicatorsRealized";
@@ -797,9 +798,10 @@ interface BUIndicatorEditorProps {
   onChange: (indicators: BUIndicators) => void;
   buName: string;
   buIcon: React.ReactNode;
+  disabled?: boolean;
 }
 
-function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicatorEditorProps) {
+function BUIndicatorEditor({ indicators, onChange, buName, buIcon, disabled = false }: BUIndicatorEditorProps) {
   const handleChange = (key: keyof BUIndicators, value: number) => {
     onChange({ ...indicators, [key]: value });
   };
@@ -823,9 +825,10 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
               value={indicators.ticketMedio}
               onChange={(e) => handleChange('ticketMedio', Number(e.target.value))}
               className="font-mono"
+              disabled={disabled}
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label>Custo por MQL (CPMQL)</Label>
             <Input
@@ -833,9 +836,10 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
               value={indicators.cpmql}
               onChange={(e) => handleChange('cpmql', Number(e.target.value))}
               className="font-mono"
+              disabled={disabled}
             />
           </div>
-          
+
           <div className="space-y-2">
             <Label>CPV (Custo por Venda)</Label>
             <Input
@@ -843,6 +847,7 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
               value={indicators.cpv}
               onChange={(e) => handleChange('cpv', Number(e.target.value))}
               className="font-mono"
+              disabled={disabled}
             />
           </div>
         </div>
@@ -862,9 +867,10 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
               max={100}
               step={1}
               className="w-full"
+              disabled={disabled}
             />
           </div>
-          
+
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <Label>RM → RR</Label>
@@ -876,6 +882,7 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
               max={100}
               step={1}
               className="w-full"
+              disabled={disabled}
             />
           </div>
         </div>
@@ -883,7 +890,7 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
         {/* Taxas de Conversão - Parte 2 */}
         <div className="space-y-4">
           <h5 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Conversão (Fundo)</h5>
-          
+
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <Label>RR → Proposta</Label>
@@ -895,9 +902,10 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
               max={100}
               step={1}
               className="w-full"
+              disabled={disabled}
             />
           </div>
-          
+
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <Label>Proposta → Venda</Label>
@@ -908,6 +916,7 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
               onValueChange={(v) => handleChange('propToVenda', v[0] / 100)}
               max={100}
               step={1}
+              disabled={disabled}
               className="w-full"
             />
           </div>
@@ -929,7 +938,7 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon }: BUIndicator
 
 export function MediaInvestmentTab() {
   // Fetch BU indicators config from database
-  const { getIndicatorsMap, isLoading: isLoadingConfig, saveIndicators, isSaving } = useBUIndicatorsConfig();
+  const { getIndicatorsMap, getIndicators, isLoading: isLoadingConfig, saveIndicators, isSaving, isMonthLocked } = useBUIndicatorsConfig();
 
   // Fetch monetary metas from database
   const { metas, isLoading: isLoadingMetas, bulkUpdateMetas, getMeta } = useMonetaryMetas();
@@ -1096,19 +1105,24 @@ export function MediaInvestmentTab() {
   const [selectedBUTab, setSelectedBUTab] = useState("modeloAtual");
   const [configLoadedFromDb, setConfigLoadedFromDb] = useState(false);
 
-  // Load indicators from DB when available
+  // Month selector for config — default to next future month
+  const CONFIG_MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const nextFutureMonth = CONFIG_MONTHS.find(m => !isMonthLocked(m)) || 'Dez';
+  const [selectedConfigMonth, setSelectedConfigMonth] = useState(nextFutureMonth);
+
+  // Load indicators from DB when available (load for selected month)
   useEffect(() => {
     if (configLoadedFromDb || isLoadingConfig) return;
     const dbMap = getIndicatorsMap();
     if (!dbMap) return;
-    
+
     const buKeyMap: Record<string, 'modeloAtual' | 'o2Tax' | 'oxyHacker' | 'franquia'> = {
       modelo_atual: 'modeloAtual',
       o2_tax: 'o2Tax',
       oxy_hacker: 'oxyHacker',
       franquia: 'franquia',
     };
-    
+
     setIndicadoresPorBU(prev => {
       const next = { ...prev };
       for (const [dbKey, stateKey] of Object.entries(buKeyMap)) {
@@ -1120,6 +1134,27 @@ export function MediaInvestmentTab() {
     });
     setConfigLoadedFromDb(true);
   }, [isLoadingConfig, getIndicatorsMap, configLoadedFromDb]);
+
+  // When month changes, reload indicators from DB for that month
+  useEffect(() => {
+    if (!configLoadedFromDb || isLoadingConfig) return;
+    const buKeyMap: Record<string, 'modeloAtual' | 'o2Tax' | 'oxyHacker' | 'franquia'> = {
+      modelo_atual: 'modeloAtual',
+      o2_tax: 'o2Tax',
+      oxy_hacker: 'oxyHacker',
+      franquia: 'franquia',
+    };
+    setIndicadoresPorBU(prev => {
+      const next = { ...prev };
+      for (const [dbKey, stateKey] of Object.entries(buKeyMap)) {
+        const monthData = getIndicators(dbKey, selectedConfigMonth);
+        if (monthData) {
+          next[stateKey] = monthData;
+        }
+      }
+      return next;
+    });
+  }, [selectedConfigMonth, configLoadedFromDb]);
 
   // Pending A Vender changes: bu -> month -> newAVenderValue
   const [pendingChanges, setPendingChanges] = useState<Record<string, Record<string, number>>>({});
@@ -1876,11 +1911,31 @@ export function MediaInvestmentTab() {
 
               {/* Indicadores por BU - Tabs */}
               <div className="border-t pt-6">
-                <h4 className="font-semibold mb-4 flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Indicadores por BU (Ticket, CPMQL, CPV, Taxas de Conversão)
-                </h4>
-                
+                <div className="flex items-center justify-between flex-wrap gap-4 mb-4">
+                  <h4 className="font-semibold flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    Indicadores por BU (Ticket, CPMQL, CPV, Taxas de Conversão)
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground whitespace-nowrap">Mês:</Label>
+                    <Select value={selectedConfigMonth} onValueChange={setSelectedConfigMonth}>
+                      <SelectTrigger className="w-[120px] h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CONFIG_MONTHS.map(m => (
+                          <SelectItem key={m} value={m}>
+                            {m} {isMonthLocked(m) ? '🔒' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {isMonthLocked(selectedConfigMonth) && (
+                      <Badge variant="secondary" className="text-xs">Somente leitura</Badge>
+                    )}
+                  </div>
+                </div>
+
                 <Tabs value={selectedBUTab} onValueChange={setSelectedBUTab}>
                   <TabsList className="grid w-full grid-cols-4 mb-6">
                     <TabsTrigger value="modeloAtual" className="flex items-center gap-2">
@@ -1907,6 +1962,7 @@ export function MediaInvestmentTab() {
                       onChange={(ind) => handleBUIndicatorChange('modeloAtual', ind)}
                       buName="Modelo Atual"
                       buIcon={<Building2 className="h-5 w-5 text-primary" />}
+                      disabled={isMonthLocked(selectedConfigMonth)}
                     />
                   </TabsContent>
 
@@ -1916,6 +1972,7 @@ export function MediaInvestmentTab() {
                       onChange={(ind) => handleBUIndicatorChange('o2Tax', ind)}
                       buName="O2 Tax"
                       buIcon={<DollarSign className="h-5 w-5 text-warning" />}
+                      disabled={isMonthLocked(selectedConfigMonth)}
                     />
                   </TabsContent>
 
@@ -1925,6 +1982,7 @@ export function MediaInvestmentTab() {
                       onChange={(ind) => handleBUIndicatorChange('oxyHacker', ind)}
                       buName="Oxy Hacker"
                       buIcon={<Rocket className="h-5 w-5 text-accent-foreground" />}
+                      disabled={isMonthLocked(selectedConfigMonth)}
                     />
                   </TabsContent>
 
@@ -1934,14 +1992,16 @@ export function MediaInvestmentTab() {
                       onChange={(ind) => handleBUIndicatorChange('franquia', ind)}
                       buName="Franquias"
                       buIcon={<Users className="h-5 w-5 text-secondary-foreground" />}
+                      disabled={isMonthLocked(selectedConfigMonth)}
                     />
                   </TabsContent>
                 </Tabs>
               </div>
 
               {/* Botão Salvar Configurações */}
-              {isAdmin && (
-                <div className="border-t pt-6 flex justify-end">
+              {isAdmin && !isMonthLocked(selectedConfigMonth) && (
+                <div className="border-t pt-6 flex justify-end gap-3 items-center">
+                  <span className="text-sm text-muted-foreground">Salvando para: <strong>{selectedConfigMonth}</strong></span>
                   <Button
                     onClick={async () => {
                       const buKeyMap: { stateKey: 'modeloAtual' | 'o2Tax' | 'oxyHacker' | 'franquia'; dbKey: string }[] = [
@@ -1953,6 +2013,7 @@ export function MediaInvestmentTab() {
                       await saveIndicators(
                         buKeyMap.map(({ stateKey, dbKey }) => ({
                           bu: dbKey,
+                          month: selectedConfigMonth,
                           indicators: indicadoresPorBU[stateKey],
                         }))
                       );
@@ -1961,7 +2022,7 @@ export function MediaInvestmentTab() {
                     className="gap-2"
                   >
                     <Save className="h-4 w-4" />
-                    {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+                    {isSaving ? 'Salvando...' : `Salvar ${selectedConfigMonth}`}
                   </Button>
                 </div>
               )}

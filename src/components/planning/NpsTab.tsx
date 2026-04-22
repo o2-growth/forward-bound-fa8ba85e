@@ -12,22 +12,10 @@ import { NpsFilters } from './nps/NpsFilters';
 import { OperationsSection } from './nps/OperationsSection';
 import { useNpsData, processNpsData, NpsCard } from '@/hooks/useNpsData';
 import { useOperationsData } from '@/hooks/useOperationsData';
+import { parsePipefyDate } from '@/hooks/dateUtils';
 import { ChevronDown, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
-import { parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-
-function parseEntradaDate(entrada: string | null | undefined): Date | null {
-  if (!entrada) return null;
-  try {
-    // Try DD/MM/YYYY format
-    const parts = entrada.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    if (parts) return new Date(+parts[3], +parts[2] - 1, +parts[1]);
-    // Try ISO format
-    return parseISO(entrada);
-  } catch {
-    return null;
-  }
-}
+import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 export function NpsTab() {
   const [npsOpen, setNpsOpen] = useState(false);
@@ -105,9 +93,13 @@ export function NpsTab() {
         if (faseAtual.startsWith(`q${qNumber}`)) {
           matchingIds.add(id);
         }
-        // "Entrada" = current active survey round = Q1
+        // "Entrada" = current active survey round = Q1, but exclude cards from previous quarters
+        // by checking the Entrada date (Q1/2026 = Jan-Mar 2026)
         if (faseAtual === 'entrada' && qNumber === '1') {
-          matchingIds.add(id);
+          const entradaDate = parsePipefyDate(card['Entrada']);
+          if (entradaDate && entradaDate >= new Date('2026-01-01')) {
+            matchingIds.add(id);
+          }
         }
       });
       filtered = filtered.filter(c => matchingIds.has(c.ID));
@@ -116,7 +108,7 @@ export function NpsTab() {
       const start = startOfDay(dateRange.from);
       const end = endOfDay(dateRange.to);
       filtered = filtered.filter(c => {
-        const d = parseEntradaDate(c['Entrada']);
+        const d = parsePipefyDate(c['Entrada']);
         if (!d) return false;
         return isWithinInterval(d, { start, end });
       });
@@ -124,17 +116,50 @@ export function NpsTab() {
       const y = parseInt(selectedYear);
       if (!isNaN(y)) {
         filtered = filtered.filter(c => {
-          const d = parseEntradaDate(c['Entrada']);
+          const d = parsePipefyDate(c['Entrada']);
           if (!d) return false;
           return d.getFullYear() === y;
         });
       }
     }
 
+    // Historical survey counts per quarter (from actual survey lists — aba Status3)
+    const QUARTER_SURVEY_COUNTS: Record<string, number> = {
+      q1: 91,  // Q1/2026 — 34 respondidas + 57 pendentes (source: Status3 sheet)
+    };
+    // Per-CFO survey counts for Q1 (uses CFO names as they appear in central_projetos)
+    const QUARTER_CFO_SURVEY_COUNTS: Record<string, Record<string, number>> = {
+      q1: {
+        'Oliveira': 10,
+        'Douglas Schossler': 10,
+        'Eduardo Milani Pedrolo': 18,
+        'Everton Bisinella': 8,
+        'Gustavo Cochlar': 9,
+        "Eduardo D'Agostini": 12,
+        'Mariana Luz da Silva': 14,
+      },
+    };
+    // Clients NOT in Q1 survey list but present in Pipefy NPS with "Entrada" phase
+    const QUARTER_EXCLUDE_CLIENTS: Record<string, string[]> = {
+      q1: ['hlv stones', 'datweb'],
+    };
+
+    // Exclude non-survey clients from Q1
+    if (isQuarterFilter && QUARTER_EXCLUDE_CLIENTS[selectedPeriod]) {
+      const excludeList = QUARTER_EXCLUDE_CLIENTS[selectedPeriod];
+      filtered = filtered.filter(c => {
+        const title = (c['Título'] || '').trim().toLowerCase();
+        return !excludeList.some(ex => title.includes(ex));
+      });
+    }
+
     // When a filter is active, don't use totalEligible (it's the CURRENT count, not historical)
     const hasActiveFilter = isQuarterFilter || (dateRange?.from && dateRange?.to) || selectedProdutos.length > 0 || selectedCfos.length > 0 || selectedYear !== 'all';
-    const totalEligible = hasActiveFilter ? undefined : npsData.raw.totalEligible;
-    const cfoEligibleMap = hasActiveFilter ? undefined : npsData.raw.cfoEligibleMap;
+    const quarterSurveyCount = isQuarterFilter ? QUARTER_SURVEY_COUNTS[selectedPeriod] : undefined;
+    const totalEligible = quarterSurveyCount ?? (hasActiveFilter ? undefined : npsData.raw.totalEligible);
+    const cfoEligibleMap = isQuarterFilter
+      ? QUARTER_CFO_SURVEY_COUNTS[selectedPeriod]
+      : (hasActiveFilter ? undefined : npsData.raw.cfoEligibleMap);
     return processNpsData(filtered, cfoMap, titleMap, npsPipeId, totalEligible, cfoEligibleMap);
   }, [npsData?.raw, selectedProdutos, selectedCfos, dateRange, selectedYear, selectedPeriod]);
 

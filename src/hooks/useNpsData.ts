@@ -116,7 +116,9 @@ async function fetchNpsData(): Promise<{ npsRows: NpsCard[]; cfoMap: Record<stri
 
   if (npsRes.error) throw npsRes.error;
 
-  const npsRows: NpsCard[] = npsRes.data?.data || [];
+  const npsRows: NpsCard[] = (npsRes.data?.data || []).filter(
+    (row: NpsCard) => !(row['Título'] || '').trim().toLowerCase().includes('rascunho')
+  );
   const connections: CardConnection[] = connRes.data?.data || [];
   const projetos: CentralProjeto[] = projRes.data?.data || [];
 
@@ -228,12 +230,13 @@ function parseCsatScore(val: string | null): number | null {
   return null;
 }
 
-function classifySeanEllis(val: string | null): 'muito_desapontado' | 'certa_forma' | 'nao_desapontado' | null {
+function classifySeanEllis(val: string | null): 'muito_desapontado' | 'certa_forma' | 'nao_desapontado' | 'nao_usa' | null {
   if (!val) return null;
   const lower = val.toLowerCase();
   if (lower.includes('muito desapontado')) return 'muito_desapontado';
   if (lower.includes('certa forma')) return 'certa_forma';
-  if (lower.includes('não ficaria') || lower.includes('nao ficaria') || lower.includes('não uso') || lower.includes('nao uso')) return 'nao_desapontado';
+  if (lower.includes('não uso') || lower.includes('nao uso')) return 'nao_usa';
+  if (lower.includes('não ficaria') || lower.includes('nao ficaria')) return 'nao_desapontado';
   return null;
 }
 
@@ -269,8 +272,18 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
   });
   const currentCards = Array.from(latestByCard.values());
 
-  // Cards with NPS response
-  const withNps = currentCards.filter(c => parseNpsScore(c['Nota NPS']) !== null);
+  // Cards with NPS response — deduplicate by client title (keep latest per client)
+  const allWithNps = currentCards.filter(c => parseNpsScore(c['Nota NPS']) !== null);
+  const latestByClient = new Map<string, NpsCard>();
+  allWithNps.forEach(c => {
+    const title = (externalTitleMap[c.ID] || c['Título'] || '').trim().toLowerCase();
+    if (!title) return;
+    const existing = latestByClient.get(title);
+    if (!existing || (c['Entrada'] || '') > (existing['Entrada'] || '')) {
+      latestByClient.set(title, c);
+    }
+  });
+  const withNps = Array.from(latestByClient.values());
   const respostas = withNps.length;
 
   // Use eligible clients count if available, fallback to card count
@@ -299,8 +312,8 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
   const neuPct = respostas > 0 ? Math.round((neutros / respostas) * 100) : 0;
   const detPct = respostas > 0 ? Math.round((detratores / respostas) * 100) : 0;
 
-  // CSAT
-  const withCsat = currentCards.map(c => parseCsatScore(c['Satisfacao Geral'])).filter((v): v is number => v !== null);
+  // CSAT — use withNps (deduplicated by client title) for consistent respondent base
+  const withCsat = withNps.map(c => parseCsatScore(c['Satisfacao Geral'])).filter((v): v is number => v !== null);
   const csatBreakdownMap: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
   withCsat.forEach(v => { if (csatBreakdownMap[v] !== undefined) csatBreakdownMap[v]++; });
   
@@ -323,18 +336,22 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
     ],
   };
 
-  // Sean Ellis
-  const seClassifications = currentCards.map(c => classifySeanEllis(c['Sentimento Oxy'])).filter((v): v is NonNullable<typeof v> => v !== null);
+  // Sean Ellis — use withNps (deduplicated by client title) for consistent respondent base
+  const seClassifications = withNps.map(c => classifySeanEllis(c['Sentimento Oxy'])).filter((v): v is NonNullable<typeof v> => v !== null);
   const seMuito = seClassifications.filter(v => v === 'muito_desapontado').length;
   const seCerta = seClassifications.filter(v => v === 'certa_forma').length;
   const seNao = seClassifications.filter(v => v === 'nao_desapontado').length;
+  const seNaoUsa = seClassifications.filter(v => v === 'nao_usa').length;
+  // Exclude "Não usa Oxy" from SE calculation — not a valid PMF response
+  const seValidTotal = seMuito + seCerta + seNao;
   const seTotal = seClassifications.length;
-  const seanEllisScore = seTotal > 0 ? Math.round((seMuito / seTotal) * 100) : 0;
+  const seanEllisScore = seValidTotal > 0 ? Math.round((seMuito / seValidTotal) * 100) : 0;
 
   const seanEllisDistribution: SeanEllisItem[] = [
     { label: 'Muito desapontado', count: seMuito, color: 'bg-green-500' },
     { label: 'De certa forma desapontado', count: seCerta, color: 'bg-amber-500' },
     { label: 'Não ficaria desapontado', count: seNao, color: 'bg-red-500' },
+    { label: 'Não usa Oxy', count: seNaoUsa, color: 'bg-gray-400' },
   ];
 
   // Metrics
@@ -356,8 +373,14 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
   // CFO Performance
   const cfoAggMap: Record<string, { enviados: number; withNps: { score: number; titulo: string; email: string; cardId: string; csat: number | null; sentiment: 'Positivo' | 'Neutro' | 'Negativo' }[]; csatScores: number[]; seClassifications: ReturnType<typeof classifySeanEllis>[] }> = {};
   
+  // CFO override for clients whose Pipefy central_projetos differs from the actual survey assignment
+  const CFO_OVERRIDES: Record<string, string> = {
+    'fiagro': 'Everton Bisinella',
+  };
+
   currentCards.forEach(c => {
-    const cfo = externalCfoMap[c.ID] || c['CFO Responsavel'] || c['Responsavel Tratativa'];
+    const titulo = (externalTitleMap[c.ID] || c['Título'] || '').trim().toLowerCase();
+    const cfo = CFO_OVERRIDES[titulo] || (externalCfoMap[c.ID] || c['CFO Responsavel'] || c['Responsavel Tratativa'] || '').trim();
     if (!cfo) return; // Ignorar cards sem CFO identificado
     if (!cfoAggMap[cfo]) cfoAggMap[cfo] = { enviados: 0, withNps: [], csatScores: [], seClassifications: [] };
     cfoAggMap[cfo].enviados++;
@@ -381,17 +404,21 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
     if (se !== null) cfoAggMap[cfo].seClassifications.push(se);
   });
 
-  // Override enviados with eligible count from central_projetos
+  // Override enviados with eligible count (from central_projetos or hardcoded per-quarter)
   if (cfoEligibleMap) {
+    // Try exact match first, then trimmed match
     Object.keys(cfoAggMap).forEach(cfo => {
-      if (cfoEligibleMap[cfo]) {
-        cfoAggMap[cfo].enviados = cfoEligibleMap[cfo];
+      const trimmedCfo = cfo.trim();
+      const eligibleCount = cfoEligibleMap[cfo] ?? cfoEligibleMap[trimmedCfo];
+      if (eligibleCount) {
+        cfoAggMap[cfo].enviados = eligibleCount;
       }
     });
 
     // Also add CFOs that have eligible clients but zero NPS responses
     Object.entries(cfoEligibleMap).forEach(([cfo, count]) => {
-      if (!cfoAggMap[cfo]) {
+      const exists = Object.keys(cfoAggMap).some(k => k.trim() === cfo.trim());
+      if (!exists) {
         cfoAggMap[cfo] = { enviados: count, withNps: [], csatScores: [], seClassifications: [] };
       }
     });
@@ -470,7 +497,7 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
     seanEllisDistribution,
     cfoPerformance,
     feedback,
-    seExcluded: currentCards.length - seTotal,
+    seExcluded: (withNps.length - seTotal) + seNaoUsa,
     npsPipeId,
   };
 }
