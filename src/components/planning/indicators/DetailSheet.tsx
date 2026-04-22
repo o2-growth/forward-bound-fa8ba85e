@@ -64,6 +64,7 @@ interface DetailSheetProps {
   kpis?: KpiItem[];
   charts?: ChartConfig[];
   filterCriteria?: FilterCriteriaGroup[];
+  extraContent?: React.ReactNode;
 }
 
 const formatCurrency = (value: number) =>
