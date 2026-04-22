@@ -289,8 +289,8 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   const CHURN_CUTOFF = new Date('2025-10-01').getTime();
 
   // Overrides from Q1 2026 churn dossier spreadsheet (source of truth)
-  const CHURN_OVERRIDES: Record<string, { motivo?: string; mrr?: number }> = {
-    'zebl arquitetura eireli': { motivo: 'Comercial O2' },
+  const CHURN_OVERRIDES: Record<string, { motivo?: string; mrr?: number; exclude?: boolean }> = {
+    'zebl arquitetura eireli': { motivo: 'Comercial O2', mrr: 6570 },
     'aled atacadão led': { motivo: 'Comercial O2' },
     'cymaco engenharia': { motivo: 'Atendimento O2' },
     'trm energy': { motivo: 'Financeiro' },
@@ -303,9 +303,22 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     'gold metropolitana': { mrr: 0 },
     'grande concreto': { mrr: 6570 },
     'protecface respiradores': { mrr: 15000 },
+    // Clients NOT in Q1 dossier spreadsheet — exclude from churn dossier
+    'cavimk': { exclude: true },
+    'exportadora são francisco': { exclude: true },
   };
+  // Dedup: track seen titles to prevent duplicate cards (e.g. ZEBL, KV TRANSPORTES)
+  const seenChurnTitles = new Set<string>();
 
-  const churnDossier: ChurnDossierCard[] = churnCards.map(card => {
+  const churnDossier: ChurnDossierCard[] = churnCards.filter(card => {
+    const key = (card['Título'] || '').trim().toLowerCase();
+    const override = CHURN_OVERRIDES[key];
+    if (override?.exclude) return false;
+    // Dedup by title — keep first occurrence only
+    if (seenChurnTitles.has(key)) return false;
+    seenChurnTitles.add(key);
+    return true;
+  }).map(card => {
     const key = (card['Título'] || '').trim().toLowerCase();
     const trat = tratativaMap.get(key);
     const nps = npsMap.get(key);
@@ -347,6 +360,25 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   }).filter(c => c._refDate >= CHURN_CUTOFF)
     .filter(c => c.motivoPrincipal || c.dataEncerramento || c.mesChurn)
     .map(({ _refDate, ...rest }) => rest);
+
+  // Inject synthetic cards for clients in the Q1 spreadsheet but missing from Pipefy
+  churnDossier.push({
+    id: 'synthetic-protectface',
+    mesChurn: 'Mar/2026',
+    cliente: 'Protectface respiradores',
+    setup: 22500,
+    mrr: 15000,
+    motivoPrincipal: 'Comercial O2',
+    motivosCancelamento: 'Comercial O2',
+    cfo: 'Luis Eduardo Dagostini',
+    produto: 'CFOaaS, Setup',
+    faseAtual: 'Churn',
+    dataAssinatura: '2026-01-28',
+    dataEncerramento: '2026-03-18',
+    ltMeses: '2',
+    problemasOxy: 'Não',
+    diagnostico: 0,
+  });
 
   return {
     phaseCount,

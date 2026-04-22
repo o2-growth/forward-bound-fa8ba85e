@@ -342,10 +342,9 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
   const seCerta = seClassifications.filter(v => v === 'certa_forma').length;
   const seNao = seClassifications.filter(v => v === 'nao_desapontado').length;
   const seNaoUsa = seClassifications.filter(v => v === 'nao_usa').length;
-  // Exclude "Não usa Oxy" from SE calculation — not a valid PMF response
-  const seValidTotal = seMuito + seCerta + seNao;
+  // SE = (muito desapontado + de certa forma) / total respondentes
   const seTotal = seClassifications.length;
-  const seanEllisScore = seValidTotal > 0 ? Math.round((seMuito / seValidTotal) * 100) : 0;
+  const seanEllisScore = seTotal > 0 ? Math.round(((seMuito + seCerta) / seTotal) * 100) : 0;
 
   const seanEllisDistribution: SeanEllisItem[] = [
     { label: 'Muito desapontado', count: seMuito, color: 'bg-green-500' },
@@ -378,13 +377,14 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
     'fiagro': 'Everton Bisinella',
   };
 
-  currentCards.forEach(c => {
+  // Use withNps (deduplicated by client title) for per-CFO aggregation — NOT currentCards
+  withNps.forEach(c => {
     const titulo = (externalTitleMap[c.ID] || c['Título'] || '').trim().toLowerCase();
     const cfo = CFO_OVERRIDES[titulo] || (externalCfoMap[c.ID] || c['CFO Responsavel'] || c['Responsavel Tratativa'] || '').trim();
-    if (!cfo) return; // Ignorar cards sem CFO identificado
+    if (!cfo) return;
     if (!cfoAggMap[cfo]) cfoAggMap[cfo] = { enviados: 0, withNps: [], csatScores: [], seClassifications: [] };
     cfoAggMap[cfo].enviados++;
-    
+
     const nps = parseNpsScore(c['Nota NPS']);
     if (nps !== null) {
       cfoAggMap[cfo].withNps.push({
@@ -396,10 +396,10 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
         sentiment: determineSentiment(nps),
       });
     }
-    
+
     const csat = parseCsatScore(c['Satisfacao Geral']);
     if (csat !== null) cfoAggMap[cfo].csatScores.push(csat);
-    
+
     const se = classifySeanEllis(c['Sentimento Oxy']);
     if (se !== null) cfoAggMap[cfo].seClassifications.push(se);
   });
@@ -497,7 +497,7 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
     seanEllisDistribution,
     cfoPerformance,
     feedback,
-    seExcluded: (withNps.length - seTotal) + seNaoUsa,
+    seExcluded: withNps.length - seTotal,
     npsPipeId,
   };
 }

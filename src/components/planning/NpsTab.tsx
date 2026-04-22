@@ -130,13 +130,13 @@ export function NpsTab() {
     // Per-CFO survey counts for Q1 (uses CFO names as they appear in central_projetos)
     const QUARTER_CFO_SURVEY_COUNTS: Record<string, Record<string, number>> = {
       q1: {
-        'Oliveira': 10,
-        'Douglas Schossler': 10,
-        'Eduardo Milani Pedrolo': 18,
-        'Everton Bisinella': 8,
-        'Gustavo Cochlar': 9,
-        "Eduardo D'Agostini": 12,
-        'Mariana Luz da Silva': 14,
+        'Oliveira': 11,
+        'Douglas Schossler': 11,
+        'Eduardo Milani Pedrolo': 21,
+        'Everton Bisinella': 9,
+        'Gustavo Cochlar': 10,
+        "Eduardo D'Agostini": 14,
+        'Mariana Luz da Silva': 15,
       },
     };
     // Clients NOT in Q1 survey list but present in Pipefy NPS with "Entrada" phase
