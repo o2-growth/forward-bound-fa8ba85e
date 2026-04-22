@@ -1350,6 +1350,7 @@ export function IndicatorsTab() {
 
   // Handle radial card click with strategic narratives
   const handleRadialCardClick = (indicator: IndicatorConfig) => {
+    setDetailSheetExtraContent(null);
     const items = getItemsForIndicator(indicator.key);
     const now = new Date();
     
@@ -1856,11 +1857,8 @@ export function IndicatorsTab() {
           ]},
           { title: '▸ Filtros ativos', items: buildActiveFilters() },
         ]);
+        setDetailSheetExtraContent(renderTierBreakdown(itemsWithTCV));
         setDetailSheetOpen(true);
-        return;
-      }
-      
-      default: {
         // Fallback for other indicators
         const columns = getColumnsForIndicator(indicator.key);
         setDetailSheetTitle(indicator.label);
@@ -2226,6 +2224,7 @@ export function IndicatorsTab() {
 
   // Handle monetary card click with strategic narratives
   const handleMonetaryCardClick = (indicator: MonetaryIndicatorConfig) => {
+    setDetailSheetExtraContent(null);
     const items = getItemsForIndicator('venda');
     const totalFaturamento = items.reduce((sum, i) => sum + (i.value || 0), 0);
     const totalMrr = items.reduce((sum, i) => sum + (i.mrr || 0), 0);
