@@ -14,9 +14,13 @@ import { OperationsSection } from './nps/OperationsSection';
 import { useNpsData, processNpsData, NpsCard } from '@/hooks/useNpsData';
 import { useOperationsData } from '@/hooks/useOperationsData';
 import { parsePipefyDate } from '@/hooks/dateUtils';
-import { ChevronDown, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { ChevronDown, ChevronRight, Loader2, AlertCircle, TrendingDown, TrendingUp, Users, DollarSign, Clock, BarChart3 } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine, ComposedChart,
+} from 'recharts';
 
 export function NpsTab() {
   const [npsOpen, setNpsOpen] = useState(false);
@@ -323,68 +327,196 @@ export function NpsTab() {
                 <QualitativeFeedback data={displayData.feedback} npsPipeId={displayData.npsPipeId} />
 
                 {/* Q4/2025 vs Q1/2026 Comparison — only when Q1 selected */}
-                {selectedPeriod === 'q1' && (
+                {selectedPeriod === 'q1' && (() => {
+                  const revenueChurnMonthly = [
+                    { month: 'Jan/26', value: 18737, pct: 2.67 },
+                    { month: 'Fev/26', value: 35457, pct: 4.39 },
+                    { month: 'Mar/26', value: 85078, pct: 10.22 },
+                  ];
+                  const logoChurnMonthly = [
+                    { month: 'Jan/26', value: 3, pct: 2.52 },
+                    { month: 'Fev/26', value: 7, pct: 5.47 },
+                    { month: 'Mar/26', value: 15, pct: 11.36 },
+                  ];
+                  const q4RevenueChurnAvg = 57534; // 172603 / 3
+                  const q4LogoChurnAvg = 7.3; // 22 / 3
+
+                  const formatBRL = (v: number) =>
+                    v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+                  const revenueTooltipFormatter = (value: number) => formatBRL(value);
+                  const logoTooltipFormatter = (value: number) => `${value} clientes`;
+
+                  type MetricRow = { icon: React.ReactNode; label: string; q4: string; q1: string; badge: string; good: boolean };
+                  const metrics: MetricRow[] = [
+                    { icon: <DollarSign className="h-4 w-4" />, label: 'MRR Base Médio', q4: 'R$ 616.341', q1: 'R$ 780.582', badge: '+26,6%', good: true },
+                    { icon: <TrendingDown className="h-4 w-4" />, label: 'Revenue Churn', q4: 'R$ 172.603 (9,3%)', q1: 'R$ 139.273 (5,95%)', badge: '-3,35pp', good: true },
+                    { icon: <Users className="h-4 w-4" />, label: 'Logo Churn', q4: '22 clientes (19,2%)', q1: '25 clientes (19,79%)', badge: '+0,59pp', good: false },
+                    { icon: <Clock className="h-4 w-4" />, label: 'LT Médio', q4: '5,76 meses', q1: '5,2 meses', badge: '-0,56m', good: false },
+                    { icon: <BarChart3 className="h-4 w-4" />, label: 'Clientes Ativos', q4: '114,7', q1: '126,3', badge: '+11,6', good: true },
+                  ];
+
+                  return (
                   <div className="space-y-6">
                     <h3 className="text-lg font-semibold">Comparativo Trimestral — Q4/2025 vs Q1/2026</h3>
+
+                    {/* Summary cards - compact grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Q4/2025 Card */}
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">Q4/2025 (Out + Nov + Dez)</CardTitle>
+                      <Card className="border-muted">
+                        <CardHeader className="pb-1 pt-4 px-4">
+                          <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Q4/2025</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm">
-                          <div className="flex justify-between"><span className="text-muted-foreground">MRR Base Médio</span><span className="font-medium">R$ 616.341,00</span></div>
-                          <div className="flex justify-between"><span className="text-muted-foreground">Revenue Churn</span><span className="font-medium text-destructive">R$ 172.603,19 (9,3%)</span></div>
-                          <div className="flex justify-between"><span className="text-muted-foreground">Logo Churn</span><span className="font-medium text-destructive">22 clientes (19,2%)</span></div>
-                          <div className="flex justify-between"><span className="text-muted-foreground">LT Médio</span><span className="font-medium">5,76 meses</span></div>
-                          <div className="flex justify-between"><span className="text-muted-foreground">Clientes Ativos (médio)</span><span className="font-medium">114,7</span></div>
+                        <CardContent className="px-4 pb-4 pt-2">
+                          <div className="space-y-2">
+                            {metrics.map((m, i) => (
+                              <div key={i} className="flex items-center gap-2 text-sm">
+                                <span className="text-muted-foreground shrink-0">{m.icon}</span>
+                                <span className="text-muted-foreground min-w-[110px]">{m.label}</span>
+                                <span className="font-medium ml-auto text-right">{m.q4}</span>
+                              </div>
+                            ))}
+                          </div>
                         </CardContent>
                       </Card>
 
-                      {/* Q1/2026 Card */}
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">Q1/2026 (Jan + Fev + Mar)</CardTitle>
+                      <Card className="border-primary/30">
+                        <CardHeader className="pb-1 pt-4 px-4">
+                          <CardTitle className="text-sm font-semibold text-primary uppercase tracking-wide">Q1/2026</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm">
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">MRR Base Médio</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">R$ 780.581,96</span>
-                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">+26,6%</Badge>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Revenue Churn</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-destructive">R$ 139.272,50 (5,95%)</span>
-                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">-3,35pp</Badge>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Logo Churn</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-destructive">25 clientes (19,79%)</span>
-                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs">+0,59pp</Badge>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">LT Médio</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">5,2 meses</span>
-                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs">-0,56m</Badge>
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-muted-foreground">Clientes Ativos (médio)</span>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">126,3</span>
-                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">+11,6</Badge>
-                            </div>
+                        <CardContent className="px-4 pb-4 pt-2">
+                          <div className="space-y-2">
+                            {metrics.map((m, i) => (
+                              <div key={i} className="flex items-center gap-2 text-sm">
+                                <span className="text-muted-foreground shrink-0">{m.icon}</span>
+                                <span className="text-muted-foreground min-w-[110px]">{m.label}</span>
+                                <span className="font-medium ml-auto">{m.q1}</span>
+                                <Badge className={`text-[10px] px-1.5 py-0 ${m.good
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                }`}>{m.badge}</Badge>
+                              </div>
+                            ))}
                           </div>
                         </CardContent>
                       </Card>
                     </div>
+
+                    {/* Charts row */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Revenue Churn monthly chart */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-semibold">Revenue Churn Mensal (Q1/2026)</CardTitle>
+                          <p className="text-xs text-muted-foreground">Linha tracejada = média mensal Q4/2025 (R$ 57.534)</p>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={240}>
+                            <ComposedChart data={revenueChurnMonthly} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                              <XAxis dataKey="month" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                              <YAxis
+                                tick={{ fontSize: 11 }}
+                                className="fill-muted-foreground"
+                                tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                              />
+                              <Tooltip
+                                formatter={revenueTooltipFormatter}
+                                labelStyle={{ fontWeight: 600 }}
+                                contentStyle={{ borderRadius: 8, fontSize: 13 }}
+                              />
+                              <ReferenceLine
+                                y={q4RevenueChurnAvg}
+                                stroke="#94a3b8"
+                                strokeDasharray="6 4"
+                                strokeWidth={2}
+                                label={{ value: 'Média Q4', position: 'right', fontSize: 11, fill: '#94a3b8' }}
+                              />
+                              <Bar dataKey="value" name="Revenue Churn" radius={[4, 4, 0, 0]} maxBarSize={48} fill="#ef4444" />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+
+                      {/* Logo Churn monthly chart */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-semibold">Logo Churn Mensal (Q1/2026)</CardTitle>
+                          <p className="text-xs text-muted-foreground">Linha tracejada = média mensal Q4/2025 (7,3 clientes)</p>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={240}>
+                            <ComposedChart data={logoChurnMonthly} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                              <XAxis dataKey="month" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                              <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                              <Tooltip
+                                formatter={logoTooltipFormatter}
+                                labelStyle={{ fontWeight: 600 }}
+                                contentStyle={{ borderRadius: 8, fontSize: 13 }}
+                              />
+                              <ReferenceLine
+                                y={q4LogoChurnAvg}
+                                stroke="#94a3b8"
+                                strokeDasharray="6 4"
+                                strokeWidth={2}
+                                label={{ value: 'Média Q4', position: 'right', fontSize: 11, fill: '#94a3b8' }}
+                              />
+                              <Bar dataKey="value" name="Logo Churn" radius={[4, 4, 0, 0]} maxBarSize={48} fill="#f97316" />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Revenue Churn % trend — gauge-like comparison */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold">Revenue Churn % — Tendência Trimestral</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-center gap-8 py-4">
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Q4/2025</p>
+                            <p className="text-3xl font-bold text-red-500">9,3%</p>
+                          </div>
+                          <div className="flex flex-col items-center gap-1">
+                            <TrendingDown className="h-6 w-6 text-green-500" />
+                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-sm font-semibold px-3">
+                              -3,35pp
+                            </Badge>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Q1/2026</p>
+                            <p className="text-3xl font-bold text-amber-500">5,95%</p>
+                          </div>
+                        </div>
+                        {/* Progress-like bar showing improvement */}
+                        <div className="max-w-md mx-auto mt-2">
+                          <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                            <span>Meta: 5%</span>
+                            <span>Q4: 9,3%</span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-3 relative">
+                            {/* Q4 marker */}
+                            <div
+                              className="absolute top-0 h-3 rounded-full bg-red-400/40"
+                              style={{ width: '93%' }}
+                            />
+                            {/* Q1 current */}
+                            <div
+                              className="absolute top-0 h-3 rounded-full bg-amber-500"
+                              style={{ width: '59.5%' }}
+                            />
+                            {/* Meta line */}
+                            <div
+                              className="absolute top-0 h-3 border-r-2 border-green-600 border-dashed"
+                              style={{ left: '50%' }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground text-center mt-1">Falta 0,95pp para atingir a meta de 5%</p>
+                        </div>
+                      </CardContent>
+                    </Card>
 
                     {/* Insights */}
                     <Card>
@@ -410,7 +542,8 @@ export function NpsTab() {
                       </CardContent>
                     </Card>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* OKRs Q1 - Visível quando Q1 selecionado */}
                 {selectedPeriod === 'q1' && (
