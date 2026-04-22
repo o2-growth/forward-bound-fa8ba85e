@@ -70,12 +70,12 @@ interface DetailSheetProps {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
 
-export function DetailSheet({ open, onOpenChange, title, description, items, columns, kpis, charts, filterCriteria }: DetailSheetProps) {
+export function DetailSheet({ open, onOpenChange, title, description, items, columns, kpis, charts, filterCriteria, extraContent }: DetailSheetProps) {
   const [sortState, setSortState] = useState<SortState>({ column: null, direction: 'none' });
   const [analyticsExpanded, setAnalyticsExpanded] = useState(true);
   const [criteriaExpanded, setCriteriaExpanded] = useState(false);
   
-  const hasAnalytics = (kpis && kpis.length > 0) || (charts && charts.length > 0);
+  const hasAnalytics = (kpis && kpis.length > 0) || (charts && charts.length > 0) || !!extraContent;
 
   const handleSort = (columnKey: keyof DetailItem) => {
     setSortState(prev => {
@@ -197,6 +197,7 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
               <CollapsibleContent>
                 {kpis && kpis.length > 0 && <KpiCardsRow kpis={kpis} />}
                 {charts && charts.length > 0 && <DrillDownCharts charts={charts} />}
+                {extraContent && <div className="mt-4">{extraContent}</div>}
               </CollapsibleContent>
             </Collapsible>
           )}
