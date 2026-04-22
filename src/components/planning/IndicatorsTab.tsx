@@ -1859,6 +1859,10 @@ export function IndicatorsTab() {
         ]);
         setDetailSheetExtraContent(renderTierBreakdown(itemsWithTCV));
         setDetailSheetOpen(true);
+        return;
+      }
+      
+      default: {
         // Fallback for other indicators
         const columns = getColumnsForIndicator(indicator.key);
         setDetailSheetTitle(indicator.label);
