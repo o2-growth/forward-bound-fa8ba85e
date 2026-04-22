@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NpsKpiCards } from './nps/NpsKpiCards';
 import { NpsGauges } from './nps/NpsGauges';
 import { NpsScoreCards } from './nps/NpsScoreCards';
@@ -212,54 +213,6 @@ export function NpsTab() {
         />
       )}
 
-      {/* OKRs Q1 - Visível quando Q1 selecionado */}
-      {selectedPeriod === 'q1' && displayData && (
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <span>⊙</span> Proximidade das Metas (KRs) — Q1/2026 (Março apurado)
-          </h3>
-          <p className="text-sm text-muted-foreground">Responsável: Andréa Franzen</p>
-          <div className="space-y-2">
-            {(() => {
-              const npsScore = displayData.metrics.nps.score;
-              const csatScore = displayData.metrics.csat.score;
-              const ltMedio = 5.2; // Consolidado Q1 do dossiê
-              const logoChurn = 11.36; // Março — último mês apurado
-              const revenueChurn = 10.22; // Março — último mês apurado
-
-              const krs = [
-                { label: 'Manter LT acima de 8 meses', value: `${ltMedio} meses`, meta: 'Meta: 8 meses', pct: (ltMedio / 8) * 100, hit: ltMedio >= 8, showBar: true },
-                { label: 'Manter Logo Churn abaixo de 5%', value: `${logoChurn}%`, meta: 'Meta: 5%', pct: 100 - ((logoChurn - 5) / 5) * 100, hit: logoChurn <= 5, showBar: false },
-                { label: 'Manter Revenue Churn abaixo de 5%', value: `${revenueChurn}%`, meta: 'Meta: 5%', pct: 100 - ((revenueChurn - 5) / 5) * 100, hit: revenueChurn <= 5, showBar: false },
-                { label: 'Manter NPS (90-100) acima de 40', value: String(npsScore), meta: 'Meta: 40', pct: (npsScore / 40) * 100, hit: npsScore >= 40, showBar: false },
-                { label: 'Manter CSAT acima de 80%', value: `${csatScore}%`, meta: 'Meta: 80%', pct: (csatScore / 80) * 100, hit: csatScore >= 80, showBar: false },
-              ];
-
-              return krs.map((kr, i) => (
-                <div key={i} className="flex items-center justify-between border rounded-lg p-4">
-                  <div className="flex items-center gap-3 flex-1">
-                    <span className={`text-lg ${kr.hit ? 'text-green-500' : 'text-red-500'}`}>
-                      {kr.hit ? '✅' : '⊗'}
-                    </span>
-                    <div className="flex-1">
-                      <span className="font-medium">{kr.label}</span>
-                      {kr.showBar && (
-                        <div className="w-full bg-muted rounded-full h-2.5 mt-2 max-w-md">
-                          <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, kr.pct))}%` }} />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <span className={`text-sm font-medium whitespace-nowrap ${kr.hit ? 'text-green-600' : 'text-red-500'}`}>
-                    {kr.value} / {kr.meta}
-                  </span>
-                </div>
-              ));
-            })()}
-          </div>
-        </div>
-      )}
-
       {/* Dossiê de Churn - No topo, aberto por padrão */}
       <div className="space-y-4">
         <button
@@ -368,6 +321,144 @@ export function NpsTab() {
                 />
                 <CfoPerformanceTable data={displayData.cfoPerformance} npsPipeId={displayData.npsPipeId} />
                 <QualitativeFeedback data={displayData.feedback} npsPipeId={displayData.npsPipeId} />
+
+                {/* Q4/2025 vs Q1/2026 Comparison — only when Q1 selected */}
+                {selectedPeriod === 'q1' && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold">Comparativo Trimestral — Q4/2025 vs Q1/2026</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Q4/2025 Card */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base">Q4/2025 (Out + Nov + Dez)</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                          <div className="flex justify-between"><span className="text-muted-foreground">MRR Base Médio</span><span className="font-medium">R$ 616.341,00</span></div>
+                          <div className="flex justify-between"><span className="text-muted-foreground">Revenue Churn</span><span className="font-medium text-destructive">R$ 172.603,19 (9,3%)</span></div>
+                          <div className="flex justify-between"><span className="text-muted-foreground">Logo Churn</span><span className="font-medium text-destructive">22 clientes (19,2%)</span></div>
+                          <div className="flex justify-between"><span className="text-muted-foreground">LT Médio</span><span className="font-medium">5,76 meses</span></div>
+                          <div className="flex justify-between"><span className="text-muted-foreground">Clientes Ativos (médio)</span><span className="font-medium">114,7</span></div>
+                        </CardContent>
+                      </Card>
+
+                      {/* Q1/2026 Card */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-base">Q1/2026 (Jan + Fev + Mar)</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">MRR Base Médio</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">R$ 780.581,96</span>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">+26,6%</Badge>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Revenue Churn</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-destructive">R$ 139.272,50 (5,95%)</span>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">-3,35pp</Badge>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Logo Churn</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-destructive">25 clientes (19,79%)</span>
+                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs">+0,59pp</Badge>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">LT Médio</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">5,2 meses</span>
+                              <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs">-0,56m</Badge>
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Clientes Ativos (médio)</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">126,3</span>
+                              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">+11,6</Badge>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Insights */}
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Insights — Q4/25 vs Q1/26</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4 text-sm">
+                        <div>
+                          <p><span className="font-semibold">1. Receita perdida caiu, mas qtde de clientes subiu:</span> Q4 perdeu R$172k em 22 clientes; Q1 perdeu R$139k em 25 clientes. Tickets menores no Q1 — sinal de churn pulverizado, mais difícil de prever e prevenir.</p>
+                        </div>
+                        <div>
+                          <p><span className="font-semibold">2. Mudança de motivo dominante:</span> em Q4, &quot;Financeiro&quot; (caixa do cliente) foi o principal motivo (~50%). Em Q1, ele perde força — entram fortes &quot;Atendimento O2&quot;, &quot;Problema na Oxy&quot; e &quot;Comercial&quot;. Esses motivos são <strong>internos</strong> e <strong>acionáveis</strong>.</p>
+                        </div>
+                        <div>
+                          <p><span className="font-semibold">3. Março/26 é o pior mês dos 6:</span> 15 churns e 10,22% de Revenue Churn. Saltou de 7 (Fev) para 15 churns — 114% de aumento. Eduardo Pedrolo concentrou 6 cancelamentos.</p>
+                        </div>
+                        <div>
+                          <p><span className="font-semibold">4. Janeiro/26 foi o melhor mês:</span> apenas 3 churns recorrentes (2,52%) e Revenue Churn de 2,67%. Mostra que a meta é viável quando há controle — o desafio é manter consistência.</p>
+                        </div>
+                        <div>
+                          <p><span className="font-semibold">5. MRR cresceu 26,7% trimestre vs trimestre</span> (R$616k → R$781k médio), mas o Logo Churn % se manteve quase igual (~19%). A operação cresceu sem corrigir a porta dos fundos.</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                )}
+
+                {/* OKRs Q1 - Visível quando Q1 selecionado */}
+                {selectedPeriod === 'q1' && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <span>⊙</span> Proximidade das Metas (KRs) — Q1/2026 (Março apurado)
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Responsável: Andréa Franzen</p>
+                    <div className="space-y-2">
+                      {(() => {
+                        const npsScore = displayData.metrics.nps.score;
+                        const csatScore = displayData.metrics.csat.score;
+                        const ltMedio = 5.2;
+                        const logoChurn = 11.36;
+                        const revenueChurn = 10.22;
+
+                        const krs = [
+                          { label: 'Manter LT acima de 8 meses', value: `${ltMedio} meses`, meta: 'Meta: 8 meses', pct: (ltMedio / 8) * 100, hit: ltMedio >= 8, showBar: true },
+                          { label: 'Manter Logo Churn abaixo de 5%', value: `${logoChurn}%`, meta: 'Meta: 5%', pct: 100 - ((logoChurn - 5) / 5) * 100, hit: logoChurn <= 5, showBar: false },
+                          { label: 'Manter Revenue Churn abaixo de 5%', value: `${revenueChurn}%`, meta: 'Meta: 5%', pct: 100 - ((revenueChurn - 5) / 5) * 100, hit: revenueChurn <= 5, showBar: false },
+                          { label: 'Manter NPS (90-100) acima de 40', value: String(npsScore), meta: 'Meta: 40', pct: (npsScore / 40) * 100, hit: npsScore >= 40, showBar: false },
+                          { label: 'Manter CSAT acima de 80%', value: `${csatScore}%`, meta: 'Meta: 80%', pct: (csatScore / 80) * 100, hit: csatScore >= 80, showBar: false },
+                        ];
+
+                        return krs.map((kr, i) => (
+                          <div key={i} className="flex items-center justify-between border rounded-lg p-4">
+                            <div className="flex items-center gap-3 flex-1">
+                              <span className={`text-lg ${kr.hit ? 'text-green-500' : 'text-red-500'}`}>
+                                {kr.hit ? '✅' : '⊗'}
+                              </span>
+                              <div className="flex-1">
+                                <span className="font-medium">{kr.label}</span>
+                                {kr.showBar && (
+                                  <div className="w-full bg-muted rounded-full h-2.5 mt-2 max-w-md">
+                                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, kr.pct))}%` }} />
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <span className={`text-sm font-medium whitespace-nowrap ${kr.hit ? 'text-green-600' : 'text-red-500'}`}>
+                              {kr.value} / {kr.meta}
+                            </span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
