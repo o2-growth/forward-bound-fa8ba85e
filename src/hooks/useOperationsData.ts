@@ -288,10 +288,28 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   // Filtro: apenas churns a partir de Outubro/2025
   const CHURN_CUTOFF = new Date('2025-10-01').getTime();
 
+  // Overrides from Q1 2026 churn dossier spreadsheet (source of truth)
+  const CHURN_OVERRIDES: Record<string, { motivo?: string; mrr?: number }> = {
+    'zebl arquitetura eireli': { motivo: 'Comercial O2' },
+    'aled atacadão led': { motivo: 'Comercial O2' },
+    'cymaco engenharia': { motivo: 'Atendimento O2' },
+    'trm energy': { motivo: 'Financeiro' },
+    'unitac': { motivo: 'Atendimento O2' },
+    'duog soluções em tecnologia': { motivo: 'Problema na Oxy' },
+    'transrossi log': { motivo: 'Financeiro' },
+    'rocha med': { motivo: 'Problema na Oxy' },
+    'básico brasil ltda': { motivo: 'Atendimento O2' },
+    'datweb': { mrr: 7510.10 },
+    'gold metropolitana': { mrr: 0 },
+    'grande concreto': { mrr: 6570 },
+    'protecface respiradores': { mrr: 15000 },
+  };
+
   const churnDossier: ChurnDossierCard[] = churnCards.map(card => {
     const key = (card['Título'] || '').trim().toLowerCase();
     const trat = tratativaMap.get(key);
     const nps = npsMap.get(key);
+    const override = CHURN_OVERRIDES[key];
 
     const dataAssinatura = assinaturaMap.get(card.ID) || card['Data de assinatura do contrato'] || '';
     const saidaDate = parsePipefyDate(trat?.['Saída']);
@@ -305,13 +323,16 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     // Determinar data de referência para filtro
     const refDate = tratEntradaDate ? tratEntradaDate.getTime() : (parsePipefyDate(card['Entrada'])?.getTime() || 0);
 
+    const baseMrr = parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']);
+    const baseMotivo = trat?.['Motivo Churn'] || trat?.['Motivo'] || card['Motivo Principal do Churn'] || '';
+
     return {
       id: card.ID,
       mesChurn,
       cliente: card['Título'] || '',
       setup: parseNumber(card['Valor Setup']),
-      mrr: parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']),
-      motivoPrincipal: trat?.['Motivo Churn'] || trat?.['Motivo'] || card['Motivo Principal do Churn'] || '',
+      mrr: override?.mrr !== undefined ? override.mrr : baseMrr,
+      motivoPrincipal: override?.motivo || baseMotivo,
       motivosCancelamento: trat?.['Motivo Churn'] || card['Motivos cancelamento'] || '',
       cfo: card['CFO Responsavel'] || card['Responsavel'] || '',
       produto: card['Produtos'] || '',

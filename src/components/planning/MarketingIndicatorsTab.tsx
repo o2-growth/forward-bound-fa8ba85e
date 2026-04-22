@@ -33,6 +33,8 @@ import { CostPerStageGauges } from "./marketing-indicators/CostPerStageGauges";
 import { ChannelAttributionCards } from "./marketing-indicators/ChannelAttributionCards";
 import { DrillDownBarChart } from "./indicators/DrillDownBarChart";
 import { DetailSheet, columnFormatters } from "./indicators/DetailSheet";
+import { BestAdsSection } from "./marketing-indicators/BestAdsSection";
+import { InvestmentForecast } from "./marketing-indicators/InvestmentForecast";
 import { CHANNEL_LABELS, ChannelId, CostPerStage, AttributionCard } from "./marketing-indicators/types";
 
 
@@ -744,6 +746,13 @@ export function MarketingIndicatorsTab() {
         googleAdsSpend={googleAdsApiTotals.investment}
       />
 
+      {/* Investment Forecast */}
+      <InvestmentForecast
+        currentSpend={enrichedTotals.totalInvestment}
+        budgetGoal={finalInvestmentGoal}
+        dateRange={dateRange}
+      />
+
       {/* Investment & Funnel Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <InvestmentByChannelChart channels={enrichedChannels} />
@@ -757,6 +766,12 @@ export function MarketingIndicatorsTab() {
 
       {/* Conversions by Channel Table */}
       <ConversionsByChannelChart cards={allAttributionCards} />
+
+      {/* Best Ads / Campaigns Ranking */}
+      <BestAdsSection
+        campaignFunnels={campaignFunnels}
+        adSetFunnels={adSetFunnels}
+      />
 
       {/* Campaigns Table - Meta + Google Ads Integration */}
       <CampaignsTable 
