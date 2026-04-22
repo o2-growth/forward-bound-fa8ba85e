@@ -1875,7 +1875,99 @@ export function IndicatorsTab() {
     }
   };
 
-  // Get columns for indicator type (legacy, used as fallback)
+  // Reusable: Tier breakdown card (Contratos por Faixa de Faturamento) for Vendas drill-down
+  const renderTierBreakdown = (vendaItems: DetailItem[]): React.ReactNode => {
+    const TIER_NORM: Record<string, string> = {
+      'Ainda não faturamos': 'Ainda não fatura',
+      'Menos de R$ 100 mil': '< R$ 100k',
+      'Entre R$ 100 mil e R$ 200 mil': 'R$ 100k - 200k',
+      'Entre R$ 200 mil e R$ 350 mil': 'R$ 200k - 350k',
+      'Entre R$ 350 mil e R$ 500 mil': 'R$ 350k - 500k',
+      'Entre R$ 500 mil e R$ 1 milhão': 'R$ 500k - 1M',
+      'Entre R$ 1 milhão e R$ 5 milhões': 'R$ 1M - 5M',
+      'Acima de R$ 5 milhões': '> R$ 5M',
+    };
+    const TIER_COLORS: Record<string, string> = {
+      'Ainda não fatura': 'bg-gray-500',
+      '< R$ 100k': 'bg-red-500',
+      'R$ 100k - 200k': 'bg-orange-500',
+      'R$ 200k - 350k': 'bg-amber-500',
+      'R$ 350k - 500k': 'bg-yellow-500',
+      'R$ 500k - 1M': 'bg-lime-500',
+      'R$ 1M - 5M': 'bg-green-500',
+      '> R$ 5M': 'bg-emerald-600',
+    };
+    const TIER_ORDER_LIST = ['Ainda não fatura','< R$ 100k','R$ 100k - 200k','R$ 200k - 350k','R$ 350k - 500k','R$ 500k - 1M','R$ 1M - 5M','> R$ 5M'];
+
+    const tierMap = new Map<string, { count: number; valor: number }>();
+    vendaItems.forEach(item => {
+      const raw = item.revenueRange || 'Não informado';
+      const tier = TIER_NORM[raw] || raw;
+      const existing = tierMap.get(tier) || { count: 0, valor: 0 };
+      existing.count += 1;
+      existing.valor += (item.value || 0);
+      tierMap.set(tier, existing);
+    });
+
+    const tierData = TIER_ORDER_LIST
+      .map(tier => ({ tier, ...(tierMap.get(tier) || { count: 0, valor: 0 }) }))
+      .filter(t => t.count > 0);
+    const naoInfo = tierMap.get('Não informado');
+    if (naoInfo && naoInfo.count > 0) tierData.push({ tier: 'Não informado', ...naoInfo });
+
+    const totalContratos = vendaItems.length;
+    const totalValor = vendaItems.reduce((s, i) => s + (i.value || 0), 0);
+
+    if (totalContratos === 0) return null;
+
+    const formatCurrency = (v: number) => {
+      if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`;
+      if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}k`;
+      return `R$ ${v.toFixed(0)}`;
+    };
+
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center justify-between">
+            <span>Contratos por Faixa de Faturamento</span>
+            <span className="text-sm font-normal text-muted-foreground">
+              {totalContratos} contratos | {formatCurrency(totalValor)} total
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {tierData.map(t => {
+              const pct = totalContratos > 0 ? Math.round((t.count / totalContratos) * 100) : 0;
+              const color = TIER_COLORS[t.tier] || 'bg-gray-400';
+              return (
+                <div key={t.tier} className="border rounded-lg p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${color}`} />
+                    <span className="text-xs font-medium text-muted-foreground truncate">{t.tier}</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-2xl font-bold">{t.count}</span>
+                    <span className="text-xs text-muted-foreground">contratos</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{formatCurrency(t.valor)}</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                    <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+
   const getColumnsForIndicator = (indicatorKey: IndicatorType): { key: keyof DetailItem; label: string; format?: (value: any) => React.ReactNode }[] => {
     const baseColumns: { key: keyof DetailItem; label: string; format?: (value: any) => React.ReactNode }[] = [
       { key: 'product', label: 'Produto', format: columnFormatters.product },
