@@ -416,16 +416,17 @@ export function NpsTab() {
                 {selectedPeriod === 'q1' && (
                   <div className="space-y-3">
                     <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <span>⊙</span> Proximidade das Metas (KRs) — Q1/2026 (Março apurado)
+                      <span>⊙</span> Proximidade das Metas (KRs) — Q1/2026 (Consolidado)
                     </h3>
                     <p className="text-sm text-muted-foreground">Responsável: Andréa Franzen</p>
                     <div className="space-y-2">
                       {(() => {
                         const npsScore = displayData.metrics.nps.score;
                         const csatScore = displayData.metrics.csat.score;
-                        const ltMedio = 5.2;
-                        const logoChurn = 11.36;
-                        const revenueChurn = 10.22;
+                        // Valores CONSOLIDADOS do Q1 (trimestre inteiro, não último mês)
+                        const ltMedio = 5.2;      // Consolidado (c): média ponderada
+                        const logoChurn = 19.79;  // Consolidado (b): 25 clientes / 126.3 média
+                        const revenueChurn = 5.95; // Consolidado (a): R$139.272,50 / R$2.341.745,87
 
                         const krs = [
                           { label: 'Manter LT acima de 8 meses', value: `${ltMedio} meses`, meta: 'Meta: 8 meses', pct: (ltMedio / 8) * 100, hit: ltMedio >= 8, showBar: true },
