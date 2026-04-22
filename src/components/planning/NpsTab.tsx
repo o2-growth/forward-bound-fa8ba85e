@@ -19,7 +19,7 @@ import { DateRange } from 'react-day-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine, ComposedChart,
+  ResponsiveContainer, ReferenceLine, ComposedChart, Cell, LabelList,
 } from 'recharts';
 
 export function NpsTab() {
@@ -341,6 +341,18 @@ export function NpsTab() {
                   const q4RevenueChurnAvg = 57534; // 172603 / 3
                   const q4LogoChurnAvg = 7.3; // 22 / 3
 
+                  // Quarter totals for side-by-side comparison
+                  const revenueQuarterTotals = [
+                    { quarter: 'Q4/2025', value: 172603, pct: 9.3 },
+                    { quarter: 'Q1/2026', value: 139273, pct: 5.95 },
+                  ];
+                  const logoQuarterTotals = [
+                    { quarter: 'Q4/2025', value: 22, pct: 19.2 },
+                    { quarter: 'Q1/2026', value: 25, pct: 19.79 },
+                  ];
+                  const quarterColors = ['#94a3b8', '#ef4444']; // gray for Q4, red for Q1
+                  const logoQuarterColors = ['#94a3b8', '#f97316']; // gray for Q4, orange for Q1
+
                   const formatBRL = (v: number) =>
                     v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
@@ -355,6 +367,28 @@ export function NpsTab() {
                     { icon: <Clock className="h-4 w-4" />, label: 'LT Médio', q4: '5,76 meses', q1: '5,2 meses', badge: '-0,56m', good: false },
                     { icon: <BarChart3 className="h-4 w-4" />, label: 'Clientes Ativos', q4: '114,7', q1: '126,3', badge: '+11,6', good: true },
                   ];
+
+                  const renderRevenueLabel = (props: { x?: number; y?: number; width?: number; index?: number }) => {
+                    const { x = 0, y = 0, width = 0, index = 0 } = props;
+                    const item = revenueQuarterTotals[index];
+                    if (!item) return null;
+                    return (
+                      <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={600} fill="#64748b">
+                        {item.pct}%
+                      </text>
+                    );
+                  };
+
+                  const renderLogoLabel = (props: { x?: number; y?: number; width?: number; index?: number }) => {
+                    const { x = 0, y = 0, width = 0, index = 0 } = props;
+                    const item = logoQuarterTotals[index];
+                    if (!item) return null;
+                    return (
+                      <text x={x + width / 2} y={y - 8} textAnchor="middle" fontSize={11} fontWeight={600} fill="#64748b">
+                        {item.pct}%
+                      </text>
+                    );
+                  };
 
                   return (
                   <div className="space-y-6">
@@ -401,7 +435,70 @@ export function NpsTab() {
                       </Card>
                     </div>
 
-                    {/* Charts row */}
+                    {/* Row 1: Quarter-total comparison charts (Q4 vs Q1 side by side bars) */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Revenue Churn — Q4 vs Q1 totals */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-semibold">Revenue Churn — Q4 vs Q1 (Total)</CardTitle>
+                          <p className="text-xs text-muted-foreground">Valores consolidados por trimestre</p>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={240}>
+                            <BarChart data={revenueQuarterTotals} margin={{ top: 24, right: 10, left: 10, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                              <XAxis dataKey="quarter" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                              <YAxis
+                                tick={{ fontSize: 11 }}
+                                className="fill-muted-foreground"
+                                tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+                              />
+                              <Tooltip
+                                formatter={revenueTooltipFormatter}
+                                labelStyle={{ fontWeight: 600 }}
+                                contentStyle={{ borderRadius: 8, fontSize: 13 }}
+                              />
+                              <Bar dataKey="value" name="Revenue Churn" radius={[4, 4, 0, 0]} maxBarSize={64}>
+                                {revenueQuarterTotals.map((_entry, idx) => (
+                                  <Cell key={idx} fill={quarterColors[idx]} />
+                                ))}
+                                <LabelList content={renderRevenueLabel} />
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+
+                      {/* Logo Churn — Q4 vs Q1 totals */}
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-semibold">Logo Churn — Q4 vs Q1 (Total)</CardTitle>
+                          <p className="text-xs text-muted-foreground">Quantidade de clientes por trimestre</p>
+                        </CardHeader>
+                        <CardContent>
+                          <ResponsiveContainer width="100%" height={240}>
+                            <BarChart data={logoQuarterTotals} margin={{ top: 24, right: 10, left: 10, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                              <XAxis dataKey="quarter" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
+                              <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                              <Tooltip
+                                formatter={logoTooltipFormatter}
+                                labelStyle={{ fontWeight: 600 }}
+                                contentStyle={{ borderRadius: 8, fontSize: 13 }}
+                              />
+                              <Bar dataKey="value" name="Logo Churn" radius={[4, 4, 0, 0]} maxBarSize={64}>
+                                {logoQuarterTotals.map((_entry, idx) => (
+                                  <Cell key={idx} fill={logoQuarterColors[idx]} />
+                                ))}
+                                <LabelList content={renderLogoLabel} />
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Row 2: Monthly Q1 breakdown charts with Q4 reference lines */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Revenue Churn monthly chart */}
                       <Card>
