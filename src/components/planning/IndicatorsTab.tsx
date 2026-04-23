@@ -2951,23 +2951,17 @@ export function IndicatorsTab() {
               .filter(c => c.date.getTime() >= pStart && c.date.getTime() <= pEnd)
               .reduce((sum, c) => sum + c.setup + c.pontual, 0);
 
-            // DRE for modelo_atual/o2_tax
-            if (hasDailyRevenueData && hasDreBUs) {
+            // DRE for modelo_atual/o2_tax → MRR cheio no dia 1º + Setup/Pontual reais por dia
+            if (hasDreBUs) {
               const overlapDaysList = eachDayOfInterval({ start: overlapStart, end: overlapEnd });
               let dailyTotal = 0;
               for (const day of overlapDaysList) {
                 const key = format(day, 'yyyy-MM-dd');
-                dailyTotal += getDailyRevenueForBUs(key);
+                dailyTotal += getDreRealizedForDay(key, monthName, year);
               }
               periodRealized += dailyTotal + pipefyPeriodRealized;
-            } else if (isTotalOverride(monthName, year)) {
-              periodRealized += (mrrBaseMonth * fraction) + pipefyPeriodRealized;
             } else {
-              // Fallback: all BUs via Pipefy cards
-              const spRealized = allSetupPontualCards
-                .filter(c => c.date.getTime() >= pStart && c.date.getTime() <= pEnd)
-                .reduce((sum, c) => sum + c.setup + c.pontual, 0);
-              periodRealized += (mrrBaseMonth * fraction) + spRealized;
+              periodRealized += pipefyPeriodRealized;
             }
 
             // Meta: faturamentoMeta (total = MRR Base + A Vender) do Plan Growth via metasPorBU
