@@ -2877,23 +2877,18 @@ export function IndicatorsTab() {
             .filter(c => c.date.getTime() >= mStart && c.date.getTime() <= mEnd)
             .reduce((sum, c) => sum + c.setup + c.pontual, 0);
 
-          // DRE for modelo_atual/o2_tax
-          if (hasDailyRevenueData && hasDreBUs) {
+          // DRE for modelo_atual/o2_tax → MRR cheio no dia 1º + Setup/Pontual reais por dia
+          if (hasDreBUs) {
             const overlapDaysList = eachDayOfInterval({ start: overlapStart, end: overlapEnd });
             let dailyTotal = 0;
             for (const day of overlapDaysList) {
               const key = format(day, 'yyyy-MM-dd');
-              dailyTotal += getDailyRevenueForBUs(key);
+              dailyTotal += getDreRealizedForDay(key, monthName, year);
             }
             totalRealized += dailyTotal + pipefyRealized;
-          } else if (isTotalOverride(monthName, year)) {
-            totalRealized += (mrrBaseMonth * fraction) + pipefyRealized;
           } else {
-            // Fallback: MRR base pro-rata + actual setup + actual pontual (all BUs)
-            const allCardsRealized = allSetupPontualCards
-              .filter(c => c.date.getTime() >= mStart && c.date.getTime() <= mEnd)
-              .reduce((sum, c) => sum + c.setup + c.pontual, 0);
-            totalRealized += (mrrBaseMonth * fraction) + allCardsRealized;
+            // Apenas BUs Pipefy (oxy_hacker/franquia) — Pipefy já somado em pipefyRealized
+            totalRealized += pipefyRealized;
           }
 
           // Meta: faturamentoMeta (total = MRR Base + A Vender) do Plan Growth via metasPorBU
