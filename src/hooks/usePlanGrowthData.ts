@@ -475,25 +475,38 @@ export function usePlanGrowthData() {
   }, [modeloAtualFunnelCalculated, funnelMetas]);
 
   // Auto-seed funnel_metas on first load if table is empty
+  // NEVER overwrite past/current months — only seed future months that don't exist yet
   useEffect(() => {
     if (isLoadingFunnel || isLoadingMetas || hasSeeded.current) return;
     if (hasFunnelForBU('modelo_atual')) return;
     if (modeloAtualFunnelCalculated.length === 0) return;
-    
+
     hasSeeded.current = true;
-    const seedData = modeloAtualFunnelCalculated.map(d => ({
-      bu: 'modelo_atual',
-      month: d.month,
-      year: 2026,
-      leads: Math.round(d.leads),
-      mqls: Math.round(d.mqls),
-      rms: Math.round(d.rms),
-      rrs: Math.round(d.rrs),
-      propostas: Math.round(d.propostas),
-      vendas: Math.round(d.vendas),
-    }));
-    
-    bulkUpsert.mutate(seedData);
+    const now = new Date();
+    const currentMonthIdx = now.getMonth(); // 0-based (Apr=3)
+    const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+    // Only seed months AFTER the current month (Mai onwards if we're in Abr)
+    const seedData = modeloAtualFunnelCalculated
+      .filter(d => {
+        const monthIdx = MONTHS.indexOf(d.month);
+        return monthIdx > currentMonthIdx; // strictly future months only
+      })
+      .map(d => ({
+        bu: 'modelo_atual',
+        month: d.month,
+        year: 2026,
+        leads: Math.round(d.leads),
+        mqls: Math.round(d.mqls),
+        rms: Math.round(d.rms),
+        rrs: Math.round(d.rrs),
+        propostas: Math.round(d.propostas),
+        vendas: Math.round(d.vendas),
+      }));
+
+    if (seedData.length > 0) {
+      bulkUpsert.mutate(seedData);
+    }
   }, [isLoadingFunnel, isLoadingMetas, modeloAtualFunnelCalculated, funnelMetas]);
 
   // Publish data to context whenever funnel data changes
