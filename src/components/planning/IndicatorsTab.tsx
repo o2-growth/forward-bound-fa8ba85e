@@ -2781,6 +2781,77 @@ export function IndicatorsTab() {
         });
         const hasDreBUs = selectedBUs.some(bu => bu === 'modelo_atual' || bu === 'o2_tax');
 
+        // === New logic: MRR cheio no dia 1º + Setup/Pontual reais no dia da assinatura ===
+        // Pipefy Setup+Pontual cards just for DRE BUs (modelo_atual + o2_tax)
+        const pipefyDreCards: { date: Date; setup: number; pontual: number }[] = [];
+        const dreBUsList = selectedBUs.filter(bu => bu === 'modelo_atual' || bu === 'o2_tax');
+        dreBUsList.forEach(bu => {
+          pipefyDreCards.push(...getSetupPontualCardsForBU(bu));
+        });
+
+        // Map: YYYY-MM-DD -> total Setup+Pontual (Pipefy DRE BUs)
+        const pipefyDreSetupPontualByDay: Record<string, number> = {};
+        for (const c of pipefyDreCards) {
+          if (!c.date || isNaN(c.date.getTime())) continue;
+          const key = format(c.date, 'yyyy-MM-dd');
+          pipefyDreSetupPontualByDay[key] = (pipefyDreSetupPontualByDay[key] || 0) + (c.setup || 0) + (c.pontual || 0);
+        }
+
+        // Map: "monthName-year" -> total Setup+Pontual Pipefy DRE BUs no mês
+        const pipefyDreSetupPontualByMonth: Record<string, number> = {};
+        for (const c of pipefyDreCards) {
+          if (!c.date || isNaN(c.date.getTime())) continue;
+          const mKey = `${monthNames[c.date.getMonth()]}-${c.date.getFullYear()}`;
+          pipefyDreSetupPontualByMonth[mKey] = (pipefyDreSetupPontualByMonth[mKey] || 0) + (c.setup || 0) + (c.pontual || 0);
+        }
+
+        // Map: "monthName-year" -> total DRE (caas+saas+tax filtrado pelas BUs DRE selecionadas)
+        const dreTotalByMonth: Record<string, number> = {};
+        for (const row of dailyRevenue) {
+          const d = new Date(row.date + 'T12:00:00');
+          if (isNaN(d.getTime())) continue;
+          const mKey = `${monthNames[d.getMonth()]}-${d.getFullYear()}`;
+          let v = 0;
+          if (selectedBUs.includes('modelo_atual')) v += (row.caas || 0) + (row.saas || 0);
+          if (selectedBUs.includes('o2_tax')) v += (row.tax || 0);
+          dreTotalByMonth[mKey] = (dreTotalByMonth[mKey] || 0) + v;
+        }
+
+        // MRR Base do mês para BUs DRE selecionadas (hoje só temos hook para modelo_atual)
+        const getMrrBaseForDreBUs = (mName: string, y: number): number => {
+          let v = 0;
+          if (selectedBUs.includes('modelo_atual')) v += getMrrBaseForMonth(mName, y);
+          // O2 TAX: sem MRR Base configurado em mrr_base_monthly hoje → 0 (fallback seguro)
+          return v;
+        };
+
+        // Mês corrente: usado para decidir entre DRE-derived MRR (passado) e MRR Base (corrente/futuro)
+        const today_ = new Date();
+        const currentMonthIdx_ = today_.getMonth();
+        const currentYear_ = today_.getFullYear();
+
+        const getMrrForMonth = (mName: string, y: number): number => {
+          const mIdx = monthNames.indexOf(mName);
+          const isPastClosed = (y < currentYear_) || (y === currentYear_ && mIdx < currentMonthIdx_);
+          if (isPastClosed) {
+            const mKey = `${mName}-${y}`;
+            const dreTotal = dreTotalByMonth[mKey] || 0;
+            const pipefyTotal = pipefyDreSetupPontualByMonth[mKey] || 0;
+            return Math.max(0, dreTotal - pipefyTotal);
+          }
+          // mês corrente ou futuro: usa MRR Base esperado
+          return getMrrBaseForDreBUs(mName, y);
+        };
+
+        // Faturamento DRE realizado num dia (só BUs DRE): MRR cheio no dia 01 + Setup/Pontual Pipefy do dia
+        const getDreRealizedForDay = (dateKey: string, mName: string, y: number): number => {
+          if (!hasDreBUs) return 0;
+          const isDayOne = dateKey.endsWith('-01');
+          const mrrChunk = isDayOne ? getMrrForMonth(mName, y) : 0;
+          const spChunk = pipefyDreSetupPontualByDay[dateKey] || 0;
+          return mrrChunk + spChunk;
+        };
+
         // Calculate total realized and total meta for header
         let totalRealized = 0;
         let totalMeta = 0;
