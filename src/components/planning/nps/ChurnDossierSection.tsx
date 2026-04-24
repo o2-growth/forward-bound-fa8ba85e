@@ -5,8 +5,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
-import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter } from 'lucide-react';
+import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 /* ─── helpers ─── */
@@ -56,13 +58,19 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
+  const [excludeMotivos, setExcludeMotivos] = useState<string[]>([]);
 
   /* ─── derived data ─── */
   const motivos = useMemo(() => [...new Set(data.map(d => d.motivoPrincipal).filter(Boolean))], [data]);
 
+  const motivoExcludeOptions = useMemo(() =>
+    motivos.map(m => ({ value: m, label: m })),
+  [motivos]);
+
   const filtered = useMemo(() => {
     return data.filter(d => {
       if (filterMotivo !== 'all' && d.motivoPrincipal !== filterMotivo) return false;
+      if (excludeMotivos.length > 0 && excludeMotivos.includes(d.motivoPrincipal)) return false;
       if (filterTipoChurn !== 'all') {
         const isDesistencia = d.faseAtual === 'Desistência';
         if (filterTipoChurn === 'operacional' && isDesistencia) return false;
@@ -91,7 +99,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
       }
       return true;
     });
-  }, [data, filterMotivo, filterTipoChurn, globalCfos, selectedProdutos, globalDateRange]);
+  }, [data, filterMotivo, filterTipoChurn, excludeMotivos, globalCfos, selectedProdutos, globalDateRange]);
 
   const totalMrrPerdido = useMemo(() => filtered.reduce((s, d) => s + (d.mrr || 0), 0), [filtered]);
   
@@ -145,9 +153,10 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
     );
   }
 
-  const hasFilters = filterMotivo !== 'all' || filterTipoChurn !== 'all' || globalCfos.length > 0 || selectedProdutos.length > 0 || !!globalDateRange?.from;
+  const hasFilters = filterMotivo !== 'all' || filterTipoChurn !== 'all' || excludeMotivos.length > 0 || globalCfos.length > 0 || selectedProdutos.length > 0 || !!globalDateRange?.from;
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -263,6 +272,14 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
             <CardTitle className="text-base flex items-center gap-2">
               <Filter className="h-4 w-4 text-primary" />
               Dossiê de Churn
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  <p>Clientes em fase de Churn, Atividades finalizadas ou Desistência. MRR = Valor CFOaaS + Valor OXY. Fonte: Pipefy — Central de Projetos + Tratativas</p>
+                </TooltipContent>
+              </Tooltip>
               <Badge variant="secondary" className="text-xs">{filtered.length} registros</Badge>
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
@@ -285,8 +302,16 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                   {motivos.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {(filterMotivo !== 'all' || filterTipoChurn !== 'all') && (
-                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setFilterMotivo('all'); setFilterTipoChurn('all'); }}>
+              <MultiSelect
+                options={motivoExcludeOptions}
+                selected={excludeMotivos}
+                onSelectionChange={setExcludeMotivos}
+                placeholder="Excluir Motivos"
+                allLabel="Excluir todos"
+                className="w-[180px] h-8 text-xs"
+              />
+              {(filterMotivo !== 'all' || filterTipoChurn !== 'all' || excludeMotivos.length > 0) && (
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setFilterMotivo('all'); setFilterTipoChurn('all'); setExcludeMotivos([]); }}>
                   Limpar
                 </Button>
               )}
@@ -403,5 +428,6 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 }

@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowUpDown, ExternalLink } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import type { JornadaCfo, JornadaCliente } from "./types";
 
 const formatCompact = (value: number) => {
@@ -63,6 +64,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
   const selectedCfoData = cfos.find(c => c.nome === selectedCfo);
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* CFO Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -73,7 +75,17 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
             onClick={() => setSelectedCfo(cfo.nome)}
           >
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">{cfo.nome}</CardTitle>
+              <CardTitle className="text-base">
+                {cfo.nome}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    <p>Clientes ativos, MRR, health score médio. Fonte: Pipefy</p>
+                  </TooltipContent>
+                </Tooltip>
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {cfo.clientes} clientes | {formatCompact(cfo.mrrTotal)} MRR
               </p>
@@ -129,7 +141,17 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
 
       {/* Comparison Table */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Comparativo CFOs</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Comparativo CFOs
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs text-xs">
+              <p>Distribuição de clientes e MRR por CFO. Fonte: Pipefy — Central de Projetos</p>
+            </TooltipContent>
+          </Tooltip>
+        </h3>
         <ScrollArea className="rounded-md border">
           <Table>
             <TableHeader>
@@ -245,5 +267,6 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
         </DialogContent>
       </Dialog>
     </div>
+    </TooltipProvider>
   );
 }

@@ -1,6 +1,8 @@
 import { RadialBarChart, RadialBar, PolarAngleAxis } from 'recharts';
 import { Card, CardContent } from '@/components/ui/card';
 import { NpsMetrics } from '@/hooks/useNpsData';
+import { Info } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 interface GaugeProps {
   title: string;
@@ -10,9 +12,10 @@ interface GaugeProps {
   meta: number;
   metaSuffix?: string;
   maxValue?: number;
+  tooltip?: string;
 }
 
-function Gauge({ title, value, suffix = '%', subtitle, meta, metaSuffix, maxValue = 100 }: GaugeProps) {
+function Gauge({ title, value, suffix = '%', subtitle, meta, metaSuffix, maxValue = 100, tooltip }: GaugeProps) {
   const pct = Math.min((value / maxValue) * 100, 100);
   const color = pct >= (meta / maxValue) * 100 ? '#16a34a' : pct >= ((meta / maxValue) * 100) * 0.7 ? '#eab308' : '#dc2626';
 
@@ -21,7 +24,19 @@ function Gauge({ title, value, suffix = '%', subtitle, meta, metaSuffix, maxValu
   return (
     <Card className="flex flex-col items-center py-6">
       <CardContent className="flex flex-col items-center p-0">
-        <h3 className="text-sm font-semibold text-foreground mb-2">{title}</h3>
+        <h3 className="text-sm font-semibold text-foreground mb-2">
+          {title}
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                <p>{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </h3>
         <div className="relative w-[160px] h-[90px] overflow-hidden">
           <RadialBarChart
             width={160}
@@ -62,6 +77,7 @@ interface Props {
 
 export function NpsGauges({ data }: Props) {
   return (
+    <TooltipProvider>
     <div>
       <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
         <span className="w-6 h-0.5 bg-primary rounded" />
@@ -73,12 +89,14 @@ export function NpsGauges({ data }: Props) {
           value={data.taxaResposta.score}
           subtitle="Clientes > 3 meses"
           meta={data.taxaResposta.meta}
+          tooltip="Respostas / Pesquisados × 100. Fonte: Pipefy — Pesquisa de Satisfação NPS"
         />
         <Gauge
           title="CSAT Score"
           value={data.csat.score}
           subtitle="Notas 4 e 5"
           meta={data.csat.meta}
+          tooltip="Customer Satisfaction Score = % notas 4-5. Fonte: Pipefy NPS"
         />
         <Gauge
           title="NPS Score"
@@ -88,8 +106,10 @@ export function NpsGauges({ data }: Props) {
           meta={data.nps.meta}
           metaSuffix=""
           maxValue={100}
+          tooltip="Net Promoter Score = %Promotores(9-10) - %Detratores(0-6). Fonte: Pipefy NPS"
         />
       </div>
     </div>
+    </TooltipProvider>
   );
 }

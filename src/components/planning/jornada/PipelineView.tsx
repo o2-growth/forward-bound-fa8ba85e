@@ -2,7 +2,8 @@ import { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, DollarSign, UserCheck, AlertTriangle, Rocket, Receipt, ExternalLink } from "lucide-react";
+import { Users, DollarSign, UserCheck, AlertTriangle, Rocket, Receipt, ExternalLink, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import type { PipelineFase, JornadaCliente } from "./types";
 
 const formatBRL = (value: number) =>
@@ -36,16 +37,17 @@ export function PipelineView({ pipeline, clientes }: PipelineViewProps) {
   const maxCount = useMemo(() => Math.max(...pipeline.map(f => f.count), 1), [pipeline]);
 
   const kpiCards = [
-    { label: "Total Ativos", value: String(kpis.totalAtivos), icon: Users, color: "text-blue-600" },
-    { label: "Clientes MRR", value: String(kpis.clientesMrr), icon: DollarSign, color: "text-green-600" },
-    { label: "Clientes Pontual", value: String(kpis.clientesPontual), icon: Receipt, color: "text-purple-600" },
-    { label: "MRR Total", value: formatCompact(kpis.mrrTotal), icon: DollarSign, color: "text-green-500" },
-    { label: "Onboarding", value: String(kpis.onboarding), icon: Rocket, color: "text-blue-500" },
-    { label: "Em Operação", value: String(kpis.emOperacao), icon: UserCheck, color: "text-green-500" },
-    { label: "Em Tratativa", value: String(kpis.emTratativa), icon: AlertTriangle, color: "text-amber-500" },
+    { label: "Total Ativos", value: String(kpis.totalAtivos), icon: Users, color: "text-blue-600", tooltip: "Clientes em Onboarding ou Em Operação Recorrente. Fonte: Pipefy — Central de Projetos" },
+    { label: "Clientes MRR", value: String(kpis.clientesMrr), icon: DollarSign, color: "text-green-600", tooltip: "Clientes ativos com receita recorrente mensal. Fonte: Pipefy — Central de Projetos" },
+    { label: "Clientes Pontual", value: String(kpis.clientesPontual), icon: Receipt, color: "text-purple-600", tooltip: "Clientes com receita pontual (setup) sem MRR. Fonte: Pipefy — Central de Projetos" },
+    { label: "MRR Total", value: formatCompact(kpis.mrrTotal), icon: DollarSign, color: "text-green-500", tooltip: "Soma de Valor CFOaaS + Valor OXY dos clientes ativos. Fonte: Pipefy — Central de Projetos" },
+    { label: "Onboarding", value: String(kpis.onboarding), icon: Rocket, color: "text-blue-500", tooltip: "Clientes na fase Onboarding. Fonte: Pipefy — Central de Projetos" },
+    { label: "Em Operação", value: String(kpis.emOperacao), icon: UserCheck, color: "text-green-500", tooltip: "Clientes na fase Em Operação Recorrente. Fonte: Pipefy — Central de Projetos" },
+    { label: "Em Tratativa", value: String(kpis.emTratativa), icon: AlertTriangle, color: "text-amber-500", tooltip: "Clientes com tratativa ativa. Fonte: Pipefy — Tratativas (pipe 306731433)" },
   ];
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
@@ -55,7 +57,17 @@ export function PipelineView({ pipeline, clientes }: PipelineViewProps) {
             <div key={kpi.label} className="flex flex-col items-center justify-center p-4 rounded-lg border bg-muted/50">
               <Icon className={`h-5 w-5 mb-1 ${kpi.color}`} />
               <span className={`text-xl font-bold ${kpi.color}`}>{kpi.value}</span>
-              <span className="text-xs text-muted-foreground text-center">{kpi.label}</span>
+              <span className="text-xs text-muted-foreground text-center">
+                {kpi.label}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    <p>{kpi.tooltip}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </span>
             </div>
           );
         })}
@@ -101,7 +113,17 @@ export function PipelineView({ pipeline, clientes }: PipelineViewProps) {
 
       {/* Pipeline Bars */}
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pipeline por Fase</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Pipeline por Fase
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs text-xs">
+              <p>Visão geral do pipeline por fase. Fonte: Pipefy — Central de Projetos (pipe 306756838)</p>
+            </TooltipContent>
+          </Tooltip>
+        </h3>
         {pipeline.map((fase) => {
           const widthPct = Math.max((fase.count / maxCount) * 100, 8);
           const fasePontual = fase.clientes.reduce((s, c) => s + c.pontual, 0);
@@ -180,5 +202,6 @@ export function PipelineView({ pipeline, clientes }: PipelineViewProps) {
         </DialogContent>
       </Dialog>
     </div>
+    </TooltipProvider>
   );
 }

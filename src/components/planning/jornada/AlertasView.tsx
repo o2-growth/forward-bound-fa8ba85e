@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, AlertTriangle, ListTodo, ThumbsDown, MessageCircleOff, XCircle, ExternalLink, Check, Eye, EyeOff } from "lucide-react";
+import { Clock, AlertTriangle, ListTodo, ThumbsDown, MessageCircleOff, XCircle, ExternalLink, Check, Eye, EyeOff, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import type { JornadaAlerta } from "./types";
 
 const formatBRL = (value: number) =>
@@ -21,6 +22,15 @@ const ALERT_ICONS: Record<JornadaAlerta["tipo"], React.ComponentType<{ className
   nps_detrator: ThumbsDown,
   sem_nps: MessageCircleOff,
   churn: XCircle,
+};
+
+const ALERT_TOOLTIPS: Record<JornadaAlerta["tipo"], string> = {
+  setup_atrasado: "Setup com mais de 90 dias. Fonte: Pipefy — Setup",
+  tratativa_aberta: "Tratativa ativa há mais de 30 dias. Fonte: Pipefy — Tratativas",
+  nps_detrator: "Cliente detrator (NPS ≤ 6). Fonte: Pipefy — NPS",
+  sem_nps: "Cliente ativo há mais de 3 meses sem pesquisa NPS. Fonte: Pipefy — NPS",
+  tarefa_atrasada: "Tarefas com prazo vencido. Fonte: Pipefy — Central de Projetos",
+  churn: "Cliente em processo de churn. Fonte: Pipefy — Central de Projetos",
 };
 
 const SEV_CONFIG: Record<JornadaAlerta["severidade"], { label: string; border: string; bg: string; bgRead: string; text: string }> = {
@@ -111,7 +121,19 @@ export function AlertasView({ alertas }: AlertasViewProps) {
   }, [filtered]);
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
+      {/* Section Header */}
+      <div className="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs text-xs">
+            <p>Alertas operacionais por severidade. Fonte: Pipefy — Central de Projetos, Tratativas, Setup, Rotinas, NPS</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
       {/* Filter Tabs */}
       <div className="flex items-center gap-3 flex-wrap">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as FilterTab)}>
@@ -179,6 +201,14 @@ export function AlertasView({ alertas }: AlertasViewProps) {
                     className={`flex items-start gap-3 p-3 rounded-lg border-l-4 transition-all ${config.border} ${isRead ? config.bgRead + ' opacity-60' : config.bg}`}
                   >
                     <Icon className={`h-5 w-5 mt-0.5 shrink-0 ${isRead ? 'text-muted-foreground' : config.text}`} />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help shrink-0 mt-1" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">
+                        <p>{ALERT_TOOLTIPS[alerta.tipo]}</p>
+                      </TooltipContent>
+                    </Tooltip>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className={`font-medium text-sm ${isRead ? 'text-muted-foreground' : ''}`}>{alerta.cliente}</span>
@@ -221,5 +251,6 @@ export function AlertasView({ alertas }: AlertasViewProps) {
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }

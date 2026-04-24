@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, Search, ChevronDown, ChevronRight, ExternalLink, Filter } from "lucide-react";
+import { ArrowUpDown, Search, ChevronDown, ChevronRight, ExternalLink, Filter, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { PipefyCardLink, PIPEFY_PIPES } from "../nps/PipefyCardLink";
 import type { JornadaCliente } from "./types";
 
 const formatBRL = (value: number) =>
@@ -86,6 +88,7 @@ export function ClientesView({ clientes }: ClientesViewProps) {
   };
 
   return (
+    <TooltipProvider>
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
@@ -150,9 +153,39 @@ export function ClientesView({ clientes }: ClientesViewProps) {
           <TableHeader>
             <TableRow>
               <TableHead className="w-8"></TableHead>
-              <TableHead>Health</TableHead>
-              <TableHead>Cliente</TableHead>
-              <TableHead>Fase</TableHead>
+              <TableHead>
+                Health
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    <p>Pontuação composta: NPS 30pts + Reuniões 30pts + Tratativa 20pts + Setup 20pts</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TableHead>
+              <TableHead>
+                Cliente
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    <p>Lista de clientes ativos com health score, NPS, setup e tratativa. Fonte: Pipefy — Central de Projetos</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TableHead>
+              <TableHead>
+                Fase
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    <p>Fase atual do projeto no Pipefy</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TableHead>
               <TableHead>CFO</TableHead>
               <TableHead className="text-right">MRR</TableHead>
               <TableHead className="text-right">NPS</TableHead>
@@ -177,11 +210,9 @@ export function ClientesView({ clientes }: ClientesViewProps) {
                     </div>
                   </TableCell>
                   <TableCell className="font-medium max-w-[200px]">
-                    <span className="inline-flex items-center gap-1 truncate">
+                    <span className="inline-flex items-center gap-1 truncate" onClick={(e) => e.stopPropagation()}>
                       {c.titulo}
-                      <a href={`https://app.pipefy.com/open-cards/${c.id}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                        <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground hover:text-primary" />
-                      </a>
+                      <PipefyCardLink pipeId={PIPEFY_PIPES.CENTRAL_PROJETOS} cardId={c.id} variant="icon" />
                     </span>
                   </TableCell>
                   <TableCell><Badge variant="outline">{c.faseAtual}</Badge></TableCell>
@@ -269,5 +300,6 @@ export function ClientesView({ clientes }: ClientesViewProps) {
         </Table>
       </ScrollArea>
     </div>
+    </TooltipProvider>
   );
 }

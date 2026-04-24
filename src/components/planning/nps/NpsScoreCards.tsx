@@ -1,7 +1,8 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { NpsMetrics, NpsDistributionData, CsatDistributionData, SeanEllisItem } from '@/hooks/useNpsData';
-import { CheckCircle2, XCircle, Target } from 'lucide-react';
+import { CheckCircle2, XCircle, Target, Info } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 interface ScoreCardProps {
   title: string;
@@ -10,15 +11,28 @@ interface ScoreCardProps {
   description: string;
   meta: number | string;
   metaAtingida: boolean;
+  tooltip?: string;
 }
 
-function ScoreCard({ title, score, suffix, description, meta, metaAtingida }: ScoreCardProps) {
+function ScoreCard({ title, score, suffix, description, meta, metaAtingida, tooltip }: ScoreCardProps) {
   const scoreColor = metaAtingida ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400';
 
   return (
     <Card>
       <CardContent className="p-5">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">{title}</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+          {title}
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                <p>{tooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </p>
         <p className={`text-5xl font-bold ${scoreColor} leading-none`}>
           {score}<span className="text-2xl">{suffix}</span>
         </p>
@@ -55,6 +69,7 @@ export function NpsScoreCards({ metrics, npsDistribution, csatDistribution, sean
   const seMuito = seanEllisDistribution.find(i => i.label.includes('Muito'))?.count || 0;
 
   return (
+    <TooltipProvider>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <ScoreCard
         title="NPS"
@@ -62,6 +77,7 @@ export function NpsScoreCards({ metrics, npsDistribution, csatDistribution, sean
         description={`${npsDistribution.promotores.count} promotores, ${npsDistribution.neutros.count} neutros, ${npsDistribution.detratores.count} detratores`}
         meta={metrics.nps.meta}
         metaAtingida={metrics.nps.metaAtingida}
+        tooltip="Net Promoter Score = %Promotores(9-10) - %Detratores(0-6). Fonte: Pipefy NPS"
       />
       <ScoreCard
         title="CSAT"
@@ -70,6 +86,7 @@ export function NpsScoreCards({ metrics, npsDistribution, csatDistribution, sean
         description={`${csatDistribution.satisfeitos.count} de ${csatDistribution.satisfeitos.count + csatDistribution.neutros.count + csatDistribution.insatisfeitos.count} respondentes satisfeitos`}
         meta={metrics.csat.meta}
         metaAtingida={metrics.csat.metaAtingida}
+        tooltip="Customer Satisfaction Score = % notas 4-5. Fonte: Pipefy NPS"
       />
       <ScoreCard
         title="SEAN ELLIS SCORE"
@@ -78,7 +95,9 @@ export function NpsScoreCards({ metrics, npsDistribution, csatDistribution, sean
         description={`${seMuito} de ${seTotal} muito desapontados`}
         meta={metrics.seanEllis.meta}
         metaAtingida={metrics.seanEllis.metaAtingida}
+        tooltip="Product-Market Fit = (Muito desapontado + De certa forma) / Total. Fonte: Pipefy NPS"
       />
     </div>
+    </TooltipProvider>
   );
 }

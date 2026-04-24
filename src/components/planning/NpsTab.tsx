@@ -309,7 +309,7 @@ export function NpsTab() {
             {displayData && (
               <>
 
-                <NpsKpiCards data={displayData.kpis} />
+                <NpsKpiCards data={displayData.kpis} cfoPerformance={displayData.cfoPerformance} />
                 <NpsGauges data={displayData.metrics} />
                 <NpsScoreCards
                   metrics={displayData.metrics}

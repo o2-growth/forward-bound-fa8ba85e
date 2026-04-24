@@ -5,7 +5,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, CheckCircle2, XCircle, Circle, AlertTriangle, ArrowUpDown, ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { Calendar, CheckCircle2, XCircle, Circle, AlertTriangle, ArrowUpDown, ExternalLink, ChevronDown, ChevronRight, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { PipefyCardLink, PIPEFY_PIPES } from "../nps/PipefyCardLink";
 import type { JornadaCliente } from "./types";
 
 const MONTH_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -275,6 +277,7 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
   }, [enriched]);
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -311,7 +314,17 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
 
       {/* CFO Summary */}
       <div className="rounded-lg border p-4">
-        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Reuniões por CFO</h4>
+        <h4 className="text-sm font-semibold text-muted-foreground mb-3">
+          Reuniões por CFO
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs text-xs">
+              <p>Acompanhamento mensal de reuniões R1-R4. Fonte: Pipefy — Rotinas (pipe 306755752)</p>
+            </TooltipContent>
+          </Tooltip>
+        </h4>
         <div className="space-y-2">
           {cfoSummary.map(c => (
             <button
@@ -382,7 +395,17 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                   CFO <ArrowUpDown className="h-3 w-3" />
                 </Button>
               </TableHead>
-              <TableHead className="text-center w-16">R1<br/><span className="text-[10px] text-muted-foreground">até dia 7</span></TableHead>
+              <TableHead className="text-center w-16">
+                R1<br/><span className="text-[10px] text-muted-foreground">até dia 7</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help inline ml-0.5" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    <p>Reuniões mensais com deadlines nos dias 7, 14, 21, 28. Verde=no prazo, Vermelho=atrasado, Laranja=sem preenchimento, Cinza=pendente</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TableHead>
               <TableHead className="text-center w-16">R2<br/><span className="text-[10px] text-muted-foreground">até dia 14</span></TableHead>
               <TableHead className="text-center w-16">R3<br/><span className="text-[10px] text-muted-foreground">até dia 21</span></TableHead>
               <TableHead className="text-center w-16">R4<br/><span className="text-[10px] text-muted-foreground">até dia 28</span></TableHead>
@@ -390,6 +413,14 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                 <Button variant="ghost" size="sm" className="gap-1" onClick={() => { setSortCol('progress'); setSortAsc(!sortAsc); }}>
                   Progresso <ArrowUpDown className="h-3 w-3" />
                 </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help inline ml-0.5" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    <p>Reuniões feitas / 4 (incluindo atrasadas)</p>
+                  </TooltipContent>
+                </Tooltip>
               </TableHead>
               <TableHead className="text-center">Participou</TableHead>
             </TableRow>
@@ -419,11 +450,9 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                       )}
                     </TableCell>
                     <TableCell className="font-medium max-w-[180px]">
-                      <span className="inline-flex items-center gap-1 truncate">
+                      <span className="inline-flex items-center gap-1 truncate" onClick={(e) => e.stopPropagation()}>
                         {r.titulo}
-                        <a href={`https://app.pipefy.com/open-cards/${r.id}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                          <ExternalLink className="h-3 w-3 shrink-0 text-muted-foreground hover:text-primary" />
-                        </a>
+                        <PipefyCardLink pipeId={PIPEFY_PIPES.ROTINAS} cardId={r.id} variant="icon" />
                       </span>
                     </TableCell>
                     <TableCell className="text-sm max-w-[140px] truncate">{r.cfo}</TableCell>
@@ -570,5 +599,6 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
         </Table>
       </ScrollArea>
     </div>
+    </TooltipProvider>
   );
 }

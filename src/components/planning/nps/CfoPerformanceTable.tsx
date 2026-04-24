@@ -5,7 +5,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Badge } from '@/components/ui/badge';
 import { CfoPerformance } from '@/hooks/useNpsData';
 import { PipefyCardLink } from './PipefyCardLink';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Info } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 function getNpsColor(nps: number) {
   if (nps >= 75) return 'text-green-600 dark:text-green-400';
@@ -30,6 +31,7 @@ export function CfoPerformanceTable({ data, npsPipeId = '' }: Props) {
   const [selectedCfo, setSelectedCfo] = useState<CfoPerformance | null>(null);
 
   return (
+    <TooltipProvider>
     <div>
       <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
         <span className="w-6 h-0.5 bg-primary rounded" />
@@ -37,7 +39,17 @@ export function CfoPerformanceTable({ data, npsPipeId = '' }: Props) {
       </h2>
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Performance por CFO — clique para ver respondentes</CardTitle>
+          <CardTitle className="text-base">
+            Performance por CFO — clique para ver respondentes
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                <p>Dados cruzados entre Central de Projetos (clientes por CFO) e Pesquisa NPS (respostas). Fonte: Pipefy</p>
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
@@ -127,5 +139,6 @@ export function CfoPerformanceTable({ data, npsPipeId = '' }: Props) {
         </SheetContent>
       </Sheet>
     </div>
+    </TooltipProvider>
   );
 }

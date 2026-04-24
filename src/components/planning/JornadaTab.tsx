@@ -3,7 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Filter, X } from "lucide-react";
+import { Loader2, Filter, X, Info } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useJornadaData } from "@/hooks/useJornadaData";
 import { PipelineView } from "./jornada/PipelineView";
 import { ClientesView } from "./jornada/ClientesView";
@@ -37,7 +38,7 @@ export function JornadaTab() {
     if (!hasFilters) return activeOnly;
     return activeOnly.filter(c => {
       if (filters.cfo.length > 0 && !filters.cfo.includes(c.cfo)) return false;
-      if (filters.produto.length > 0 && !c.produtos.some(p => filters.produto.includes(p))) return false;
+      if (filters.produto.length > 0 && !filters.produto.includes(c.produto)) return false;
       if (filters.healthLevel.length > 0 && !filters.healthLevel.includes(c.healthLevel)) return false;
       return true;
     });
@@ -86,10 +87,19 @@ export function JornadaTab() {
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* Filter Bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <Filter className="h-4 w-4 text-muted-foreground" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs text-xs">
+            <p>Jornada do Cliente — visão 360 de pipeline, clientes, reuniões, CFOs e alertas. Fonte: Pipefy</p>
+          </TooltipContent>
+        </Tooltip>
 
         {/* CFO Select */}
         <Select
@@ -212,5 +222,6 @@ export function JornadaTab() {
         </TabsContent>
       </Tabs>
     </div>
+    </TooltipProvider>
   );
 }

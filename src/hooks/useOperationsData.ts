@@ -52,9 +52,10 @@ export interface TratativaCard {
 export interface CfoClient {
   titulo: string;
   mrr: number;
+  pontual: number;
+  produto: string;
   cardId: string;
   fase: string;
-  produto: string;
 }
 
 export interface CfoDistribution {
@@ -187,7 +188,18 @@ async function fetchTableData(table: string, limit = 1000) {
 
 function parseNumber(val: string | null | undefined): number {
   if (!val) return 0;
-  const cleaned = String(val).replace(/[^\d.,\-]/g, '').replace(',', '.');
+  // Handle Brazilian format: "R$ 6.570,10" → remove thousands dots, replace decimal comma
+  const stripped = String(val).replace(/[^\d.,\-]/g, '');
+  // If both . and , exist, assume Brazilian format (dots=thousands, comma=decimal)
+  let cleaned: string;
+  if (stripped.includes(',') && stripped.includes('.')) {
+    cleaned = stripped.replace(/\./g, '').replace(',', '.');
+  } else if (stripped.includes(',')) {
+    // Only comma — treat as decimal separator
+    cleaned = stripped.replace(',', '.');
+  } else {
+    cleaned = stripped;
+  }
   return parseFloat(cleaned) || 0;
 }
 
@@ -228,30 +240,37 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   let mrrEmRisco = 0;
 
   const fasesAtivas = ['Onboarding', 'Em Operação Recorrente'];
+  const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico', 'Turnaround', 'Valuation', 'Educação'];
 
   currentPhase.forEach(card => {
     const fase = card['Fase Atual'] || 'Desconhecida';
     phaseCount[fase] = (phaseCount[fase] || 0) + 1;
 
     const cfo = card['CFO Responsavel'] || card['Responsavel'] || 'Sem CFO';
-    const mrr = parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']);
+    const valorTotal = parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']);
+    const produtoRaw = card['Produtos'] || '';
+    const produtos = produtoRaw.split(',').map(p => p.trim()).filter(Boolean);
+    const isPontualOnly = produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+    const clientMrr = isPontualOnly ? 0 : valorTotal;
+    const clientPontual = isPontualOnly ? valorTotal : 0;
 
     if (fasesAtivas.includes(fase)) {
       if (!cfoMapAtivos[cfo]) cfoMapAtivos[cfo] = { clientes: 0, mrr: 0, clients: [] };
       cfoMapAtivos[cfo].clientes += 1;
-      cfoMapAtivos[cfo].mrr += mrr;
+      cfoMapAtivos[cfo].mrr += clientMrr;
       cfoMapAtivos[cfo].clients.push({
         titulo: card['Título'] || '',
-        mrr,
+        mrr: clientMrr,
+        pontual: clientPontual,
+        produto: produtoRaw,
         cardId: card.ID,
         fase,
-        produto: card['Produtos'] || '',
       });
-      mrrTotal += mrr;
+      mrrTotal += clientMrr;
     }
 
     if (fase === 'Em Tratativa') {
-      mrrEmRisco += mrr;
+      mrrEmRisco += valorTotal;
     }
   });
 
@@ -472,7 +491,7 @@ function processSetup(rows: SetupCard[], projetos: ProjectCard[]) {
     return {
       id: card.ID,
       empresa: card['Título'] || card['Nome Empresa'] || '',
-      responsavel: card['CFO Responsavel'] || 'N/A',
+      responsavel: card['CFO Responsavel'] || card['Nome - Interlocução O2'] || card['Implantador Oxy'] || 'N/A',
       faseAtual: card['Fase Atual'] || '',
       diasEmSetup: dias,
       atrasado: dias > 90,

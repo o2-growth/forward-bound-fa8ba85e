@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, UserCheck, AlertTriangle, UserMinus, DollarSign, ClipboardList, ChevronRight, Settings, Clock, ListChecks, ShieldCheck, TrendingDown, ShieldAlert } from 'lucide-react';
+import { Users, UserCheck, AlertTriangle, UserMinus, DollarSign, ClipboardList, ChevronRight, Settings, Clock, ListChecks, ShieldCheck, TrendingDown, ShieldAlert, Info } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
 import { DateRange } from 'react-day-picker';
@@ -175,6 +176,15 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
     setupByErp = [], satisfacaoDistribution = [],
   } = filteredData;
 
+  const kpiTooltips: Record<string, string> = {
+    'Clientes Ativos': 'Clientes em Onboarding ou Em Operação Recorrente. Fonte: Pipefy — Central de Projetos (pipe 306756838)',
+    'MRR Total': 'Soma de Valor CFOaaS + Valor OXY dos clientes ativos. Fonte: Pipefy — Central de Projetos',
+    'Em Tratativa': 'Clientes com tratativa ativa. Fonte: Pipefy — Tratativas (pipe 306731433)',
+    'Em Setup': 'Setups em andamento. Fonte: Pipefy — Setup (pipe 304026589)',
+    'Setup >90d': 'Setups em andamento há mais de 90 dias. Fonte: Pipefy — Setup (pipe 304026589)',
+    'Tarefas Atrasadas': 'Rotinas vencidas ou com overdue. Fonte: Pipefy — Rotinas (pipe 306755752)',
+  };
+
   const kpiCards = [
     { icon: Users, label: 'Clientes Ativos', value: kpis.totalAtivos, color: 'text-primary' },
     { icon: UserCheck, label: 'Em Operação', value: kpis.emOperacao, color: 'text-green-600 dark:text-green-400' },
@@ -287,6 +297,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                   <TableHead>Responsável</TableHead>
                   <TableHead>Fase</TableHead>
                   <TableHead className="text-right">Dias</TableHead>
+                  <TableHead className="w-8" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -297,6 +308,9 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                     <TableCell className="text-xs text-muted-foreground">{s.faseAtual}</TableCell>
                     <TableCell className="text-right font-mono">
                       <span className={s.atrasado ? 'text-destructive font-bold' : ''}>{s.diasEmSetup}d</span>
+                    </TableCell>
+                    <TableCell>
+                      <PipefyCardLink pipeId={PIPEFY_PIPES.SETUP} cardId={s.id} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -318,6 +332,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                     <TableHead>Responsável</TableHead>
                     <TableHead>Fase</TableHead>
                     <TableHead className="text-right">Dias</TableHead>
+                    <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -327,6 +342,9 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                       <TableCell>{s.responsavel}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{s.faseAtual}</TableCell>
                       <TableCell className="text-right font-mono text-destructive font-bold">{s.diasEmSetup}d</TableCell>
+                      <TableCell>
+                        <PipefyCardLink pipeId={PIPEFY_PIPES.SETUP} cardId={s.id} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -350,6 +368,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                     <TableHead>CFO</TableHead>
                     <TableHead>Tipo Entrega</TableHead>
                     <TableHead className="text-right">Dias Atraso</TableHead>
+                    <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -359,6 +378,9 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                       <TableCell>{t.cfo}</TableCell>
                       <TableCell className="text-xs">{t.tipoEntrega}</TableCell>
                       <TableCell className="text-right font-mono text-destructive font-bold">{t.diasAtraso}d</TableCell>
+                      <TableCell>
+                        <PipefyCardLink pipeId={PIPEFY_PIPES.ROTINAS} cardId={t.id} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -380,6 +402,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                     <TableHead>CFO</TableHead>
                     <TableHead>Fase</TableHead>
                     <TableHead className="text-right">Dias</TableHead>
+                    <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -391,6 +414,9 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                       <TableCell className="text-xs text-muted-foreground">{t.faseAtual}</TableCell>
                       <TableCell className="text-right font-mono">
                         <span className={t.diasEmTratativa > 30 ? 'text-destructive font-bold' : ''}>{t.diasEmTratativa}d</span>
+                      </TableCell>
+                      <TableCell>
+                        <PipefyCardLink pipeId={PIPEFY_PIPES.TRATATIVAS} cardId={t.id} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -473,6 +499,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                     <TableHead>CFO</TableHead>
                     <TableHead>Motivo</TableHead>
                     <TableHead className="text-right">Dias</TableHead>
+                    <TableHead className="w-8" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -483,6 +510,9 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                       <TableCell><Badge variant="outline">{t.motivo}</Badge></TableCell>
                       <TableCell className="text-right font-mono">
                         <span className={t.diasEmTratativa > 30 ? 'text-destructive font-bold' : ''}>{t.diasEmTratativa}d</span>
+                      </TableCell>
+                      <TableCell>
+                        <PipefyCardLink pipeId={PIPEFY_PIPES.TRATATIVAS} cardId={t.id} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -497,11 +527,13 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {kpiCards.map((kpi) => {
           const Icon = kpi.icon;
+          const tt = kpiTooltips[kpi.label];
           return (
             <div
               key={kpi.label}
@@ -512,7 +544,19 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                 <Icon className={`h-5 w-5 ${kpi.color}`} />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">{kpi.label}</p>
+                <p className="text-xs text-muted-foreground">
+                  {kpi.label}
+                  {tt && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">
+                        <p>{tt}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </p>
                 <p className="text-xl font-bold text-foreground">{kpi.value}</p>
               </div>
             </div>
@@ -856,8 +900,13 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                       <div className="space-y-0.5 min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground truncate">{client.titulo}</p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{formatCurrency(client.mrr)}</span>
+                          {client.pontual > 0 ? (
+                            <span className="text-amber-600 dark:text-amber-400 font-medium">Pontual: {formatCurrency(client.pontual)}</span>
+                          ) : (
+                            <span>{formatCurrency(client.mrr)}</span>
+                          )}
                           <Badge variant="outline" className="text-[10px]">{client.fase}</Badge>
+                          {client.produto && <Badge variant="outline" className="text-[10px]">{client.produto}</Badge>}
                         </div>
                       </div>
                       <div className="shrink-0 ml-2">
@@ -924,5 +973,6 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
         </SheetContent>
       </Sheet>
     </div>
+    </TooltipProvider>
   );
 }

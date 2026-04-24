@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { FeedbackItem } from '@/hooks/useNpsData';
-import { ChevronDown, Quote, User, Building2 } from 'lucide-react';
+import { ChevronDown, Quote, User, Building2, Info } from 'lucide-react';
 import { PipefyCardLink } from './PipefyCardLink';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 const TABS = [
   { key: 'elogios', label: 'Elogio', color: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' },
@@ -73,10 +74,19 @@ export function QualitativeFeedback({ data, npsPipeId = '' }: Props) {
   if (totalFeedback === 0) return null;
 
   return (
+    <TooltipProvider>
     <div>
       <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
         <span className="w-6 h-0.5 bg-primary rounded" />
         Análise Qualitativa
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs text-xs">
+            <p>Comentários dos respondentes categorizados automaticamente. Fonte: Pipefy NPS — campo Comentários</p>
+          </TooltipContent>
+        </Tooltip>
       </h2>
       <Collapsible open={open} onOpenChange={setOpen}>
         <Card>
@@ -119,5 +129,6 @@ export function QualitativeFeedback({ data, npsPipeId = '' }: Props) {
         </Card>
       </Collapsible>
     </div>
+    </TooltipProvider>
   );
 }

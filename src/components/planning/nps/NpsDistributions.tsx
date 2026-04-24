@@ -1,12 +1,24 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { NpsDistributionData, CsatDistributionData, SeanEllisItem } from '@/hooks/useNpsData';
+import { Info } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 function NpsDistribution({ data }: { data: NpsDistributionData }) {
   const { promotores, neutros, detratores } = data;
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Distribuição NPS</CardTitle>
+        <CardTitle className="text-base">
+            Distribuição NPS
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                <p>Promotores (9-10), Neutros (7-8), Detratores (0-6). Fonte: Pipefy NPS</p>
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex rounded-full overflow-hidden h-7 text-xs font-semibold text-white">
@@ -47,7 +59,17 @@ function CsatDistribution({ data }: { data: CsatDistributionData }) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Distribuição CSAT</CardTitle>
+        <CardTitle className="text-base">
+            Distribuição CSAT
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                <p>Notas de 1 a 5. Satisfeitos = notas 4 e 5. Fonte: Pipefy NPS</p>
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex rounded-full overflow-hidden h-7 text-xs font-semibold text-white">
@@ -85,7 +107,17 @@ function SeanEllisDistribution({ data, excluded }: { data: SeanEllisItem[]; excl
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Distribuição Sean Ellis</CardTitle>
+        <CardTitle className="text-base">
+            Distribuição Sean Ellis
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                <p>Classificação Product-Market Fit. Fonte: Pipefy NPS</p>
+              </TooltipContent>
+            </Tooltip>
+          </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         {data.map(item => (
@@ -119,10 +151,12 @@ interface Props {
 
 export function NpsDistributions({ npsDistribution, csatDistribution, seanEllisDistribution, seExcluded }: Props) {
   return (
+    <TooltipProvider>
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <NpsDistribution data={npsDistribution} />
       <CsatDistribution data={csatDistribution} />
       <SeanEllisDistribution data={seanEllisDistribution} excluded={seExcluded} />
     </div>
+    </TooltipProvider>
   );
 }
