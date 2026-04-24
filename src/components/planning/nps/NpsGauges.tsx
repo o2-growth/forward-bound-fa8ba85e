@@ -89,14 +89,14 @@ export function NpsGauges({ data }: Props) {
           value={data.taxaResposta.score}
           subtitle="Clientes > 3 meses"
           meta={data.taxaResposta.meta}
-          tooltip="Respostas / Pesquisados × 100. Fonte: Pipefy — Pesquisa de Satisfação NPS"
+          tooltip="Respostas / Pesquisados × 100. Considera apenas clientes elegíveis (Onboarding ou Em Operação Recorrente, > 3 meses). Fonte: Pipefy — Pesquisa de Satisfação NPS"
         />
         <Gauge
           title="CSAT Score"
           value={data.csat.score}
           subtitle="Notas 4 e 5"
           meta={data.csat.meta}
-          tooltip="Customer Satisfaction Score = % notas 4-5. Fonte: Pipefy NPS"
+          tooltip="% de notas 4 e 5 sobre total de respondentes. CSAT = (Nota 4 + Nota 5) / Total Respostas × 100. Fonte: Pipefy — Pesquisa de Satisfação NPS"
         />
         <Gauge
           title="NPS Score"
@@ -106,7 +106,7 @@ export function NpsGauges({ data }: Props) {
           meta={data.nps.meta}
           metaSuffix=""
           maxValue={100}
-          tooltip="Net Promoter Score = %Promotores(9-10) - %Detratores(0-6). Fonte: Pipefy NPS"
+          tooltip="(Promotores - Detratores) / Total Respostas × 100. Promotores = nota 9-10. Detratores = nota 0-6. Deduplicado por cliente (última resposta). Fonte: Pipefy — Pesquisa NPS"
         />
       </div>
     </div>

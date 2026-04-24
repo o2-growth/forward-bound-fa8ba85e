@@ -14,10 +14,10 @@ export function NpsKpiCards({ data, cfoPerformance = [] }: Props) {
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
 
   const kpis = [
-    { icon: Users, label: 'Clientes Pesquisados', value: data.clientesPesquisados, key: 'pesquisados', tooltip: 'Total de clientes que receberam a pesquisa NPS no período. Fonte: Pipefy — Pesquisa de Satisfação NPS' },
-    { icon: MessageSquare, label: 'Respostas', value: data.respostas, key: 'respostas', tooltip: 'Clientes que responderam à pesquisa com nota NPS. Fonte: Pipefy — Pesquisa de Satisfação NPS' },
-    { icon: TrendingUp, label: 'Taxa Resposta', value: `${data.taxaResposta}%`, key: 'taxa', tooltip: 'Respostas / Pesquisados × 100. Fonte: Pipefy — Pesquisa de Satisfação NPS' },
-    { icon: Target, label: 'CFOs Ativos', value: data.cfosAtivos, key: 'cfos', tooltip: 'CFOs com clientes respondentes na pesquisa. Fonte: Pipefy — Central de Projetos' },
+    { icon: Users, label: 'Clientes Pesquisados', value: data.clientesPesquisados, key: 'pesquisados', tooltip: 'Total de clientes elegíveis (Onboarding ou Em Operação Recorrente) que receberam a pesquisa NPS no período. Fonte: Pipefy — Pesquisa de Satisfação NPS' },
+    { icon: MessageSquare, label: 'Respostas', value: data.respostas, key: 'respostas', tooltip: 'Clientes que responderam à pesquisa com nota NPS registrada. Deduplicado por cliente (última resposta). Fonte: Pipefy — Pesquisa de Satisfação NPS' },
+    { icon: TrendingUp, label: 'Taxa Resposta', value: `${data.taxaResposta}%`, key: 'taxa', tooltip: 'Taxa = Respostas / Pesquisados × 100. Considera apenas clientes > 3 meses. Fonte: Pipefy — Pesquisa de Satisfação NPS' },
+    { icon: Target, label: 'CFOs Ativos', value: data.cfosAtivos, key: 'cfos', tooltip: 'CFOs com pelo menos 1 cliente respondente na pesquisa. Cruzamento: Central de Projetos (CFO) + Pesquisa NPS (respostas). Fonte: Pipefy' },
   ];
 
   function renderDetail(key: string) {

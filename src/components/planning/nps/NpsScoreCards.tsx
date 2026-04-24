@@ -77,7 +77,7 @@ export function NpsScoreCards({ metrics, npsDistribution, csatDistribution, sean
         description={`${npsDistribution.promotores.count} promotores, ${npsDistribution.neutros.count} neutros, ${npsDistribution.detratores.count} detratores`}
         meta={metrics.nps.meta}
         metaAtingida={metrics.nps.metaAtingida}
-        tooltip="Net Promoter Score = %Promotores(9-10) - %Detratores(0-6). Fonte: Pipefy NPS"
+        tooltip="(Promotores - Detratores) / Total Respostas × 100. Promotores = nota 9-10. Detratores = nota 0-6. Deduplicado por cliente (última resposta). Fonte: Pipefy — Pesquisa NPS"
       />
       <ScoreCard
         title="CSAT"
@@ -86,7 +86,7 @@ export function NpsScoreCards({ metrics, npsDistribution, csatDistribution, sean
         description={`${csatDistribution.satisfeitos.count} de ${csatDistribution.satisfeitos.count + csatDistribution.neutros.count + csatDistribution.insatisfeitos.count} respondentes satisfeitos`}
         meta={metrics.csat.meta}
         metaAtingida={metrics.csat.metaAtingida}
-        tooltip="Customer Satisfaction Score = % notas 4-5. Fonte: Pipefy NPS"
+        tooltip="% de notas 4 e 5 sobre total de respondentes. CSAT = (Nota 4 + Nota 5) / Total Respostas × 100. Fonte: Pipefy — Pesquisa de Satisfação NPS"
       />
       <ScoreCard
         title="SEAN ELLIS SCORE"
@@ -95,7 +95,7 @@ export function NpsScoreCards({ metrics, npsDistribution, csatDistribution, sean
         description={`${seMuito} de ${seTotal} muito desapontados`}
         meta={metrics.seanEllis.meta}
         metaAtingida={metrics.seanEllis.metaAtingida}
-        tooltip="Product-Market Fit = (Muito desapontado + De certa forma) / Total. Fonte: Pipefy NPS"
+        tooltip="(Muito desapontado + De certa forma) / Total respondentes × 100. PMF alcançado quando ≥ 40%. Fonte: Pipefy — Pesquisa de Satisfação NPS"
       />
     </div>
     </TooltipProvider>

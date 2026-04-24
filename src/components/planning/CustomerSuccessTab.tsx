@@ -36,7 +36,7 @@ function CustomerSuccessTabInner() {
   const [activeTab, setActiveTab] = useState('visao-geral');
 
   // Data hooks
-  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
+  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
   const { data: npsData, isLoading: npsLoading, error: npsError } = useNpsData();
   const { data: opsData } = useOperationsData();
 
@@ -305,11 +305,6 @@ function CustomerSuccessTabInner() {
             </>
           )}
 
-          {lastSync && (
-            <span className="text-xs text-muted-foreground ml-auto">
-              Atualizado: {new Date(lastSync).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às {new Date(lastSync).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
         </div>
 
         {/* Sub-tabs */}

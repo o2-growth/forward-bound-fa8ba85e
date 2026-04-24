@@ -277,7 +277,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                   <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-xs">
-                  <p>Clientes em fase de Churn, Atividades finalizadas ou Desistência. MRR = Valor CFOaaS + Valor OXY. Fonte: Pipefy — Central de Projetos + Tratativas</p>
+                  <p>Clientes em fase de Churn, Atividades finalizadas ou Desistência. MRR Perdido = Soma(Valor CFOaaS + Valor OXY) dos churns. LT Médio = meses entre Data Assinatura e Data Encerramento. Revenue Churn = MRR Perdido / MRR Base × 100. Logo Churn = Qtd churns / Clientes ativos médios × 100. Fonte: Pipefy — Central de Projetos + Tratativas</p>
                 </TooltipContent>
               </Tooltip>
               <Badge variant="secondary" className="text-xs">{filtered.length} registros</Badge>

@@ -15,7 +15,7 @@ function NpsDistribution({ data }: { data: NpsDistributionData }) {
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs text-xs">
-                <p>Promotores (9-10), Neutros (7-8), Detratores (0-6). Fonte: Pipefy NPS</p>
+                <p>Promotores (nota 9-10), Neutros (nota 7-8), Detratores (nota 0-6). NPS = %Promotores - %Detratores. Deduplicado por cliente (última resposta). Fonte: Pipefy — Pesquisa NPS</p>
               </TooltipContent>
             </Tooltip>
           </CardTitle>
@@ -66,7 +66,7 @@ function CsatDistribution({ data }: { data: CsatDistributionData }) {
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs text-xs">
-                <p>Notas de 1 a 5. Satisfeitos = notas 4 e 5. Fonte: Pipefy NPS</p>
+                <p>Notas de 1 a 5. CSAT = (Notas 4 + 5) / Total × 100. Satisfeitos = notas 4 e 5. Neutros = nota 3. Insatisfeitos = notas 1 e 2. Fonte: Pipefy — Pesquisa NPS</p>
               </TooltipContent>
             </Tooltip>
           </CardTitle>
@@ -114,7 +114,7 @@ function SeanEllisDistribution({ data, excluded }: { data: SeanEllisItem[]; excl
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs text-xs">
-                <p>Classificação Product-Market Fit. Fonte: Pipefy NPS</p>
+                <p>Sean Ellis Score = (Muito desapontado + De certa forma) / Total respondentes × 100. PMF alcançado quando ≥ 40%. Fonte: Pipefy — Pesquisa NPS</p>
               </TooltipContent>
             </Tooltip>
           </CardTitle>

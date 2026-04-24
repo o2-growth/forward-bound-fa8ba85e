@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -7,9 +7,36 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
-import { ArrowUpDown, ExternalLink, Info, ChevronDown, ChevronRight, Users, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowUpDown, ExternalLink, Info, ChevronDown, ChevronRight, Users, DollarSign, Plus, Minus, X, Calculator, Zap, Trash2 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from "recharts";
 import type { JornadaCfo, JornadaCliente } from "./types";
+
+/* ── Simulator types ── */
+interface SimulatedClient {
+  id: string;
+  nome: string;
+  produto: string;
+  feeMensal: number;
+  feeSetup: number;
+  isPontual: boolean;
+  action: 'add' | 'remove';
+}
+
+const PRODUTO_OPTIONS = [
+  { value: 'CFOaaS/Enterprise', label: 'CFOaaS / Enterprise', pontual: false },
+  { value: 'Diagnóstico', label: 'Diagnóstico', pontual: true },
+  { value: 'Turnaround', label: 'Turnaround', pontual: true },
+  { value: 'OXY', label: 'OXY', pontual: false },
+  { value: 'Valuation', label: 'Valuation', pontual: true },
+  { value: 'Educação', label: 'Educação', pontual: false },
+];
+
+let simIdCounter = 0;
+const nextSimId = () => `sim-${++simIdCounter}-${Date.now()}`;
 
 /* ── Squad Data ── */
 const CFO_SQUADS: Record<string, {
@@ -169,6 +196,432 @@ function getAnalystCount(cfoNome: string): number {
   return 1 + sq.membros.length; // CFO + members
 }
 
+/* ── Simulator Sub-Component ── */
+interface SimuladorCarteiraProps {
+  mrrTotal: number;
+  custoSquad: number;
+  clientes: JornadaCliente[];
+  totalClientes: number;
+  analystCount: number;
+}
+
+function SimuladorCarteira({ mrrTotal, custoSquad, clientes, totalClientes, analystCount }: SimuladorCarteiraProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [simulatedClients, setSimulatedClients] = useState<SimulatedClient[]>([]);
+
+  // Form state
+  const [formNome, setFormNome] = useState('');
+  const [formProduto, setFormProduto] = useState('CFOaaS/Enterprise');
+  const [formFeeMensal, setFormFeeMensal] = useState(7000);
+  const [formFeeSetup, setFormFeeSetup] = useState(15000);
+  const [formIsPontual, setFormIsPontual] = useState(false);
+  const [removeClientId, setRemoveClientId] = useState('');
+
+  // Auto-check pontual when selecting certain products
+  const handleProdutoChange = useCallback((value: string) => {
+    setFormProduto(value);
+    const opt = PRODUTO_OPTIONS.find(o => o.value === value);
+    if (opt) setFormIsPontual(opt.pontual);
+  }, []);
+
+  const handleAddClient = useCallback(() => {
+    const newClient: SimulatedClient = {
+      id: nextSimId(),
+      nome: formNome || `Novo ${formProduto}`,
+      produto: formProduto,
+      feeMensal: formIsPontual ? 0 : formFeeMensal,
+      feeSetup: formFeeSetup,
+      isPontual: formIsPontual,
+      action: 'add',
+    };
+    setSimulatedClients(prev => [...prev, newClient]);
+    setFormNome('');
+  }, [formNome, formProduto, formFeeMensal, formFeeSetup, formIsPontual]);
+
+  const handleRemoveClient = useCallback(() => {
+    if (!removeClientId) return;
+    const cliente = clientes.find(c => c.id === removeClientId);
+    if (!cliente) return;
+    // Check not already removed
+    if (simulatedClients.some(s => s.action === 'remove' && s.nome === cliente.titulo)) return;
+    const removeSim: SimulatedClient = {
+      id: nextSimId(),
+      nome: cliente.titulo,
+      produto: cliente.produtos.join(', '),
+      feeMensal: cliente.mrr,
+      feeSetup: 0,
+      isPontual: cliente.mrr === 0 && cliente.pontual > 0,
+      action: 'remove',
+    };
+    setSimulatedClients(prev => [...prev, removeSim]);
+    setRemoveClientId('');
+  }, [removeClientId, clientes, simulatedClients]);
+
+  const handleUndo = useCallback((id: string) => {
+    setSimulatedClients(prev => prev.filter(s => s.id !== id));
+  }, []);
+
+  const handleClear = useCallback(() => {
+    setSimulatedClients([]);
+  }, []);
+
+  const handleScenarioIdeal = useCallback(() => {
+    // Target: 10 clients at R$ 8k ticket
+    const targetClientes = 10;
+    const targetTicket = 8000;
+    const diff = targetClientes - totalClientes;
+    const newSims: SimulatedClient[] = [];
+
+    if (diff > 0) {
+      for (let i = 0; i < diff; i++) {
+        newSims.push({
+          id: nextSimId(),
+          nome: `Cliente Ideal ${i + 1}`,
+          produto: 'CFOaaS/Enterprise',
+          feeMensal: targetTicket,
+          feeSetup: 15000,
+          isPontual: false,
+          action: 'add',
+        });
+      }
+    } else if (diff < 0) {
+      // Remove the lowest MRR clients to reach target
+      const sortedByMrr = [...clientes].sort((a, b) => a.mrr - b.mrr);
+      for (let i = 0; i < Math.abs(diff); i++) {
+        const c = sortedByMrr[i];
+        if (c) {
+          newSims.push({
+            id: nextSimId(),
+            nome: c.titulo,
+            produto: c.produtos.join(', '),
+            feeMensal: c.mrr,
+            feeSetup: 0,
+            isPontual: false,
+            action: 'remove',
+          });
+        }
+      }
+    }
+    setSimulatedClients(newSims);
+  }, [totalClientes, clientes]);
+
+  const handleScenarioLoseBiggest = useCallback(() => {
+    if (clientes.length === 0) return;
+    const biggest = clientes.reduce((max, c) => c.mrr > max.mrr ? c : max, clientes[0]);
+    setSimulatedClients([{
+      id: nextSimId(),
+      nome: biggest.titulo,
+      produto: biggest.produtos.join(', '),
+      feeMensal: biggest.mrr,
+      feeSetup: 0,
+      isPontual: false,
+      action: 'remove',
+    }]);
+  }, [clientes]);
+
+  // Compute simulation result
+  const simResult = useMemo(() => {
+    const additions = simulatedClients.filter(s => s.action === 'add');
+    const removals = simulatedClients.filter(s => s.action === 'remove');
+
+    const atualClientes = totalClientes;
+    const atualMrr = mrrTotal;
+    const atualPontual = clientes.reduce((s, c) => s + c.pontual, 0);
+
+    const addedMrr = additions.reduce((s, c) => s + c.feeMensal, 0);
+    const removedMrr = removals.reduce((s, c) => s + c.feeMensal, 0);
+    const addedPontual = additions.filter(c => c.isPontual).reduce((s, c) => s + c.feeSetup, 0);
+
+    const simClientes = atualClientes + additions.length - removals.length;
+    const simMrr = atualMrr + addedMrr - removedMrr;
+    const simPontual = atualPontual + addedPontual;
+
+    const atualMargem = atualMrr > 0 ? ((atualMrr - custoSquad) / atualMrr) * 100 : 0;
+    const simMargem = simMrr > 0 ? ((simMrr - custoSquad) / simMrr) * 100 : 0;
+
+    const atualTicket = atualClientes > 0 ? atualMrr / atualClientes : 0;
+    const simTicket = simClientes > 0 ? simMrr / simClientes : 0;
+
+    const atualCliAnalista = atualClientes / analystCount;
+    const simCliAnalista = simClientes / analystCount;
+
+    const atualMargemBruta = atualMrr - custoSquad;
+    const simMargemBruta = simMrr - custoSquad;
+
+    return {
+      rows: [
+        { metrica: 'Clientes', atual: atualClientes, simulado: simClientes, impacto: simClientes - atualClientes, format: 'int' as const },
+        { metrica: 'Receita (MRR)', atual: atualMrr, simulado: simMrr, impacto: simMrr - atualMrr, format: 'brl' as const },
+        { metrica: 'Receita (Pontual)', atual: atualPontual, simulado: simPontual, impacto: simPontual - atualPontual, format: 'brl' as const },
+        { metrica: 'Custo Squad', atual: custoSquad, simulado: custoSquad, impacto: 0, format: 'brl' as const },
+        { metrica: 'Margem Bruta', atual: atualMargemBruta, simulado: simMargemBruta, impacto: simMargemBruta - atualMargemBruta, format: 'brl' as const },
+        { metrica: 'Margem %', atual: atualMargem, simulado: simMargem, impacto: simMargem - atualMargem, format: 'pct' as const },
+        { metrica: 'Ticket Medio', atual: atualTicket, simulado: simTicket, impacto: simTicket - atualTicket, format: 'brl' as const },
+        { metrica: 'Cli/Analista', atual: atualCliAnalista, simulado: simCliAnalista, impacto: simCliAnalista - atualCliAnalista, format: 'dec' as const },
+      ],
+      chartData: [
+        { name: 'Receita', Atual: atualMrr, Simulado: simMrr },
+        { name: 'Margem', Atual: atualMargemBruta, Simulado: simMargemBruta },
+      ],
+    };
+  }, [simulatedClients, totalClientes, mrrTotal, custoSquad, clientes, analystCount]);
+
+  const formatCell = (value: number, format: 'int' | 'brl' | 'pct' | 'dec') => {
+    switch (format) {
+      case 'int': return value.toString();
+      case 'brl': return formatBRL(value);
+      case 'pct': return `${value.toFixed(0)}%`;
+      case 'dec': return value.toFixed(1);
+    }
+  };
+
+  const formatImpacto = (value: number, format: 'int' | 'brl' | 'pct' | 'dec') => {
+    if (Math.abs(value) < 0.5 && format !== 'dec') return '—';
+    if (Math.abs(value) < 0.05 && format === 'dec') return '—';
+    const sign = value > 0 ? '+' : '';
+    switch (format) {
+      case 'int': return `${sign}${value}`;
+      case 'brl': return `${sign}${formatBRL(value)}`;
+      case 'pct': return `${sign}${value.toFixed(0)}pp`;
+      case 'dec': return `${sign}${value.toFixed(1)}`;
+    }
+  };
+
+  const impactoColor = (value: number, metrica: string) => {
+    if (Math.abs(value) < 0.05) return 'text-muted-foreground';
+    // For Cli/Analista, higher is not necessarily good
+    if (metrica === 'Cli/Analista') return value > 2 ? 'text-red-600 dark:text-red-400' : value > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400';
+    return value > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+  };
+
+  const hasChanges = simulatedClients.length > 0;
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="border-dashed bg-muted/30">
+        <CardContent className="pt-4 pb-3 space-y-3">
+          <CollapsibleTrigger asChild>
+            <button className="flex items-center gap-2 text-sm font-semibold w-full hover:text-primary transition-colors">
+              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <Calculator className="h-4 w-4 text-primary" />
+              Simulador de Carteira
+              {hasChanges && (
+                <Badge variant="secondary" className="ml-2 text-[10px]">
+                  {simulatedClients.length} {simulatedClients.length === 1 ? 'alteracao' : 'alteracoes'}
+                </Badge>
+              )}
+            </button>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent className="space-y-4 pt-2">
+            {/* Section 1: Adicionar Cliente */}
+            <div className="space-y-2 p-3 rounded-md border border-green-500/30 bg-green-500/5">
+              <p className="text-xs font-semibold text-green-700 dark:text-green-400 flex items-center gap-1">
+                <Plus className="h-3 w-3" /> Adicionar Cliente
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Nome (opcional)</label>
+                  <Input
+                    placeholder="Nome do cliente"
+                    value={formNome}
+                    onChange={(e) => setFormNome(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Produto</label>
+                  <Select value={formProduto} onValueChange={handleProdutoChange}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRODUTO_OPTIONS.map(o => (
+                        <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Fee Mensal (R$)</label>
+                  <Input
+                    type="number"
+                    value={formFeeMensal}
+                    onChange={(e) => setFormFeeMensal(Number(e.target.value))}
+                    className="h-8 text-xs"
+                    disabled={formIsPontual}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Fee Setup (R$)</label>
+                  <Input
+                    type="number"
+                    value={formFeeSetup}
+                    onChange={(e) => setFormFeeSetup(Number(e.target.value))}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="isPontual"
+                    checked={formIsPontual}
+                    onCheckedChange={(checked) => setFormIsPontual(!!checked)}
+                  />
+                  <label htmlFor="isPontual" className="text-xs text-muted-foreground cursor-pointer">
+                    Pontual (sem recorrencia)
+                  </label>
+                </div>
+                <Button size="sm" className="h-7 text-xs gap-1" onClick={handleAddClient}>
+                  <Plus className="h-3 w-3" /> Adicionar
+                </Button>
+              </div>
+            </div>
+
+            {/* Section 2: Remover Cliente */}
+            {clientes.length > 0 && (
+              <div className="space-y-2 p-3 rounded-md border border-red-500/30 bg-red-500/5">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400 flex items-center gap-1">
+                  <Minus className="h-3 w-3" /> Remover Cliente
+                </p>
+                <div className="flex gap-2">
+                  <Select value={removeClientId} onValueChange={setRemoveClientId}>
+                    <SelectTrigger className="h-8 text-xs flex-1">
+                      <SelectValue placeholder="Selecionar cliente..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clientes.map(c => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                          {c.titulo} — {formatCompact(c.mrr)} MRR
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="destructive" className="h-8 text-xs gap-1" onClick={handleRemoveClient} disabled={!removeClientId}>
+                    <Minus className="h-3 w-3" /> Remover
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Section 3: Clientes simulados (list) */}
+            {hasChanges && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground">Alteracoes simuladas</p>
+                <div className="space-y-1">
+                  {simulatedClients.map(s => (
+                    <div
+                      key={s.id}
+                      className={`flex items-center justify-between text-xs px-2 py-1.5 rounded-md border ${
+                        s.action === 'add'
+                          ? 'border-green-500/30 bg-green-500/5'
+                          : 'border-red-500/30 bg-red-500/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          className={`text-[10px] ${
+                            s.action === 'add'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }`}
+                        >
+                          {s.action === 'add' ? '+' : '-'}
+                        </Badge>
+                        <span className="font-medium">{s.nome}</span>
+                        <span className="text-muted-foreground">{s.produto}</span>
+                        {s.feeMensal > 0 && <span className="text-muted-foreground">{formatCompact(s.feeMensal)}/mes</span>}
+                        {s.isPontual && s.feeSetup > 0 && <span className="text-purple-600">{formatCompact(s.feeSetup)} setup</span>}
+                      </div>
+                      <button
+                        onClick={() => handleUndo(s.id)}
+                        className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Section 4: Resultado da Simulacao */}
+            {hasChanges && (
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground">Resultado da Simulacao</p>
+                <div className="overflow-x-auto rounded-md border">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="text-left py-1.5 px-2 font-semibold">Metrica</th>
+                        <th className="text-right py-1.5 px-2 font-semibold">Atual</th>
+                        <th className="text-right py-1.5 px-2 font-semibold">Simulado</th>
+                        <th className="text-right py-1.5 px-2 font-semibold">Impacto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {simResult.rows.map(row => (
+                        <tr key={row.metrica} className="border-b last:border-0">
+                          <td className="py-1.5 px-2 font-medium">{row.metrica}</td>
+                          <td className="text-right py-1.5 px-2">{formatCell(row.atual, row.format)}</td>
+                          <td className="text-right py-1.5 px-2 font-medium">{formatCell(row.simulado, row.format)}</td>
+                          <td className={`text-right py-1.5 px-2 font-semibold ${impactoColor(row.impacto, row.metrica)}`}>
+                            {formatImpacto(row.impacto, row.format)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Comparison bar chart */}
+                <div className="h-40">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={simResult.chartData} barGap={4}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => formatCompact(v)} width={70} />
+                      <Bar dataKey="Atual" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                        <LabelList dataKey="Atual" position="top" formatter={(v: number) => formatCompact(v)} className="text-[10px] fill-muted-foreground" />
+                        {simResult.chartData.map((_, i) => (
+                          <Cell key={`atual-${i}`} className="fill-muted-foreground/40" />
+                        ))}
+                      </Bar>
+                      <Bar dataKey="Simulado" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                        <LabelList dataKey="Simulado" position="top" formatter={(v: number) => formatCompact(v)} className="text-[10px] fill-primary" />
+                        {simResult.chartData.map((entry, i) => (
+                          <Cell key={`sim-${i}`} className={entry.Simulado >= entry.Atual ? 'fill-green-500' : 'fill-red-500'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Section 5: Cenarios pre-definidos */}
+            <Separator />
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={handleScenarioIdeal}>
+                <Zap className="h-3 w-3" /> Cenario Ideal (10 cli, R$ 8k)
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={handleScenarioLoseBiggest}>
+                <Minus className="h-3 w-3 text-red-500" /> Perder maior cliente
+              </Button>
+              {hasChanges && (
+                <Button size="sm" variant="ghost" className="h-7 text-xs gap-1 text-muted-foreground" onClick={handleClear}>
+                  <Trash2 className="h-3 w-3" /> Limpar simulacao
+                </Button>
+              )}
+            </div>
+          </CollapsibleContent>
+        </CardContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
 /* ── Component ── */
 interface CfoViewProps {
   cfos: JornadaCfo[];
@@ -241,7 +694,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>Visao consolidada lado a lado de todos os CFOs: receita, custo, margem, ticket medio e health score. Fonte: Pipefy + Squad data.</p>
+              <p>Receita = MRR (CFOaaS + OXY). Custo = Fee CFO + Fee analistas. Margem = (Receita - Custo) / Receita × 100. Ticket = MRR / Clientes. Health Score = média ponderada NPS 30pts + Reuniões 30pts + Tratativa 20pts + Setup 20pts. Fonte: Pipefy + Squad data</p>
             </TooltipContent>
           </Tooltip>
         </h3>
@@ -333,7 +786,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                         <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-xs text-xs">
-                        <p>Clientes ativos, MRR, health score médio. Fonte: Pipefy</p>
+                        <p>MRR = CFOaaS + OXY. NPS = média dos clientes respondentes. Health = média ponderada (NPS 30 + Reuniões 30 + Tratativa 20 + Setup 20). Fonte: Pipefy — Central de Projetos + NPS</p>
                       </TooltipContent>
                     </Tooltip>
                   </span>
@@ -474,7 +927,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>Distribuição de clientes e MRR por CFO. Fonte: Pipefy — Central de Projetos</p>
+              <p>Comparativo completo por CFO: MRR, Health, Taxa Entrega, Tratativas, MRR em Risco, Custo Squad, Margem %, Ticket Médio. Fonte: Pipefy — Central de Projetos + Squad data</p>
             </TooltipContent>
           </Tooltip>
         </h3>
@@ -680,6 +1133,16 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Interactive Client Simulator */}
+                <SimuladorCarteira
+                  key={selectedCfo}
+                  mrrTotal={mrrTotal}
+                  custoSquad={custoSquad}
+                  clientes={dialogClientes}
+                  totalClientes={selectedCfoData?.clientes ?? 0}
+                  analystCount={getAnalystCount(selectedCfo)}
+                />
 
                 <Separator />
               </div>

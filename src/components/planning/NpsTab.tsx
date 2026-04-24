@@ -10,7 +10,6 @@ import { QualitativeFeedback } from './nps/QualitativeFeedback';
 import { ChurnDossierSection } from './nps/ChurnDossierSection';
 import { NpsFilters } from './nps/NpsFilters';
 
-import { OperationsSection } from './nps/OperationsSection';
 import { useNpsData, processNpsData, NpsCard } from '@/hooks/useNpsData';
 import { useOperationsData } from '@/hooks/useOperationsData';
 import { parsePipefyDate } from '@/hooks/dateUtils';
@@ -23,7 +22,6 @@ import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 export function NpsTab() {
   const [npsOpen, setNpsOpen] = useState(true);
   const [churnOpen, setChurnOpen] = useState(false);
-  const [opsOpen, setOpsOpen] = useState(false);
   const { data: npsData, isLoading, error } = useNpsData();
   const { data: opsData } = useOperationsData();
 
@@ -242,30 +240,6 @@ export function NpsTab() {
                 dateRange?.from && dateRange?.to ? { from: dateRange.from, to: dateRange.to } :
                 undefined
               }
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Operação Section - Collapsible */}
-      <div className="space-y-4">
-        <button
-          onClick={() => setOpsOpen(!opsOpen)}
-          className="flex items-center gap-2 text-xl font-semibold text-foreground hover:text-primary transition-colors w-full text-left"
-        >
-          {opsOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-          📊 Operação
-          <Badge variant="outline" className="ml-2 text-xs font-normal">
-            {opsOpen ? 'Clique para fechar' : 'Clique para abrir'}
-          </Badge>
-        </button>
-
-        {opsOpen && (
-          <div className="animate-in fade-in-0 slide-in-from-top-2 duration-300">
-            <OperationsSection
-              selectedProdutos={selectedProdutos}
-              selectedCfos={selectedCfos}
-              dateRange={dateRange}
             />
           </div>
         )}

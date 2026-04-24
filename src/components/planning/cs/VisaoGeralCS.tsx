@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, DollarSign, Heart, SmilePlus, TrendingDown, AlertTriangle } from 'lucide-react';
+import { Users, DollarSign, Heart, SmilePlus, TrendingDown, AlertTriangle, Info } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import type { JornadaCliente, JornadaCfo, JornadaAlerta } from '@/components/planning/jornada/types';
 
 interface VisaoGeralCSProps {
@@ -73,14 +74,15 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
 
   // KPI Cards
   const kpis = [
-    { label: 'Clientes Ativos', value: String(activeClientes.length), icon: Users, color: 'text-blue-600' },
-    { label: 'MRR Base', value: formatCurrency(mrrBase), icon: DollarSign, color: 'text-green-600' },
-    { label: 'Health Score', value: `${avgHealthScore}pts`, icon: Heart, color: avgHealthScore >= 70 ? 'text-green-600' : avgHealthScore >= 40 ? 'text-yellow-600' : 'text-red-600' },
-    { label: 'NPS Score', value: npsScore !== null ? String(npsScore) : '—', icon: SmilePlus, color: (npsScore ?? 0) >= 40 ? 'text-green-600' : 'text-yellow-600' },
-    { label: 'Revenue Churn', value: `${revenueChurnRate}%`, icon: TrendingDown, color: revenueChurnRate <= 5 ? 'text-green-600' : 'text-red-600' },
+    { label: 'Clientes Ativos', value: String(activeClientes.length), icon: Users, color: 'text-blue-600', tooltip: 'Clientes em fase Onboarding ou Em Operação Recorrente. Exclui Churn, Desistência, Arquivado. Fonte: Pipefy — Central de Projetos' },
+    { label: 'MRR Base', value: formatCurrency(mrrBase), icon: DollarSign, color: 'text-green-600', tooltip: 'Soma de (Valor CFOaaS + Valor OXY) de clientes em Onboarding ou Em Operação Recorrente. Exclui produtos pontuais. Fonte: Pipefy — Central de Projetos' },
+    { label: 'Health Score', value: `${avgHealthScore}pts`, icon: Heart, color: avgHealthScore >= 70 ? 'text-green-600' : avgHealthScore >= 40 ? 'text-yellow-600' : 'text-red-600', tooltip: 'Média ponderada: NPS 30pts + Reuniões 30pts + Tratativa 20pts + Setup 20pts. Verde ≥ 70, Amarelo ≥ 40, Vermelho < 40. Fonte: Pipefy — Central + Rotinas + Tratativas + NPS' },
+    { label: 'NPS Score', value: npsScore !== null ? String(npsScore) : '—', icon: SmilePlus, color: (npsScore ?? 0) >= 40 ? 'text-green-600' : 'text-yellow-600', tooltip: '(Promotores - Detratores) / Total Respostas × 100. Promotores = nota 9-10. Detratores = nota 0-6. Deduplicado por cliente (última resposta). Fonte: Pipefy — Pesquisa NPS' },
+    { label: 'Revenue Churn', value: `${revenueChurnRate}%`, icon: TrendingDown, color: revenueChurnRate <= 5 ? 'text-green-600' : 'text-red-600', tooltip: 'Soma MRR dos clientes que churaram no período / MRR Base × 100. Fonte: Pipefy — Central de Projetos + Tratativas' },
   ];
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* Hero KPI Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -91,7 +93,17 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               <CardContent className="pt-4 pb-3 px-4">
                 <div className="flex items-center gap-2 mb-1">
                   <Icon className={`h-4 w-4 ${kpi.color}`} />
-                  <span className="text-xs text-muted-foreground">{kpi.label}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {kpi.label}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help inline ml-1" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs">
+                        <p>{kpi.tooltip}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
                 </div>
                 <p className="text-2xl font-bold">{kpi.value}</p>
               </CardContent>
@@ -209,5 +221,6 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
         </Card>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

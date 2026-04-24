@@ -46,7 +46,7 @@ export function CfoPerformanceTable({ data, npsPipeId = '' }: Props) {
                 <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs text-xs">
-                <p>Dados cruzados entre Central de Projetos (clientes por CFO) e Pesquisa NPS (respostas). Fonte: Pipefy</p>
+                <p>NPS, CSAT e Sean Ellis por CFO. NPS = (Promotores - Detratores) / Total × 100. CSAT = % notas 4-5. Sean Ellis = (Muito desapontado + De certa forma) / Total × 100. Cruzamento: Central de Projetos + Pesquisa NPS. Fonte: Pipefy</p>
               </TooltipContent>
             </Tooltip>
           </CardTitle>

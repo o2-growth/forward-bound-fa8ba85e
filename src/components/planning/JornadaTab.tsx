@@ -14,7 +14,7 @@ import { ReunioesView } from "./jornada/ReunioesView";
 import type { JornadaFilter, JornadaCliente, JornadaCfo, PipelineFase } from "./jornada/types";
 
 export function JornadaTab() {
-  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, isLoading, error } = useJornadaData();
+  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading, error } = useJornadaData();
 
   const [filters, setFilters] = useState<JornadaFilter>({ cfo: [], produto: [], healthLevel: [] });
 
@@ -177,11 +177,6 @@ export function JornadaTab() {
           </>
         )}
 
-        {lastSync && (
-          <span className="text-xs text-muted-foreground ml-auto">
-            Atualizado: {new Date(lastSync).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às {new Date(lastSync).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        )}
       </div>
 
       {/* Sub-tabs */}

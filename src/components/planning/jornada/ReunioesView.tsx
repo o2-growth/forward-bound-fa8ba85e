@@ -321,7 +321,7 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>Acompanhamento mensal de reuniões R1-R4. Fonte: Pipefy — Rotinas (pipe 306755752)</p>
+              <p>R1-R4 = reuniões semanais com deadlines nos dias 7, 14, 21 e 28. Taxa = reuniões feitas / 4 × 100. Reunião no prazo = preenchida antes do deadline. Atrasada = preenchida após. Fonte: Pipefy — Rotinas (pipe 306755752)</p>
             </TooltipContent>
           </Tooltip>
         </h4>
@@ -402,7 +402,7 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                     <Info className="h-3 w-3 text-muted-foreground cursor-help inline ml-0.5" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs">
-                    <p>Reuniões mensais com deadlines nos dias 7, 14, 21, 28. Verde=no prazo, Vermelho=atrasado, Laranja=sem preenchimento, Cinza=pendente</p>
+                    <p>R1 (dia 7), R2 (dia 14), R3 (dia 21), R4 (dia 28). Verde = no prazo. Vermelho = preenchido após prazo. Laranja = prazo expirado sem preenchimento. Cinza = prazo futuro. Fonte: Pipefy — Rotinas</p>
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
