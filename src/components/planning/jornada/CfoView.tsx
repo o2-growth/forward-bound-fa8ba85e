@@ -170,6 +170,12 @@ function produtoBadges(produtos: string[]) {
   });
 }
 
+/* A3: Rank badge helper */
+const rankBadge = (rank: number) => {
+  const cls = rank === 1 ? 'text-green-700 dark:text-green-400' : rank <= 3 ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground';
+  return <sup className={`ml-0.5 text-[9px] font-bold ${cls}`}>#{rank}</sup>;
+};
+
 const marginColor = (pct: number) =>
   pct > 50 ? "text-green-600 dark:text-green-400" : pct >= 30 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400";
 
@@ -202,10 +208,9 @@ interface SimuladorCarteiraProps {
   custoSquad: number;
   clientes: JornadaCliente[];
   totalClientes: number;
-  analystCount: number;
 }
 
-function SimuladorCarteira({ mrrTotal, custoSquad, clientes, totalClientes, analystCount }: SimuladorCarteiraProps) {
+function SimuladorCarteira({ mrrTotal, custoSquad, clientes, totalClientes }: SimuladorCarteiraProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [simulatedClients, setSimulatedClients] = useState<SimulatedClient[]>([]);
 
@@ -342,9 +347,6 @@ function SimuladorCarteira({ mrrTotal, custoSquad, clientes, totalClientes, anal
     const atualTicket = atualClientes > 0 ? atualMrr / atualClientes : 0;
     const simTicket = simClientes > 0 ? simMrr / simClientes : 0;
 
-    const atualCliAnalista = atualClientes / analystCount;
-    const simCliAnalista = simClientes / analystCount;
-
     const atualMargemBruta = atualMrr - custoSquad;
     const simMargemBruta = simMrr - custoSquad;
 
@@ -357,14 +359,13 @@ function SimuladorCarteira({ mrrTotal, custoSquad, clientes, totalClientes, anal
         { metrica: 'Margem Bruta', atual: atualMargemBruta, simulado: simMargemBruta, impacto: simMargemBruta - atualMargemBruta, format: 'brl' as const },
         { metrica: 'Margem %', atual: atualMargem, simulado: simMargem, impacto: simMargem - atualMargem, format: 'pct' as const },
         { metrica: 'Ticket Medio', atual: atualTicket, simulado: simTicket, impacto: simTicket - atualTicket, format: 'brl' as const },
-        { metrica: 'Cli/Analista', atual: atualCliAnalista, simulado: simCliAnalista, impacto: simCliAnalista - atualCliAnalista, format: 'dec' as const },
       ],
       chartData: [
         { name: 'Receita', Atual: atualMrr, Simulado: simMrr },
         { name: 'Margem', Atual: atualMargemBruta, Simulado: simMargemBruta },
       ],
     };
-  }, [simulatedClients, totalClientes, mrrTotal, custoSquad, clientes, analystCount]);
+  }, [simulatedClients, totalClientes, mrrTotal, custoSquad, clientes]);
 
   const formatCell = (value: number, format: 'int' | 'brl' | 'pct' | 'dec') => {
     switch (format) {
@@ -628,7 +629,7 @@ interface CfoViewProps {
   clientes: JornadaCliente[];
 }
 
-type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco";
+type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco" | "churns";
 
 const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
 
@@ -654,15 +655,31 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
 
   const sortedCfos = useMemo(() => {
     return [...cfos].sort((a, b) => {
-      const av = a[sortCol];
-      const bv = b[sortCol];
+      if (sortCol === 'churns') {
+        const av = churnsPerCfo[a.nome] || 0;
+        const bv = churnsPerCfo[b.nome] || 0;
+        return sortAsc ? av - bv : bv - av;
+      }
+      const av = a[sortCol as keyof JornadaCfo];
+      const bv = b[sortCol as keyof JornadaCfo];
       if (typeof av === "string" && typeof bv === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
       return sortAsc ? ((av as number) ?? 0) - ((bv as number) ?? 0) : ((bv as number) ?? 0) - ((av as number) ?? 0);
     });
-  }, [cfos, sortCol, sortAsc]);
+  }, [cfos, sortCol, sortAsc, churnsPerCfo]);
 
   const activeClientes = useMemo(() => {
     return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
+  }, [clientes]);
+
+  // A1: Count churns per CFO
+  const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
+  const churnsPerCfo = useMemo(() => {
+    const map: Record<string, number> = {};
+    clientes.filter(c => CHURN_PHASES.includes(c.faseAtual)).forEach(c => {
+      const cfo = c.cfo || 'Sem CFO';
+      map[cfo] = (map[cfo] || 0) + 1;
+    });
+    return map;
   }, [clientes]);
 
   const dialogClientes = useMemo(() => {
@@ -678,9 +695,34 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
       const custoSquad = getSquadCusto(cfo.nome);
       const margem = cfo.mrrTotal > 0 ? ((cfo.mrrTotal - custoSquad) / cfo.mrrTotal) * 100 : 0;
       const ticketMedio = cfo.clientes > 0 ? cfo.mrrTotal / cfo.clientes : 0;
-      return { ...cfo, custoSquad, margem, ticketMedio };
+      const churns = churnsPerCfo[cfo.nome] || 0;
+      return { ...cfo, custoSquad, margem, ticketMedio, churns };
     });
-  }, [cfos]);
+  }, [cfos, churnsPerCfo]);
+
+  /* A3: Compute rankings per metric (higher is better, except churns where lower is better) */
+  const rankings = useMemo(() => {
+    const metrics = ['clientes', 'mrrTotal', 'healthScoreMedio', 'taxaEntrega', 'margem', 'ticketMedio'] as const;
+    const lowerIsBetter = ['churns', 'clientesTratativa', 'mrrEmRisco', 'custoSquad'] as const;
+    const result: Record<string, Record<string, number>> = {};
+
+    const rankBy = (key: string, ascending: boolean) => {
+      const sorted = [...comparisonData].sort((a, b) => {
+        const av = (a as any)[key] ?? 0;
+        const bv = (b as any)[key] ?? 0;
+        return ascending ? av - bv : bv - av;
+      });
+      sorted.forEach((cfo, idx) => {
+        if (!result[cfo.nome]) result[cfo.nome] = {};
+        result[cfo.nome][key] = idx + 1;
+      });
+    };
+
+    metrics.forEach(m => rankBy(m, false));
+    lowerIsBetter.forEach(m => rankBy(m, true));
+
+    return result;
+  }, [comparisonData]);
 
   return (
     <TooltipProvider>
@@ -705,7 +747,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                 <th className="text-left py-2 px-3 font-semibold sticky left-0 bg-muted/50 z-10 min-w-[100px]">Metrica</th>
                 {comparisonData.map((cfo) => (
                   <th key={cfo.nome} className="text-center py-2 px-3 font-semibold min-w-[100px] whitespace-nowrap">
-                    {cfo.nome.split(' ')[0]}
+                    {cfo.nome}
                   </th>
                 ))}
               </tr>
@@ -714,19 +756,19 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
               <tr className="border-b">
                 <td className="py-1.5 px-3 font-medium sticky left-0 bg-background z-10">Clientes</td>
                 {comparisonData.map((cfo) => (
-                  <td key={cfo.nome} className="text-center py-1.5 px-3">{cfo.clientes}</td>
+                  <td key={cfo.nome} className="text-center py-1.5 px-3">{cfo.clientes}{rankBadge(rankings[cfo.nome]?.clientes ?? 0)}</td>
                 ))}
               </tr>
               <tr className="border-b">
                 <td className="py-1.5 px-3 font-medium sticky left-0 bg-background z-10">Receita (MRR)</td>
                 {comparisonData.map((cfo) => (
-                  <td key={cfo.nome} className="text-center py-1.5 px-3">{formatCompact(cfo.mrrTotal)}</td>
+                  <td key={cfo.nome} className="text-center py-1.5 px-3">{formatCompact(cfo.mrrTotal)}{rankBadge(rankings[cfo.nome]?.mrrTotal ?? 0)}</td>
                 ))}
               </tr>
               <tr className="border-b">
                 <td className="py-1.5 px-3 font-medium sticky left-0 bg-background z-10">Custo Squad</td>
                 {comparisonData.map((cfo) => (
-                  <td key={cfo.nome} className="text-center py-1.5 px-3">{cfo.custoSquad > 0 ? formatCompact(cfo.custoSquad) : '—'}</td>
+                  <td key={cfo.nome} className="text-center py-1.5 px-3">{cfo.custoSquad > 0 ? <>{formatCompact(cfo.custoSquad)}{rankBadge(rankings[cfo.nome]?.custoSquad ?? 0)}</> : '—'}</td>
                 ))}
               </tr>
               <tr className="border-b">
@@ -734,7 +776,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                 {comparisonData.map((cfo) => (
                   <td key={cfo.nome} className="text-center py-1.5 px-3">
                     {cfo.custoSquad > 0 ? (
-                      <Badge className={`${marginBgColor(cfo.margem)} text-[10px]`}>{cfo.margem.toFixed(0)}%</Badge>
+                      <><Badge className={`${marginBgColor(cfo.margem)} text-[10px]`}>{cfo.margem.toFixed(0)}%</Badge>{rankBadge(rankings[cfo.nome]?.margem ?? 0)}</>
                     ) : '—'}
                   </td>
                 ))}
@@ -742,17 +784,27 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
               <tr className="border-b">
                 <td className="py-1.5 px-3 font-medium sticky left-0 bg-background z-10">Ticket Medio</td>
                 {comparisonData.map((cfo) => (
-                  <td key={cfo.nome} className="text-center py-1.5 px-3">{formatCompact(cfo.ticketMedio)}</td>
+                  <td key={cfo.nome} className="text-center py-1.5 px-3">{formatCompact(cfo.ticketMedio)}{rankBadge(rankings[cfo.nome]?.ticketMedio ?? 0)}</td>
                 ))}
               </tr>
-              <tr>
+              <tr className="border-b">
                 <td className="py-1.5 px-3 font-medium sticky left-0 bg-background z-10">Health Score</td>
                 {comparisonData.map((cfo) => (
                   <td key={cfo.nome} className="text-center py-1.5 px-3">
                     <div className="flex items-center justify-center gap-1">
                       <span className={`inline-block w-2 h-2 rounded-full ${healthDot(cfo.healthScoreMedio)}`} />
-                      {cfo.healthScoreMedio}
+                      {cfo.healthScoreMedio}{rankBadge(rankings[cfo.nome]?.healthScoreMedio ?? 0)}
                     </div>
+                  </td>
+                ))}
+              </tr>
+              <tr>
+                <td className="py-1.5 px-3 font-medium sticky left-0 bg-background z-10">Churns</td>
+                {comparisonData.map((cfo) => (
+                  <td key={cfo.nome} className="text-center py-1.5 px-3">
+                    {cfo.churns > 0 ? (
+                      <><Badge variant="destructive" className="text-[10px]">{cfo.churns}</Badge>{rankBadge(rankings[cfo.nome]?.churns ?? 0)}</>
+                    ) : <span className="text-muted-foreground">0{rankBadge(rankings[cfo.nome]?.churns ?? 0)}</span>}
                   </td>
                 ))}
               </tr>
@@ -768,7 +820,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
           const custoSquad = getSquadCusto(cfo.nome);
           const margem = cfo.mrrTotal > 0 ? ((cfo.mrrTotal - custoSquad) / cfo.mrrTotal) * 100 : 0;
           const ticketMedio = cfo.clientes > 0 ? cfo.mrrTotal / cfo.clientes : 0;
-          const cliPorAnalista = cfo.clientes / getAnalystCount(cfo.nome);
+          const cfoChurns = churnsPerCfo[cfo.nome] || 0;
           const isSquadOpen = expandedSquads.has(cfo.nome);
 
           return (
@@ -843,6 +895,12 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                   <Badge variant="outline">
                     NPS {cfo.npsMediaClientes ?? "—"}
                   </Badge>
+
+                  {cfoChurns > 0 && (
+                    <Badge variant="destructive" className="text-[10px]">
+                      {cfoChurns} {cfoChurns === 1 ? 'churn' : 'churns'}
+                    </Badge>
+                  )}
                 </div>
 
                 <Separator />
@@ -907,10 +965,6 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                     <span className="text-muted-foreground">Ticket</span>
                     <span className="font-medium">{formatCompact(ticketMedio)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Cli/analista</span>
-                    <span className="font-medium">{cliPorAnalista.toFixed(1)}</span>
-                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -943,6 +997,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                   ["taxaEntrega", "Entrega %"],
                   ["clientesTratativa", "Tratativas"],
                   ["mrrEmRisco", "MRR Risco"],
+                  ["churns", "Churns"],
                 ] as [SortCol, string][]).map(([col, label]) => (
                   <TableHead key={col}>
                     <Button variant="ghost" size="sm" className="gap-1 -ml-3" onClick={() => handleSort(col)}>
@@ -982,6 +1037,11 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                     <TableCell className={cfo.mrrEmRisco > 0 ? "text-red-600 font-medium" : ""}>
                       {formatBRL(cfo.mrrEmRisco)}
                     </TableCell>
+                    <TableCell>
+                      {(churnsPerCfo[cfo.nome] || 0) > 0 ? (
+                        <Badge variant="destructive" className="text-[10px]">{churnsPerCfo[cfo.nome]}</Badge>
+                      ) : <span className="text-muted-foreground">0</span>}
+                    </TableCell>
                     <TableCell className="text-right">{custoSquad > 0 ? formatCompact(custoSquad) : '—'}</TableCell>
                     <TableCell className="text-right">
                       {custoSquad > 0 ? (
@@ -1020,11 +1080,8 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
             const impostos = receitaBruta * 0.18;
             const receitaLiquida = receitaBruta - impostos;
             const margemBruta = receitaLiquida - custoSquad;
-            const sgna = receitaBruta * 0.06;
-            const resultadoLiquido = margemBruta - sgna;
             const margemPct = receitaBruta > 0 ? (margemBruta / receitaBruta) * 100 : 0;
             const ticketMedio = (selectedCfoData?.clientes ?? 0) > 0 ? mrrTotal / (selectedCfoData?.clientes ?? 1) : 0;
-            const cliPorAnalista = (selectedCfoData?.clientes ?? 0) / getAnalystCount(selectedCfo);
 
             return (
               <div className="space-y-4">
@@ -1086,19 +1143,10 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                         <span>- {formatBRL(custoSquad)}</span>
                       </div>
                       <Separator className="my-1" />
-                      <div className="flex justify-between font-semibold">
-                        <span>Margem Bruta</span>
-                        <span className={marginColor(margemPct)}>{formatBRL(margemBruta)} ({margemPct.toFixed(0)}%)</span>
-                      </div>
-                      <div className="flex justify-between text-muted-foreground">
-                        <span className="pl-3">(-) SG&A (6%)</span>
-                        <span>- {formatBRL(sgna)}</span>
-                      </div>
-                      <Separator className="my-1" />
                       <div className="flex justify-between font-bold text-sm">
-                        <span>Resultado Líquido</span>
-                        <span className={resultadoLiquido >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                          {formatBRL(resultadoLiquido)}
+                        <span>Margem Bruta</span>
+                        <span className={margemBruta >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                          {formatBRL(margemBruta)} ({margemPct.toFixed(0)}%)
                         </span>
                       </div>
                     </div>
@@ -1127,9 +1175,9 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                   </Card>
                   <Card className="border-dashed">
                     <CardContent className="pt-3 pb-2 text-center">
-                      <p className="text-xs text-muted-foreground">Cli / Analista</p>
-                      <p className="text-lg font-bold">{cliPorAnalista.toFixed(1)}</p>
-                      <p className="text-[10px] text-muted-foreground">Margem: <span className={marginColor(margemPct)}>{margemPct.toFixed(0)}%</span> (meta {TARGETS.margemTarget}%)</p>
+                      <p className="text-xs text-muted-foreground">Margem Bruta</p>
+                      <p className={`text-lg font-bold ${marginColor(margemPct)}`}>{margemPct.toFixed(0)}%</p>
+                      <p className="text-[10px] text-muted-foreground">Meta: {TARGETS.margemTarget}%</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -1141,7 +1189,6 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                   custoSquad={custoSquad}
                   clientes={dialogClientes}
                   totalClientes={selectedCfoData?.clientes ?? 0}
-                  analystCount={getAnalystCount(selectedCfo)}
                 />
 
                 <Separator />
