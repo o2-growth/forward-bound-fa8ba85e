@@ -17,7 +17,8 @@ import { useUserPermissions, TabKey } from "@/hooks/useUserPermissions";
 import { MediaMetasProvider } from "@/contexts/MediaMetasContext";
 import { FinancialTab } from "@/components/planning/FinancialTab";
 import { JornadaTab } from "@/components/planning/JornadaTab";
-import { Calendar, BarChart3, LineChart, Megaphone, Lightbulb, Users, Settings, LogOut, User, Loader2, EyeOff, Eye, Activity, DollarSign, Route } from "lucide-react";
+import { CustomerSuccessTab } from "@/components/planning/CustomerSuccessTab";
+import { Calendar, BarChart3, LineChart, Megaphone, Lightbulb, Users, Settings, LogOut, User, Loader2, EyeOff, Eye, Activity, DollarSign, Route, HeartHandshake } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { O2Logo } from "@/components/O2Logo";
 import { Separator } from "@/components/ui/separator";
@@ -29,7 +30,7 @@ const TAB_CONFIG: { key: TabKey; label: string; icon: React.ComponentType<{ clas
   
   { key: 'media', label: 'Plan Growth', icon: Megaphone },
   { key: 'indicators', label: 'Indicadores', icon: Activity },
-  { key: 'jornada', label: 'Jornada', icon: Route },
+  { key: 'cs', label: 'Customer Success', icon: HeartHandshake },
   { key: 'financial', label: 'Financeiro', icon: DollarSign },
   { key: 'marketing', label: 'Marketing', icon: Lightbulb },
   { key: 'structure', label: 'Estrutura', icon: Users },
@@ -170,8 +171,8 @@ export default function Planning2026() {
                 <FinancialTab />
               </TabsContent>
 
-              <TabsContent value="jornada" className="mt-0">
-                <JornadaTab />
+              <TabsContent value="cs" className="mt-0">
+                <CustomerSuccessTab />
               </TabsContent>
 
               <TabsContent value="marketing" className="mt-0">

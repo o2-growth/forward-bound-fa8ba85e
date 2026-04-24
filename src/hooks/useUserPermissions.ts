@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export type TabKey = 'context' | 'goals' | 'monthly' | 'media' | 'marketing' | 'structure' | 'admin' | 'indicators' | 'marketing_indicators' | 'nps' | 'financial' | 'jornada';
+export type TabKey = 'context' | 'goals' | 'monthly' | 'media' | 'marketing' | 'structure' | 'admin' | 'indicators' | 'marketing_indicators' | 'nps' | 'financial' | 'jornada' | 'cs';
 
 export function useUserPermissions(userId: string | undefined) {
   const { data: permissions, isLoading: permissionsLoading } = useQuery({
@@ -39,17 +39,22 @@ export function useUserPermissions(userId: string | undefined) {
   });
 
   // Admins have access to all tabs
-  const allAdminTabs: TabKey[] = ['context', 'goals', 'monthly', 'media', 'indicators', 'jornada', 'financial', 'marketing', 'structure', 'admin'];
+  const allAdminTabs: TabKey[] = ['context', 'goals', 'monthly', 'media', 'indicators', 'cs', 'financial', 'marketing', 'structure', 'admin'];
   
   // Map marketing_indicators and nps permissions to indicators tab access
+  // Map jornada and nps permissions to cs (Customer Success) tab access
   const rawPermissions = permissions || [];
-  const mappedPermissions = rawPermissions.includes('marketing_indicators') || rawPermissions.includes('nps')
+  let mappedPermissions = rawPermissions.includes('marketing_indicators') || rawPermissions.includes('nps')
     ? [...new Set([...rawPermissions, 'indicators' as TabKey])]
-    : rawPermissions;
-  
-  const allowedTabs: TabKey[] = isAdmin 
+    : [...rawPermissions];
+  // Grant cs tab access to users who have jornada or nps permissions
+  if (rawPermissions.includes('jornada') || rawPermissions.includes('nps')) {
+    mappedPermissions = [...new Set([...mappedPermissions, 'cs' as TabKey])];
+  }
+
+  const allowedTabs: TabKey[] = isAdmin
     ? allAdminTabs
-    : mappedPermissions.filter(t => !['marketing_indicators', 'nps'].includes(t));
+    : mappedPermissions.filter(t => !['marketing_indicators', 'nps', 'jornada'].includes(t));
 
   return {
     allowedTabs,
