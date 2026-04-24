@@ -188,7 +188,7 @@ export function NpsTab() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-2">
-          <Badge variant="secondary">2025</Badge>
+          <Badge variant="secondary">2026</Badge>
           <Badge variant="outline">Customer Success</Badge>
         </div>
         <h1 className="text-3xl font-bold text-foreground">Customer Success — Operação & NPS</h1>

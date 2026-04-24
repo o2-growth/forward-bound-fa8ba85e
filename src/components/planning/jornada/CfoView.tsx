@@ -653,6 +653,21 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
     });
   };
 
+  const activeClientes = useMemo(() => {
+    return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
+  }, [clientes]);
+
+  // A1: Count churns per CFO
+  const CHURN_PHASES_LOCAL = ['Churn', 'Atividades finalizadas', 'Desistência'];
+  const churnsPerCfo = useMemo(() => {
+    const map: Record<string, number> = {};
+    clientes.filter(c => CHURN_PHASES_LOCAL.includes(c.faseAtual)).forEach(c => {
+      const cfo = c.cfo || 'Sem CFO';
+      map[cfo] = (map[cfo] || 0) + 1;
+    });
+    return map;
+  }, [clientes]);
+
   const sortedCfos = useMemo(() => {
     return [...cfos].sort((a, b) => {
       if (sortCol === 'churns') {
@@ -666,21 +681,6 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
       return sortAsc ? ((av as number) ?? 0) - ((bv as number) ?? 0) : ((bv as number) ?? 0) - ((av as number) ?? 0);
     });
   }, [cfos, sortCol, sortAsc, churnsPerCfo]);
-
-  const activeClientes = useMemo(() => {
-    return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
-  }, [clientes]);
-
-  // A1: Count churns per CFO
-  const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
-  const churnsPerCfo = useMemo(() => {
-    const map: Record<string, number> = {};
-    clientes.filter(c => CHURN_PHASES.includes(c.faseAtual)).forEach(c => {
-      const cfo = c.cfo || 'Sem CFO';
-      map[cfo] = (map[cfo] || 0) + 1;
-    });
-    return map;
-  }, [clientes]);
 
   const dialogClientes = useMemo(() => {
     if (!selectedCfo) return [];

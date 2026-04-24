@@ -405,6 +405,15 @@ export function useJornadaData() {
       cfoMap.set(c.cfo, existing);
     }
 
+    // Count churns per CFO (from all clients, not just active)
+    allClientes.filter(c => CHURN_PHASES.includes(c.faseAtual)).forEach(c => {
+      if (!c.cfo) return;
+      const existing = cfoMap.get(c.cfo);
+      if (existing) {
+        existing.clientesChurn++;
+      }
+    });
+
     // Calculate averages (only from active clients)
     for (const [cfo, data] of cfoMap) {
       const cfoActive = activeClientes.filter(c => c.cfo === cfo);

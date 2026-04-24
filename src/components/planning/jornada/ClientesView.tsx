@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,7 +68,7 @@ export function ClientesView({ clientes }: ClientesViewProps) {
       return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
     return list;
-  }, [clientes, search, sortKey, sortAsc]);
+  }, [clientes, search, sortKey, sortAsc, filterFase, filterPeriod]);
 
   const healthColor = (level: string) =>
     level === "green" ? "bg-green-500" : level === "yellow" ? "bg-yellow-500" : "bg-red-500";
@@ -194,9 +194,8 @@ export function ClientesView({ clientes }: ClientesViewProps) {
           </TableHeader>
           <TableBody>
             {filtered.map((c) => (
-              <>
+              <React.Fragment key={c.id}>
                 <TableRow
-                  key={c.id}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => setExpandedId(expandedId === c.id ? null : c.id)}
                 >
@@ -294,7 +293,7 @@ export function ClientesView({ clientes }: ClientesViewProps) {
                     </TableCell>
                   </TableRow>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </TableBody>
         </Table>

@@ -401,6 +401,14 @@ function CustomerSuccessTabInner() {
                   <QualitativeFeedback data={displayNpsData.feedback} npsPipeId={displayNpsData.npsPipeId} />
                 </>
               )}
+              <QuarterlyComparison visible={selectedPeriod === 'q1'} />
+              {displayNpsData && (
+                <OkrProximity
+                  npsScore={displayNpsData.metrics.nps.score}
+                  csatScore={displayNpsData.metrics.csat.score}
+                  visible={selectedPeriod === 'q1'}
+                />
+              )}
             </div>
           </TabsContent>
 
@@ -419,14 +427,6 @@ function CustomerSuccessTabInner() {
                   undefined
                 }
               />
-              <QuarterlyComparison visible={selectedPeriod === 'q1'} />
-              {displayNpsData && (
-                <OkrProximity
-                  npsScore={displayNpsData.metrics.nps.score}
-                  csatScore={displayNpsData.metrics.csat.score}
-                  visible={selectedPeriod === 'q1'}
-                />
-              )}
             </div>
           </TabsContent>
 

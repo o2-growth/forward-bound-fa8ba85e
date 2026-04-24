@@ -33,8 +33,8 @@ const HEALTH_LABELS: Record<string, string> = {
   red: 'Critico',
 };
 
-const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistencia', 'Arquivado'];
-const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistencia'];
+const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
+const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
 const PONTUAL_PRODUCTS = ['Diagnostico', 'Turnaround', 'Valuation', 'Educacao'];
 
 type KpiDialogType = 'clientes' | 'mrr' | 'health' | 'nps' | 'churn' | null;
@@ -62,8 +62,22 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
   }, [activeClientes]);
 
   const revenueChurnRate = useMemo(() => {
-    return 5.95;
-  }, []);
+    // Revenue churn = MRR perdido no mês corrente / (MRR ativo + MRR perdido no mês)
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const churnedThisMonth = clientes.filter(c => {
+      if (!CHURN_PHASES.includes(c.faseAtual)) return false;
+      // Use dataEntrada to approximate churn month
+      const d = c.dataEntrada ? new Date(c.dataEntrada) : null;
+      return d && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+    const churnedMrr = churnedThisMonth.reduce((sum, c) => sum + c.mrr, 0);
+    const activeMrr = activeClientes.reduce((sum, c) => sum + c.mrr, 0);
+    const baseMrr = activeMrr + churnedMrr;
+    if (baseMrr === 0) return 0;
+    return Math.round((churnedMrr / baseMrr) * 10000) / 100;
+  }, [clientes, activeClientes]);
 
   const alertSummary = useMemo(() => {
     const criticos = alertas.filter(a => a.severidade === 'critico').length;
@@ -491,6 +505,9 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
             </div>
             <p className="text-xs text-muted-foreground text-center">
               Total de respostas: {npsBreakdown.total} clientes
+            </p>
+            <p className="text-xs text-muted-foreground text-center italic">
+              Baseado no último NPS registrado por cliente. Para dados completos da pesquisa, veja a aba NPS.
             </p>
           </div>
         </DialogContent>
