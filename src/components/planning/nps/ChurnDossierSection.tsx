@@ -9,7 +9,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
 import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 
 /* ─── helpers ─── */
 function formatDate(dateStr: string | null | undefined): string {
@@ -214,7 +214,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(val: number) => [val, 'Churns']} />
+                <RechartsTooltip formatter={(val: number) => [val, 'Churns']} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-wrap gap-2 mt-1 justify-center">
@@ -239,7 +239,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} fontSize={10} />
                 <YAxis type="category" dataKey="name" fontSize={10} width={55} />
-                <Tooltip formatter={(val: number) => [formatCurrency(val), 'MRR Perdido']} />
+                <RechartsTooltip formatter={(val: number) => [formatCurrency(val), 'MRR Perdido']} />
                 <Bar dataKey="mrr" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -257,7 +257,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="mes" fontSize={10} />
                 <YAxis fontSize={10} />
-                <Tooltip formatter={(val: number, name: string) => [name === 'count' ? val : formatCurrency(val as number), name === 'count' ? 'Churns' : 'MRR']} />
+                <RechartsTooltip formatter={(val: number, name: string) => [name === 'count' ? val : formatCurrency(val as number), name === 'count' ? 'Churns' : 'MRR']} />
                 <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

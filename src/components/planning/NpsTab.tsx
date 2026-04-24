@@ -18,7 +18,7 @@ import { ChevronDown, ChevronRight, Loader2, AlertCircle, TrendingDown, Trending
 import { DateRange } from 'react-day-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, ReferenceLine, ComposedChart, Cell, LabelList,
 } from 'recharts';
 
@@ -453,7 +453,7 @@ export function NpsTab() {
                                 className="fill-muted-foreground"
                                 tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
                               />
-                              <Tooltip
+                              <RechartsTooltip
                                 formatter={revenueTooltipFormatter}
                                 labelStyle={{ fontWeight: 600 }}
                                 contentStyle={{ borderRadius: 8, fontSize: 13 }}
@@ -481,7 +481,7 @@ export function NpsTab() {
                               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                               <XAxis dataKey="quarter" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
                               <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                              <Tooltip
+                              <RechartsTooltip
                                 formatter={logoTooltipFormatter}
                                 labelStyle={{ fontWeight: 600 }}
                                 contentStyle={{ borderRadius: 8, fontSize: 13 }}
@@ -516,7 +516,7 @@ export function NpsTab() {
                                 className="fill-muted-foreground"
                                 tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
                               />
-                              <Tooltip
+                              <RechartsTooltip
                                 formatter={revenueTooltipFormatter}
                                 labelStyle={{ fontWeight: 600 }}
                                 contentStyle={{ borderRadius: 8, fontSize: 13 }}
@@ -546,7 +546,7 @@ export function NpsTab() {
                               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                               <XAxis dataKey="month" tick={{ fontSize: 12 }} className="fill-muted-foreground" />
                               <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                              <Tooltip
+                              <RechartsTooltip
                                 formatter={logoTooltipFormatter}
                                 labelStyle={{ fontWeight: 600 }}
                                 contentStyle={{ borderRadius: 8, fontSize: 13 }}

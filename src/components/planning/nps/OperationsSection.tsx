@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, UserCheck, AlertTriangle, UserMinus, DollarSign, ClipboardList, ChevronRight, Settings, Clock, ListChecks, ShieldCheck, TrendingDown, ShieldAlert, Info } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
 import { DateRange } from 'react-day-picker';
 
@@ -688,7 +688,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                     label={{ value: 'dias', position: 'insideBottomRight', offset: -5, fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                   />
                   <YAxis dataKey="erp" type="category" width={120} tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }} />
-                  <Tooltip
+                  <RechartsTooltip
                     contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                     formatter={(value: number, _: string, props: { payload: { count: number } }) => [`${value} dias (${props.payload.count} projetos)`, 'Média']}
@@ -716,7 +716,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="nota" tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }} />
                   <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
-                  <Tooltip
+                  <RechartsTooltip
                     contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                   />
@@ -770,7 +770,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
                   <YAxis dataKey="name" type="category" width={160} tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }} />
-                  <Tooltip
+                  <RechartsTooltip
                     contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                   />
