@@ -744,7 +744,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} />
                 <YAxis dataKey="name" type="category" width={140} tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }} />
-                <Tooltip
+                <RechartsTooltip
                   contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8 }}
                   labelStyle={{ color: 'hsl(var(--foreground))' }}
                 />
