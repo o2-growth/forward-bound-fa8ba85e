@@ -63,6 +63,15 @@ function normalizeStr(s: string): string {
   return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
 }
 
+const NORMALIZED_PHASE_TO_INDICATOR: Record<string, string> = Object.fromEntries(
+  Object.entries(ALL_PHASE_TO_INDICATOR).map(([k, v]) => [normalizeStr(k), v])
+);
+
+function getIndicatorForPhase(fase: string): string | undefined {
+  if (!fase) return undefined;
+  return NORMALIZED_PHASE_TO_INDICATOR[normalizeStr(fase)];
+}
+
 interface Movement {
   id: string;
   titulo: string;
