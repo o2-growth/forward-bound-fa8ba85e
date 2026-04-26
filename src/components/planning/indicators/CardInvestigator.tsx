@@ -63,6 +63,15 @@ function normalizeStr(s: string): string {
   return s.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ');
 }
 
+const NORMALIZED_PHASE_TO_INDICATOR: Record<string, string> = Object.fromEntries(
+  Object.entries(ALL_PHASE_TO_INDICATOR).map(([k, v]) => [normalizeStr(k), v])
+);
+
+function getIndicatorForPhase(fase: string): string | undefined {
+  if (!fase) return undefined;
+  return NORMALIZED_PHASE_TO_INDICATOR[normalizeStr(fase)];
+}
+
 interface Movement {
   id: string;
   titulo: string;
@@ -126,7 +135,7 @@ function buildDiagnostics(movements: Movement[], faixaFaturamento: string, motiv
   // Find the first movement for each indicator
   const indicatorFirstDate: Record<string, Date> = {};
   for (const m of movements) {
-    const indicator = ALL_PHASE_TO_INDICATOR[m.fase];
+    const indicator = getIndicatorForPhase(m.fase);
     if (indicator && (!indicatorFirstDate[indicator] || m.entrada < indicatorFirstDate[indicator])) {
       indicatorFirstDate[indicator] = m.entrada;
     }
@@ -134,7 +143,7 @@ function buildDiagnostics(movements: Movement[], faixaFaturamento: string, motiv
 
   // Check MQL qualification
   const hasMqlPhase = movements.some(m => {
-    const ind = ALL_PHASE_TO_INDICATOR[m.fase];
+    const ind = getIndicatorForPhase(m.fase);
     return ind === 'MQL' || ind === 'Leads';
   });
 
@@ -174,7 +183,7 @@ function buildDiagnostics(movements: Movement[], faixaFaturamento: string, motiv
   }
 
   // Detect problems
-  const unmappedPhases = movements.filter(m => !ALL_PHASE_TO_INDICATOR[m.fase]);
+  const unmappedPhases = movements.filter(m => !getIndicatorForPhase(m.fase));
   const uniqueUnmapped = [...new Set(unmappedPhases.map(m => m.fase))];
   for (const phase of uniqueUnmapped) {
     problems.push({ severity: 'warning', message: `Fase "${phase}" nao e mapeada no dashboard — este movimento e invisivel` });
@@ -442,7 +451,7 @@ export function CardInvestigator({ open, onOpenChange }: CardInvestigatorProps) 
                 <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Timeline de Movimentacoes</h4>
                 <div className="space-y-1 font-mono text-xs">
                   {card.movements.map((m, idx) => {
-                    const indicator = ALL_PHASE_TO_INDICATOR[m.fase];
+                    const indicator = getIndicatorForPhase(m.fase);
                     const isMapped = !!indicator;
                     return (
                       <div
