@@ -222,7 +222,7 @@ async function searchCards(searchTerm: string): Promise<CardResult[]> {
   };
 
   const isIdSearch = /^\d+$/.test(searchTerm.trim());
-  const searchColumn = isIdSearch ? 'ID' : 'Titulo';
+  const searchColumn = isIdSearch ? 'ID' : 'Título';
 
   const requests = tables.map(table =>
     supabase.functions.invoke('query-external-db', {
