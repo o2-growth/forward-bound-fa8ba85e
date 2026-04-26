@@ -1,27 +1,42 @@
 ## Problema
 
-No **Card Investigator**, fases com acento (`Reunião agendada / Qualificado`, `Reunião Realizada`, `Proposta enviada / Follow Up`, `1° Reunião Realizada - Apresentação`) **não são reconhecidas** porque os mapas `MA_PHASE_TO_INDICATOR` e `EXP_PHASE_TO_INDICATOR` usam chaves sem acento (`Reuniao`, `Realizada`, `Apresentacao`).
+O `CardInvestigator` mostra como "fase invisível" várias fases que **na verdade são conhecidas pelo dashboard** — só que o mapa interno do Investigator está incompleto comparado aos hooks reais (`useModeloAtualAnalytics`, `useO2TaxAnalytics`, `useExpansaoAnalytics`).
 
-O lookup `ALL_PHASE_TO_INDICATOR[m.fase]` é uma comparação exata de string, então o Pipefy retornando `"Reunião agendada / Qualificado"` (com til) **não bate** com a chave `"Reuniao agendada / Qualificado"` (sem til). Resultado: RM e RR aparecem como "Sem movimento" mesmo quando existem.
+Após confirmar nos hooks:
 
-Isso afeta **apenas o diagnóstico do CardInvestigator** — os widgets reais (`useModeloAtualAnalytics`, etc.) já usam `normalizeStr` e funcionam corretamente.
+| Fase | Status real |
+|---|---|
+| `Ganho` | ✅ Conta como **Venda** (Expansão e O2 TAX) — falta no Investigator |
+| `Enviar para assinatura` | ✅ Fase intermediária válida (O2 TAX) |
+| `Em Contato` | ⚪ Existe no Pipefy mas **não conta** em nenhum indicador |
+| `Enviar proposta` | ⚪ Existe no Pipefy mas **não conta** (Modelo Atual usa só "Proposta enviada / Follow Up") |
+| `Contrato em elaboração` | ⚪ Fase intermediária, **não conta** |
+| `Perdido` / `Arquivado` | ⚪ Terminais, **não contam** como indicador |
 
-## Correção
+O Investigator trata os dois casos (não mapeada vs. intencionalmente ignorada) da mesma forma, e ainda esconde casos verdadeiros como "Ganho".
 
-Em `src/components/planning/indicators/CardInvestigator.tsx`, trocar o lookup direto por um lookup **normalizado** (trim + lowercase + remove acentos), reutilizando a função `normalizeStr` que já existe no arquivo.
+## Correção em `src/components/planning/indicators/CardInvestigator.tsx`
 
-### Passos
+### 1. Adicionar `'Ganho': 'Venda'` em `MA_PHASE_TO_INDICATOR` e `EXP_PHASE_TO_INDICATOR`
+Reflete o `sales-phase-universal-definition` (Ganho = venda nas BUs de Expansão e O2 TAX).
 
-1. Construir um `NORMALIZED_PHASE_TO_INDICATOR` derivado de `ALL_PHASE_TO_INDICATOR`, com chaves passadas por `normalizeStr`.
-2. Criar um helper `getIndicatorForPhase(fase: string)` que faz `NORMALIZED_PHASE_TO_INDICATOR[normalizeStr(fase)]`.
-3. Substituir todas as 4 ocorrências de `ALL_PHASE_TO_INDICATOR[m.fase]` (em `buildDiagnostics` e no JSX da timeline) por `getIndicatorForPhase(m.fase)`.
-4. Mesma troca para a deduplicação de `unmappedPhases` (usar o helper).
+### 2. Criar `KNOWN_NON_COUNTING_PHASES` (set normalizado)
+Inclui: `em contato`, `enviar proposta`, `contrato em elaboracao`, `enviar para assinatura`, `perdido`, `arquivado`. Fases conhecidas do Pipefy que intencionalmente não contam como indicador.
 
-### Resultado esperado
+### 3. Refinar detecção de problemas em `buildDiagnostics`
+Substituir o loop atual de `unmappedPhases` por uma lógica de 3 estados:
+- **Mapeada** → conta no indicador (sem problema).
+- **Conhecida não-contabilizada** → não emite problema (fase intermediária esperada).
+- **Genuinamente desconhecida** → mantém warning "fase não mapeada — invisível".
 
-Para o card `1338671728` (sem título, Modelo Atual):
-- Linha `19/abr — Reunião agendada / Qualificado` passa a marcar **RM abr/26**.
-- Linha `23/abr — Reunião Realizada` passa a marcar **RR abr/26**.
-- Diagnóstico de RM e RR muda de "NAO — Sem movimento" para "SIM (abr/26) — Entrada 19/abr" e "SIM (abr/26) — Entrada 23/abr".
+### 4. Atualizar renderização da timeline
+Adicionar terceiro estado visual: para fases em `KNOWN_NON_COUNTING_PHASES`, exibir em cinza neutro **sem** o `HelpCircle` amarelo e **sem** badge — deixando claro que é fase intermediária reconhecida (não erro).
 
-Nenhuma mudança em outros componentes ou no banco.
+## Resultado esperado
+
+Para o card relatado:
+- `Em Contato`, `Enviar proposta`, `Contrato em elaboração` → somem de "Possíveis Problemas". Aparecem na timeline em cinza neutro.
+- `Ganho` → passa a contar como Venda com badge + mês.
+- Apenas fases realmente desconhecidas (typos, fases novas do Pipefy) continuam gerando warning.
+
+Sem mudanças em outros componentes ou no banco.

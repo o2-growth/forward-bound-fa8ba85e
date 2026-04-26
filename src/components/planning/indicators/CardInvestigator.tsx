@@ -20,6 +20,7 @@ const MA_PHASE_TO_INDICATOR: Record<string, string> = {
   '1\u00b0 Reuniao Realizada - Apresentacao': 'RR (Reuniao Realizada)',
   'Proposta enviada / Follow Up': 'Proposta',
   'Contrato assinado': 'Venda',
+  'Ganho': 'Venda',
 };
 
 // Phase to indicator mapping (Expansao - pipefy_cards_movements_expansao)
@@ -31,7 +32,25 @@ const EXP_PHASE_TO_INDICATOR: Record<string, string> = {
   'Reuniao Realizada': 'RR (Reuniao Realizada)',
   'Proposta enviada / Follow Up': 'Proposta',
   'Contrato assinado': 'Venda',
+  'Ganho': 'Venda',
 };
+
+// Fases conhecidas do Pipefy que intencionalmente NAO contam como indicador.
+// Aparecem na timeline em estilo neutro (sem warning, sem badge).
+const KNOWN_NON_COUNTING_PHASES_NORMALIZED = new Set<string>([
+  'em contato',
+  'enviar proposta',
+  'contrato em elaboracao',
+  'enviar para assinatura',
+  'perdido',
+  'arquivado',
+  'cancelado',
+  'cancelada',
+]);
+
+function isKnownNonCountingPhase(fase: string): boolean {
+  return KNOWN_NON_COUNTING_PHASES_NORMALIZED.has(normalizeStr(fase || ''));
+}
 
 // Merge both maps for display
 const ALL_PHASE_TO_INDICATOR: Record<string, string> = {
