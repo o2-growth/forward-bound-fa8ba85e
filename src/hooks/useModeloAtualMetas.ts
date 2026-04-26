@@ -76,12 +76,26 @@ export function isMqlExcludedByLoss(faseAtual?: string, motivoPerda?: string): b
 }
 
 // Build a Set of card IDs that should be excluded from MQL counting.
-// A card is excluded if ANY of its rows has an excluded loss reason.
-export function buildExcludedMqlCardIds(rows: Array<{ id: string; motivoPerda?: string }>): Set<string> {
+// IMPORTANT: usa apenas o motivo da movimentação MAIS RECENTE de cada card.
+// Se o motivo foi removido/alterado no Pipefy hoje, o card volta a contar
+// (mesmo que linhas históricas ainda carreguem o motivo antigo).
+export function buildExcludedMqlCardIds(
+  rows: Array<{ id: string; motivoPerda?: string; dataEntrada?: Date }>
+): Set<string> {
+  const latestByCard = new Map<string, { motivoPerda?: string; ts: number }>();
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const ts = row.dataEntrada ? row.dataEntrada.getTime() : i;
+    const current = latestByCard.get(row.id);
+    if (!current || ts >= current.ts) {
+      latestByCard.set(row.id, { motivoPerda: row.motivoPerda, ts });
+    }
+  }
+
   const excluded = new Set<string>();
-  for (const row of rows) {
-    if (row.motivoPerda && isMqlExcludedByLoss(undefined, row.motivoPerda)) {
-      excluded.add(row.id);
+  for (const [id, info] of latestByCard) {
+    if (info.motivoPerda && isMqlExcludedByLoss(undefined, info.motivoPerda)) {
+      excluded.add(id);
     }
   }
   return excluded;
