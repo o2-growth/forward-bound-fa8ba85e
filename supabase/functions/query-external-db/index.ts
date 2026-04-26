@@ -409,14 +409,21 @@ Deno.serve(async (req) => {
       const normalizedExcludedLosses = excludedLosses.map(normalize);
 
       const dataQuery = `
-        SELECT "ID",
-               MAX("Título") as titulo,
-               array_agg(DISTINCT "Faixa de faturamento mensal") FILTER (WHERE "Faixa de faturamento mensal" IS NOT NULL) as faixas,
-               array_agg(DISTINCT "Motivo da perda") FILTER (WHERE "Motivo da perda" IS NOT NULL) as motivos_perda,
-               MAX("Fase Atual") as fase_atual
-        FROM ${table}
-        WHERE "Data Criação" >= $1::timestamp AND "Data Criação" <= $2::timestamp
-        GROUP BY "ID"
+        WITH latest AS (
+          SELECT DISTINCT ON ("ID") "ID", "Motivo da perda" AS motivo_atual
+          FROM ${table}
+          WHERE "Data Criação" >= $1::timestamp AND "Data Criação" <= $2::timestamp
+          ORDER BY "ID", "Entrada" DESC NULLS LAST
+        )
+        SELECT t."ID",
+               MAX(t."Título") as titulo,
+               array_agg(DISTINCT t."Faixa de faturamento mensal") FILTER (WHERE t."Faixa de faturamento mensal" IS NOT NULL) as faixas,
+               MAX(latest.motivo_atual) as motivo_atual,
+               MAX(t."Fase Atual") as fase_atual
+        FROM ${table} t
+        LEFT JOIN latest ON latest."ID" = t."ID"
+        WHERE t."Data Criação" >= $1::timestamp AND t."Data Criação" <= $2::timestamp
+        GROUP BY t."ID"
       `;
       const dataResult = await client.query(dataQuery, [startDate, endDate]);
 
@@ -424,17 +431,19 @@ Deno.serve(async (req) => {
         ID: string;
         titulo: string;
         faixas: string[] | null;
-        motivos_perda: string[] | null;
+        motivo_atual: string | null;
         fase_atual: string;
       }>;
 
       const qualified = allCards.filter((c) => (c.faixas || []).some((f) => qualifyingFaixas.includes(f)));
       const testExcluded = qualified.filter((c) => testIds.includes(c.ID));
       // Use normalized comparison for loss reasons (same as system)
-      const isExcludedByLoss = (motivos: string[] | null) =>
-        (motivos || []).some((m) => normalizedExcludedLosses.includes(normalize(m)));
-      const lossExcluded = qualified.filter((c) => !testIds.includes(c.ID) && isExcludedByLoss(c.motivos_perda));
-      const netMqls = qualified.filter((c) => !testIds.includes(c.ID) && !isExcludedByLoss(c.motivos_perda));
+      // IMPORTANTE: usa apenas o motivo ATUAL do card (última movimentação),
+      // não o histórico — alinhado com buildExcludedMqlCardIds.
+      const isExcludedByLoss = (motivo: string | null) =>
+        !!motivo && normalizedExcludedLosses.includes(normalize(motivo));
+      const lossExcluded = qualified.filter((c) => !testIds.includes(c.ID) && isExcludedByLoss(c.motivo_atual));
+      const netMqls = qualified.filter((c) => !testIds.includes(c.ID) && !isExcludedByLoss(c.motivo_atual));
 
       // Compare with Pipefy titles if provided - use normalized comparison
       let comparison = null;

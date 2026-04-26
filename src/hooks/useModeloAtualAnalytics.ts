@@ -560,7 +560,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
         }
         // MQL = card entered MQLs phase AND has revenue >= R$ 200k
         if (indicator === 'mql') {
-          return cardIndicator === 'mql' && isMqlQualified(m.faixa) && !isMqlExcludedByLoss(m.faseAtual, m.motivoPerda);
+          return cardIndicator === 'mql' && isMqlQualified(m.faixa) && !excludedMqlIds.has(cardId);
         }
         return cardIndicator === indicator;
       });

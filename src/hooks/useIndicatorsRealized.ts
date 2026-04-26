@@ -187,17 +187,19 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
   }
 
   // Parse MQL-by-creation
-  interface MqlCreation { id: string; dataCriacao: Date | null; faseAtual: string; motivoPerda?: string; faixaFaturamento?: string; }
+  interface MqlCreation { id: string; dataCriacao: Date | null; faseAtual: string; motivoPerda?: string; faixaFaturamento?: string; dataEntrada?: Date; }
   const mqlByCreation: MqlCreation[] = [];
   for (const row of creationRows) {
     const id = String(row['ID'] || row['id'] || '');
     if (!id) continue;
+    const entradaParsed = parseDate(row['Entrada'] || row['entrada']);
     mqlByCreation.push({
       id,
       dataCriacao: parseDate(row['Data Criação']),
       faseAtual: row['Fase Atual'] || row['fase_atual'] || '',
       motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
       faixaFaturamento: (row['Faixa de faturamento mensal'] || row['Faixa'] || '') || undefined,
+      dataEntrada: entradaParsed || undefined,
     });
   }
 
