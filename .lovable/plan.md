@@ -1,46 +1,27 @@
 ## Problema
 
-Ao buscar cards no Card Investigator, todos aparecem como **"(sem titulo)"** e os campos SDR, Closer, Faixa e Motivo da perda também ficam vazios.
+No **Card Investigator**, fases com acento (`Reunião agendada / Qualificado`, `Reunião Realizada`, `Proposta enviada / Follow Up`, `1° Reunião Realizada - Apresentação`) **não são reconhecidas** porque os mapas `MA_PHASE_TO_INDICATOR` e `EXP_PHASE_TO_INDICATOR` usam chaves sem acento (`Reuniao`, `Realizada`, `Apresentacao`).
 
-## Causa Raiz
+O lookup `ALL_PHASE_TO_INDICATOR[m.fase]` é uma comparação exata de string, então o Pipefy retornando `"Reunião agendada / Qualificado"` (com til) **não bate** com a chave `"Reuniao agendada / Qualificado"` (sem til). Resultado: RM e RR aparecem como "Sem movimento" mesmo quando existem.
 
-Confirmado nos logs da edge function (`query-external-db`) e na resposta de rede: o banco externo (Pipefy) retorna os nomes de coluna **com acentos e capitalização original do Pipefy**:
-
-- `Título` (não `Titulo`)
-- `SDR responsável` (não `SDR responsavel`)
-- `Closer responsável` (não `Closer responsavel`)
-- `Data Criação` (não `Data Criacao`)
-- `Motivo da perda` ✓ (já correto)
-
-Mas o código em `CardInvestigator.tsx` (linhas 264–275) lê as chaves **sem acento**, então o lookup falha em todas e cai no fallback `''`.
-
-Já corrigimos o `searchColumn` para `'Título'` (com acento), mas o mapeamento dos resultados continua usando chaves erradas.
+Isso afeta **apenas o diagnóstico do CardInvestigator** — os widgets reais (`useModeloAtualAnalytics`, etc.) já usam `normalizeStr` e funcionam corretamente.
 
 ## Correção
 
-**Arquivo:** `src/components/planning/indicators/CardInvestigator.tsx` (linhas ~264–275)
+Em `src/components/planning/indicators/CardInvestigator.tsx`, trocar o lookup direto por um lookup **normalizado** (trim + lowercase + remove acentos), reutilizando a função `normalizeStr` que já existe no arquivo.
 
-Atualizar as chaves de leitura para usar **primeiro** os nomes reais do banco (com acento), mantendo as variantes sem acento como fallback por segurança:
+### Passos
 
-```typescript
-titulo: row['Título'] || row['Titulo'] || row['titulo'] || row['Nome'] || row['Empresa'] || '',
-fase: row['Fase'] || row['fase'] || '',
-faseAtual: row['Fase Atual'] || row['fase_atual'] || '',
-entrada: parseDate(row['Entrada'] || row['entrada']) || new Date(),
-dataCriacao: parseDate(row['Data Criação'] || row['Data Criacao']),
-sdr: row['SDR responsável'] || row['SDR responsavel'] || row['sdr_responsavel'] || '',
-closer: row['Closer responsável'] || row['Closer responsavel'] || row['closer_responsavel'] || '',
-faixaFaturamento: row['Faixa de faturamento mensal'] || row['Faixa'] || row['faixa'] || '',
-motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || '',
-```
+1. Construir um `NORMALIZED_PHASE_TO_INDICATOR` derivado de `ALL_PHASE_TO_INDICATOR`, com chaves passadas por `normalizeStr`.
+2. Criar um helper `getIndicatorForPhase(fase: string)` que faz `NORMALIZED_PHASE_TO_INDICATOR[normalizeStr(fase)]`.
+3. Substituir todas as 4 ocorrências de `ALL_PHASE_TO_INDICATOR[m.fase]` (em `buildDiagnostics` e no JSX da timeline) por `getIndicatorForPhase(m.fase)`.
+4. Mesma troca para a deduplicação de `unmappedPhases` (usar o helper).
 
-## Resultado Esperado
+### Resultado esperado
 
-Após a correção, o Card Investigator vai exibir corretamente:
-- Título da empresa (ex.: "Moto locação")
-- SDR e Closer responsáveis
-- Faixa de faturamento (essencial para o diagnóstico de MQL)
-- Motivo da perda (essencial para o diagnóstico de exclusão de MQL)
-- Data de criação do card
+Para o card `1338671728` (sem título, Modelo Atual):
+- Linha `19/abr — Reunião agendada / Qualificado` passa a marcar **RM abr/26**.
+- Linha `23/abr — Reunião Realizada` passa a marcar **RR abr/26**.
+- Diagnóstico de RM e RR muda de "NAO — Sem movimento" para "SIM (abr/26) — Entrada 19/abr" e "SIM (abr/26) — Entrada 23/abr".
 
-Sem essa correção, o diagnóstico de MQL fica incorreto (faixa sempre vazia → sempre "não qualifica").
+Nenhuma mudança em outros componentes ou no banco.
