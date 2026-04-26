@@ -3022,15 +3022,12 @@ export function IndicatorsTab() {
 
       {/* Card Investigator - diagnostic tool */}
       <div className="flex justify-end mt-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-xs text-muted-foreground hover:text-foreground"
+        <span
+          className="text-[10px] text-muted-foreground/30 hover:text-muted-foreground cursor-pointer transition-colors select-none"
           onClick={() => setCardInvestigatorOpen(true)}
         >
-          <Search className="h-3 w-3 mr-1" />
-          Investigar Card
-        </Button>
+          auditoria
+        </span>
       </div>
       <CardInvestigator open={cardInvestigatorOpen} onOpenChange={setCardInvestigatorOpen} />
 

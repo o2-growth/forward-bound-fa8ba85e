@@ -368,6 +368,34 @@ export function CardInvestigator({ open, onOpenChange }: CardInvestigatorProps) 
           </Button>
         </div>
 
+        {/* Cards com problemas conhecidos — atalhos rápidos */}
+        {!results && !isSearching && (
+          <div className="mt-4 space-y-2 flex-shrink-0">
+            <p className="text-xs text-muted-foreground font-medium">Cards com problemas detectados:</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { nome: 'Odoni', motivo: 'Não existe no banco', cor: 'destructive' as const },
+                { nome: 'Luciano Jardon', motivo: 'RM em Mar, sem mov. Abr', cor: 'secondary' as const },
+                { nome: 'Gabriel Soares', motivo: 'No-show não mapeado', cor: 'secondary' as const },
+                { nome: 'Adriano Patelli', motivo: 'No-show não mapeado', cor: 'secondary' as const },
+                { nome: 'Delta Publicidade', motivo: 'SDR vazio', cor: 'destructive' as const },
+                { nome: 'Ferraz H', motivo: 'No-show não mapeado', cor: 'secondary' as const },
+                { nome: 'Grupo Viseu', motivo: 'RR atualizado tarde', cor: 'secondary' as const },
+              ].map(card => (
+                <Badge
+                  key={card.nome}
+                  variant={card.cor}
+                  className="cursor-pointer text-[10px] hover:opacity-80"
+                  onClick={() => { setSearchTerm(card.nome); }}
+                  title={card.motivo}
+                >
+                  {card.nome} — {card.motivo}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
         <ScrollArea className="flex-1 mt-4 pr-2">
           {error && !results?.length && (
             <div className="flex items-center gap-2 p-4 rounded-lg bg-destructive/10 text-destructive">
