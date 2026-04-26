@@ -272,7 +272,7 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
   const excludedMqlIds = useMemo(() => {
     const historyToUse = fullHistory.length > 0 ? fullHistory : cards;
     return buildExcludedMqlCardIds(
-      historyToUse.map(c => ({ id: c.id, motivoPerda: c.motivoPerda || undefined }))
+      historyToUse.map(c => ({ id: c.id, motivoPerda: c.motivoPerda || undefined, dataEntrada: c.dataEntrada }))
     );
   }, [cards, fullHistory]);
 
