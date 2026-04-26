@@ -20,6 +20,7 @@ const MA_PHASE_TO_INDICATOR: Record<string, string> = {
   '1\u00b0 Reuniao Realizada - Apresentacao': 'RR (Reuniao Realizada)',
   'Proposta enviada / Follow Up': 'Proposta',
   'Contrato assinado': 'Venda',
+  'Ganho': 'Venda',
 };
 
 // Phase to indicator mapping (Expansao - pipefy_cards_movements_expansao)
@@ -31,7 +32,25 @@ const EXP_PHASE_TO_INDICATOR: Record<string, string> = {
   'Reuniao Realizada': 'RR (Reuniao Realizada)',
   'Proposta enviada / Follow Up': 'Proposta',
   'Contrato assinado': 'Venda',
+  'Ganho': 'Venda',
 };
+
+// Fases conhecidas do Pipefy que intencionalmente NAO contam como indicador.
+// Aparecem na timeline em estilo neutro (sem warning, sem badge).
+const KNOWN_NON_COUNTING_PHASES_NORMALIZED = new Set<string>([
+  'em contato',
+  'enviar proposta',
+  'contrato em elaboracao',
+  'enviar para assinatura',
+  'perdido',
+  'arquivado',
+  'cancelado',
+  'cancelada',
+]);
+
+function isKnownNonCountingPhase(fase: string): boolean {
+  return KNOWN_NON_COUNTING_PHASES_NORMALIZED.has(normalizeStr(fase || ''));
+}
 
 // Merge both maps for display
 const ALL_PHASE_TO_INDICATOR: Record<string, string> = {
@@ -182,9 +201,12 @@ function buildDiagnostics(movements: Movement[], faixaFaturamento: string, motiv
     }
   }
 
-  // Detect problems
-  const unmappedPhases = movements.filter(m => !getIndicatorForPhase(m.fase));
-  const uniqueUnmapped = [...new Set(unmappedPhases.map(m => m.fase))];
+  // Detect problems — separar fases verdadeiramente desconhecidas
+  // de fases conhecidas-mas-nao-contabilizadas (intermediarias do Pipefy).
+  const trulyUnmappedPhases = movements.filter(m =>
+    !getIndicatorForPhase(m.fase) && !isKnownNonCountingPhase(m.fase)
+  );
+  const uniqueUnmapped = [...new Set(trulyUnmappedPhases.map(m => m.fase))];
   for (const phase of uniqueUnmapped) {
     problems.push({ severity: 'warning', message: `Fase "${phase}" nao e mapeada no dashboard — este movimento e invisivel` });
   }
@@ -453,6 +475,8 @@ export function CardInvestigator({ open, onOpenChange }: CardInvestigatorProps) 
                   {card.movements.map((m, idx) => {
                     const indicator = getIndicatorForPhase(m.fase);
                     const isMapped = !!indicator;
+                    const isKnownNonCounting = !isMapped && isKnownNonCountingPhase(m.fase);
+                    const isUnknown = !isMapped && !isKnownNonCounting;
                     return (
                       <div
                         key={idx}
@@ -468,7 +492,12 @@ export function CardInvestigator({ open, onOpenChange }: CardInvestigatorProps) 
                             {indicator} {getMonthLabel(m.entrada)}
                           </Badge>
                         )}
-                        {!isMapped && (
+                        {isKnownNonCounting && (
+                          <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 flex-shrink-0 opacity-60" title="Fase intermediaria do Pipefy — nao conta como indicador">
+                            intermediaria
+                          </Badge>
+                        )}
+                        {isUnknown && (
                           <HelpCircle className="h-3 w-3 text-yellow-500 flex-shrink-0 mt-0.5" />
                         )}
                       </div>
