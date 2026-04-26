@@ -201,9 +201,12 @@ function buildDiagnostics(movements: Movement[], faixaFaturamento: string, motiv
     }
   }
 
-  // Detect problems
-  const unmappedPhases = movements.filter(m => !getIndicatorForPhase(m.fase));
-  const uniqueUnmapped = [...new Set(unmappedPhases.map(m => m.fase))];
+  // Detect problems — separar fases verdadeiramente desconhecidas
+  // de fases conhecidas-mas-nao-contabilizadas (intermediarias do Pipefy).
+  const trulyUnmappedPhases = movements.filter(m =>
+    !getIndicatorForPhase(m.fase) && !isKnownNonCountingPhase(m.fase)
+  );
+  const uniqueUnmapped = [...new Set(trulyUnmappedPhases.map(m => m.fase))];
   for (const phase of uniqueUnmapped) {
     problems.push({ severity: 'warning', message: `Fase "${phase}" nao e mapeada no dashboard — este movimento e invisivel` });
   }
