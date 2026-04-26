@@ -263,13 +263,13 @@ async function searchCards(searchTerm: string): Promise<CardResult[]> {
       const movements: Movement[] = cardRows
         .map(row => ({
           id,
-          titulo: row['Titulo'] || row['titulo'] || row['Nome'] || '',
+          titulo: row['Título'] || row['Titulo'] || row['titulo'] || row['Empresa'] || row['Nome'] || '',
           fase: row['Fase'] || row['fase'] || '',
           faseAtual: row['Fase Atual'] || row['fase_atual'] || '',
           entrada: parseDate(row['Entrada'] || row['entrada']) || new Date(),
-          dataCriacao: parseDate(row['Data Criacao']),
-          sdr: row['SDR responsavel'] || row['sdr_responsavel'] || '',
-          closer: row['Closer responsavel'] || row['closer_responsavel'] || '',
+          dataCriacao: parseDate(row['Data Criação'] || row['Data Criacao']),
+          sdr: row['SDR responsável'] || row['SDR responsavel'] || row['sdr_responsavel'] || '',
+          closer: row['Closer responsável'] || row['Closer responsavel'] || row['closer_responsavel'] || '',
           faixaFaturamento: row['Faixa de faturamento mensal'] || row['Faixa'] || row['faixa'] || '',
           motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || '',
           fonte: tableLabels[table],
