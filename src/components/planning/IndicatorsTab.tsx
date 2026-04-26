@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Line, ComposedChart, RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
-import { RefreshCw, Loader2, BarChart3, TrendingUp, ExternalLink, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { RefreshCw, Loader2, BarChart3, TrendingUp, ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Search } from "lucide-react";
 import { useFunnelRealized, IndicatorType, BUType } from "@/hooks/useFunnelRealized";
 import { useModeloAtualMetas, ChartGrouping, ModeloAtualIndicator } from "@/hooks/useModeloAtualMetas";
 import { useExpansaoMetas, ExpansaoIndicator } from "@/hooks/useExpansaoMetas";
@@ -35,6 +35,7 @@ import { ChartConfig } from "./indicators/DrillDownCharts";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
+import { CardInvestigator } from "./indicators/CardInvestigator";
 
 type ViewMode = 'daily' | 'accumulated';
 
@@ -387,7 +388,8 @@ export function IndicatorsTab() {
   const [startDate, setStartDate] = useState<Date>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
-  
+  const [cardInvestigatorOpen, setCardInvestigatorOpen] = useState(false);
+
   // Handle date change from DateRangePickerGA
   const handleDateRangeChange = (start: Date, end: Date) => {
     setStartDate(start);
@@ -3017,6 +3019,20 @@ export function IndicatorsTab() {
           <div className="flex items-center gap-2 bg-card p-4 rounded-lg shadow-lg"><Loader2 className="h-5 w-5 animate-spin" /><span>Carregando dados...</span></div>
         </div>
       )}
+
+      {/* Card Investigator - diagnostic tool */}
+      <div className="flex justify-end mt-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setCardInvestigatorOpen(true)}
+        >
+          <Search className="h-3 w-3 mr-1" />
+          Investigar Card
+        </Button>
+      </div>
+      <CardInvestigator open={cardInvestigatorOpen} onOpenChange={setCardInvestigatorOpen} />
 
       {/* Detail Sheet for Radial Cards */}
       <DetailSheet
