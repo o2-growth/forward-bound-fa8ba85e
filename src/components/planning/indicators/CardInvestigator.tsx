@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Search, AlertTriangle, CheckCircle2, XCircle, Clock, HelpCircle } from "lucide-react";
+import { Loader2, Search, AlertTriangle, CheckCircle2, XCircle, Clock, HelpCircle, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -222,7 +222,7 @@ async function searchCards(searchTerm: string): Promise<CardResult[]> {
   };
 
   const isIdSearch = /^\d+$/.test(searchTerm.trim());
-  const searchColumn = isIdSearch ? 'ID' : 'Título';
+  const searchColumn = isIdSearch ? 'ID' : 'Titulo';
 
   const requests = tables.map(table =>
     supabase.functions.invoke('query-external-db', {
@@ -420,6 +420,15 @@ export function CardInvestigator({ open, onOpenChange }: CardInvestigatorProps) 
                   <span className="font-semibold text-base">{card.titulo || '(sem titulo)'}</span>
                   <Badge variant="outline" className="text-xs">ID: {card.id}</Badge>
                   <Badge variant="secondary" className="text-xs">{card.fonte}</Badge>
+                  <a
+                    href={`https://app.pipefy.com/open-cards/${card.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Abrir no Pipefy
+                  </a>
                 </div>
                 <div className="text-sm text-muted-foreground space-y-0.5">
                   <div>SDR: <span className={card.sdr ? 'text-foreground' : 'text-destructive font-medium'}>{card.sdr || '(vazio)'}</span> | Closer: <span className={card.closer ? 'text-foreground' : 'text-muted-foreground'}>{card.closer || '(vazio)'}</span></div>
