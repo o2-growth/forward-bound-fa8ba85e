@@ -36,6 +36,7 @@ import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison } from "./indicators/WeeklyComparison";
+import { MonthlyComparison } from "./indicators/MonthlyComparison";
 import { CardInvestigator } from "./indicators/CardInvestigator";
 
 type ViewMode = 'daily' | 'accumulated';
@@ -2628,6 +2629,14 @@ export function IndicatorsTab() {
 
       {/* Weekly Comparison Panel */}
       <WeeklyComparison
+        startDate={startDate}
+        endDate={endDate}
+        getItemsForIndicator={getItemsForIndicator}
+        indicatorConfigs={indicatorConfigs}
+      />
+
+      {/* Monthly Comparison Panel */}
+      <MonthlyComparison
         startDate={startDate}
         endDate={endDate}
         getItemsForIndicator={getItemsForIndicator}
