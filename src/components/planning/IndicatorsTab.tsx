@@ -35,6 +35,7 @@ import { ChartConfig } from "./indicators/DrillDownCharts";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
+import { WeeklyComparison } from "./indicators/WeeklyComparison";
 import { CardInvestigator } from "./indicators/CardInvestigator";
 
 type ViewMode = 'daily' | 'accumulated';
@@ -2624,6 +2625,14 @@ export function IndicatorsTab() {
           />
         ))}
       </div>
+
+      {/* Weekly Comparison Panel */}
+      <WeeklyComparison
+        startDate={startDate}
+        endDate={endDate}
+        getItemsForIndicator={getItemsForIndicator}
+        indicatorConfigs={indicatorConfigs}
+      />
 
       {/* Contratos por Faixa de Faturamento */}
       {(() => {
