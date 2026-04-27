@@ -108,23 +108,13 @@ interface SdrBreakdownProps {
   indicatorConfigs: IndicatorConfig[];
 }
 
-function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }: SdrBreakdownProps) {
-  const startTime = startDate.getTime();
-  const endTime = new Date(
-    endDate.getFullYear(),
-    endDate.getMonth(),
-    endDate.getDate(),
-    23, 59, 59, 999
-  ).getTime();
-
-  // Only include columns whose indicator is present in the active config
-  const presentKeys = new Set(indicatorConfigs.map(c => c.key));
-  const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
-  if (columns.length === 0) return null;
-
-  // group -> { display, counts: { rm, rr, proposta, venda } }
+function aggregateSdrCounts(
+  itemsByIndicator: Record<string, DetailItem[]>,
+  columns: { key: IndicatorType; label: string }[],
+  startTime: number,
+  endTime: number,
+): Map<string, { display: string; counts: Record<string, number> }> {
   const groups = new Map<string, { display: string; counts: Record<string, number> }>();
-
   for (const col of columns) {
     const items = itemsByIndicator[col.key] || [];
     for (const item of items) {
@@ -143,6 +133,24 @@ function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }
       }
     }
   }
+  return groups;
+}
+
+function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }: SdrBreakdownProps) {
+  const startTime = startDate.getTime();
+  const endTime = new Date(
+    endDate.getFullYear(),
+    endDate.getMonth(),
+    endDate.getDate(),
+    23, 59, 59, 999
+  ).getTime();
+
+  // Only include columns whose indicator is present in the active config
+  const presentKeys = new Set(indicatorConfigs.map(c => c.key));
+  const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
+  if (columns.length === 0) return null;
+
+  const groups = aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime);
 
   if (groups.size === 0) {
     return (

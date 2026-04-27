@@ -1,53 +1,22 @@
-## Objetivo
+## Adicionar breakdown de SDR por semana
 
-Adicionar, dentro do **Comparativo Semanal**, uma seção que mostra a **quantidade de Reuniões Marcadas (RM), Reuniões Realizadas (RR), Propostas e Vendas por SDR** no período selecionado.
+Atualmente o "Comparativo Semanal" mostra a tabela "Por SDR" apenas com totais do período inteiro. Vou adicionar uma visão semanal: para cada semana (S1, S2, S3...), exibir uma tabela com SDR × indicadores (RM, RR, Prop, Venda).
 
-## Onde aparece
+### Mudanças em `src/components/planning/indicators/WeeklyComparison.tsx`
 
-Dentro do card "Comparativo Semanal" (que já é colapsável), abaixo dos cards de semanas e antes do gráfico de barras existente. Aparece quando o usuário expande o painel.
+1. **Novo componente `SdrBreakdownWeekly`**
+   - Recebe a lista de `weeks`, `itemsByIndicator` e `indicatorConfigs`.
+   - Para cada semana, calcula o agrupamento `SDR → { rm, rr, proposta, venda }` usando a mesma função `getSdrName` (campo `sdr` com fallback `responsible`, "Sem SDR" para vazios).
+   - Renderiza uma tabela compacta por semana, com cabeçalho "S1 (1-7)" etc., colunas dos indicadores presentes, linhas por SDR ordenadas pela primeira coluna (RM) e linha de Total.
+   - Semanas sem dados mostram "Sem dados" discreto em vez de tabela vazia.
 
-## O que mostra
+2. **Layout**
+   - Manter a tabela atual `SdrBreakdown` (período completo) como resumo no topo.
+   - Logo abaixo, uma seção "Por SDR — semana a semana" com as tabelas semanais empilhadas verticalmente (cada semana como um bloco com borda).
+   - Para muitas semanas (4–5), as tabelas ficam compactas (padding reduzido, fontes xs).
 
-Uma tabela compacta com uma linha por SDR e quatro colunas numéricas:
+3. **Reuso**
+   - Extrair a lógica de agregação SDR×indicadores num helper `aggregateSdrCounts(items, columns, startTime, endTime)` para ser usado tanto pelo total quanto por cada semana.
+   - Sem mudanças nos charts nem na lógica de filtros existentes.
 
-```text
-| SDR              |  RM  |  RR  | Prop | Venda |
-|------------------|------|------|------|-------|
-| Carlos Ramos     |  18  |  12  |   7  |   2   |
-| Carolina Boeira  |  15  |  10  |   5  |   1   |
-| Marco Aurélio    |   9  |   6  |   3  |   1   |
-| Pedro Albite     |   4  |   3  |   1  |   0   |
-| Sem SDR          |   2  |   1  |   0  |   0   |
-| **Total**        |  48  |  32  |  16  |   4   |
-```
-
-- Ordenação: por RM decrescente.
-- Linha "Sem SDR" agrupa cards onde o campo SDR está em branco.
-- Linha "Total" no rodapé.
-- Período = período já selecionado no Comparativo Semanal (mesmo `startDate`/`endDate`).
-- Respeita os filtros já ativos da aba Indicadores (BU, SDR, Closer) — pois usa o mesmo `itemsByIndicator` que o painel já recebe.
-
-## Como o nome do SDR é resolvido
-
-Para cada `DetailItem`, usa `item.sdr` quando existe; caso vazio, cai em `item.responsible`; caso ainda vazio, agrupa como "Sem SDR". Normaliza com `trim()` e ignora maiúsculas/minúsculas no agrupamento, mas mantém a forma original mais comum para exibição.
-
-## Indicadores incluídos
-
-Apenas RM, RR, Proposta e Venda (não inclui MQL/Lead, conforme pedido). Se algum desses indicadores não estiver presente em `indicatorConfigs` (por exemplo em uma BU que não rastreia proposta), a coluna correspondente é omitida.
-
-## Implementação técnica
-
-- **Arquivo único editado**: `src/components/planning/indicators/WeeklyComparison.tsx`.
-  - Novo componente interno `SdrBreakdown` que recebe `itemsByIndicator` + período.
-  - Filtra os itens de cada indicador pelo intervalo `[startDate, endDate]` (mesma lógica de `countItemsInWeek`).
-  - Agrupa por SDR usando `Map<string, { rm, rr, proposta, venda }>`.
-  - Renderiza como `<table>` estilizada com Tailwind (`text-sm`, bordas suaves, células `text-right`).
-  - Inserido logo abaixo da grid de semanas, antes do `BarChart`.
-- Sem novos arquivos, sem novas dependências, sem mudanças de tipos.
-
-## O que NÃO muda
-
-- Comportamento colapsável e título do card.
-- Gráfico de barras agrupadas existente.
-- Cards por semana acima.
-- Filtros e período (controlados pela página `IndicatorsTab`).
+Nenhum outro arquivo será alterado.
