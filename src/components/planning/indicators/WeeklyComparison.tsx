@@ -234,85 +234,182 @@ interface SdrBreakdownWeeklyProps {
 function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs }: SdrBreakdownWeeklyProps) {
   const presentKeys = new Set(indicatorConfigs.map(c => c.key));
   const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
-  if (columns.length === 0) return null;
+
+  const [activeIndicator, setActiveIndicator] = useState<IndicatorType | null>(
+    columns[0]?.key ?? null
+  );
+
+  if (columns.length === 0 || !activeIndicator) return null;
+
+  const weeklyAggregates = weeks.map(week => {
+    const startTime = week.start.getTime();
+    const endTime = week.end.getTime();
+    return aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime);
+  });
+
+  // sdrGroup -> { display, perWeek: number[] }
+  const sdrMap = new Map<string, { display: string; perWeek: number[] }>();
+  weeklyAggregates.forEach((groups, wIdx) => {
+    groups.forEach((data, key) => {
+      let entry = sdrMap.get(key);
+      if (!entry) {
+        entry = { display: data.display, perWeek: new Array(weeks.length).fill(0) };
+        sdrMap.set(key, entry);
+      }
+      entry.perWeek[wIdx] = data.counts[activeIndicator] || 0;
+    });
+  });
+
+  const sdrRows = Array.from(sdrMap.values()).sort((a, b) => {
+    const sa = a.perWeek.reduce((x, y) => x + y, 0);
+    const sb = b.perWeek.reduce((x, y) => x + y, 0);
+    return sb - sa;
+  });
+
+  const weekTotals = weeks.map((_, i) =>
+    sdrRows.reduce((sum, r) => sum + r.perWeek[i], 0)
+  );
+
+  const activeColor = INDICATOR_COLORS[activeIndicator] || "#6b7280";
+  const activeLabel = columns.find(c => c.key === activeIndicator)?.label || activeIndicator;
+
+  const hasAnyData = sdrRows.length > 0 && weekTotals.some(t => t > 0);
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="px-3 py-2 border-b bg-muted/40">
-        <div className="text-sm font-semibold">Por SDR — semana a semana</div>
-        <div className="text-xs text-muted-foreground">
-          Quantidade de cards por SDR responsável em cada semana.
+      <div className="px-3 py-2 border-b bg-muted/40 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold">Por SDR — comparativo semanal</div>
+          <div className="text-xs text-muted-foreground">
+            {activeLabel} por SDR em cada semana, com variação vs. semana anterior.
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          {columns.map(col => {
+            const isActive = col.key === activeIndicator;
+            return (
+              <button
+                key={col.key}
+                type="button"
+                onClick={() => setActiveIndicator(col.key)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                  isActive
+                    ? "border-transparent text-white"
+                    : "bg-background text-muted-foreground hover:bg-muted border-border"
+                }`}
+                style={
+                  isActive
+                    ? { backgroundColor: INDICATOR_COLORS[col.key] }
+                    : undefined
+                }
+              >
+                {col.label}
+              </button>
+            );
+          })}
         </div>
       </div>
-      <div className="divide-y">
-        {weeks.map(week => {
-          const startTime = week.start.getTime();
-          const endTime = week.end.getTime();
-          const groups = aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime);
 
-          if (groups.size === 0) {
-            return (
-              <div key={week.label} className="px-3 py-2">
-                <div className="text-xs font-semibold mb-1">{week.label}</div>
-                <div className="text-xs text-muted-foreground">Sem dados de SDR nesta semana.</div>
-              </div>
-            );
-          }
-
-          const sortKey = columns[0].key;
-          const rows = Array.from(groups.values()).sort(
-            (a, b) => (b.counts[sortKey] || 0) - (a.counts[sortKey] || 0)
-          );
-          const totals: Record<string, number> = {};
-          for (const col of columns) {
-            totals[col.key] = rows.reduce((sum, r) => sum + (r.counts[col.key] || 0), 0);
-          }
-
-          return (
-            <div key={week.label} className="px-3 py-2">
-              <div className="text-xs font-semibold mb-1.5 text-muted-foreground">{week.label}</div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left px-2 py-1 font-medium text-muted-foreground">SDR</th>
-                      {columns.map(col => (
-                        <th
-                          key={col.key}
-                          className="text-right px-2 py-1 font-medium"
-                          style={{ color: INDICATOR_COLORS[col.key] }}
-                        >
-                          {col.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, i) => (
-                      <tr key={i} className="border-b last:border-b-0 hover:bg-muted/30">
-                        <td className="px-2 py-1">{row.display}</td>
-                        {columns.map(col => (
-                          <td key={col.key} className="text-right px-2 py-1 tabular-nums">
-                            {row.counts[col.key] || 0}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                    <tr className="bg-muted/30 font-semibold">
-                      <td className="px-2 py-1">Total</td>
-                      {columns.map(col => (
-                        <td key={col.key} className="text-right px-2 py-1 tabular-nums">
-                          {totals[col.key]}
+      {!hasAnyData ? (
+        <div className="px-3 py-4 text-xs text-muted-foreground text-center">
+          Sem dados de SDR no período selecionado.
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b bg-muted/20">
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground sticky left-0 bg-muted/20 z-10 min-w-[140px]">
+                  SDR
+                </th>
+                {weeks.map(week => (
+                  <th
+                    key={week.label}
+                    className="text-center px-2 py-2 font-medium text-muted-foreground min-w-[90px]"
+                  >
+                    <div>{week.shortLabel}</div>
+                    <div className="text-[10px] font-normal opacity-70">
+                      {format(week.start, "dd/MM")}–{format(week.end, "dd/MM")}
+                    </div>
+                  </th>
+                ))}
+                <th className="text-center px-3 py-2 font-medium text-muted-foreground min-w-[70px]">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {sdrRows.map((row, idx) => {
+                const total = row.perWeek.reduce((a, b) => a + b, 0);
+                return (
+                  <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/30">
+                    <td className="px-3 py-1.5 font-medium sticky left-0 bg-background z-10">
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className="w-1.5 h-1.5 rounded-full shrink-0"
+                          style={{ backgroundColor: activeColor }}
+                        />
+                        {row.display}
+                      </div>
+                    </td>
+                    {row.perWeek.map((count, wIdx) => {
+                      const prev = wIdx > 0 ? row.perWeek[wIdx - 1] : null;
+                      const change = prev === null
+                        ? { text: "—", color: "text-muted-foreground", trend: "neutral" as const }
+                        : formatPctChange(count, prev);
+                      return (
+                        <td key={wIdx} className="text-center px-2 py-1.5">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="font-semibold tabular-nums text-sm">{count}</span>
+                            <span
+                              className={`flex items-center gap-0.5 text-[10px] font-medium ${change.color}`}
+                            >
+                              {change.trend === "up" && <TrendingUp className="h-2.5 w-2.5" />}
+                              {change.trend === "down" && <TrendingDown className="h-2.5 w-2.5" />}
+                              {change.trend === "neutral" && <Minus className="h-2.5 w-2.5" />}
+                              {change.text}
+                            </span>
+                          </div>
                         </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                      );
+                    })}
+                    <td className="text-center px-3 py-1.5 font-bold tabular-nums">
+                      {total}
+                    </td>
+                  </tr>
+                );
+              })}
+              <tr className="bg-muted/40 font-semibold border-t-2">
+                <td className="px-3 py-1.5 sticky left-0 bg-muted/40 z-10">Total</td>
+                {weekTotals.map((total, wIdx) => {
+                  const prev = wIdx > 0 ? weekTotals[wIdx - 1] : null;
+                  const change = prev === null
+                    ? { text: "—", color: "text-muted-foreground", trend: "neutral" as const }
+                    : formatPctChange(total, prev);
+                  return (
+                    <td key={wIdx} className="text-center px-2 py-1.5">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="tabular-nums text-sm">{total}</span>
+                        <span
+                          className={`flex items-center gap-0.5 text-[10px] font-medium ${change.color}`}
+                        >
+                          {change.trend === "up" && <TrendingUp className="h-2.5 w-2.5" />}
+                          {change.trend === "down" && <TrendingDown className="h-2.5 w-2.5" />}
+                          {change.trend === "neutral" && <Minus className="h-2.5 w-2.5" />}
+                          {change.text}
+                        </span>
+                      </div>
+                    </td>
+                  );
+                })}
+                <td className="text-center px-3 py-1.5 tabular-nums font-bold">
+                  {weekTotals.reduce((a, b) => a + b, 0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
