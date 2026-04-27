@@ -6,6 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Line, ComposedChart } from "recharts";
 
+export interface TierBreakdownItem {
+  tier: string;
+  count: number;
+  valor: number;
+  colorClass: string;
+}
+
 interface RevenuePaceChartProps {
   realized: number;
   meta: number;
@@ -13,6 +20,9 @@ interface RevenuePaceChartProps {
   paceExpected: number;
   isLoading: boolean;
   chartData: { label: string; realizado: number; meta: number }[];
+  tierBreakdown?: TierBreakdownItem[];
+  totalContratos?: number;
+  totalContratosValor?: number;
 }
 
 const formatCompactCurrency = (value: number): string => {
