@@ -217,7 +217,7 @@ function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }
   );
 }
 
-
+export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicatorConfigs }: WeeklyComparisonProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const totalDays = differenceInDays(endDate, startDate) + 1;
