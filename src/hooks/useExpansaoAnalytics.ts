@@ -490,19 +490,42 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
 
   // Get lost deals: faseAtual=Perdido AND created during the period
   const getLostDeals = useMemo(() => {
-    const lostCards: ExpansaoCard[] = [];
-    const seenIds = new Set<string>();
+    // `cards` is a movements table — pick best row per card preferring fase==='Perdido'
+    // (only that row carries "Motivo da perda" in Pipefy).
+    const bestByCard = new Map<string, ExpansaoCard>();
 
     for (const card of cards) {
-      if (seenIds.has(card.id)) continue;
       if (card.faseAtual !== 'Perdido') continue;
       if (!card.dataCriacao) continue;
       const creationTime = card.dataCriacao.getTime();
-      if (creationTime >= startTime && creationTime <= endTime) {
-        lostCards.push(card);
-        seenIds.add(card.id);
+      if (creationTime < startTime || creationTime > endTime) continue;
+
+      const existing = bestByCard.get(card.id);
+      if (!existing) {
+        bestByCard.set(card.id, card);
+        continue;
+      }
+      const existingIsLossEntry = existing.fase === 'Perdido';
+      const currentIsLossEntry = card.fase === 'Perdido';
+      if (currentIsLossEntry && !existingIsLossEntry) {
+        bestByCard.set(card.id, card);
+      } else if (currentIsLossEntry && existingIsLossEntry && !existing.motivoPerda && card.motivoPerda) {
+        bestByCard.set(card.id, card);
       }
     }
+
+    // Backfill motivoPerda from any "Perdido" movement of the same card
+    const motivoByCardId = new Map<string, string>();
+    for (const card of cards) {
+      if (card.fase === 'Perdido' && card.motivoPerda && !motivoByCardId.has(card.id)) {
+        motivoByCardId.set(card.id, card.motivoPerda);
+      }
+    }
+    const lostCards: ExpansaoCard[] = Array.from(bestByCard.values()).map(card => {
+      if (card.motivoPerda) return card;
+      const filled = motivoByCardId.get(card.id);
+      return filled ? { ...card, motivoPerda: filled } : card;
+    });
 
     const totalValue = lostCards.reduce((sum, card) => sum + card.valor, 0);
 
