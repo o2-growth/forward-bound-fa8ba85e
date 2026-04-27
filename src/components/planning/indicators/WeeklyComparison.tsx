@@ -87,7 +87,137 @@ function formatPctChange(current: number, previous: number): { text: string; col
   return { text: "0%", color: "text-muted-foreground", trend: "neutral" };
 }
 
-export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicatorConfigs }: WeeklyComparisonProps) {
+// ============ SDR Breakdown ============
+const SDR_INDICATORS: { key: IndicatorType; label: string }[] = [
+  { key: "rm", label: "RM" },
+  { key: "rr", label: "RR" },
+  { key: "proposta", label: "Prop" },
+  { key: "venda", label: "Venda" },
+];
+
+function getSdrName(item: DetailItem): { display: string; group: string } {
+  const raw = (item.sdr || item.responsible || "").trim();
+  if (!raw) return { display: "Sem SDR", group: "__none__" };
+  return { display: raw, group: raw.toLowerCase() };
+}
+
+interface SdrBreakdownProps {
+  itemsByIndicator: Record<string, DetailItem[]>;
+  startDate: Date;
+  endDate: Date;
+  indicatorConfigs: IndicatorConfig[];
+}
+
+function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }: SdrBreakdownProps) {
+  const startTime = startDate.getTime();
+  const endTime = new Date(
+    endDate.getFullYear(),
+    endDate.getMonth(),
+    endDate.getDate(),
+    23, 59, 59, 999
+  ).getTime();
+
+  // Only include columns whose indicator is present in the active config
+  const presentKeys = new Set(indicatorConfigs.map(c => c.key));
+  const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
+  if (columns.length === 0) return null;
+
+  // group -> { display, counts: { rm, rr, proposta, venda } }
+  const groups = new Map<string, { display: string; counts: Record<string, number> }>();
+
+  for (const col of columns) {
+    const items = itemsByIndicator[col.key] || [];
+    for (const item of items) {
+      if (!item.date) continue;
+      const t = new Date(item.date).getTime();
+      if (t < startTime || t > endTime) continue;
+      const { display, group } = getSdrName(item);
+      const existing = groups.get(group);
+      if (existing) {
+        existing.counts[col.key] = (existing.counts[col.key] || 0) + 1;
+      } else {
+        groups.set(group, {
+          display,
+          counts: { [col.key]: 1 },
+        });
+      }
+    }
+  }
+
+  if (groups.size === 0) {
+    return (
+      <div className="border rounded-lg p-3">
+        <div className="text-sm font-semibold mb-1">Por SDR</div>
+        <div className="text-xs text-muted-foreground">
+          Sem dados de SDR no período selecionado.
+        </div>
+      </div>
+    );
+  }
+
+  // Sort: highest RM first; if no RM column, by first column desc
+  const sortKey = columns[0].key;
+  const rows = Array.from(groups.values()).sort(
+    (a, b) => (b.counts[sortKey] || 0) - (a.counts[sortKey] || 0)
+  );
+
+  // Totals
+  const totals: Record<string, number> = {};
+  for (const col of columns) {
+    totals[col.key] = rows.reduce((sum, r) => sum + (r.counts[col.key] || 0), 0);
+  }
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <div className="px-3 py-2 border-b bg-muted/40">
+        <div className="text-sm font-semibold">Por SDR (período completo)</div>
+        <div className="text-xs text-muted-foreground">
+          Quantidade de cards por SDR responsável no intervalo selecionado.
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/20">
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground">SDR</th>
+              {columns.map(col => (
+                <th
+                  key={col.key}
+                  className="text-right px-3 py-2 font-medium text-muted-foreground"
+                  style={{ color: INDICATOR_COLORS[col.key] }}
+                >
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-b last:border-b-0 hover:bg-muted/30">
+                <td className="px-3 py-1.5">{row.display}</td>
+                {columns.map(col => (
+                  <td key={col.key} className="text-right px-3 py-1.5 tabular-nums">
+                    {row.counts[col.key] || 0}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr className="bg-muted/40 font-semibold">
+              <td className="px-3 py-1.5">Total</td>
+              {columns.map(col => (
+                <td key={col.key} className="text-right px-3 py-1.5 tabular-nums">
+                  {totals[col.key]}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+
   const [isOpen, setIsOpen] = useState(false);
 
   const totalDays = differenceInDays(endDate, startDate) + 1;
@@ -184,6 +314,14 @@ export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicat
                 </div>
               ))}
             </div>
+
+            {/* Breakdown por SDR (RM, RR, Proposta, Venda) */}
+            <SdrBreakdown
+              itemsByIndicator={allItemsByIndicator}
+              startDate={startDate}
+              endDate={endDate}
+              indicatorConfigs={indicatorConfigs}
+            />
 
             {/* Grouped bar chart */}
             <div className="h-[280px] w-full">
