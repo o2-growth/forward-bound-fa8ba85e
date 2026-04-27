@@ -21,7 +21,7 @@ interface IndicatorConfig {
 interface MonthlyComparisonProps {
   startDate: Date;
   endDate: Date;
-  getItemsForIndicator: (key: IndicatorType) => DetailItem[];
+  itemsByIndicator: Record<string, DetailItem[]>;
   indicatorConfigs: IndicatorConfig[];
 }
 
@@ -106,22 +106,15 @@ function formatPctChange(
 export function MonthlyComparison({
   startDate,
   endDate,
-  getItemsForIndicator,
+  itemsByIndicator,
   indicatorConfigs,
 }: MonthlyComparisonProps) {
   const [isOpen, setIsOpen] = useState(true);
 
   const months = useMemo(() => getMonthsInRange(startDate, endDate), [startDate, endDate]);
 
-  // Pre-fetch all items per indicator once
-  const allItemsByIndicator = useMemo(() => {
-    const map: Record<string, DetailItem[]> = {};
-    for (const config of indicatorConfigs) {
-      map[config.key] = getItemsForIndicator(config.key);
-    }
-    return map;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [indicatorConfigs, startDate, endDate]);
+  // Use pre-computed items from parent (avoids stale closure issues)
+  const allItemsByIndicator = itemsByIndicator;
 
   // monthIndex -> indicatorKey -> count
   const monthlyData = useMemo(() => {

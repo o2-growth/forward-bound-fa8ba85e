@@ -18,7 +18,7 @@ interface IndicatorConfig {
 interface WeeklyComparisonProps {
   startDate: Date;
   endDate: Date;
-  getItemsForIndicator: (key: IndicatorType) => DetailItem[];
+  itemsByIndicator: Record<string, DetailItem[]>;
   indicatorConfigs: IndicatorConfig[];
 }
 
@@ -87,7 +87,7 @@ function formatPctChange(current: number, previous: number): { text: string; col
   return { text: "0%", color: "text-muted-foreground", trend: "neutral" };
 }
 
-export function WeeklyComparison({ startDate, endDate, getItemsForIndicator, indicatorConfigs }: WeeklyComparisonProps) {
+export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicatorConfigs }: WeeklyComparisonProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const totalDays = differenceInDays(endDate, startDate) + 1;
@@ -95,15 +95,8 @@ export function WeeklyComparison({ startDate, endDate, getItemsForIndicator, ind
   // All hooks must be called before any early return (React Rules of Hooks)
   const weeks = useMemo(() => getWeeksInRange(startDate, endDate), [startDate, endDate]);
 
-  // Pre-fetch all items for each indicator once
-  const allItemsByIndicator = useMemo(() => {
-    const map: Record<string, DetailItem[]> = {};
-    for (const config of indicatorConfigs) {
-      map[config.key] = getItemsForIndicator(config.key);
-    }
-    return map;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [indicatorConfigs, startDate, endDate]);
+  // Use pre-computed items from parent (avoids stale closure issues)
+  const allItemsByIndicator = itemsByIndicator;
 
   // Build weekly data matrix: weekIndex -> indicatorKey -> count
   const weeklyData = useMemo(() => {

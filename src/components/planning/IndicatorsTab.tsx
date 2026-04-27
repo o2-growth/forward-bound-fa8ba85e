@@ -1238,7 +1238,28 @@ export function IndicatorsTab() {
     return items;
   };
 
-  // COHORT MODE: Get items for indicator using full card history 
+  // Pre-compute items for each indicator for Weekly/Monthly comparison panels.
+  // This avoids stale-closure issues when passing getItemsForIndicator as a callback.
+  const itemsByIndicator = useMemo(() => {
+    const map: Record<string, DetailItem[]> = {};
+    for (const config of indicatorConfigs) {
+      map[config.key] = getItemsForIndicator(config.key);
+    }
+    return map;
+  }, [
+    // Re-compute when any analytics data changes (loading -> loaded)
+    modeloAtualAnalytics.isLoading, modeloAtualAnalytics.cards,
+    o2TaxAnalytics.isLoading,
+    franquiaAnalytics.isLoading,
+    oxyHackerAnalytics.isLoading,
+    // Re-compute when BU/closer/SDR filters change
+    includesModeloAtual, includesO2Tax, includesFranquia, includesOxyHacker,
+    effectiveSelectedClosers, effectiveSelectedSDRs,
+    // Re-compute when date range changes
+    startDate, endDate,
+  ]);
+
+  // COHORT MODE: Get items for indicator using full card history
   // (for accurate tier conversion analysis across month boundaries)
   const getItemsWithFullHistory = (indicatorKey: IndicatorType): DetailItem[] => {
     let items: DetailItem[] = [];
@@ -2631,7 +2652,7 @@ export function IndicatorsTab() {
       <WeeklyComparison
         startDate={startDate}
         endDate={endDate}
-        getItemsForIndicator={getItemsForIndicator}
+        itemsByIndicator={itemsByIndicator}
         indicatorConfigs={indicatorConfigs}
       />
 
@@ -2639,7 +2660,7 @@ export function IndicatorsTab() {
       <MonthlyComparison
         startDate={startDate}
         endDate={endDate}
-        getItemsForIndicator={getItemsForIndicator}
+        itemsByIndicator={itemsByIndicator}
         indicatorConfigs={indicatorConfigs}
       />
 
