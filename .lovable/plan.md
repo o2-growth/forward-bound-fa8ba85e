@@ -1,25 +1,53 @@
 ## Objetivo
 
-Na aba **Indicadores**, deixar o painel **Comparativo Semanal** encolhido (fechado) por padrão e **remover** completamente o painel **Comparativo Mensal**.
+Adicionar, dentro do **Comparativo Semanal**, uma seção que mostra a **quantidade de Reuniões Marcadas (RM), Reuniões Realizadas (RR), Propostas e Vendas por SDR** no período selecionado.
 
-## Situação atual
+## Onde aparece
 
-- O painel **Comparativo Semanal** (`WeeklyComparison`) já é um collapsible e já abre **fechado** por padrão (estado inicial `isOpen = false`). Ou seja, ele já fica encolhido — nada a alterar no comportamento.
-- O painel **Comparativo Mensal** (`MonthlyComparison`) é renderizado logo abaixo, em `IndicatorsTab.tsx` (linhas 2660–2665).
+Dentro do card "Comparativo Semanal" (que já é colapsável), abaixo dos cards de semanas e antes do gráfico de barras existente. Aparece quando o usuário expande o painel.
 
-## O que será feito
+## O que mostra
 
-1. **`src/components/planning/IndicatorsTab.tsx`**
-   - Remover o bloco JSX do `<MonthlyComparison ... />` (linhas 2660–2665).
-   - Remover o import não utilizado: `import { MonthlyComparison } from "./indicators/MonthlyComparison";` (linha 39).
+Uma tabela compacta com uma linha por SDR e quatro colunas numéricas:
 
-2. **`src/components/planning/indicators/MonthlyComparison.tsx`**
-   - Excluir o arquivo (não é mais usado em nenhum lugar).
+```text
+| SDR              |  RM  |  RR  | Prop | Venda |
+|------------------|------|------|------|-------|
+| Carlos Ramos     |  18  |  12  |   7  |   2   |
+| Carolina Boeira  |  15  |  10  |   5  |   1   |
+| Marco Aurélio    |   9  |   6  |   3  |   1   |
+| Pedro Albite     |   4  |   3  |   1  |   0   |
+| Sem SDR          |   2  |   1  |   0  |   0   |
+| **Total**        |  48  |  32  |  16  |   4   |
+```
 
-3. **`src/components/planning/indicators/WeeklyComparison.tsx`**
-   - Sem alteração — já inicia encolhido.
+- Ordenação: por RM decrescente.
+- Linha "Sem SDR" agrupa cards onde o campo SDR está em branco.
+- Linha "Total" no rodapé.
+- Período = período já selecionado no Comparativo Semanal (mesmo `startDate`/`endDate`).
+- Respeita os filtros já ativos da aba Indicadores (BU, SDR, Closer) — pois usa o mesmo `itemsByIndicator` que o painel já recebe.
 
-## Resultado esperado
+## Como o nome do SDR é resolvido
 
-- A seção "Comparativo Semanal — {mês}" continua aparecendo, fechada por padrão, e o usuário pode expandir clicando no header.
-- A seção "Comparativo Mensal" some completamente da aba Indicadores.
+Para cada `DetailItem`, usa `item.sdr` quando existe; caso vazio, cai em `item.responsible`; caso ainda vazio, agrupa como "Sem SDR". Normaliza com `trim()` e ignora maiúsculas/minúsculas no agrupamento, mas mantém a forma original mais comum para exibição.
+
+## Indicadores incluídos
+
+Apenas RM, RR, Proposta e Venda (não inclui MQL/Lead, conforme pedido). Se algum desses indicadores não estiver presente em `indicatorConfigs` (por exemplo em uma BU que não rastreia proposta), a coluna correspondente é omitida.
+
+## Implementação técnica
+
+- **Arquivo único editado**: `src/components/planning/indicators/WeeklyComparison.tsx`.
+  - Novo componente interno `SdrBreakdown` que recebe `itemsByIndicator` + período.
+  - Filtra os itens de cada indicador pelo intervalo `[startDate, endDate]` (mesma lógica de `countItemsInWeek`).
+  - Agrupa por SDR usando `Map<string, { rm, rr, proposta, venda }>`.
+  - Renderiza como `<table>` estilizada com Tailwind (`text-sm`, bordas suaves, células `text-right`).
+  - Inserido logo abaixo da grid de semanas, antes do `BarChart`.
+- Sem novos arquivos, sem novas dependências, sem mudanças de tipos.
+
+## O que NÃO muda
+
+- Comportamento colapsável e título do card.
+- Gráfico de barras agrupadas existente.
+- Cards por semana acima.
+- Filtros e período (controlados pela página `IndicatorsTab`).
