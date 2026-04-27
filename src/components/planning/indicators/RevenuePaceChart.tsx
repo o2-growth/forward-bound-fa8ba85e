@@ -112,6 +112,42 @@ export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
+            {tierBreakdown && tierBreakdown.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-semibold text-foreground">Contratos por Faixa de Faturamento</h4>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {totalContratos ?? 0} contratos · {formatCompactCurrency(totalContratosValor ?? 0)} total
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {tierBreakdown.map(t => {
+                    const pct = (totalContratos && totalContratos > 0) ? Math.round((t.count / totalContratos) * 100) : 0;
+                    return (
+                      <div key={t.tier} className="border border-border rounded-lg p-3 space-y-2 bg-muted/30">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2.5 h-2.5 rounded-full ${t.colorClass}`} />
+                          <span className="text-xs font-medium text-muted-foreground truncate">{t.tier}</span>
+                        </div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl font-bold text-foreground">{t.count}</span>
+                          <span className="text-xs text-muted-foreground">contratos</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{formatCompactCurrency(t.valor)}</span>
+                          <span>{pct}%</span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                          <div className={`h-full rounded-full ${t.colorClass}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </CardContent>
         </CollapsibleContent>
       </Card>
