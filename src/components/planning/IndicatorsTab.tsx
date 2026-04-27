@@ -2966,6 +2966,50 @@ export function IndicatorsTab() {
           mrrBaseTotal += getMrrBaseForMonth(monthName, year) * fraction;
         }
 
+        // === Contratos por Faixa de Faturamento (embutido no acelerômetro) ===
+        const TIER_NORM: Record<string, string> = {
+          'Ainda não faturamos': 'Ainda não fatura',
+          'Menos de R$ 100 mil': '< R$ 100k',
+          'Entre R$ 100 mil e R$ 200 mil': 'R$ 100k - 200k',
+          'Entre R$ 200 mil e R$ 350 mil': 'R$ 200k - 350k',
+          'Entre R$ 350 mil e R$ 500 mil': 'R$ 350k - 500k',
+          'Entre R$ 500 mil e R$ 1 milhão': 'R$ 500k - 1M',
+          'Entre R$ 1 milhão e R$ 5 milhões': 'R$ 1M - 5M',
+          'Acima de R$ 5 milhões': '> R$ 5M',
+        };
+        const TIER_COLORS: Record<string, string> = {
+          'Ainda não fatura': 'bg-gray-500',
+          '< R$ 100k': 'bg-red-500',
+          'R$ 100k - 200k': 'bg-orange-500',
+          'R$ 200k - 350k': 'bg-amber-500',
+          'R$ 350k - 500k': 'bg-yellow-500',
+          'R$ 500k - 1M': 'bg-lime-500',
+          'R$ 1M - 5M': 'bg-green-500',
+          '> R$ 5M': 'bg-emerald-600',
+        };
+        const TIER_ORDER_LIST = ['Ainda não fatura','< R$ 100k','R$ 100k - 200k','R$ 200k - 350k','R$ 350k - 500k','R$ 500k - 1M','R$ 1M - 5M','> R$ 5M'];
+
+        const vendaItems = getItemsForIndicator('venda');
+        const tierMap = new Map<string, { count: number; valor: number }>();
+        vendaItems.forEach(item => {
+          const raw = item.revenueRange || 'Não informado';
+          const tier = TIER_NORM[raw] || raw;
+          const existing = tierMap.get(tier) || { count: 0, valor: 0 };
+          existing.count += 1;
+          existing.valor += (item.value || 0);
+          tierMap.set(tier, existing);
+        });
+
+        const tierBreakdown = TIER_ORDER_LIST
+          .map(tier => ({ tier, ...(tierMap.get(tier) || { count: 0, valor: 0 }), colorClass: TIER_COLORS[tier] || 'bg-gray-400' }))
+          .filter(t => t.count > 0);
+        const naoInfo = tierMap.get('Não informado');
+        if (naoInfo && naoInfo.count > 0) {
+          tierBreakdown.push({ tier: 'Não informado', ...naoInfo, colorClass: 'bg-gray-400' });
+        }
+        const totalContratos = vendaItems.length;
+        const totalContratosValor = vendaItems.reduce((s, i) => s + (i.value || 0), 0);
+
         return (
           <RevenuePaceChart
             realized={totalRealized}
@@ -2974,6 +3018,9 @@ export function IndicatorsTab() {
             paceExpected={paceExpected}
             isLoading={o2TaxAnalytics.isLoading || modeloAtualAnalytics.isLoading || isLoadingMrrBase || isLoadingDre}
             chartData={paceChartData}
+            tierBreakdown={tierBreakdown}
+            totalContratos={totalContratos}
+            totalContratosValor={totalContratosValor}
           />
         );
       })()}
