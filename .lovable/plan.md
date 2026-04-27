@@ -1,22 +1,26 @@
-## Adicionar breakdown de SDR por semana
+## Redesenhar "Por SDR — semana a semana" como matriz comparativa
 
-Atualmente o "Comparativo Semanal" mostra a tabela "Por SDR" apenas com totais do período inteiro. Vou adicionar uma visão semanal: para cada semana (S1, S2, S3...), exibir uma tabela com SDR × indicadores (RM, RR, Prop, Venda).
+A tabela atual lista uma sub-tabela por semana, sem mostrar variações. Vou substituir por uma **matriz** (linhas = SDRs, colunas = semanas) com a mesma "pegada" do comparativo principal: número grande + % de variação vs. semana anterior, com setas TrendingUp/Down/Minus.
 
 ### Mudanças em `src/components/planning/indicators/WeeklyComparison.tsx`
 
-1. **Novo componente `SdrBreakdownWeekly`**
-   - Recebe a lista de `weeks`, `itemsByIndicator` e `indicatorConfigs`.
-   - Para cada semana, calcula o agrupamento `SDR → { rm, rr, proposta, venda }` usando a mesma função `getSdrName` (campo `sdr` com fallback `responsible`, "Sem SDR" para vazios).
-   - Renderiza uma tabela compacta por semana, com cabeçalho "S1 (1-7)" etc., colunas dos indicadores presentes, linhas por SDR ordenadas pela primeira coluna (RM) e linha de Total.
-   - Semanas sem dados mostram "Sem dados" discreto em vez de tabela vazia.
+**Substituir o componente `SdrBreakdownWeekly`:**
 
-2. **Layout**
-   - Manter a tabela atual `SdrBreakdown` (período completo) como resumo no topo.
-   - Logo abaixo, uma seção "Por SDR — semana a semana" com as tabelas semanais empilhadas verticalmente (cada semana como um bloco com borda).
-   - Para muitas semanas (4–5), as tabelas ficam compactas (padding reduzido, fontes xs).
+1. **Seletor de indicador** no header (RM / RR / Prop / Venda) — pills coloridos com a cor do indicador ativo. Mostra um indicador por vez para manter a matriz legível.
 
-3. **Reuso**
-   - Extrair a lógica de agregação SDR×indicadores num helper `aggregateSdrCounts(items, columns, startTime, endTime)` para ser usado tanto pelo total quanto por cada semana.
-   - Sem mudanças nos charts nem na lógica de filtros existentes.
+2. **Matriz tabular**:
+   - Coluna fixa esquerda: nome do SDR (com bullet colorido do indicador ativo) — `sticky left-0`.
+   - Uma coluna por semana com cabeçalho `S1` + faixa de datas `dd/MM–dd/MM`.
+   - Cada célula: número grande tabular + linha de % de variação vs. semana anterior usando o mesmo `formatPctChange` e ícones `TrendingUp/Down/Minus` já usados nos cards semanais.
+   - Coluna final "Total" com a soma do SDR no período.
+   - Linha "Total" no rodapé com soma por semana e % de variação semana a semana.
 
-Nenhum outro arquivo será alterado.
+3. **Ordenação**: SDRs ordenados pelo total do indicador ativo (desc).
+
+4. **Estado vazio**: se não houver dados, mostrar "Sem dados de SDR no período selecionado." centralizado.
+
+5. **Responsivo**: `overflow-x-auto` no wrapper; coluna SDR com `min-w-[140px]` e sticky para scroll horizontal limpo.
+
+6. **Tokens**: usar `bg-muted`, `bg-background`, `text-muted-foreground`, `border` (semantic tokens). Cores de indicadores reaproveitadas do mapa `INDICATOR_COLORS` existente.
+
+Nada mais muda — a tabela "Por SDR — período completo" e o gráfico permanecem.
