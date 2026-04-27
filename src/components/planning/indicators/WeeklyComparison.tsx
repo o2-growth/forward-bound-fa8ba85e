@@ -415,11 +415,18 @@ export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicat
               ))}
             </div>
 
-            {/* Breakdown por SDR (RM, RR, Proposta, Venda) */}
+            {/* Breakdown por SDR (RM, RR, Proposta, Venda) — período completo */}
             <SdrBreakdown
               itemsByIndicator={allItemsByIndicator}
               startDate={startDate}
               endDate={endDate}
+              indicatorConfigs={indicatorConfigs}
+            />
+
+            {/* Breakdown por SDR semana a semana */}
+            <SdrBreakdownWeekly
+              weeks={weeks}
+              itemsByIndicator={allItemsByIndicator}
               indicatorConfigs={indicatorConfigs}
             />
 
