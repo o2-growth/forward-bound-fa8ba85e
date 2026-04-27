@@ -1,35 +1,43 @@
-## Diagnóstico — "Negócios Perdidos sem motivo"
+## Por que ainda há 54% em "Não informado"
 
-### Causa raiz
+Investigando mais a fundo, descobri a causa real:
 
-Os cards do Modelo Atual (e BUs de expansão) são lidos da tabela `pipefy_moviment_cfos`, que é uma tabela de **movimentações** (uma linha por entrada em cada fase). A coluna `"Motivo da perda"` no Pipefy só é preenchida no movimento em que o card entrou na fase **"Perdido"**.
+### Causa raiz (confirmada)
 
-No `getLostDeals` (em `src/hooks/useModeloAtualAnalytics.ts`, linhas 610-634, e equivalentes em `useO2TaxAnalytics.ts` / `useExpansaoAnalytics.ts`), o filtro usado é:
+No parser dos hooks (`parseCardRow`), a fase **'Perdido' NÃO está em `PHASE_TO_INDICATOR`**. Por isso, quando chamamos `parseCards(rows)` (sem `skipPhaseFilter`), todas as linhas de movimento onde `fase === 'Perdido'` são **descartadas**:
 
 ```ts
-if (card.faseAtual !== 'Perdido') continue;   // Fase Atual = estado final do card
+// useModeloAtualAnalytics.ts linha 127
+if (!skipPhaseFilter && !PHASE_TO_INDICATOR[fase]) return null;
 ```
 
-Isso pega **todas as linhas de movimento** (RM, RR, Proposta, etc.) de qualquer card cujo estado final seja "Perdido". Como o campo `"Motivo da perda"` está vazio em todas as linhas que não sejam a entrada em "Perdido", o `getLossReasons` agrupa a maioria como `"Não informado"`.
+Como o Pipefy só preenche "Motivo da perda" justamente na linha em que o card entrou em "Perdido", o array `cards` (usado pelo meu fix anterior) **nunca contém** essa linha. Resultado: meu backfill que varria `cards` procurando `fase === 'Perdido'` nunca achava nada.
 
-Resumindo:
-- O motivo só existe em 1 das N linhas de movimento de cada card perdido.
-- O código está somando **todas** as N linhas como "perdidas" e tratando cada linha como um deal independente, então a maioria cai em "Sem motivo / Não informado".
+### O hook já carrega esses dados — só não estávamos usando
 
-Efeito visível: a Análise de Perdas mostra muito mais deals perdidos do que existem de fato, e quase todos sem motivo.
+O hook `useModeloAtualAnalytics` já expõe três outras fontes que **contêm** as linhas de Perdido:
+- `allCards` (`allCardsUnfiltered`) — todas as fases, período por Entrada
+- `fullHistory` — histórico completo dos cards do período
+- `mqlByCreation` — cards criados no período (qualquer fase, inclui Perdido)
 
-### Correção proposta
+### Correção
 
-1. **Deduplicar por `card.id` em `getLostDeals`** nos três hooks (`useModeloAtualAnalytics`, `useO2TaxAnalytics`, `useExpansaoAnalytics`).
-2. **Selecionar a melhor linha por card**: preferir a linha com `fase === 'Perdido'` (que carrega o motivo); se não existir, usar a linha mais recente.
-3. **Propagar o motivo para o card escolhido** mesmo quando a linha "vencedora" for de outra fase, copiando `motivoPerda` da linha onde `fase === 'Perdido'` se houver alguma.
-4. **Aplicar o filtro de período sobre a Data de Criação do card**, não sobre a `Entrada` da fase, para evitar contar o mesmo card várias vezes.
-5. Manter "Não informado" apenas para cards que realmente não têm motivo registrado no Pipefy.
+Em `getLostDeals` dos três hooks (`useModeloAtualAnalytics`, `useO2TaxAnalytics`, `useExpansaoAnalytics`):
+
+1. Construir o mapa `motivoByCardId` varrendo **todas** as fontes disponíveis (`cards + allCards + fullHistory + mqlByCreation`), priorizando linhas com `fase === 'Perdido' && motivoPerda`.
+2. Selecionar a linha representativa do card perdido também a partir dessas fontes (não apenas de `cards`), preferindo a linha `fase === 'Perdido'`.
+3. Preencher `motivoPerda` no card final usando o mapa quando estiver vazio.
+
+Adicionalmente, preciso confirmar que `useO2TaxAnalytics` e `useExpansaoAnalytics` também expõem `allCards`/`fullHistory`. Se não expuserem internamente, vou usar apenas `cards` + qualquer outra fonte já disponível dentro de cada hook (todos têm pelo menos `mqlByCreation` ou equivalente).
 
 ### Arquivos a alterar
 
-- `src/hooks/useModeloAtualAnalytics.ts` — `getLostDeals` e `getLossReasons`
-- `src/hooks/useO2TaxAnalytics.ts` — `getLostDeals` e `getLossReasons`
-- `src/hooks/useExpansaoAnalytics.ts` — `getLostDeals` e `getLossReasons`
+- `src/hooks/useModeloAtualAnalytics.ts` — usar `allCards`, `fullHistory`, `mqlByCreation` no `getLostDeals`
+- `src/hooks/useO2TaxAnalytics.ts` — mesmo ajuste, com as fontes equivalentes
+- `src/hooks/useExpansaoAnalytics.ts` — mesmo ajuste, com as fontes equivalentes
 
-Sem mudanças de UI, banco ou edge functions — apenas lógica de agregação nos hooks. Após o ajuste, a contagem de "Negócios Perdidos" deve cair para o número real de cards perdidos e a fatia de "Não informado" reduzir significativamente.
+Sem alterações de UI, banco ou edge functions.
+
+### Resultado esperado
+
+A fatia "Não informado" deve cair para a quantidade real de cards que foram para "Perdido" sem nenhum motivo registrado no Pipefy (geralmente algo entre 0% e 15%, não 54%).
