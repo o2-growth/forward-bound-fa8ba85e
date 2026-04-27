@@ -608,20 +608,51 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
 
   // Get lost deals in period
   const getLostDeals = useMemo(() => {
-    // Cards with faseAtual=Perdido/Arquivado AND created (dataCriacao) during the period
-    const lostCards: ModeloAtualCard[] = [];
-    const seenIds = new Set<string>();
+    // Cards with faseAtual=Perdido AND created (dataCriacao) during the period.
+    // Since `cards` is a movements table (one row per phase entry), we must pick
+    // the BEST row per card — preferring the row where fase === 'Perdido'
+    // because that's where "Motivo da perda" is filled in Pipefy.
+    const bestByCard = new Map<string, ModeloAtualCard>();
 
     for (const card of cards) {
-      if (seenIds.has(card.id)) continue;
       if (card.faseAtual !== 'Perdido') continue;
       if (!card.dataCriacao) continue;
       const creationTime = card.dataCriacao.getTime();
-      if (creationTime >= startTime && creationTime <= endTime) {
-        lostCards.push(card);
-        seenIds.add(card.id);
+      if (creationTime < startTime || creationTime > endTime) continue;
+
+      const existing = bestByCard.get(card.id);
+      if (!existing) {
+        bestByCard.set(card.id, card);
+        continue;
+      }
+      // Prefer the row that is the actual "Perdido" entry (it carries motivoPerda)
+      const existingIsLossEntry = existing.fase === 'Perdido';
+      const currentIsLossEntry = card.fase === 'Perdido';
+      if (currentIsLossEntry && !existingIsLossEntry) {
+        bestByCard.set(card.id, card);
+      } else if (currentIsLossEntry && existingIsLossEntry) {
+        // Both are loss entries — keep the one with motivoPerda; tiebreak by latest entry
+        if (!existing.motivoPerda && card.motivoPerda) {
+          bestByCard.set(card.id, card);
+        }
       }
     }
+
+    // Backfill motivoPerda for any chosen row that is missing it,
+    // by scanning all movements of the same card for the loss reason.
+    const motivoByCardId = new Map<string, string>();
+    for (const card of cards) {
+      if (card.fase === 'Perdido' && card.motivoPerda) {
+        if (!motivoByCardId.has(card.id)) {
+          motivoByCardId.set(card.id, card.motivoPerda);
+        }
+      }
+    }
+    const lostCards: ModeloAtualCard[] = Array.from(bestByCard.values()).map(card => {
+      if (card.motivoPerda) return card;
+      const filled = motivoByCardId.get(card.id);
+      return filled ? { ...card, motivoPerda: filled } : card;
+    });
 
     const totalValue = lostCards.reduce((sum, card) => sum + card.valor, 0);
 
