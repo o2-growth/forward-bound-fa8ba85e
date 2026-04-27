@@ -80,7 +80,7 @@ function countItemsInWeek(items: DetailItem[], weekStart: Date, weekEnd: Date): 
 
 function formatPctChange(current: number, previous: number): { text: string; color: string; trend: "up" | "down" | "neutral" } {
   if (previous === 0 && current === 0) return { text: "—", color: "text-muted-foreground", trend: "neutral" };
-  if (previous === 0) return { text: `+${current * 100}%`, color: "text-green-600 dark:text-green-400", trend: "up" };
+  if (previous === 0) return { text: `+${current}`, color: "text-green-600 dark:text-green-400", trend: "up" };
   const pct = ((current - previous) / previous) * 100;
   if (pct > 0) return { text: `+${pct.toFixed(1)}%`, color: "text-green-600 dark:text-green-400", trend: "up" };
   if (pct < 0) return { text: `${pct.toFixed(1)}%`, color: "text-red-600 dark:text-red-400", trend: "down" };
@@ -92,9 +92,7 @@ export function WeeklyComparison({ startDate, endDate, getItemsForIndicator, ind
 
   const totalDays = differenceInDays(endDate, startDate) + 1;
 
-  // Only render when date range is <= 62 days (roughly 2 months)
-  if (totalDays > 62) return null;
-
+  // All hooks must be called before any early return (React Rules of Hooks)
   const weeks = useMemo(() => getWeeksInRange(startDate, endDate), [startDate, endDate]);
 
   // Pre-fetch all items for each indicator once
@@ -104,7 +102,8 @@ export function WeeklyComparison({ startDate, endDate, getItemsForIndicator, ind
       map[config.key] = getItemsForIndicator(config.key);
     }
     return map;
-  }, [indicatorConfigs, getItemsForIndicator]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indicatorConfigs, startDate, endDate]);
 
   // Build weekly data matrix: weekIndex -> indicatorKey -> count
   const weeklyData = useMemo(() => {
@@ -128,8 +127,14 @@ export function WeeklyComparison({ startDate, endDate, getItemsForIndicator, ind
     });
   }, [weeks, weeklyData, indicatorConfigs]);
 
-  const monthLabel = format(startDate, "MMMM yyyy", { locale: ptBR });
-  const capitalizedMonth = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1);
+  // Early return AFTER all hooks (React Rules of Hooks)
+  if (totalDays > 62) return null;
+
+  const startMonth = format(startDate, "MMMM yyyy", { locale: ptBR });
+  const endMonth = format(endDate, "MMMM yyyy", { locale: ptBR });
+  const capitalizedMonth = startMonth === endMonth
+    ? startMonth.charAt(0).toUpperCase() + startMonth.slice(1)
+    : `${startMonth.charAt(0).toUpperCase() + startMonth.slice(1)} — ${endMonth.charAt(0).toUpperCase() + endMonth.slice(1)}`;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
