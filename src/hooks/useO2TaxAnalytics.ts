@@ -502,11 +502,24 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
 
   // Get lost deals in period
   const getLostDeals = useMemo(() => {
-    // `cards` is a movements table — pick best row per card preferring fase==='Perdido'
-    // (only that row carries "Motivo da perda" in Pipefy).
-    const bestByCard = new Map<string, O2TaxCard>();
+    // IMPORTANT: parser filters out 'Perdido' phase, so the row carrying
+    // "Motivo da perda" is missing in `cards`. Look across all sources.
+    const allSources: O2TaxCard[] = [...cards, ...fullHistory, ...mqlByCreation];
 
-    for (const card of cards) {
+    const motivoByCardId = new Map<string, string>();
+    for (const c of allSources) {
+      if (c.fase === 'Perdido' && c.motivoPerda) {
+        motivoByCardId.set(c.id, c.motivoPerda);
+      }
+    }
+    for (const c of allSources) {
+      if (!motivoByCardId.has(c.id) && c.motivoPerda) {
+        motivoByCardId.set(c.id, c.motivoPerda);
+      }
+    }
+
+    const bestByCard = new Map<string, O2TaxCard>();
+    for (const card of allSources) {
       if (card.faseAtual !== 'Perdido') continue;
       if (!card.dataCriacao) continue;
       const creationTime = card.dataCriacao.getTime();
@@ -517,8 +530,8 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
         bestByCard.set(card.id, card);
         continue;
       }
-      const existingIsLossEntry = existing.fase === 'Perdido';
       const currentIsLossEntry = card.fase === 'Perdido';
+      const existingIsLossEntry = existing.fase === 'Perdido';
       if (currentIsLossEntry && !existingIsLossEntry) {
         bestByCard.set(card.id, card);
       } else if (currentIsLossEntry && existingIsLossEntry && !existing.motivoPerda && card.motivoPerda) {
@@ -526,13 +539,6 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
       }
     }
 
-    // Backfill motivoPerda from any "Perdido" movement of the same card
-    const motivoByCardId = new Map<string, string>();
-    for (const card of cards) {
-      if (card.fase === 'Perdido' && card.motivoPerda && !motivoByCardId.has(card.id)) {
-        motivoByCardId.set(card.id, card.motivoPerda);
-      }
-    }
     const lostCards: O2TaxCard[] = Array.from(bestByCard.values()).map(card => {
       if (card.motivoPerda) return card;
       const filled = motivoByCardId.get(card.id);
@@ -547,7 +553,7 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
       trend: 0,
       cards: lostCards,
     };
-  }, [cards, startTime, endTime]);
+  }, [cards, fullHistory, mqlByCreation, startTime, endTime]);
 
   const getLossReasons = useMemo((): LossReasonData[] => {
     const reasonMap = new Map<string, O2TaxCard[]>();
