@@ -108,23 +108,13 @@ interface SdrBreakdownProps {
   indicatorConfigs: IndicatorConfig[];
 }
 
-function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }: SdrBreakdownProps) {
-  const startTime = startDate.getTime();
-  const endTime = new Date(
-    endDate.getFullYear(),
-    endDate.getMonth(),
-    endDate.getDate(),
-    23, 59, 59, 999
-  ).getTime();
-
-  // Only include columns whose indicator is present in the active config
-  const presentKeys = new Set(indicatorConfigs.map(c => c.key));
-  const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
-  if (columns.length === 0) return null;
-
-  // group -> { display, counts: { rm, rr, proposta, venda } }
+function aggregateSdrCounts(
+  itemsByIndicator: Record<string, DetailItem[]>,
+  columns: { key: IndicatorType; label: string }[],
+  startTime: number,
+  endTime: number,
+): Map<string, { display: string; counts: Record<string, number> }> {
   const groups = new Map<string, { display: string; counts: Record<string, number> }>();
-
   for (const col of columns) {
     const items = itemsByIndicator[col.key] || [];
     for (const item of items) {
@@ -143,6 +133,24 @@ function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }
       }
     }
   }
+  return groups;
+}
+
+function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }: SdrBreakdownProps) {
+  const startTime = startDate.getTime();
+  const endTime = new Date(
+    endDate.getFullYear(),
+    endDate.getMonth(),
+    endDate.getDate(),
+    23, 59, 59, 999
+  ).getTime();
+
+  // Only include columns whose indicator is present in the active config
+  const presentKeys = new Set(indicatorConfigs.map(c => c.key));
+  const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
+  if (columns.length === 0) return null;
+
+  const groups = aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime);
 
   if (groups.size === 0) {
     return (
@@ -212,6 +220,98 @@ function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+interface SdrBreakdownWeeklyProps {
+  weeks: WeekRange[];
+  itemsByIndicator: Record<string, DetailItem[]>;
+  indicatorConfigs: IndicatorConfig[];
+}
+
+function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs }: SdrBreakdownWeeklyProps) {
+  const presentKeys = new Set(indicatorConfigs.map(c => c.key));
+  const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
+  if (columns.length === 0) return null;
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <div className="px-3 py-2 border-b bg-muted/40">
+        <div className="text-sm font-semibold">Por SDR — semana a semana</div>
+        <div className="text-xs text-muted-foreground">
+          Quantidade de cards por SDR responsável em cada semana.
+        </div>
+      </div>
+      <div className="divide-y">
+        {weeks.map(week => {
+          const startTime = week.start.getTime();
+          const endTime = week.end.getTime();
+          const groups = aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime);
+
+          if (groups.size === 0) {
+            return (
+              <div key={week.label} className="px-3 py-2">
+                <div className="text-xs font-semibold mb-1">{week.label}</div>
+                <div className="text-xs text-muted-foreground">Sem dados de SDR nesta semana.</div>
+              </div>
+            );
+          }
+
+          const sortKey = columns[0].key;
+          const rows = Array.from(groups.values()).sort(
+            (a, b) => (b.counts[sortKey] || 0) - (a.counts[sortKey] || 0)
+          );
+          const totals: Record<string, number> = {};
+          for (const col of columns) {
+            totals[col.key] = rows.reduce((sum, r) => sum + (r.counts[col.key] || 0), 0);
+          }
+
+          return (
+            <div key={week.label} className="px-3 py-2">
+              <div className="text-xs font-semibold mb-1.5 text-muted-foreground">{week.label}</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left px-2 py-1 font-medium text-muted-foreground">SDR</th>
+                      {columns.map(col => (
+                        <th
+                          key={col.key}
+                          className="text-right px-2 py-1 font-medium"
+                          style={{ color: INDICATOR_COLORS[col.key] }}
+                        >
+                          {col.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, i) => (
+                      <tr key={i} className="border-b last:border-b-0 hover:bg-muted/30">
+                        <td className="px-2 py-1">{row.display}</td>
+                        {columns.map(col => (
+                          <td key={col.key} className="text-right px-2 py-1 tabular-nums">
+                            {row.counts[col.key] || 0}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    <tr className="bg-muted/30 font-semibold">
+                      <td className="px-2 py-1">Total</td>
+                      {columns.map(col => (
+                        <td key={col.key} className="text-right px-2 py-1 tabular-nums">
+                          {totals[col.key]}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -315,11 +415,18 @@ export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicat
               ))}
             </div>
 
-            {/* Breakdown por SDR (RM, RR, Proposta, Venda) */}
+            {/* Breakdown por SDR (RM, RR, Proposta, Venda) — período completo */}
             <SdrBreakdown
               itemsByIndicator={allItemsByIndicator}
               startDate={startDate}
               endDate={endDate}
+              indicatorConfigs={indicatorConfigs}
+            />
+
+            {/* Breakdown por SDR semana a semana */}
+            <SdrBreakdownWeekly
+              weeks={weeks}
+              itemsByIndicator={allItemsByIndicator}
               indicatorConfigs={indicatorConfigs}
             />
 
