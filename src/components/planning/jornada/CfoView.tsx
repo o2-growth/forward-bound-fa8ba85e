@@ -42,61 +42,69 @@ const nextSimId = () => `sim-${++simIdCounter}-${Date.now()}`;
 const CFO_SQUADS: Record<string, {
   nome: string;
   fee: number;
-  membros: { nome: string; cargo: string; fee: number }[];
+  beneficios: number;
+  membros: { nome: string; cargo: string; fee: number; beneficios: number }[];
 }> = {
   'Oliveira': {
     nome: 'Adivilso Souza de Oliveira Junior',
     fee: 12000,
+    beneficios: 1075,
     membros: [
-      { nome: 'Pedro Fuzer Garcia', cargo: 'Analista FP&A', fee: 6000 },
+      { nome: 'Pedro Fuzer Garcia', cargo: 'Analista FP&A', fee: 6000, beneficios: 770 },
     ],
   },
   'Douglas Schossler': {
     nome: 'Douglas Pinheiro Schossler',
     fee: 17500,
+    beneficios: 503,
     membros: [
-      { nome: 'Tainara Sofia Konzen', cargo: 'Analista FP&A', fee: 7500 },
+      { nome: 'Tainara Sofia Konzen', cargo: 'Analista FP&A', fee: 7500, beneficios: 90 },
     ],
   },
   'Eduardo Milani Pedrolo': {
     nome: 'Eduardo Milani Pedrolo',
     fee: 13000,
+    beneficios: 0,
     membros: [
-      { nome: 'Sergio Pereira Piva Junior', cargo: 'Analista FP&A', fee: 7500 },
-      { nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000 },
-      { nome: 'Eric Alves da Silveira', cargo: 'Analista Financeiro', fee: 7000 },
-      { nome: 'Pedro Oppermann Michelucci', cargo: 'Estagiário FP&A', fee: 0 },
+      { nome: 'Sergio Pereira Piva Junior', cargo: 'Analista FP&A', fee: 7500, beneficios: 690 },
+      { nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000, beneficios: 0 },
+      { nome: 'Eric Alves da Silveira', cargo: 'Analista Financeiro', fee: 7000, beneficios: 60 },
+      { nome: 'Pedro Oppermann Michelucci', cargo: 'Estagiário FP&A', fee: 0, beneficios: 0 },
     ],
   },
   'Everton Bisinella': {
     nome: 'Everton Bisinella',
     fee: 14000,
+    beneficios: 959,
     membros: [
-      { nome: 'Anderson Felizardo Mendes', cargo: 'Analista FP&A', fee: 0 },
-      { nome: 'Maria Eduarda Nery Reckziegel', cargo: 'Estagiária FP&A', fee: 0 },
+      { nome: 'Anderson Felizardo Mendes', cargo: 'Analista FP&A', fee: 0, beneficios: 0 },
+      { nome: 'Maria Eduarda Nery Reckziegel', cargo: 'Estagiária FP&A', fee: 0, beneficios: 618 },
     ],
   },
   'Gustavo Cochlar': {
     nome: 'Gustavo Ferreira Cochlar',
     fee: 22349,
+    beneficios: 731,
     membros: [
-      { nome: 'Humberto de Azevedo Behs', cargo: 'Analista FP&A', fee: 7000 },
+      { nome: 'Humberto de Azevedo Behs', cargo: 'Analista FP&A', fee: 7000, beneficios: 751 },
     ],
   },
   "Eduardo D'Agostini": {
     nome: 'Luis Eduardo Dagostini',
     fee: 29254,
+    beneficios: 505,
     membros: [
-      { nome: 'Pamela Luiza dos Santos Quadros', cargo: 'Analista FP&A', fee: 7500 },
-      { nome: 'Matheus da Silva Besnos', cargo: 'Analista FP&A', fee: 7000 },
+      { nome: 'Pamela Luiza dos Santos Quadros', cargo: 'Analista FP&A', fee: 7500, beneficios: 553 },
+      { nome: 'Matheus da Silva Besnos', cargo: 'Analista FP&A', fee: 7000, beneficios: 649 },
     ],
   },
   'Mariana Luz da Silva': {
     nome: 'Mariana Luz da Silva',
     fee: 15000,
+    beneficios: 947,
     membros: [
-      { nome: 'Roberta Costa Curta Lirio', cargo: 'Analista FP&A', fee: 7500 },
-      { nome: 'Raissa Bonamigo Daros', cargo: 'Estagiária FP&A', fee: 0 },
+      { nome: 'Roberta Costa Curta Lirio', cargo: 'Analista FP&A', fee: 7500, beneficios: 623 },
+      { nome: 'Raissa Bonamigo Daros', cargo: 'Estagiária FP&A', fee: 0, beneficios: 447 },
     ],
   },
   'Rafael Marchioretto': {
@@ -193,7 +201,15 @@ function getSquad(cfoNome: string) {
 function getSquadCusto(cfoNome: string): number {
   const sq = getSquad(cfoNome);
   if (!sq) return 0;
-  return sq.fee + sq.membros.reduce((s, m) => s + m.fee, 0);
+  const fees = sq.fee + sq.membros.reduce((s, m) => s + m.fee, 0);
+  const beneficios = sq.beneficios + sq.membros.reduce((s, m) => s + m.beneficios, 0);
+  return fees + beneficios;
+}
+
+function getSquadBeneficios(cfoNome: string): number {
+  const sq = getSquad(cfoNome);
+  if (!sq) return 0;
+  return sq.beneficios + sq.membros.reduce((s, m) => s + m.beneficios, 0);
 }
 
 function getAnalystCount(cfoNome: string): number {
@@ -1139,8 +1155,12 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                         <span>{formatBRL(receitaLiquida)}</span>
                       </div>
                       <div className="flex justify-between text-muted-foreground">
-                        <span className="pl-3">(-) COGS (custo squad)</span>
-                        <span>- {formatBRL(custoSquad)}</span>
+                        <span className="pl-3">(-) Fees (remuneração)</span>
+                        <span>- {formatBRL(custoSquad - getSquadBeneficios(selectedCfo))}</span>
+                      </div>
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="pl-3">(-) Benefícios (desloc. + alim.)</span>
+                        <span>- {formatBRL(getSquadBeneficios(selectedCfo))}</span>
                       </div>
                       <Separator className="my-1" />
                       <div className="flex justify-between font-bold text-sm">

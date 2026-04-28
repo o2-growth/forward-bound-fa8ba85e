@@ -342,9 +342,9 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
   const seCerta = seClassifications.filter(v => v === 'certa_forma').length;
   const seNao = seClassifications.filter(v => v === 'nao_desapontado').length;
   const seNaoUsa = seClassifications.filter(v => v === 'nao_usa').length;
-  // SE = (muito desapontado + de certa forma) / total respondentes
-  const seTotal = seClassifications.length;
-  const seanEllisScore = seTotal > 0 ? Math.round(((seMuito + seCerta) / seTotal) * 100) : 0;
+  // SE PMF = muito desapontado / total válidos (exclui "não usa")
+  const seValidTotal = seMuito + seCerta + seNao;
+  const seanEllisScore = seValidTotal > 0 ? Math.round((seMuito / seValidTotal) * 100) : 0;
 
   const seanEllisDistribution: SeanEllisItem[] = [
     { label: 'Muito desapontado', count: seMuito, color: 'bg-green-500' },
@@ -436,7 +436,10 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
     const cfoCsat = data.csatScores.length > 0 ? Math.round((cfoCsatSat / data.csatScores.length) * 100) : 0;
     
     const cfeSeMuito = data.seClassifications.filter(s => s === 'muito_desapontado').length;
-    const cfeSe = data.seClassifications.length > 0 ? Math.round((cfeSeMuito / data.seClassifications.length) * 100) : null;
+    const cfeSeCerta = data.seClassifications.filter(s => s === 'certa_forma').length;
+    const cfeSeNao = data.seClassifications.filter(s => s === 'nao_desapontado').length;
+    const cfeSeValid = cfeSeMuito + cfeSeCerta + cfeSeNao; // exclui "não usa"
+    const cfeSe = cfeSeValid > 0 ? Math.round((cfeSeMuito / cfeSeValid) * 100) : null;
 
     const cards: CfoNpsCard[] = data.withNps.map(n => ({
       titulo: n.titulo,
