@@ -343,6 +343,7 @@ export function processNpsData(rows: NpsCard[], externalCfoMap: Record<string, s
   const seNao = seClassifications.filter(v => v === 'nao_desapontado').length;
   const seNaoUsa = seClassifications.filter(v => v === 'nao_usa').length;
   // SE PMF = muito desapontado / total válidos (exclui "não usa")
+  const seTotal = seClassifications.length;
   const seValidTotal = seMuito + seCerta + seNao;
   const seanEllisScore = seValidTotal > 0 ? Math.round((seMuito / seValidTotal) * 100) : 0;
 
