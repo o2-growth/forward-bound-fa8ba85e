@@ -241,7 +241,7 @@ export function useJornadaData() {
         ? [...dbProdutos].join(', ')
         : (row['Produtos'] || '').trim();
       // Check if product is pontual-only (no recurring component)
-      const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico Estratégico', 'Turnaround', 'Valuation', 'Educação', 'Educação – Dono CFO', 'Educação – Engenheiro de Negócios', 'Educação – Financeiro Raiz'];
+      const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico Estratégico', 'Diagnóstico', 'Turnaround', 'Valuation', 'Educação', 'Educação – Dono CFO', 'Educação – Engenheiro de Negócios', 'Educação – Financeiro Raiz'];
       const produtoParts = dbProdutos && dbProdutos.size > 0
         ? [...dbProdutos]
         : produto.split(',').map(p => p.trim());
@@ -249,7 +249,7 @@ export function useJornadaData() {
 
       const valorCfoaas = parseNum(row['Valor CFOaaS']);
       const valorOxy = parseNum(row['Valor OXY']);
-      const valorDiagnostico = parseNum(row['Valor Diagnóstico Estratégico'] || row['Valor Diagnostico']);
+      const valorDiagnostico = parseNum(row['Valor Diagnóstico Estratégico'] || row['Valor Diagnostico'] || row['Valor Diagnóstico'] || row['Valor Setup']);
       const valorTurnaround = parseNum(row['Valor Turnaround']);
       const valorValuation = parseNum(row['Valor Valuation']);
       const valorEducacao = parseNum(row['Valor Educação'] || row['Valor Educacao']);
