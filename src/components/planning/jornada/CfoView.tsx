@@ -645,7 +645,7 @@ interface CfoViewProps {
   clientes: JornadaCliente[];
 }
 
-type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco" | "churns";
+type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco" | "churns" | "custoSquad" | "margem" | "ticketMedio";
 
 const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
 
@@ -686,11 +686,30 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
 
   const sortedCfos = useMemo(() => {
     return [...cfos].sort((a, b) => {
+      // Colunas calculadas (não existem diretamente no JornadaCfo)
       if (sortCol === 'churns') {
         const av = churnsPerCfo[a.nome] || 0;
         const bv = churnsPerCfo[b.nome] || 0;
         return sortAsc ? av - bv : bv - av;
       }
+      if (sortCol === 'custoSquad') {
+        const av = getSquadCusto(a.nome);
+        const bv = getSquadCusto(b.nome);
+        return sortAsc ? av - bv : bv - av;
+      }
+      if (sortCol === 'margem') {
+        const ca = getSquadCusto(a.nome);
+        const cb = getSquadCusto(b.nome);
+        const av = a.mrrTotal > 0 ? ((a.mrrTotal - ca) / a.mrrTotal) * 100 : 0;
+        const bv = b.mrrTotal > 0 ? ((b.mrrTotal - cb) / b.mrrTotal) * 100 : 0;
+        return sortAsc ? av - bv : bv - av;
+      }
+      if (sortCol === 'ticketMedio') {
+        const av = a.clientes > 0 ? a.mrrTotal / a.clientes : 0;
+        const bv = b.clientes > 0 ? b.mrrTotal / b.clientes : 0;
+        return sortAsc ? av - bv : bv - av;
+      }
+      // Colunas diretas do JornadaCfo
       const av = a[sortCol as keyof JornadaCfo];
       const bv = b[sortCol as keyof JornadaCfo];
       if (typeof av === "string" && typeof bv === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
@@ -1014,6 +1033,9 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                   ["clientesTratativa", "Tratativas"],
                   ["mrrEmRisco", "MRR Risco"],
                   ["churns", "Churns"],
+                  ["custoSquad", "Custo Squad"],
+                  ["margem", "Margem %"],
+                  ["ticketMedio", "Ticket"],
                 ] as [SortCol, string][]).map(([col, label]) => (
                   <TableHead key={col}>
                     <Button variant="ghost" size="sm" className="gap-1 -ml-3" onClick={() => handleSort(col)}>
@@ -1022,9 +1044,6 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                     </Button>
                   </TableHead>
                 ))}
-                <TableHead className="text-right">Custo Squad</TableHead>
-                <TableHead className="text-right">Margem %</TableHead>
-                <TableHead className="text-right">Ticket</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
