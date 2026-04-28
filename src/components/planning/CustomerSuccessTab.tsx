@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, Filter, X, Info } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { CustomerSuccessFilterProvider, useCustomerSuccessFilters } from '@/contexts/CustomerSuccessFilterContext';
+import { DateRangePickerGA } from './DateRangePickerGA';
 import { useJornadaData } from '@/hooks/useJornadaData';
 import { useNpsData, processNpsData, NpsCard } from '@/hooks/useNpsData';
 import { useOperationsData } from '@/hooks/useOperationsData';
@@ -34,6 +35,16 @@ import { AlertCircle } from 'lucide-react';
 function CustomerSuccessTabInner() {
   const { filters, setFilters, clearFilters } = useCustomerSuccessFilters();
   const [activeTab, setActiveTab] = useState('visao-geral');
+
+  // Date range for CS filtering (same pattern as Indicadores Comercial)
+  const now = new Date();
+  const [csStartDate, setCsStartDate] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
+  const [csEndDate, setCsEndDate] = useState(() => now);
+
+  const handleCsDateChange = (start: Date, end: Date) => {
+    setCsStartDate(start);
+    setCsEndDate(end);
+  };
 
   // Data hooks
   const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
@@ -282,6 +293,12 @@ function CustomerSuccessTabInner() {
               ))}
             </SelectContent>
           </Select>
+
+          <DateRangePickerGA
+            startDate={csStartDate}
+            endDate={csEndDate}
+            onDateChange={handleCsDateChange}
+          />
 
           {hasFilters && (
             <>
