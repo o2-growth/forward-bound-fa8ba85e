@@ -149,12 +149,30 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
     return { promotores, neutros, detratores, total: withNps.length };
   }, [activeClientes]);
 
+  // Last NPS and CSAT dates
+  const lastNpsDate = useMemo(() => {
+    const withNps = activeClientes.filter(c => c.dataNps !== null);
+    if (withNps.length === 0) return null;
+    const latest = withNps.reduce((max, c) => {
+      if (!max.dataNps) return c;
+      if (!c.dataNps) return max;
+      return c.dataNps > max.dataNps ? c : max;
+    });
+    return latest.dataNps;
+  }, [activeClientes]);
+
+  const lastNpsLabel = useMemo(() => {
+    if (!lastNpsDate) return null;
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return `${months[lastNpsDate.getMonth()]}/${lastNpsDate.getFullYear()}`;
+  }, [lastNpsDate]);
+
   // B1: Churn breakdown by motivo
   const churnBreakdown = useMemo(() => {
     const churned = clientes.filter(c => CHURN_PHASES.includes(c.faseAtual));
     const byMotivo: Record<string, number> = {};
     churned.forEach(c => {
-      const motivo = c.tratativaMotivo || 'Nao informado';
+      const motivo = c.motivoChurn || 'Nao informado';
       byMotivo[motivo] = (byMotivo[motivo] || 0) + 1;
     });
     return { total: churned.length, byMotivo: Object.entries(byMotivo).sort((a, b) => b[1] - a[1]) };
@@ -197,6 +215,9 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                   </span>
                 </div>
                 <p className="text-2xl font-bold">{kpi.value}</p>
+                {kpi.key === 'nps' && lastNpsLabel && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Ultima pesquisa: {lastNpsLabel}</p>
+                )}
               </CardContent>
             </Card>
           );
@@ -309,7 +330,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                         {dateStr && <span className="text-[10px] text-muted-foreground whitespace-nowrap">{dateStr}</span>}
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>{c.tratativaMotivo || 'Motivo nao informado'}</span>
+                        <span>{c.motivoChurn || 'Sem motivo'}</span>
                         <span className="ml-auto font-medium">{formatCurrency(c.mrr)}</span>
                       </div>
                     </div>

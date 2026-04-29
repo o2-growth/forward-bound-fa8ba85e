@@ -158,15 +158,28 @@ export function useJornadaData() {
 
     // Tratativas map: active tratativas per project title
     const tratativaMap = new Map<string, { motivo: string; dias: number; fase: string }>();
+    // All tratativas map: captures motivo from ANY tratativa (for churned clients)
+    const allTratativaMap = new Map<string, { motivo: string; fase: string }>();
     for (const row of tratativas) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const titulo = (row['Título'] || '').trim().toLowerCase();
       if (!titulo) continue;
       const fase = row['Fase Atual'] || '';
-      if (!TRATATIVA_ACTIVE.includes(fase)) continue;
+      const motivo = row['Motivo'] || 'Não informado';
       const entrada = parseDate(row['Entrada'] || row['Data de Inicio da Tratativa']);
       const dias = entrada ? daysBetween(entrada, now) : 0;
-      const motivo = row['Motivo'] || 'Não informado';
+
+      // Store in all-tratativas map (latest wins)
+      const existingAll = allTratativaMap.get(titulo);
+      if (!existingAll) {
+        allTratativaMap.set(titulo, { motivo, fase });
+      } else {
+        // Overwrite if current entry is more recent (later in the list)
+        allTratativaMap.set(titulo, { motivo, fase });
+      }
+
+      // Only active tratativas go into the active map
+      if (!TRATATIVA_ACTIVE.includes(fase)) continue;
       tratativaMap.set(titulo, { motivo, dias, fase });
     }
 
@@ -306,6 +319,10 @@ export function useJornadaData() {
 
       const healthLevel = health >= 70 ? 'green' as const : health >= 40 ? 'yellow' as const : 'red' as const;
 
+      // Churn motivo: from active tratativa first, fallback to any tratativa
+      const allTratData = allTratativaMap.get(tituloLower);
+      const motivoChurn = tratData?.motivo ?? allTratData?.motivo ?? null;
+
       clienteMap.set(id, {
         id,
         titulo,
@@ -337,6 +354,7 @@ export function useJornadaData() {
         tratativaAtiva: !!tratData,
         tratativaMotivo: tratData?.motivo ?? null,
         tratativaDias: tratData?.dias ?? null,
+        motivoChurn,
         lifetimeMonths: lifetime,
         diasNaFaseAtual: diasNaFase,
         healthBreakdown: { nps: hNps, reunioes: hReunioes, tratativa: hTratativa, setup: hSetup },
@@ -418,8 +436,14 @@ export function useJornadaData() {
     for (const [cfo, data] of cfoMap) {
       const cfoActive = activeClientes.filter(c => c.cfo === cfo);
       data.healthScoreMedio = cfoActive.length > 0 ? Math.round(cfoActive.reduce((s, c) => s + c.healthScore, 0) / cfoActive.length) : 0;
-      const withNps = cfoActive.filter(c => c.ultimoNps !== null);
-      data.npsMediaClientes = withNps.length > 0 ? Math.round(withNps.reduce((s, c) => s + (c.ultimoNps || 0), 0) / withNps.length) : null;
+      const withNps = cfoActive.filter(c => c.npsClassificacao !== null);
+      if (withNps.length > 0) {
+        const promotores = withNps.filter(c => c.npsClassificacao === 'promotor').length;
+        const detratores = withNps.filter(c => c.npsClassificacao === 'detrator').length;
+        data.npsMediaClientes = Math.round(((promotores - detratores) / withNps.length) * 100);
+      } else {
+        data.npsMediaClientes = null;
+      }
       const rotinas = rotinasByCfo.get(cfo);
       data.taxaEntrega = rotinas && rotinas.ativas > 0 ? Math.round(((rotinas.ativas - rotinas.atrasadas) / rotinas.ativas) * 100) : 100;
     }

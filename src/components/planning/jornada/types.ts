@@ -42,6 +42,9 @@ export interface JornadaCliente {
   tratativaMotivo: string | null;
   tratativaDias: number | null;
 
+  // Churn reason (from any tratativa, not just active ones)
+  motivoChurn: string | null;
+
   // Lifecycle
   lifetimeMonths: number | null;
   diasNaFaseAtual: number;

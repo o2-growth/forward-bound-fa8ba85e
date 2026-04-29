@@ -321,7 +321,7 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>R1-R4 = reuniões semanais com deadlines nos dias 7, 14, 21 e 28. Taxa = reuniões feitas / 4 × 100. Reunião no prazo = preenchida antes do deadline. Atrasada = preenchida após. Fonte: Pipefy — Rotinas (pipe 306755752)</p>
+              <p>R1-R3 = reuniões semanais (dias 7, 14, 21). Comitê = reunião mensal estratégica (dia 28). Taxa = reuniões feitas / 4 × 100. Reunião no prazo = preenchida antes do deadline. Atrasada = preenchida após. Fonte: Pipefy — Rotinas (pipe 306755752)</p>
             </TooltipContent>
           </Tooltip>
         </h4>
@@ -402,13 +402,16 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                     <Info className="h-3 w-3 text-muted-foreground cursor-help inline ml-0.5" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs">
-                    <p>R1 (dia 7), R2 (dia 14), R3 (dia 21), R4 (dia 28). Verde = no prazo. Vermelho = preenchido após prazo. Laranja = prazo expirado sem preenchimento. Cinza = prazo futuro. Fonte: Pipefy — Rotinas</p>
+                    <p>R1 (dia 7), R2 (dia 14), R3 (dia 21) = reuniões semanais. Comitê (dia 28) = reunião mensal estratégica. Verde = no prazo. Vermelho = preenchido após prazo. Laranja = prazo expirado sem preenchimento. Cinza = prazo futuro. Fonte: Pipefy — Rotinas</p>
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
               <TableHead className="text-center w-16">R2<br/><span className="text-[10px] text-muted-foreground">até dia 14</span></TableHead>
               <TableHead className="text-center w-16">R3<br/><span className="text-[10px] text-muted-foreground">até dia 21</span></TableHead>
-              <TableHead className="text-center w-16">R4<br/><span className="text-[10px] text-muted-foreground">até dia 28</span></TableHead>
+              <TableHead className="text-center w-16 bg-indigo-500/10 border-l-2 border-indigo-500/30">
+                <span className="text-indigo-600 dark:text-indigo-400 font-semibold">Comitê</span><br/>
+                <span className="text-[10px] text-muted-foreground">até dia 28</span>
+              </TableHead>
               <TableHead className="text-center">
                 <Button variant="ghost" size="sm" className="gap-1" onClick={() => { setSortCol('progress'); setSortAsc(!sortAsc); }}>
                   Progresso <ArrowUpDown className="h-3 w-3" />
@@ -462,8 +465,9 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                       const date = dates[i];
                       const dateLabel = date ? `${String(date.getDate()).padStart(2, '0')}/${MONTH_ABBR[date.getMonth()]}` : null;
 
+                      const isComite = i === 3;
                       return (
-                        <TableCell key={i} className="text-center">
+                        <TableCell key={i} className={`text-center ${isComite ? 'bg-indigo-500/5 border-l-2 border-indigo-500/30' : ''}`}>
                           {status === 'done' ? (
                             <div className="flex flex-col items-center gap-0.5">
                               <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/20">

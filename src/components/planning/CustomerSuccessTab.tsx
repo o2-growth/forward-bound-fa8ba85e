@@ -300,6 +300,28 @@ function CustomerSuccessTabInner() {
             onDateChange={handleCsDateChange}
           />
 
+          <div className="flex gap-1">
+            {[
+              { label: 'Q1', start: new Date(now.getFullYear(), 0, 1), end: new Date(now.getFullYear(), 2, 31) },
+              { label: 'Q2', start: new Date(now.getFullYear(), 3, 1), end: new Date(now.getFullYear(), 5, 30) },
+              { label: 'Q3', start: new Date(now.getFullYear(), 6, 1), end: new Date(now.getFullYear(), 8, 30) },
+              { label: 'Q4', start: new Date(now.getFullYear(), 9, 1), end: new Date(now.getFullYear(), 11, 31) },
+            ].map(q => {
+              const isActive = csStartDate.getTime() === q.start.getTime() && csEndDate.getTime() === q.end.getTime();
+              return (
+                <Button
+                  key={q.label}
+                  variant={isActive ? 'default' : 'outline'}
+                  size="sm"
+                  className="text-xs px-2 h-7"
+                  onClick={() => handleCsDateChange(q.start, q.end)}
+                >
+                  {q.label}
+                </Button>
+              );
+            })}
+          </div>
+
           {hasFilters && (
             <>
               <div className="flex gap-1 flex-wrap">
