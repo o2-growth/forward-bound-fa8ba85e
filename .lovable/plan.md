@@ -1,25 +1,20 @@
-## Mover "Contratos por Faixa de Faturamento" para dentro do Acelerômetro de Vendas
+## Objetivo
+Nos gauges radiais do acelerômetro (MQLs, Reuniões Agendadas, Realizadas, Propostas, Vendas, SLA, Fat Incremento, MRR, Setup, Pontual), pintar de **verde quando o percentual atingir ≥ 90%** da meta — em vez de só a partir de 100%.
 
-### O que é cada coisa
-- **Acelerômetro de vendas** = card "Faturamento" (`RevenuePaceChart`) — gauge/área acumulada que compara realizado vs meta de faturamento ao longo do período. Vive em `src/components/planning/indicators/RevenuePaceChart.tsx` e é renderizado em `IndicatorsTab.tsx` linha ~2970.
-- **Contratos por Faixa de Faturamento** = card autônomo logo acima do acelerômetro (`IndicatorsTab.tsx` linhas 2658–2750). Mostra grid de tiers (`< R$ 100k`, `R$ 100k–200k`, …) com nº de contratos, valor total e %.
+## Comportamento atual
+Em `src/components/planning/ClickableRadialCard.tsx`:
+- `isAboveMeta = percentage >= 100`
+- Se `isAboveMeta` → verde (`hsl(var(--chart-2))`), número % verde
+- Caso contrário → vermelho (`hsl(var(--destructive))`)
 
-### Mudanças
+## Mudança
+Trocar o limiar para `>= 90`:
+- `const isAboveMeta = percentage >= 90;`
 
-1. **`RevenuePaceChart.tsx`**
-   - Adicionar props opcionais: `tierBreakdown`, `totalContratos`, `totalContratosValor`.
-   - Dentro do `CollapsibleContent`, abaixo do gráfico, renderizar o grid de tiers (mesma UI dos cards: bolinha colorida, contagem, valor, % e barra de progresso). Título da seção: "Contratos por Faixa de Faturamento" com o total ao lado.
-   - Não renderizar a seção se `tierBreakdown` vier vazio.
+Isso afeta tanto a cor do arco quanto a cor do texto de porcentagem, mantendo a regra unificada (≥90% = verde, <90% = vermelho). Nenhuma outra lógica/negócio é alterada.
 
-2. **`IndicatorsTab.tsx`**
-   - Remover o card autônomo (linhas 2658–2750).
-   - Calcular `tierData`, `totalContratos`, `totalValor` no escopo do `RevenuePaceChart` (junto à preparação do `paceChartData`) e passar como props.
-   - Manter exatamente a mesma lógica de mapeamento de tiers (`TIER_NORM`, `TIER_COLORS`, `TIER_ORDER_LIST`) já existente, agora dentro da preparação dos dados do acelerômetro.
+## Arquivos
+- `src/components/planning/ClickableRadialCard.tsx` (1 linha)
 
-### Resultado
-Card "Faturamento" passa a ter duas seções dentro do mesmo Collapsible:
-- Em cima: gráfico de pace (acumulado)
-- Embaixo: grid de Contratos por Faixa de Faturamento
-A seção autônoma some, eliminando duplicação visual.
-
-Sem mudanças em hooks, banco ou edge functions.
+## Observação
+O SLA é um caso invertido (quanto menor, melhor) — hoje ele já fica vermelho porque o "realizado" passa muito da meta de 30min, então a regra continua coerente com o comportamento atual; não há tratamento especial para SLA neste card genérico.
