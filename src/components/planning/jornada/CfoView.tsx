@@ -669,8 +669,9 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
     });
   };
 
+  const ACTIVE_PHASES_LOCAL = ['Onboarding', 'Em Operação Recorrente'];
   const activeClientes = useMemo(() => {
-    return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
+    return clientes.filter(c => ACTIVE_PHASES_LOCAL.includes(c.faseAtual));
   }, [clientes]);
 
   // A1: Count churns per CFO
