@@ -157,30 +157,38 @@ export function useJornadaData() {
     }
 
     // Tratativas map: active tratativas per project title
-    const tratativaMap = new Map<string, { motivo: string; dias: number; fase: string }>();
+    const tratativaMap = new Map<string, { motivo: string; motivoChurn: string | null; dias: number; fase: string }>();
     // All tratativas map: captures motivo from ANY tratativa (for churned clients)
-    const allTratativaMap = new Map<string, { motivo: string; fase: string }>();
+    const allTratativaMap = new Map<string, { motivo: string; motivoChurn: string | null; fase: string }>();
     for (const row of tratativas) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const titulo = (row['Título'] || '').trim().toLowerCase();
       if (!titulo) continue;
       const fase = row['Fase Atual'] || '';
-      const motivo = row['Motivo'] || 'Não informado';
+      const motivoChurnTrat = (row['Motivo Churn'] || '').trim() || null;
+      const motivo = (row['Motivo'] || '').trim() || 'Não informado';
       const entrada = parseDate(row['Entrada'] || row['Data de Inicio da Tratativa']);
       const dias = entrada ? daysBetween(entrada, now) : 0;
 
       // Store in all-tratativas map (latest wins)
-      const existingAll = allTratativaMap.get(titulo);
-      if (!existingAll) {
-        allTratativaMap.set(titulo, { motivo, fase });
-      } else {
-        // Overwrite if current entry is more recent (later in the list)
-        allTratativaMap.set(titulo, { motivo, fase });
-      }
+      allTratativaMap.set(titulo, { motivo, motivoChurn: motivoChurnTrat, fase });
 
       // Only active tratativas go into the active map
       if (!TRATATIVA_ACTIVE.includes(fase)) continue;
-      tratativaMap.set(titulo, { motivo, dias, fase });
+      tratativaMap.set(titulo, { motivo, motivoChurn: motivoChurnTrat, dias, fase });
+    }
+
+    // Motivo de churn vindo direto do card central de projetos
+    const projetoMotivoChurnMap = new Map<string, { principal: string | null; cancelamento: string | null }>();
+    for (const row of projetos) {
+      if (row['Fase'] !== row['Fase Atual']) continue;
+      const titulo = (row['Título'] || '').trim().toLowerCase();
+      if (!titulo) continue;
+      const principal = (row['Motivo Principal do Churn'] || '').trim() || null;
+      const cancelamento = (row['Motivos cancelamento'] || row['Motivos Cancelamento'] || '').trim() || null;
+      if (principal || cancelamento) {
+        projetoMotivoChurnMap.set(titulo, { principal, cancelamento });
+      }
     }
 
     // Rotinas map: per CFO aggregation
@@ -319,9 +327,23 @@ export function useJornadaData() {
 
       const healthLevel = health >= 70 ? 'green' as const : health >= 40 ? 'yellow' as const : 'red' as const;
 
-      // Churn motivo: from active tratativa first, fallback to any tratativa
+      // Churn motivo: hierarchy alinhada ao useOperationsData
+      // 1) tratativa ativa - Motivo Churn (campo específico de churn)
+      // 2) qualquer tratativa - Motivo Churn
+      // 3) tratativa ativa - Motivo (campo genérico)
+      // 4) qualquer tratativa - Motivo
+      // 5) central_projetos - Motivo Principal do Churn
+      // 6) central_projetos - Motivos cancelamento
       const allTratData = allTratativaMap.get(tituloLower);
-      const motivoChurn = tratData?.motivo ?? allTratData?.motivo ?? null;
+      const projMotivos = projetoMotivoChurnMap.get(tituloLower);
+      const motivoChurn =
+        tratData?.motivoChurn ??
+        allTratData?.motivoChurn ??
+        (tratData?.motivo && tratData.motivo !== 'Não informado' ? tratData.motivo : null) ??
+        (allTratData?.motivo && allTratData.motivo !== 'Não informado' ? allTratData.motivo : null) ??
+        projMotivos?.principal ??
+        projMotivos?.cancelamento ??
+        null;
 
       clienteMap.set(id, {
         id,
