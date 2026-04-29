@@ -127,10 +127,18 @@ export function useJornadaData() {
 
     // NPS map: get latest NPS per project title (since NPS connects via title)
     const npsMap = new Map<string, { nota: number; csat: number | null; data: Date }>();
+    // NPS feedback map: captura Motivo da Nota / Comentarios (mesmo de NPS sem nota)
+    const npsFeedbackMap = new Map<string, string>();
     for (const row of nps) {
       const titulo = (row['Título'] || '').trim().toLowerCase();
+      if (!titulo) continue;
+      const motivoNota = (row['Motivo da Nota'] || '').trim();
+      const comentarios = (row['Comentarios'] || row['Comentários'] || '').trim();
+      const feedback = motivoNota || comentarios;
+      if (feedback) npsFeedbackMap.set(titulo, feedback);
+
       const nota = parseInt(String(row['Nota NPS'] || '').replace(/\D/g, ''));
-      if (!titulo || isNaN(nota)) continue;
+      if (isNaN(nota)) continue;
       const dt = parseDate(row['Entrada']) || new Date();
       const existing = npsMap.get(titulo);
       if (!existing || dt > existing.data) {
@@ -179,17 +187,32 @@ export function useJornadaData() {
     }
 
     // Motivo de churn vindo direto do card central de projetos
-    const projetoMotivoChurnMap = new Map<string, { principal: string | null; cancelamento: string | null }>();
+    const projetoMotivoChurnMap = new Map<string, { principal: string | null; cancelamento: string | null; problemasOxy: string | null }>();
     for (const row of projetos) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const titulo = (row['Título'] || '').trim().toLowerCase();
       if (!titulo) continue;
       const principal = (row['Motivo Principal do Churn'] || '').trim() || null;
       const cancelamento = (row['Motivos cancelamento'] || row['Motivos Cancelamento'] || '').trim() || null;
-      if (principal || cancelamento) {
-        projetoMotivoChurnMap.set(titulo, { principal, cancelamento });
+      const problemasOxy = (row['Problemas com a Oxy'] || '').trim() || null;
+      if (principal || cancelamento || problemasOxy) {
+        projetoMotivoChurnMap.set(titulo, { principal, cancelamento, problemasOxy });
       }
     }
+
+    // Overrides do dossiê Q1 (planilha fonte de verdade)
+    const CHURN_OVERRIDES: Record<string, string> = {
+      'zebl arquitetura eireli': 'Comercial O2',
+      'aled atacadão led': 'Comercial O2',
+      'cymaco engenharia': 'Atendimento O2',
+      'trm energy': 'Financeiro',
+      'unitac': 'Atendimento O2',
+      'duog soluções em tecnologia': 'Problema na Oxy',
+      'transrossi log': 'Financeiro',
+      'rocha med': 'Problema na Oxy',
+      'básico brasil ltda': 'Atendimento O2',
+      'protectface respiradores': 'Comercial O2',
+    };
 
     // Rotinas map: per CFO aggregation
     const rotinasByCfo = new Map<string, { ativas: number; atrasadas: number }>();
@@ -327,22 +350,30 @@ export function useJornadaData() {
 
       const healthLevel = health >= 70 ? 'green' as const : health >= 40 ? 'yellow' as const : 'red' as const;
 
-      // Churn motivo: hierarchy alinhada ao useOperationsData
-      // 1) tratativa ativa - Motivo Churn (campo específico de churn)
-      // 2) qualquer tratativa - Motivo Churn
-      // 3) tratativa ativa - Motivo (campo genérico)
-      // 4) qualquer tratativa - Motivo
-      // 5) central_projetos - Motivo Principal do Churn
-      // 6) central_projetos - Motivos cancelamento
+      // Churn motivo — hierarquia completa (várias fontes no Pipefy):
+      // 1) Override manual do dossiê Q1 (planilha fonte de verdade)
+      // 2) tratativa ativa - Motivo Churn
+      // 3) qualquer tratativa - Motivo Churn
+      // 4) tratativa ativa - Motivo
+      // 5) qualquer tratativa - Motivo
+      // 6) central_projetos - Motivo Principal do Churn
+      // 7) central_projetos - Motivos cancelamento
+      // 8) central_projetos - Problemas com a Oxy
+      // 9) NPS - Motivo da Nota / Comentarios
       const allTratData = allTratativaMap.get(tituloLower);
       const projMotivos = projetoMotivoChurnMap.get(tituloLower);
+      const npsFeedback = npsFeedbackMap.get(tituloLower);
+      const override = CHURN_OVERRIDES[tituloLower];
       const motivoChurn =
+        override ??
         tratData?.motivoChurn ??
         allTratData?.motivoChurn ??
         (tratData?.motivo && tratData.motivo !== 'Não informado' ? tratData.motivo : null) ??
         (allTratData?.motivo && allTratData.motivo !== 'Não informado' ? allTratData.motivo : null) ??
         projMotivos?.principal ??
         projMotivos?.cancelamento ??
+        projMotivos?.problemasOxy ??
+        npsFeedback ??
         null;
 
       clienteMap.set(id, {
