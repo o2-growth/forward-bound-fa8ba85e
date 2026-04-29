@@ -7,6 +7,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Planning2026 from "./pages/Planning2026";
 import Auth from "./pages/Auth";
+import DebugReuniao from "./pages/DebugReuniao";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Planning2026 />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/debug-reuniao/:cardId"
+              element={
+                <ProtectedRoute>
+                  <DebugReuniao />
                 </ProtectedRoute>
               }
             />
