@@ -21,7 +21,7 @@ export function ClickableRadialCard({
   isClickable = false 
 }: ClickableRadialCardProps) {
   const percentage = meta > 0 ? (realized / meta) * 100 : 0;
-  const isAboveMeta = percentage >= 100;
+  const isAboveMeta = percentage >= 90;
   const chartData = [{ value: Math.min(percentage, 100), fill: isAboveMeta ? "hsl(var(--chart-2))" : "hsl(var(--destructive))" }];
 
   return (
