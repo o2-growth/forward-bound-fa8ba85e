@@ -97,6 +97,19 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           }
         }
 
+        // Lê com fallback de variações de nome de campo (Pipefy às vezes tem
+        // colunas com acentuação/capitalização diferente)
+        const readNum = (...keys: string[]): number | null => {
+          for (const k of keys) {
+            const v = row[k];
+            if (v !== null && v !== undefined && v !== '') {
+              const n = parseFloat(String(v).replace(/[R$\s.]/g, '').replace(',', '.'));
+              if (!isNaN(n) && n > 0) return n;
+            }
+          }
+          return null;
+        };
+
         const movement: ExpansaoMovement = {
           id: String(row.ID),
           titulo: row['Título'] || '',
@@ -104,11 +117,20 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           faseAtual: row['Fase Atual'] || '',
           dataEntrada,
           dataSaida: parseDate(row['Saída']),
-          valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
-          valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
-          valorSetup: row['Valor Setup'] ? parseFloat(row['Valor Setup']) : null,
-          taxaFranquia: row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : null,
-          investimentoDisponivel: row['Investimento disponível'] || null,
+          valorMRR: readNum('Valor MRR', 'Valor mensal', 'MRR'),
+          valorPontual: readNum('Valor Pontual', 'Valor pontual'),
+          valorSetup: readNum('Valor Setup', 'Valor setup'),
+          taxaFranquia: readNum(
+            'Taxa de franquia',
+            'Taxa de Franquia',
+            'Valor da Franquia',
+            'Valor Franquia',
+            'Valor da franquia',
+            'Valor Total',
+            'Valor Contrato',
+            'Valor do Contrato',
+          ),
+          investimentoDisponivel: row['Investimento disponível'] || row['Investimento Disponivel'] || null,
           produto,
         };
 
@@ -221,16 +243,18 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
 
         if (shouldCount && !cardValues.has(movement.id)) {
           const taxaFranquia = movement.taxaFranquia || 0;
-          
-          if (taxaFranquia > 0) {
-            cardValues.set(movement.id, taxaFranquia);
-          } else {
-            const pontual = movement.valorPontual || 0;
-            const setup = movement.valorSetup || 0;
-            const mrr = movement.valorMRR || 0;
-            const sum = pontual + setup + mrr;
-            cardValues.set(movement.id, sum > 0 ? sum : 140000); // fallback R$ 140k
+          const pontual = movement.valorPontual || 0;
+          const setup = movement.valorSetup || 0;
+          const mrr = movement.valorMRR || 0;
+          // Usa Taxa de franquia se preenchida; senão soma pontual+setup+MRR
+          // SEM fallback hardcoded — valor real do banco
+          const value = taxaFranquia > 0 ? taxaFranquia : (pontual + setup + mrr);
+
+          if (indicator === 'venda') {
+            console.log(`[useExpansaoMetas] VENDA "${movement.titulo}" (id ${movement.id}): taxaFranquia=${taxaFranquia}, pontual=${pontual}, setup=${setup}, mrr=${mrr} → valor=${value}`);
           }
+
+          cardValues.set(movement.id, value);
         }
       }
     }
