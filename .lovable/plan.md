@@ -1,68 +1,73 @@
-## Problema
+## Objetivo
 
-Na aba Jornada → Reuniões, as datas das colunas R1, R2, R3 e Comitê aparecem com **dia e mês trocados**:
+Aplicar override por código no card "Ashia Andrade" para que apareça como **Oxy Hacker** com valor de **R$ 32.000**, em vez de Franquia (que é como está classificado no Pipefy hoje).
 
-| Cliente              | Aparece    | Provável correto |
-|----------------------|------------|------------------|
-| Etel                 | 04/Ago     | 08/Abr           |
-| Mineração Rio Piranema | 04/Jul   | 07/Abr           |
-| Babyland              | 04/Fev    | 02/Abr           |
-| Construtora Izza Caetano | 04/Jan | 01/Abr           |
-| FilmStar              | 04/Fev    | 02/Abr           |
+## Abordagem
 
-Datas com dia > 12 (ex.: `17/Abr`, `14/Abr`, `16/Abr`, `15/Abr`) aparecem corretas — confirma que o problema é exatamente o swap DD↔MM quando o "dia" cabe num mês válido (1–12).
+Criar um mapa centralizado de exceções (`CARD_OVERRIDES`) no hook `useExpansaoAnalytics.ts`, indexado pelo **ID do card no Pipefy**, que sobrescreve `produto` e/ou valores monetários (`taxaFranquia`, `valorMRR`, `valorSetup`, `valorPontual`) na função `parseRawCard`.
 
-## Causa
+Assim:
+- O card migra automaticamente da view de Franquia para a view de Oxy Hacker.
+- O valor exibido em drill-downs, gauges e somatórios passa a ser R$ 32.000.
+- Futuros casos similares só precisam de uma linha nova no mapa.
 
-`useJornadaData.ts` está lendo as datas das reuniões e do prazo previsto com `parsePipefyDateOnly` (linhas 228, 261-264, 608-613). Essa função foi criada para compensar um sync legacy que invertia DD↔MM antes de salvar no banco — então ela "desinverte" trocando dia e mês quando o dia ≤ 12.
+## Pré-requisito
 
-Acontece que a tabela `pipefy_moviment_rotinas` é alimentada pelo sync atual do Pipefy, **que já salva no formato correto** (mesma situação que confirmamos para `pipefy_db_clientes` no fix anterior do Norte Gas). Como o `parsePipefyDateOnly` ainda aplica o swap, datas corretas viram inversões erradas.
+Preciso do **ID do card no Pipefy** da "Ashia Andrade". Como não consigo acessar o banco externo daqui, na implementação eu vou:
 
-Outros hooks que usam `parsePipefyDateOnly` (Modelo Atual, Expansão, OxyHacker) leem outras tabelas com sync diferente que ainda têm o problema legacy — não devem ser alterados.
+1. Adicionar um lookup temporário por **título normalizado** (`"ashia andrade"`) como fallback, já cobrindo o caso agora.
+2. Logar no console o ID do card quando o override por título disparar, para você me passar o ID e a gente trocar para match exato (mais seguro contra cards homônimos no futuro).
 
-## Correção
+## Mudanças (arquivo único)
 
-**Arquivo:** `src/hooks/useJornadaData.ts`
+**`src/hooks/useExpansaoAnalytics.ts`**
 
-Substituir as 6 chamadas de `parsePipefyDateOnly` por `parsePipefyDate` (parser direto, sem swap) nos seguintes pontos:
+1. Adicionar no topo do arquivo:
+   ```ts
+   // Overrides de classificação/valor para cards específicos do Pipefy
+   // que estão com dados incorretos na origem e ainda não foram corrigidos lá.
+   // Preferir match por ID. Match por título é fallback temporário.
+   const CARD_OVERRIDES_BY_ID: Record<string, Partial<{ produto: string; taxaFranquia: number }>> = {
+     // "1234567890": { produto: "Oxy Hacker", taxaFranquia: 32000 },
+   };
 
-- Linha 228 — `Data Prevista Entrega` (cálculo de tarefas atrasadas)
-- Linha 261 — `Data Reuniao 1`
-- Linha 262 — `Data Reuniao 2`
-- Linha 263 — `Data Reuniao 3`
-- Linha 264 — `Data Mensal` (R4 / Comitê)
-- Linhas 608-613 — mesmos campos no objeto `reunioes` retornado para `ReunioesView`
+   const CARD_OVERRIDES_BY_TITLE: Record<string, Partial<{ produto: string; taxaFranquia: number }>> = {
+     "ashia andrade": { produto: "Oxy Hacker", taxaFranquia: 32000 },
+   };
 
-A linha 103 (`Data de assinatura do contrato` em `pipefy_db_clientes`) **permanece com `parsePipefyDateOnly`**, conforme o fix do Norte Gas já aprovado. Vamos confirmar que esse caminho continua funcionando — se necessário, também trocar para `parsePipefyDate` (mesma origem de sync, mesmo comportamento esperado).
+   function normalizeTitle(s: string): string {
+     return (s || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+   }
+   ```
 
-`parsePipefyDate` já está importado no topo do arquivo (linha 5), portanto não há mudança de imports.
+2. Em `parseRawCard`, antes do `return`, aplicar override:
+   - Lê `produto` e `taxaFranquia` do row normalmente.
+   - Se houver override por ID, sobrescreve.
+   - Senão, se houver override por título normalizado, sobrescreve e loga `console.warn` com o ID para registro.
+   - Recalcula `valor` final usando o `taxaFranquia` (eventualmente sobrescrito) seguindo a mesma regra atual (taxaFranquia > soma > defaultTicket).
 
-## Detalhes técnicos
+3. Importante para o filtro de produto funcionar: a comparação `if (rowProduto !== produto) continue;` (linhas 217–218 e 234–235) usa o `Produtos` cru do row, **não** o card já parseado. Para o override surtir efeito no filtro, vou trocar essas comparações para usar o `produto` **após** o override — ou seja, fazer o override antes do filtro, parseando o card e descartando-o se o produto resultante não bater.
 
-`parsePipefyDate` (em `src/hooks/dateUtils.ts`) trata:
-- DD/MM/YYYY string → parse direto no fuso local, meio-dia (sem timezone shift)
-- ISO `YYYY-MM-DDTHH:mm:ss.sssZ` → `new Date(s)` (preserva hora UTC). Para campos date-only à meia-noite UTC isso pode causar shift para dia anterior em UTC-3, mas a função `getReunionStatus` usa `data.getDate()` no fuso local → o dia exibido fica deslocado.
+## Efeitos esperados
 
-Para evitar esse shift, melhor estratégia: **inline um parser ISO sem swap** dentro do `useJornadaData.ts` (ou criar uma helper `parseRotinaDateOnly` no `dateUtils.ts`) que:
-1. Se string casa com `YYYY-MM-DD...`, monte `new Date(year, month-1, day, 12, 0, 0)` (meio-dia local) — sem swap.
-2. Se string casa com `DD/MM/YYYY`, parse direto (mesma lógica do `parsePipefyDate`).
-3. Caso contrário, retorna null.
+- Card "Ashia Andrade" some da aba Franquia.
+- Aparece na aba Oxy Hacker, contando em Leads/MQL/RM/RR/Proposta/Venda conforme as fases por que passou.
+- Valor de R$ 32.000 aparece em pipeline, ticket médio, vendas e drill-downs.
+- Funil cumulativo de Expansão Oxy Hacker passa a incluir esse card.
 
-Recomendação: criar `parseRotinaDateOnly` em `dateUtils.ts` e usar nas 6 chamadas. Mantém `parsePipefyDateOnly` intocado.
+## Não muda
 
-## Resultado esperado
+- Nada no Pipefy (continua marcado como Franquia lá até alguém corrigir).
+- Nenhum outro card.
+- Lógica de Modelo Atual, O2 TAX, Marketing, NPS etc. permanece intacta.
+- Estrutura dos componentes UI permanece intacta.
 
-Após o fix:
-- Etel: `08/Abr` (não `04/Ago`)
-- Mineração Rio Piranema: `07/Abr`
-- Babyland: `02/Abr` em vez de `04/Fev`
-- Construtora Izza Caetano: `01/Abr`
-- Datas com dia > 12 continuam iguais (já estavam corretas)
-- Cálculo de "atrasadas" de tarefas usa data correta
+## Validação após implementação
 
-## Fora de escopo
+1. Abrir aba Expansão → Oxy Hacker no período em que o card existe — deve aparecer "Ashia Andrade" com R$ 32k.
+2. Abrir aba Expansão → Franquia no mesmo período — não deve mais aparecer.
+3. Conferir console: deve haver um warn com o ID do card. Você me passa esse ID e na sequência migramos para `CARD_OVERRIDES_BY_ID` (mais robusto que título).
 
-- Não tocar em `parsePipefyDateOnly` (afeta outros hooks).
-- Não mexer em `ReunioesView.tsx`.
-- Não alterar backend nem o sync.
-- Linha 103 (`Data de assinatura do contrato`) continua como está, já validada com Norte Gas.
+## Dívida técnica registrada
+
+Esse mapa é uma exceção manual. Toda vez que o time de operação corrigir o card no Pipefy, a entrada correspondente deve ser removida daqui. Sugiro revisão trimestral do mapa.
