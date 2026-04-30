@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import Planning2026 from "./pages/Planning2026";
 import Auth from "./pages/Auth";
 import DebugReuniao from "./pages/DebugReuniao";
+import DebugCliente from "./pages/DebugCliente";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +35,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DebugReuniao />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/debug-cliente/:titulo"
+              element={
+                <ProtectedRoute>
+                  <DebugCliente />
                 </ProtectedRoute>
               }
             />
