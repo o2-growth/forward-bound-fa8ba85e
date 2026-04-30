@@ -102,7 +102,12 @@ function buildClientSummary(cliente: JornadaCliente): string[] {
 
   // Lifetime
   if (cliente.lifetimeMonths) {
-    lines.push(`Cliente há ${cliente.lifetimeMonths} meses`);
+    const dataStr = cliente.dataAssinatura
+      ? cliente.dataAssinatura.toLocaleDateString('pt-BR')
+      : null;
+    lines.push(
+      `Cliente há ${cliente.lifetimeMonths} meses${dataStr ? ` (desde ${dataStr})` : ''}`
+    );
   }
 
   // Setup

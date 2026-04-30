@@ -1,20 +1,42 @@
 ## Objetivo
-Nos gauges radiais do acelerômetro (MQLs, Reuniões Agendadas, Realizadas, Propostas, Vendas, SLA, Fat Incremento, MRR, Setup, Pontual), pintar de **verde quando o percentual atingir ≥ 90%** da meta — em vez de só a partir de 100%.
 
-## Comportamento atual
-Em `src/components/planning/ClickableRadialCard.tsx`:
-- `isAboveMeta = percentage >= 100`
-- Se `isAboveMeta` → verde (`hsl(var(--chart-2))`), número % verde
-- Caso contrário → vermelho (`hsl(var(--destructive))`)
+Ao lado do indicador **"Cliente há X meses"** na visão Jornada (ReunioesView), exibir também a **data de assinatura do contrato** que vem do DB Clientes.
+
+Exemplo:
+```
+Cliente há 12 meses (desde 08/05/2025)
+```
+
+## Onde mudar
+
+**Arquivo:** `src/components/planning/jornada/ReunioesView.tsx`
+**Função:** `buildClientSummary` (linhas 100–106)
 
 ## Mudança
-Trocar o limiar para `>= 90`:
-- `const isAboveMeta = percentage >= 90;`
 
-Isso afeta tanto a cor do arco quanto a cor do texto de porcentagem, mantendo a regra unificada (≥90% = verde, <90% = vermelho). Nenhuma outra lógica/negócio é alterada.
+Trocar:
+```ts
+if (cliente.lifetimeMonths) {
+  lines.push(`Cliente há ${cliente.lifetimeMonths} meses`);
+}
+```
 
-## Arquivos
-- `src/components/planning/ClickableRadialCard.tsx` (1 linha)
+Por algo como:
+```ts
+if (cliente.lifetimeMonths) {
+  const dataStr = cliente.dataAssinatura
+    ? cliente.dataAssinatura.toLocaleDateString('pt-BR')
+    : null;
+  lines.push(
+    `Cliente há ${cliente.lifetimeMonths} meses${dataStr ? ` (desde ${dataStr})` : ''}`
+  );
+}
+```
 
-## Observação
-O SLA é um caso invertido (quanto menor, melhor) — hoje ele já fica vermelho porque o "realizado" passa muito da meta de 30min, então a regra continua coerente com o comportamento atual; não há tratamento especial para SLA neste card genérico.
+O campo `dataAssinatura` já existe no tipo `JornadaCliente` e já é populado pelo `useJornadaData` a partir de `pipefy_db_clientes` → não precisa mexer em hook nem em backend.
+
+## Fora de escopo
+
+- Não muda a fonte da data (continua DB Clientes).
+- Não cria fallback para Central de Projetos (Norte gas tem a data corretamente no DB Clientes).
+- Não altera nenhum outro indicador, cálculo ou visualização.
