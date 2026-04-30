@@ -100,7 +100,7 @@ export function useJornadaData() {
     const clienteAssinaturas = new Map<string, Date>();
     for (const c of clientes) {
       const id = String(c.ID || c.id || '');
-      const dt = parseDate(c['Data de assinatura do contrato'] || c['Data assinatura']);
+      const dt = parsePipefyDateOnly(c['Data de assinatura do contrato'] || c['Data assinatura']);
       if (id && dt) clienteAssinaturas.set(id, dt);
     }
 
