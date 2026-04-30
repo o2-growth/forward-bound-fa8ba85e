@@ -110,6 +110,7 @@ const CFO_SQUADS: Record<string, {
   'Rafael Marchioretto': {
     nome: 'Rafael Marchioretto Bokorni',
     fee: 9000,
+    beneficios: 0,
     membros: [],
   },
 };
