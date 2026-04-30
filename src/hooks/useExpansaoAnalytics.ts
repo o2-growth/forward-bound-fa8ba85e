@@ -44,6 +44,33 @@ function isExpansaoMqlQualified(investimento: string | undefined, _produto: stri
   return !!investimento && investimento.trim().length > 0;
 }
 
+// Overrides de classificação/valor para cards específicos do Pipefy
+// que estão com dados incorretos na origem e ainda não foram corrigidos lá.
+// Preferir match por ID. Match por título é fallback temporário.
+type CardOverride = Partial<{ produto: string; taxaFranquia: number }>;
+
+const CARD_OVERRIDES_BY_ID: Record<string, CardOverride> = {
+  // "1234567890": { produto: "Oxy Hacker", taxaFranquia: 32000 },
+};
+
+const CARD_OVERRIDES_BY_TITLE: Record<string, CardOverride> = {
+  "ashia andrade": { produto: "Oxy Hacker", taxaFranquia: 32000 },
+};
+
+function normalizeTitle(s: string): string {
+  return (s || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function getCardOverride(id: string, titulo: string): CardOverride | null {
+  if (CARD_OVERRIDES_BY_ID[id]) return CARD_OVERRIDES_BY_ID[id];
+  const key = normalizeTitle(titulo);
+  if (CARD_OVERRIDES_BY_TITLE[key]) {
+    console.warn(`[ExpansaoAnalytics] Override por título aplicado em "${titulo}" (id=${id}). Migrar para CARD_OVERRIDES_BY_ID.`);
+    return CARD_OVERRIDES_BY_TITLE[key];
+  }
+  return null;
+}
+
 // Map Pipefy phase names to indicator keys
 const PHASE_TO_INDICATOR: Record<string, IndicatorType> = {
   'Start form': 'leads',
@@ -114,21 +141,32 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
     duracao = Math.floor((Date.now() - dataEntrada.getTime()) / 1000);
   }
   
-  const taxaFranquia = row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : 0;
+  let taxaFranquia = row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : 0;
   const valorMRR = row['Valor MRR'] ? parseFloat(row['Valor MRR']) : 0;
   const valorPontual = row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : 0;
   const valorSetup = row['Valor Setup'] ? parseFloat(row['Valor Setup']) : 0;
-  
+  let produto = row['Produtos'] || '';
+  const titulo = row['Título'] || '';
+
+  // Apply manual overrides for cards with incorrect data in Pipefy
+  const override = getCardOverride(id, titulo);
+  if (override) {
+    if (override.produto !== undefined) produto = override.produto;
+    if (override.taxaFranquia !== undefined) taxaFranquia = override.taxaFranquia;
+  }
+
   // Calculate value: prioritize taxaFranquia, then sum of other values, then defaultTicket
+  // Note: defaultTicket depends on produto (Franquia=0, Oxy Hacker=54000), so recompute based on overridden produto
+  const effectiveDefaultTicket = produto === 'Oxy Hacker' ? 54000 : (produto === 'Franquia' ? 0 : defaultTicket);
   let valor = taxaFranquia;
   if (valor <= 0) {
     const sumValues = valorPontual + valorSetup + valorMRR;
-    valor = sumValues > 0 ? sumValues : defaultTicket;
+    valor = sumValues > 0 ? sumValues : effectiveDefaultTicket;
   }
   
   return {
     id,
-    titulo: row['Título'] || '',
+    titulo,
     fase: row['Fase'] || '',
     faseAtual: row['Fase Atual'] || '',
     dataEntrada,
@@ -139,7 +177,7 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
     valorMRR,
     valorPontual,
     valorSetup,
-    produto: row['Produtos'] || '',
+    produto,
     responsavel: row['Closer responsável'] || row['SDR responsável'] || null,
     sdr: row['SDR responsável'] || null,
     closer: row['Closer responsável'] || null,
@@ -214,12 +252,13 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       const seen = new Set<string>();
       const cards: ExpansaoCard[] = [];
       for (const row of allRows) {
-        const rowProduto = row['Produtos'] || '';
-        if (rowProduto !== produto) continue;
         const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
         if (seen.has(key)) continue;
+        const parsed = parseRawCard(row, defaultTicket);
+        // Filter by produto AFTER override (allows reclassified cards to show in correct view)
+        if (parsed.produto !== produto) continue;
         seen.add(key);
-        cards.push(parseRawCard(row, defaultTicket));
+        cards.push(parsed);
       }
 
       console.log(`[${produto} Analytics] Period query returned ${cards.length} movements`);
@@ -239,11 +278,11 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
         });
         
         if (!historyError && historyData?.data) {
-          // Filter history by product too
+          // Filter history by product too (post-override)
           for (const row of historyData.data) {
-            const rowProduto = row['Produtos'] || '';
-            if (rowProduto !== produto) continue;
-            fullHistory.push(parseRawCard(row, defaultTicket));
+            const parsed = parseRawCard(row, defaultTicket);
+            if (parsed.produto !== produto) continue;
+            fullHistory.push(parsed);
           }
           console.log(`[${produto} Analytics] Full history: ${fullHistory.length} movements for ${uniqueCardIds.length} cards`);
         }
