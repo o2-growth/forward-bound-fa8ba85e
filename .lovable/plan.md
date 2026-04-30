@@ -1,42 +1,45 @@
-## Objetivo
+## Problema
 
-Ao lado do indicador **"Cliente há X meses"** na visão Jornada (ReunioesView), exibir também a **data de assinatura do contrato** que vem do DB Clientes.
+Na visão Reuniões, o card "Norte gas" mostra:
 
-Exemplo:
+```
+Cliente há 12 meses (desde 07/05/2025)
+```
+
+Mas no banco (`pipefy_db_clientes`), o valor é `2025-05-08T00:00:00.000Z` — ou seja, **08/05/2025**.
+
+## Causa
+
+A data vem do banco como ISO em UTC à meia-noite (`...T00:00:00.000Z`). O parser usado em `src/hooks/useJornadaData.ts` (`parseDate` → `parsePipefyDate`) trata esse caso com `new Date(s)`, que produz um instante UTC. Quando o `ReunioesView` formata com `toLocaleDateString('pt-BR')`, o navegador converte UTC → America/Sao_Paulo (UTC-3), e 08/05 00:00 UTC vira **07/05 21:00**, exibindo `07/05/2025`.
+
+Já existe no projeto a função `parsePipefyDateOnly` (em `src/hooks/dateUtils.ts`) feita exatamente para campos date-only do Pipefy — ela monta a data no fuso local em meio-dia, evitando esse deslocamento. Outros hooks (Modelo Atual, Expansão, OxyHacker) já usam `parseDateOnly` para `Data de assinatura do contrato`. Só o `useJornadaData` ficou usando o parser genérico.
+
+## Correção
+
+**Arquivo:** `src/hooks/useJornadaData.ts` (linha 103)
+
+Trocar:
+```ts
+const dt = parseDate(c['Data de assinatura do contrato'] || c['Data assinatura']);
+```
+Por:
+```ts
+const dt = parsePipefyDateOnly(c['Data de assinatura do contrato'] || c['Data assinatura']);
+```
+
+`parsePipefyDateOnly` já está importado no topo do arquivo (linha 5), então não há mudança de imports.
+
+## Resultado esperado
+
+`Norte gas` passa a exibir:
 ```
 Cliente há 12 meses (desde 08/05/2025)
 ```
 
-## Onde mudar
-
-**Arquivo:** `src/components/planning/jornada/ReunioesView.tsx`
-**Função:** `buildClientSummary` (linhas 100–106)
-
-## Mudança
-
-Trocar:
-```ts
-if (cliente.lifetimeMonths) {
-  lines.push(`Cliente há ${cliente.lifetimeMonths} meses`);
-}
-```
-
-Por algo como:
-```ts
-if (cliente.lifetimeMonths) {
-  const dataStr = cliente.dataAssinatura
-    ? cliente.dataAssinatura.toLocaleDateString('pt-BR')
-    : null;
-  lines.push(
-    `Cliente há ${cliente.lifetimeMonths} meses${dataStr ? ` (desde ${dataStr})` : ''}`
-  );
-}
-```
-
-O campo `dataAssinatura` já existe no tipo `JornadaCliente` e já é populado pelo `useJornadaData` a partir de `pipefy_db_clientes` → não precisa mexer em hook nem em backend.
+E o `lifetimeMonths` continua igual (a diferença de algumas horas não muda a contagem de meses).
 
 ## Fora de escopo
 
-- Não muda a fonte da data (continua DB Clientes).
-- Não cria fallback para Central de Projetos (Norte gas tem a data corretamente no DB Clientes).
-- Não altera nenhum outro indicador, cálculo ou visualização.
+- Não alterar `parsePipefyDate` em si (é usado por dezenas de outros campos).
+- Não mexer no `ReunioesView.tsx`.
+- Não mexer em backend nem em outros hooks.
