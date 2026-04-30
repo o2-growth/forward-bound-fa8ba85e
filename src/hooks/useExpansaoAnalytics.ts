@@ -141,21 +141,32 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
     duracao = Math.floor((Date.now() - dataEntrada.getTime()) / 1000);
   }
   
-  const taxaFranquia = row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : 0;
+  let taxaFranquia = row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : 0;
   const valorMRR = row['Valor MRR'] ? parseFloat(row['Valor MRR']) : 0;
   const valorPontual = row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : 0;
   const valorSetup = row['Valor Setup'] ? parseFloat(row['Valor Setup']) : 0;
-  
+  let produto = row['Produtos'] || '';
+  const titulo = row['Título'] || '';
+
+  // Apply manual overrides for cards with incorrect data in Pipefy
+  const override = getCardOverride(id, titulo);
+  if (override) {
+    if (override.produto !== undefined) produto = override.produto;
+    if (override.taxaFranquia !== undefined) taxaFranquia = override.taxaFranquia;
+  }
+
   // Calculate value: prioritize taxaFranquia, then sum of other values, then defaultTicket
+  // Note: defaultTicket depends on produto (Franquia=0, Oxy Hacker=54000), so recompute based on overridden produto
+  const effectiveDefaultTicket = produto === 'Oxy Hacker' ? 54000 : (produto === 'Franquia' ? 0 : defaultTicket);
   let valor = taxaFranquia;
   if (valor <= 0) {
     const sumValues = valorPontual + valorSetup + valorMRR;
-    valor = sumValues > 0 ? sumValues : defaultTicket;
+    valor = sumValues > 0 ? sumValues : effectiveDefaultTicket;
   }
   
   return {
     id,
-    titulo: row['Título'] || '',
+    titulo,
     fase: row['Fase'] || '',
     faseAtual: row['Fase Atual'] || '',
     dataEntrada,
@@ -166,7 +177,7 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
     valorMRR,
     valorPontual,
     valorSetup,
-    produto: row['Produtos'] || '',
+    produto,
     responsavel: row['Closer responsável'] || row['SDR responsável'] || null,
     sdr: row['SDR responsável'] || null,
     closer: row['Closer responsável'] || null,
