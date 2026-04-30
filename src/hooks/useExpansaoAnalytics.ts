@@ -278,11 +278,11 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
         });
         
         if (!historyError && historyData?.data) {
-          // Filter history by product too
+          // Filter history by product too (post-override)
           for (const row of historyData.data) {
-            const rowProduto = row['Produtos'] || '';
-            if (rowProduto !== produto) continue;
-            fullHistory.push(parseRawCard(row, defaultTicket));
+            const parsed = parseRawCard(row, defaultTicket);
+            if (parsed.produto !== produto) continue;
+            fullHistory.push(parsed);
           }
           console.log(`[${produto} Analytics] Full history: ${fullHistory.length} movements for ${uniqueCardIds.length} cards`);
         }
