@@ -252,12 +252,13 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       const seen = new Set<string>();
       const cards: ExpansaoCard[] = [];
       for (const row of allRows) {
-        const rowProduto = row['Produtos'] || '';
-        if (rowProduto !== produto) continue;
         const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
         if (seen.has(key)) continue;
+        const parsed = parseRawCard(row, defaultTicket);
+        // Filter by produto AFTER override (allows reclassified cards to show in correct view)
+        if (parsed.produto !== produto) continue;
         seen.add(key);
-        cards.push(parseRawCard(row, defaultTicket));
+        cards.push(parsed);
       }
 
       console.log(`[${produto} Analytics] Period query returned ${cards.length} movements`);
