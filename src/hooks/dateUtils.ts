@@ -68,6 +68,50 @@ export function parsePipefyDateOnly(val: string | null | undefined): Date | null
 }
 
 /**
+ * Parses date-only fields from tables fed by the CURRENT Pipefy sync
+ * (e.g. pipefy_moviment_rotinas, pipefy_db_clientes).
+ *
+ * Unlike `parsePipefyDateOnly`, this parser does NOT apply the legacy
+ * DD↔MM swap — the current sync already stores dates correctly.
+ *
+ * Handles:
+ * - DD/MM/YYYY string → local-noon Date
+ * - ISO "YYYY-MM-DD..." (date-only at midnight UTC) → local-noon Date
+ *   (avoids UTC→local timezone shift that would display the previous day)
+ * - Other ISO with real timestamp → parsed normally
+ */
+export function parseRotinaDateOnly(val: string | null | undefined): Date | null {
+  if (!val) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+
+  // DD/MM/YYYY
+  const slashParts = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slashParts) {
+    const d = new Date(+slashParts[3], +slashParts[2] - 1, +slashParts[1], 12, 0, 0);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // ISO date-only (midnight UTC) — build at local noon, no swap
+  const isoMidnight = s.match(/^(\d{4})-(\d{2})-(\d{2})T00:00:00/);
+  if (isoMidnight) {
+    const d = new Date(+isoMidnight[1], +isoMidnight[2] - 1, +isoMidnight[3], 12, 0, 0);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // ISO YYYY-MM-DD (no time)
+  const isoDate = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDate) {
+    const d = new Date(+isoDate[1], +isoDate[2] - 1, +isoDate[3], 12, 0, 0);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // Other ISO formats (with real timestamp) → parse normally
+  const iso = new Date(s);
+  return isNaN(iso.getTime()) ? null : iso;
+}
+
+/**
  * Detects and fixes possible day/month inversion in dates.
  *
  * Some source systems (e.g. Pipefy) store dates as DD/MM/YYYY but the database
