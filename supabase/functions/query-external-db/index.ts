@@ -221,11 +221,19 @@ Deno.serve(async (req) => {
       let searchQuery: string;
       let searchPattern: string;
 
+      // Check if table has "Entrada" column (some tables like pipefy_db_clientes / pipefy_card_connections don't)
+      const colCheck = await client.query(
+        `SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=$1 AND column_name='Entrada' LIMIT 1`,
+        [table]
+      );
+      const hasEntrada = colCheck.rows.length > 0;
+      const orderClause = hasEntrada ? `ORDER BY "Entrada" DESC` : ``;
+
       if (searchColumn === "ID") {
         searchQuery = `
           SELECT * FROM ${table} 
           WHERE "ID" = $1
-          ORDER BY "Entrada" DESC 
+          ${orderClause}
           LIMIT $2
         `;
         searchPattern = searchTerm;
@@ -233,7 +241,7 @@ Deno.serve(async (req) => {
         searchQuery = `
           SELECT * FROM ${table} 
           WHERE "${searchColumn}" ILIKE $1
-          ORDER BY "Entrada" DESC 
+          ${orderClause}
           LIMIT $2
         `;
         searchPattern = `%${searchTerm}%`;
