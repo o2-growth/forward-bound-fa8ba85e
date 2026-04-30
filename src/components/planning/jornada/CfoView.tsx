@@ -122,6 +122,20 @@ const TARGETS = {
   margemTarget: 56,
 };
 
+/* ── Tax rate used in P&L (alíquota de impostos sobre receita) ── */
+const IMPOSTOS_RATE = 0.18;
+
+/**
+ * Margem operacional do squad — única fórmula usada em toda a tela.
+ * Considera receita líquida (após 18% de impostos) menos custo do squad,
+ * dividido pela receita bruta. Mesma fórmula do P&L do dialog.
+ */
+const computeMargem = (mrr: number, custoSquad: number): number => {
+  if (mrr <= 0) return 0;
+  const receitaLiquida = mrr * (1 - IMPOSTOS_RATE);
+  return ((receitaLiquida - custoSquad) / mrr) * 100;
+};
+
 /* ── Helpers ── */
 const formatCompact = (value: number) => {
   if (value >= 1_000_000) return `R$ ${(value / 1_000_000).toFixed(2)}M`;
@@ -729,7 +743,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
   const comparisonData = useMemo(() => {
     return cfos.map((cfo) => {
       const custoSquad = getSquadCusto(cfo.nome);
-      const margem = cfo.mrrTotal > 0 ? ((cfo.mrrTotal - custoSquad) / cfo.mrrTotal) * 100 : 0;
+      const margem = computeMargem(cfo.mrrTotal, custoSquad);
       const ticketMedio = cfo.clientes > 0 ? cfo.mrrTotal / cfo.clientes : 0;
       const churns = churnsPerCfo[cfo.nome] || 0;
       return { ...cfo, custoSquad, margem, ticketMedio, churns };
@@ -854,7 +868,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
         {cfos.map((cfo) => {
           const squad = getSquad(cfo.nome);
           const custoSquad = getSquadCusto(cfo.nome);
-          const margem = cfo.mrrTotal > 0 ? ((cfo.mrrTotal - custoSquad) / cfo.mrrTotal) * 100 : 0;
+          const margem = computeMargem(cfo.mrrTotal, custoSquad);
           const ticketMedio = cfo.clientes > 0 ? cfo.mrrTotal / cfo.clientes : 0;
           const cfoChurns = churnsPerCfo[cfo.nome] || 0;
           const isSquadOpen = expandedSquads.has(cfo.nome);
@@ -1050,7 +1064,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
             <TableBody>
               {sortedCfos.map((cfo) => {
                 const custoSquad = getSquadCusto(cfo.nome);
-                const margem = cfo.mrrTotal > 0 ? ((cfo.mrrTotal - custoSquad) / cfo.mrrTotal) * 100 : 0;
+                const margem = computeMargem(cfo.mrrTotal, custoSquad);
                 const ticketMedio = cfo.clientes > 0 ? cfo.mrrTotal / cfo.clientes : 0;
 
                 return (
@@ -1122,37 +1136,50 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
             return (
               <div className="space-y-4">
                 {/* Squad overview */}
-                {squad && (
-                  <Card className="border-dashed">
-                    <CardContent className="pt-4 pb-3 space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-semibold">
-                        <Users className="h-4 w-4" />
-                        Composição do Squad
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        <div className="flex justify-between border rounded-md px-3 py-2">
-                          <div>
-                            <p className="font-medium">{squad.nome}</p>
-                            <p className="text-muted-foreground">CFO</p>
-                          </div>
-                          <span className="font-medium self-center">{formatBRL(squad.fee)}</span>
+                {squad && (() => {
+                  const totalFees = squad.fee + squad.membros.reduce((s, m) => s + (m.fee || 0), 0);
+                  const totalBeneficios = squad.beneficios + squad.membros.reduce((s, m) => s + (m.beneficios || 0), 0);
+                  return (
+                    <Card className="border-dashed">
+                      <CardContent className="pt-4 pb-3 space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-semibold">
+                          <Users className="h-4 w-4" />
+                          Composição do Squad
+                          <span className="text-xs font-normal text-muted-foreground ml-auto">Fees + Benefícios (deslocamento + alimentação)</span>
                         </div>
-                        {squad.membros.map((m) => (
-                          <div key={m.nome} className="flex justify-between border rounded-md px-3 py-2">
+                        <div className="space-y-1.5 text-xs">
+                          <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center border rounded-md px-3 py-2">
                             <div>
-                              <p className="font-medium">{m.nome}</p>
-                              <p className="text-muted-foreground">{m.cargo}</p>
+                              <p className="font-medium">{squad.nome}</p>
+                              <p className="text-muted-foreground">CFO</p>
                             </div>
-                            <span className="font-medium self-center">{m.fee > 0 ? formatBRL(m.fee) : '—'}</span>
+                            <span className="text-right tabular-nums">Fee: <span className="font-medium">{formatBRL(squad.fee)}</span></span>
+                            <span className="text-right tabular-nums text-muted-foreground">Benef.: <span className="font-medium">{squad.beneficios > 0 ? formatBRL(squad.beneficios) : '—'}</span></span>
+                            <span className="text-right tabular-nums font-semibold w-24">{formatBRL(squad.fee + squad.beneficios)}</span>
                           </div>
-                        ))}
-                      </div>
-                      <div className="flex justify-end text-sm font-semibold pt-1">
-                        Total custo: {formatBRL(custoSquad)}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                          {squad.membros.map((m) => (
+                            <div key={m.nome} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center border rounded-md px-3 py-2">
+                              <div>
+                                <p className="font-medium">{m.nome}</p>
+                                <p className="text-muted-foreground">{m.cargo}</p>
+                              </div>
+                              <span className="text-right tabular-nums">Fee: <span className="font-medium">{m.fee > 0 ? formatBRL(m.fee) : '—'}</span></span>
+                              <span className="text-right tabular-nums text-muted-foreground">Benef.: <span className="font-medium">{m.beneficios > 0 ? formatBRL(m.beneficios) : '—'}</span></span>
+                              <span className="text-right tabular-nums font-semibold w-24">{formatBRL((m.fee || 0) + (m.beneficios || 0))}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <Separator className="my-1" />
+                        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center text-sm font-semibold pt-1">
+                          <span>Totais</span>
+                          <span className="text-right tabular-nums">{formatBRL(totalFees)}</span>
+                          <span className="text-right tabular-nums">{formatBRL(totalBeneficios)}</span>
+                          <span className="text-right tabular-nums w-24">{formatBRL(custoSquad)}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
 
                 {/* Mini P&L */}
                 <Card className="border-dashed">
