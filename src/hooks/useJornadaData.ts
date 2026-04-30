@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { JornadaCliente, JornadaCfo, JornadaAlerta, PipelineFase, JornadaFilter } from "@/components/planning/jornada/types";
-import { parsePipefyDate, parsePipefyDateOnly } from "./dateUtils";
+import { parsePipefyDate, parsePipefyDateOnly, parseRotinaDateOnly } from "./dateUtils";
 
 function parseDate(val: string | null | undefined): Date | null {
   return parsePipefyDate(val);
@@ -225,7 +225,7 @@ export function useJornadaData() {
       const cfo = normalizeCfoName(rawCfoRotina);
       const titulo = (row['Título'] || '').trim().toLowerCase();
       const isOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
-      const dataPrevista = parsePipefyDateOnly(row['Data Prevista Entrega']);
+      const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
       const atrasada = isOverdue || (dataPrevista && dataPrevista < now);
 
       if (cfo) {
@@ -258,10 +258,10 @@ export function useJornadaData() {
 
       const titulo = (row['Título'] || '').trim().toLowerCase();
       if (!titulo) continue;
-      const r1 = parsePipefyDateOnly(row['Data Reuniao 1']);
-      const r2 = parsePipefyDateOnly(row['Data Reuniao 2']);
-      const r3 = parsePipefyDateOnly(row['Data Reuniao 3']);
-      const r4 = parsePipefyDateOnly(row['Data Mensal']);
+      const r1 = parseRotinaDateOnly(row['Data Reuniao 1']);
+      const r2 = parseRotinaDateOnly(row['Data Reuniao 2']);
+      const r3 = parseRotinaDateOnly(row['Data Reuniao 3']);
+      const r4 = parseRotinaDateOnly(row['Data Mensal']);
       const feitas = [r1, r2, r3, r4].filter(d => d !== null).length;
       reunioesByTitulo.set(titulo, { feitas });
     }
@@ -605,12 +605,12 @@ export function useJornadaData() {
         mesReferencia: (row['Mes Referencia'] || '').trim(),
         selecaoReuniao: row['Selecao Reuniao'] || null,
         clienteParticipou: row['Cliente Participou'] || null,
-        dataPrevista: parsePipefyDateOnly(row['Data Prevista Entrega']),
+        dataPrevista: parseRotinaDateOnly(row['Data Prevista Entrega']),
         overdue: row['Overdue'] === true || row['Overdue'] === 'true',
-        r1: parsePipefyDateOnly(row['Data Reuniao 1']),
-        r2: parsePipefyDateOnly(row['Data Reuniao 2']),
-        r3: parsePipefyDateOnly(row['Data Reuniao 3']),
-        r4: parsePipefyDateOnly(row['Data Mensal']),
+        r1: parseRotinaDateOnly(row['Data Reuniao 1']),
+        r2: parseRotinaDateOnly(row['Data Reuniao 2']),
+        r3: parseRotinaDateOnly(row['Data Reuniao 3']),
+        r4: parseRotinaDateOnly(row['Data Mensal']),
         t1: row['Temperatura 1'] || null,
         t2: row['Temperatura 2'] || null,
         t3: row['Temperatura 3'] || null,
