@@ -128,10 +128,10 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
   let dataEntrada = parseDate(row['Entrada']) || new Date();
   const dataSaida = parseDate(row['Saída']);
   const fase = row['Fase'] || '';
-  const titulo = row['Título'] || '';
+  const tituloRaw = row['Título'] || '';
   const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
   if (fase === 'Contrato assinado' && dataAssinatura) {
-    if (shouldForceAssinaturaDate(titulo, 'expansao')) {
+    if (shouldForceAssinaturaDate(tituloRaw, 'expansao')) {
       dataEntrada = dataAssinatura;
     } else {
       dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
