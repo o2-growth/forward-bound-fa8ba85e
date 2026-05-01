@@ -474,9 +474,13 @@ export function useJornadaData() {
       };
       existing.clientes++;
       if (ACTIVE_PHASES.includes(c.faseAtual)) existing.clientesAtivos++;
-      existing.mrrTotal += c.mrr;
+      // Mariana atende clientes pontuais (Diagnóstico, Turnaround, Valuation): tratamos pontual como MRR
+      // somente para o agregado do CFO, sem alterar dados dos clientes nem outras telas.
+      const tratarPontualComoMrr = (c.cfo ?? '').includes('Mariana');
+      const receitaCliente = c.mrr + (tratarPontualComoMrr ? (c.pontual ?? 0) : 0);
+      existing.mrrTotal += receitaCliente;
       if (c.faseAtual === 'Onboarding') existing.clientesSetup++;
-      if (c.tratativaAtiva) { existing.clientesTratativa++; existing.mrrEmRisco += c.mrr; }
+      if (c.tratativaAtiva) { existing.clientesTratativa++; existing.mrrEmRisco += receitaCliente; }
       existing.tarefasAtrasadas += c.tarefasAtrasadas;
       cfoMap.set(c.cfo, existing);
     }
