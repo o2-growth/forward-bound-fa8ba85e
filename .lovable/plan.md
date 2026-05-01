@@ -1,58 +1,49 @@
-## Objetivo
+## Diagnóstico
 
-Na tabela de clientes que aparece ao clicar no card de um CFO (ex: Everton) na aba **Jornada → CFOs**, tornar os cabeçalhos de coluna **clicáveis** para ordenar a lista — incluindo ordem alfabética por Cliente, e numérica/categórica nas demais.
+Confirmei direto no banco Pipefy externo (tabelas `pipefy_central_projetos`, `pipefy_moviment_rotinas`, `pipefy_moviment_setup`):
 
-## Escopo
+```
+ID 1299643591 | Garantia Br | CFO Responsavel = "Oliveira"
+                            | Responsavel    = "Adivilso Souza de Oliveira Junior"
+                            | Fase Atual     = "Em Operação Recorrente"
+                            | updated_at     = 2026-05-01 15:29
+```
 
-Apenas a tabela do dialog em `src/components/planning/jornada/CfoView.tsx` (linhas ~1268-1284), com as colunas:
+**O dado no banco está correto: Garantia Br pertence ao Oliveira.** Não existe nenhum registro com "Everton" para esse cliente em nenhuma das tabelas auxiliares.
 
-- **Cliente** (alfabética A→Z / Z→A)
-- **Status** (Risco → Novo → Controlado e inverso)
-- **Produto** (alfabético pelo primeiro produto)
-- **Fase** (alfabético)
-- **Fee Mensal** (numérico)
-- **Pontual** (numérico)
-- **Health** (numérico)
-- **NPS** (numérico, com `null` no fim)
-- **Tratativa** (sim/não)
+Logo, o motivo de ainda aparecer no Everton é **cache do front-end** — não é bug de lógica nem dado errado.
 
-## Comportamento
+### Onde está o cache
 
-- Clique no cabeçalho ordena ascendente; segundo clique inverte para descendente.
-- Indicador visual (ícone `ArrowUp` / `ArrowDown` / `ArrowUpDown` neutro) ao lado do label, igual ao padrão já usado na tabela comparativa de CFOs (linhas ~1042-1065).
-- Padrão inicial: ordenado por **Fee Mensal desc** (mantém o comportamento atual `b.mrr - a.mrr`).
-- Ordenação puramente client-side, sem mudanças em hooks ou lógica de negócio.
+`src/hooks/useJornadaData.ts` (linha 87) usa React Query com:
+```ts
+staleTime: 5 * 60 * 1000   // 5 minutos
+```
 
-## Detalhes técnicos
+Como sua sessão do navegador foi aberta **antes** do `updated_at = 15:29`, o React Query devolveu a versão antiga em memória. Não há `refetchOnWindowFocus`, então só atualiza:
+- ao recarregar a página (F5), ou
+- após 5 min de inatividade da query, ou
+- ao fechar/abrir o navegador.
 
-1. Substituir o `useMemo` de `dialogClientes` (linha ~737-740) por:
-   - `dialogClientesBase` = `activeClientes.filter(c => c.cfo === selectedCfo)` (sem sort fixo).
-   - Novo estado: `clientSortCol` (string) e `clientSortAsc` (boolean), default `'feeMensal'` / `false`.
-   - Novo `useMemo` `dialogClientes` que aplica o sort dinâmico sobre `dialogClientesBase`.
+Não há mapa de override no código que jogue Garantia Br para o Everton — confirmado em `CFO_NAME_NORMALIZE` (só normaliza nomes longos, não muda CFO).
 
-2. Mapa de extratores de valor por coluna (para manter o sort consistente):
-   - `cliente` → `c.titulo` (string, `localeCompare` com `'pt-BR'`, `sensitivity: 'base'`).
-   - `status` → ordem fixa `risco=0, novo=1, controlado=2` via `deriveStatus(c)`.
-   - `produto` → `(c.produtos[0] ?? '')` (string).
-   - `fase` → `c.faseAtual` (string).
-   - `feeMensal` → `c.mrr` (number).
-   - `pontual` → `c.pontual` (number).
-   - `health` → `c.healthScore` (number).
-   - `nps` → `c.npsScore ?? -Infinity` no asc / `+Infinity` no desc para empurrar nulos ao fim.
-   - `tratativa` → `c.tratativaAtiva ? 1 : 0`.
+## O que fazer
 
-3. Atualizar os `<TableHead>` das linhas ~1274-1282 para virar botões clicáveis usando o mesmo padrão da tabela comparativa (linhas 1042-1065): `onClick={() => toggleClientSort(col)}`, com `cursor-pointer select-none` e ícone à direita.
+Três opções, em ordem do mais simples ao mais robusto:
 
-4. Helper `toggleClientSort(col)`: se já é a coluna ativa, inverte `clientSortAsc`; senão define `clientSortCol = col` e usa um default sensato (`false`/desc para numéricos, `true`/asc para strings).
+### Opção A — Verificação imediata (sem código)
+Apertar **Cmd/Ctrl + Shift + R** (hard reload) na aba do dashboard. Garantia Br deve sumir do Everton e aparecer no Oliveira na hora.
 
-## Fora de escopo
+### Opção B — Botão "Atualizar dados" na aba Jornada
+Adicionar um botão de refresh no header das views (CFOs, Reuniões, Clientes) que invalida a query `['jornada-data']` via `queryClient.invalidateQueries`. Útil para o time não depender de hard reload.
 
-- Não alterar `useJornadaData.ts` nem nenhuma regra de negócio (fases ativas, status de churn, cálculo de health etc.).
-- Não mexer na tabela comparativa de CFOs (já tem sort).
-- Não adicionar filtro/busca nesta iteração — apenas ordenação.
+### Opção C — Reduzir `staleTime` ou habilitar `refetchOnWindowFocus`
+Mudar `staleTime` de 5 min para algo como 60 s, ou ativar `refetchOnWindowFocus: true` no `useQuery`. Trade-off: mais chamadas ao Edge Function `query-external-db` (que faz consulta SQL pesada às 7 tabelas Pipefy).
 
-## Validação
+## Recomendação
 
-- Abrir o dialog do Everton, clicar em "Cliente" → ordem alfabética; clicar de novo → inversa.
-- Clicar em "Health" → menores no topo; de novo → maiores no topo.
-- Clicar em "NPS" → clientes sem NPS vão para o fim em ambos sentidos.
+Como a divergência é **percepção causada por cache**, sugiro:
+1. Hard reload agora para confirmar (Opção A).
+2. Implementar **Opção B** (botão de refresh manual visível) — mantém custo baixo no Edge Function e dá controle ao time quando alguém altera algo no Pipefy.
+
+Confirma se quer que eu implemente o botão de refresh, ou se prefere que eu reduza o `staleTime` (Opção C)?
