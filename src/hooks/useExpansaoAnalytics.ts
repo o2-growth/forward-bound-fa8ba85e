@@ -130,12 +130,11 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
   const fase = row['Fase'] || '';
   const tituloRaw = row['Título'] || '';
   const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
-  if (fase === 'Contrato assinado' && dataAssinatura) {
-    if (shouldForceAssinaturaDate(tituloRaw, 'expansao')) {
-      dataEntrada = dataAssinatura;
-    } else {
-      dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
-    }
+  // Cards na lista forçada: usar data fixa (Abril/2026), independente de fase/data
+  if (shouldForceAssinaturaDate(tituloRaw, 'expansao')) {
+    dataEntrada = getForcedSaleDate();
+  } else if (fase === 'Contrato assinado' && dataAssinatura) {
+    dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
   }
   
   // Calculate duration dynamically
