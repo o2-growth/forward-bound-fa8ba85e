@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isTestCard } from "@/hooks/useModeloAtualMetas";
-import { fixPossibleDateInversion, shouldForceAssinaturaDate } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 
 export interface ModeloAtualCard {
   id: string;
@@ -130,18 +130,15 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
   let correctedAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
   const tituloRaw = row['Título'] || row['titulo'] || row['Nome'] || '';
   
-  // For "Contrato assinado" phase: override dataEntrada with dataAssinatura
-  // Also fix dataAssinatura so effectiveDate logic for 'venda' uses the corrected date
-  if (fase === 'Contrato assinado' && correctedAssinatura) {
-    if (shouldForceAssinaturaDate(tituloRaw, 'modelo_atual')) {
-      // Force: use signature date as-is, no inversion check
-      dataEntrada = correctedAssinatura;
-      // correctedAssinatura already correct
-    } else {
-      const fixed = fixPossibleDateInversion(correctedAssinatura, dataEntrada);
-      dataEntrada = fixed;
-      correctedAssinatura = fixed;
-    }
+  // Cards na lista forçada: usar data fixa (Abril/2026), independente de fase/data
+  if (shouldForceAssinaturaDate(tituloRaw, 'modelo_atual')) {
+    const forced = getForcedSaleDate();
+    dataEntrada = forced;
+    correctedAssinatura = forced;
+  } else if (fase === 'Contrato assinado' && correctedAssinatura) {
+    const fixed = fixPossibleDateInversion(correctedAssinatura, dataEntrada);
+    dataEntrada = fixed;
+    correctedAssinatura = fixed;
   }
   const valorMRR = parseNumericValue(row['Valor MRR'] || row['valor_mrr'] || 0);
   const valorPontual = parseNumericValue(row['Valor Pontual'] || row['valor_pontual'] || 0);

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fixPossibleDateInversion, shouldForceAssinaturaDate } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 
@@ -273,14 +273,12 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
         const dataCriacao = parseDate(row['Data Criação']);
         const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
 
-        // For 'Contrato assinado' phase: prioritize signature date over entry date
-        // Apply date inversion fix before using signature date
-        if (fase === 'Contrato assinado' && dataAssinatura) {
-          if (shouldForceAssinaturaDate(titulo, 'modelo_atual')) {
-            dataEntrada = dataAssinatura;
-          } else {
-            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
-          }
+        // Cards na lista forçada: usar data fixa (Abril/2026), independente de fase/data
+        if (shouldForceAssinaturaDate(titulo, 'modelo_atual')) {
+          dataEntrada = getForcedSaleDate();
+        } else if (fase === 'Contrato assinado' && dataAssinatura) {
+          // Para 'Contrato assinado': priorizar data de assinatura
+          dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
         }
 
         movements.push({
@@ -343,12 +341,10 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
           const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
           let dataEntrada = parseDate(row['Entrada'] || row['entrada']) || new Date();
           const tituloMerge = row['Título'] || row['titulo'] || row['Nome'] || '';
-          if (fase === 'Contrato assinado' && dataAssinatura) {
-            if (shouldForceAssinaturaDate(tituloMerge, 'modelo_atual')) {
-              dataEntrada = dataAssinatura;
-            } else {
-              dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
-            }
+          if (shouldForceAssinaturaDate(tituloMerge, 'modelo_atual')) {
+            dataEntrada = getForcedSaleDate();
+          } else if (fase === 'Contrato assinado' && dataAssinatura) {
+            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
           }
           const valorMRR = parseNumericValue(row['Valor MRR'] || 0);
           const valorPontual = parseNumericValue(row['Valor Pontual'] || 0);

@@ -166,3 +166,14 @@ export function shouldForceAssinaturaDate(
   return FORCE_ASSINATURA_TITLES[bu].some(name => t.includes(normalizeTitle(name)));
 }
 
+/**
+ * Data fixa (Abril/2026) usada para forçar os cards listados em
+ * FORCE_ASSINATURA_TITLES a contarem como venda no mês passado,
+ * independentemente das datas registradas no Pipefy.
+ */
+export const FORCED_SALE_DATE = new Date(2026, 3, 15, 12, 0, 0); // 15/Abr/2026
+
+export function getForcedSaleDate(): Date {
+  return new Date(FORCED_SALE_DATE.getTime());
+}
+

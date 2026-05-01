@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
-import { fixPossibleDateInversion, shouldForceAssinaturaDate } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 
 export interface ExpansaoCard {
   id: string;
@@ -130,12 +130,11 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
   const fase = row['Fase'] || '';
   const tituloRaw = row['Título'] || '';
   const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
-  if (fase === 'Contrato assinado' && dataAssinatura) {
-    if (shouldForceAssinaturaDate(tituloRaw, 'expansao')) {
-      dataEntrada = dataAssinatura;
-    } else {
-      dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
-    }
+  // Cards na lista forçada: usar data fixa (Abril/2026), independente de fase/data
+  if (shouldForceAssinaturaDate(tituloRaw, 'expansao')) {
+    dataEntrada = getForcedSaleDate();
+  } else if (fase === 'Contrato assinado' && dataAssinatura) {
+    dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
   }
   
   // Calculate duration dynamically
@@ -495,7 +494,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
           const movementIndicator = PHASE_TO_INDICATOR[m.fase];
           
           if (indicator === 'venda') {
-            return m.fase === 'Contrato assinado';
+            return m.fase === 'Contrato assinado' || m.fase === 'Ganho' || shouldForceAssinaturaDate(m.titulo, 'expansao');
           } else if (indicator === 'proposta') {
             return movementIndicator === 'proposta';
           }

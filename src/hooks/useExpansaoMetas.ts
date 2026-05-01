@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
-import { fixPossibleDateInversion, shouldForceAssinaturaDate } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 
 export type ExpansaoIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -89,17 +89,16 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         
         let dataEntrada = parseDate(row['Entrada']) || new Date();
         const titulo = row['Título'] || '';
-        
-        // For "Contrato assinado", use signature date like other hooks
-        if ((row['Fase'] || '') === 'Contrato assinado') {
+        const fase = row['Fase'] || '';
+
+        // Cards na lista forçada: usar data fixa (Abril/2026), independente da fase/data
+        if (shouldForceAssinaturaDate(titulo, 'expansao')) {
+          dataEntrada = getForcedSaleDate();
+        } else if (fase === 'Contrato assinado') {
+          // Para "Contrato assinado", priorizar data de assinatura
           const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
           if (dataAssinatura) {
-            // Force override for specific cards (lista em dateUtils)
-            if (shouldForceAssinaturaDate(titulo, 'expansao')) {
-              dataEntrada = dataAssinatura;
-            } else {
-              dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
-            }
+            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
           }
         }
 
@@ -183,7 +182,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
 
         if (indicator === 'venda') {
-          if (movement.fase === 'Contrato assinado') {
+          if (movement.fase === 'Contrato assinado' || shouldForceAssinaturaDate(movement.titulo, 'expansao')) {
             uniqueCards.add(movement.id);
           }
         } else if (indicator === 'proposta') {
@@ -228,7 +227,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         let shouldCount = false;
         
         if (indicator === 'venda') {
-          if (movement.fase === 'Contrato assinado') {
+          if (movement.fase === 'Contrato assinado' || shouldForceAssinaturaDate(movement.titulo, 'expansao')) {
             shouldCount = true;
           }
         } else if (indicator === 'proposta') {
@@ -319,7 +318,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
           
           if (indicator === 'venda') {
-            if (movement.fase === 'Contrato assinado') {
+            if (movement.fase === 'Contrato assinado' || shouldForceAssinaturaDate(movement.titulo, 'expansao')) {
               uniqueCards.add(movement.id);
             }
           } else if (indicator === 'proposta') {
