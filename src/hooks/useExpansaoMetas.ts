@@ -89,17 +89,16 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         
         let dataEntrada = parseDate(row['Entrada']) || new Date();
         const titulo = row['Título'] || '';
-        
-        // For "Contrato assinado", use signature date like other hooks
-        if ((row['Fase'] || '') === 'Contrato assinado') {
+        const fase = row['Fase'] || '';
+
+        // Cards na lista forçada: usar data fixa (Abril/2026), independente da fase/data
+        if (shouldForceAssinaturaDate(titulo, 'expansao')) {
+          dataEntrada = getForcedSaleDate();
+        } else if (fase === 'Contrato assinado') {
+          // Para "Contrato assinado", priorizar data de assinatura
           const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
           if (dataAssinatura) {
-            // Force override for specific cards (lista em dateUtils)
-            if (shouldForceAssinaturaDate(titulo, 'expansao')) {
-              dataEntrada = dataAssinatura;
-            } else {
-              dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
-            }
+            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
           }
         }
 
