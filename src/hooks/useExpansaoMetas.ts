@@ -318,7 +318,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
           
           if (indicator === 'venda') {
-            if (movement.fase === 'Contrato assinado') {
+            if (movement.fase === 'Contrato assinado' || shouldForceAssinaturaDate(movement.titulo, 'expansao')) {
               uniqueCards.add(movement.id);
             }
           } else if (indicator === 'proposta') {
