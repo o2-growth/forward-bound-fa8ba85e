@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
-import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
 
 export interface ExpansaoCard {
   id: string;
@@ -146,9 +146,9 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
   }
   
   let taxaFranquia = row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : 0;
-  const valorMRR = row['Valor MRR'] ? parseFloat(row['Valor MRR']) : 0;
-  const valorPontual = row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : 0;
-  const valorSetup = row['Valor Setup'] ? parseFloat(row['Valor Setup']) : 0;
+  let valorMRR = row['Valor MRR'] ? parseFloat(row['Valor MRR']) : 0;
+  let valorPontual = row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : 0;
+  let valorSetup = row['Valor Setup'] ? parseFloat(row['Valor Setup']) : 0;
   let produto = row['Produtos'] || '';
   const titulo = row['Título'] || '';
 
@@ -157,6 +157,15 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
   if (override) {
     if (override.produto !== undefined) produto = override.produto;
     if (override.taxaFranquia !== undefined) taxaFranquia = override.taxaFranquia;
+  }
+
+  // Override de Valor Pontual fixo (Alexandre Correa, Jean Morbis)
+  const forcedPontual = getForcedPontualValue(titulo);
+  if (forcedPontual !== null) {
+    valorPontual = forcedPontual;
+    valorMRR = 0;
+    valorSetup = 0;
+    taxaFranquia = 0;
   }
 
   // Calculate value: prioritize taxaFranquia, then sum of other values, then defaultTicket

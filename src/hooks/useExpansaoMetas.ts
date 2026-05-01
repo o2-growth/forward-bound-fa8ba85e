@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
-import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
 
 export type ExpansaoIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -139,6 +139,15 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           investimentoDisponivel: row['Investimento disponível'] || row['Investimento Disponivel'] || null,
           produto,
         };
+
+        // Override de Valor Pontual fixo (Alexandre Correa, Jean Morbis)
+        const forcedPontual = getForcedPontualValue(movement.titulo);
+        if (forcedPontual !== null) {
+          movement.valorPontual = forcedPontual;
+          movement.valorMRR = 0;
+          movement.valorSetup = 0;
+          movement.taxaFranquia = 0;
+        }
 
         movements.push(movement);
       }
