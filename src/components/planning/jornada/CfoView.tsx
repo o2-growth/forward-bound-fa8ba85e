@@ -77,7 +77,7 @@ const CFO_SQUADS: Record<string, {
     fee: 14000,
     beneficios: 959,
     membros: [
-      { nome: 'Anderson Felizardo Mendes', cargo: 'Analista FP&A', fee: 0, beneficios: 0 },
+      { nome: 'Anderson Felizardo Mendes', cargo: 'Analista FP&A', fee: 6933.33, beneficios: 0 },
       { nome: 'Maria Eduarda Nery Reckziegel', cargo: 'Estagiária FP&A', fee: 1500, beneficios: 618 },
     ],
   },
