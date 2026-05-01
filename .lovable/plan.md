@@ -1,33 +1,27 @@
-## Override RGO Máquinas e Guará Acessórios: tratar `pontual` como `mrr`
+## Atualizar benefícios do squad do Dago (Eduardo Milani Pedrolo)
 
-Em `src/hooks/useJornadaData.ts`, expandir o override que já existe para Libracom (~linha 305-308) para incluir mais dois clientes do Dago.
+Ajuste pontual em `src/components/planning/jornada/CfoView.tsx` no objeto `CFO_SQUADS`, dentro do squad `'Eduardo Milani Pedrolo'`.
 
-### Mudança
+### Valores atuais → novos
 
-Substituir:
+| Membro | Atual | Novo |
+|---|---|---|
+| Felipe Vargas Brenner | R$ 300 | **R$ 690** (390 alimentação + 300 Raiô) |
+| Eric Alves da Silveira | R$ 360 | **R$ 600** (300 deslocamento + 300 Raiô) |
+| Pedro Oppermann Michelucci | R$ 300 | **R$ 889** (589 base + 300 Raiô) |
+| Sergio Pereira Piva Junior | R$ 990 | mantém |
+
+### Mudança técnica
+
+Linhas 70-72 do arquivo, atualizar apenas o campo `beneficios`:
+
 ```ts
-if (tituloLower.includes('libracom')) {
-  mrr = mrr + pontual;
-  pontual = 0;
-}
+{ nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000, beneficios: 690 },
+{ nome: 'Eric Alves da Silveira', cargo: 'Analista Financeiro', fee: 7000, beneficios: 600 },
+{ nome: 'Pedro Oppermann Michelucci', cargo: 'Estagiário FP&A', fee: 1500, beneficios: 889 },
 ```
 
-Por:
-```ts
-const PONTUAL_TO_MRR_OVERRIDES = ['libracom', 'rgo', 'guará', 'guara'];
-if (PONTUAL_TO_MRR_OVERRIDES.some(k => tituloLower.includes(k))) {
-  mrr = mrr + pontual;
-  pontual = 0;
-}
-```
+### Impacto
 
-(uso de `guará` e `guara` para garantir match com ou sem acento, já que o título lower mantém acentos.)
-
-### Efeito
-
-- Para os cards cujo título contenha "libracom", "rgo" ou "guará/guara" (case-insensitive), o pontual é realocado como MRR.
-- Reflete em todos os cálculos do squad do Dago (ranking CFO, MRR total, P&L, GMV).
-
-### Arquivos alterados
-
-- `src/hooks/useJornadaData.ts` — apenas o bloco de override
+- O P&L do squad do Dago e o card de "Benefícios (desloc. + alim. + Raiô)" recalcularão automaticamente via `getSquadBeneficios`, refletindo o novo total de benefícios e nova Margem Bruta.
+- Nenhum outro squad é afetado.
