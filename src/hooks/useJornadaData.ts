@@ -634,5 +634,5 @@ export function useJornadaData() {
     return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync };
   }, [data]);
 
-  return { ...result, isLoading, error };
+  return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };
 }
