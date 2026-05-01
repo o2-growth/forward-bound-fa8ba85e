@@ -64,7 +64,7 @@ const CFO_SQUADS: Record<string, {
   'Eduardo Milani Pedrolo': {
     nome: 'Eduardo Milani Pedrolo',
     fee: 13000,
-    beneficios: 300,
+    beneficios: 900,
     membros: [
       { nome: 'Sergio Pereira Piva Junior', cargo: 'Analista FP&A', fee: 7500, beneficios: 990 },
       { nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000, beneficios: 950 },
