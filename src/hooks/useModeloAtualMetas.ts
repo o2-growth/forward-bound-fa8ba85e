@@ -273,14 +273,12 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
         const dataCriacao = parseDate(row['Data Criação']);
         const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
 
-        // For 'Contrato assinado' phase: prioritize signature date over entry date
-        // Apply date inversion fix before using signature date
-        if (fase === 'Contrato assinado' && dataAssinatura) {
-          if (shouldForceAssinaturaDate(titulo, 'modelo_atual')) {
-            dataEntrada = dataAssinatura;
-          } else {
-            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
-          }
+        // Cards na lista forçada: usar data fixa (Abril/2026), independente de fase/data
+        if (shouldForceAssinaturaDate(titulo, 'modelo_atual')) {
+          dataEntrada = getForcedSaleDate();
+        } else if (fase === 'Contrato assinado' && dataAssinatura) {
+          // Para 'Contrato assinado': priorizar data de assinatura
+          dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
         }
 
         movements.push({
