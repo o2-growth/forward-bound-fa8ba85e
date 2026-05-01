@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowUpDown, ExternalLink, Info, ChevronDown, ChevronRight, Users, DollarSign, Plus, Minus, X, Calculator, Zap, Trash2 } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Info, ChevronDown, ChevronRight, ChevronUp, Users, DollarSign, Plus, Minus, X, Calculator, Zap, Trash2 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from "recharts";
 import type { JornadaCfo, JornadaCliente } from "./types";
@@ -734,10 +734,46 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
     });
   }, [cfos, sortCol, sortAsc, churnsPerCfo]);
 
+  // Sort state for dialog client table
+  type ClientSortCol = 'cliente' | 'status' | 'produto' | 'fase' | 'feeMensal' | 'pontual' | 'health' | 'nps' | 'tratativa';
+  const [clientSortCol, setClientSortCol] = useState<ClientSortCol>('feeMensal');
+  const [clientSortAsc, setClientSortAsc] = useState(false);
+  const STRING_COLS: ClientSortCol[] = ['cliente', 'produto', 'fase'];
+
+  const toggleClientSort = (col: ClientSortCol) => {
+    if (clientSortCol === col) setClientSortAsc(prev => !prev);
+    else { setClientSortCol(col); setClientSortAsc(STRING_COLS.includes(col)); }
+  };
+
   const dialogClientes = useMemo(() => {
     if (!selectedCfo) return [];
-    return activeClientes.filter(c => c.cfo === selectedCfo).sort((a, b) => b.mrr - a.mrr);
-  }, [activeClientes, selectedCfo]);
+    const base = activeClientes.filter(c => c.cfo === selectedCfo);
+    const statusOrder: Record<ClienteStatus, number> = { risco: 0, novo: 1, controlado: 2 };
+    const dir = clientSortAsc ? 1 : -1;
+    const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
+    return [...base].sort((a, b) => {
+      switch (clientSortCol) {
+        case 'cliente': return cmpStr(a.titulo || '', b.titulo || '') * dir;
+        case 'status': return (statusOrder[deriveStatus(a)] - statusOrder[deriveStatus(b)]) * dir;
+        case 'produto': return cmpStr(a.produtos[0] || '', b.produtos[0] || '') * dir;
+        case 'fase': return cmpStr(a.faseAtual || '', b.faseAtual || '') * dir;
+        case 'feeMensal': return (a.mrr - b.mrr) * dir;
+        case 'pontual': return (a.pontual - b.pontual) * dir;
+        case 'health': return (a.healthScore - b.healthScore) * dir;
+        case 'nps': {
+          // null sempre no fim
+          const av = a.ultimoNps;
+          const bv = b.ultimoNps;
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          return (av - bv) * dir;
+        }
+        case 'tratativa': return ((a.tratativaAtiva ? 1 : 0) - (b.tratativaAtiva ? 1 : 0)) * dir;
+        default: return 0;
+      }
+    });
+  }, [activeClientes, selectedCfo, clientSortCol, clientSortAsc]);
 
   const selectedCfoData = cfos.find(c => c.nome === selectedCfo);
 
@@ -1271,15 +1307,34 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Fase</TableHead>
-                  <TableHead className="text-right">Fee Mensal</TableHead>
-                  <TableHead className="text-right">Pontual</TableHead>
-                  <TableHead className="text-right">Health</TableHead>
-                  <TableHead className="text-right">NPS</TableHead>
-                  <TableHead>Tratativa</TableHead>
+                  {([
+                    ['cliente', 'Cliente', 'left'],
+                    ['status', 'Status', 'left'],
+                    ['produto', 'Produto', 'left'],
+                    ['fase', 'Fase', 'left'],
+                    ['feeMensal', 'Fee Mensal', 'right'],
+                    ['pontual', 'Pontual', 'right'],
+                    ['health', 'Health', 'right'],
+                    ['nps', 'NPS', 'right'],
+                    ['tratativa', 'Tratativa', 'left'],
+                  ] as [ClientSortCol, string, 'left' | 'right'][]).map(([col, label, align]) => {
+                    const active = clientSortCol === col;
+                    const Icon = active ? (clientSortAsc ? ChevronUp : ChevronDown) : ArrowUpDown;
+                    return (
+                      <TableHead key={col} className={align === 'right' ? 'text-right' : ''}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`gap-1 h-7 px-2 ${align === 'right' ? '-mr-2' : '-ml-2'} ${active ? 'text-primary font-semibold' : ''}`}
+                          onClick={() => toggleClientSort(col)}
+                        >
+                          {align === 'right' && <Icon className="h-3 w-3" />}
+                          {label}
+                          {align === 'left' && <Icon className="h-3 w-3" />}
+                        </Button>
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
               </TableHeader>
               <TableBody>
