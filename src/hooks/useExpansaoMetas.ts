@@ -88,14 +88,21 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         if (produto !== 'Franquia') continue;
         
         let dataEntrada = parseDate(row['Entrada']) || new Date();
+        const titulo = row['Título'] || '';
         
         // For "Contrato assinado", use signature date like other hooks
         if ((row['Fase'] || '') === 'Contrato assinado') {
           const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
           if (dataAssinatura) {
-            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+            // Force override for specific cards (lista em dateUtils)
+            if (shouldForceAssinaturaDate(titulo, 'expansao')) {
+              dataEntrada = dataAssinatura;
+            } else {
+              dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+            }
           }
         }
+
 
         // Lê com fallback de variações de nome de campo (Pipefy às vezes tem
         // colunas com acentuação/capitalização diferente)
