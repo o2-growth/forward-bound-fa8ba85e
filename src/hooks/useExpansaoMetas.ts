@@ -140,6 +140,15 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           produto,
         };
 
+        // Override de Valor Pontual fixo (Alexandre Correa, Jean Morbis)
+        const forcedPontual = getForcedPontualValue(movement.titulo);
+        if (forcedPontual !== null) {
+          movement.valorPontual = forcedPontual;
+          movement.valorMRR = 0;
+          movement.valorSetup = 0;
+          movement.taxaFranquia = 0;
+        }
+
         movements.push(movement);
       }
 
