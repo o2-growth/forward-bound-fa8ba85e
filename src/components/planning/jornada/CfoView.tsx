@@ -1244,7 +1244,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                         <span>- {formatBRL(custoSquad - getSquadBeneficios(selectedCfo))}</span>
                       </div>
                       <div className="flex justify-between text-muted-foreground">
-                        <span className="pl-3">(-) Benefícios (desloc. + alim.)</span>
+                        <span className="pl-3">(-) Benefícios (desloc. + alim. + Raiô)</span>
                         <span>- {formatBRL(getSquadBeneficios(selectedCfo))}</span>
                       </div>
                       <Separator className="my-1" />
