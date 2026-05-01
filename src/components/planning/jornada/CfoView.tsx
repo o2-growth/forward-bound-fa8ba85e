@@ -1183,7 +1183,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                         <div className="flex items-center gap-2 text-sm font-semibold">
                           <Users className="h-4 w-4" />
                           Composição do Squad
-                          <span className="text-xs font-normal text-muted-foreground ml-auto">Fees + Benefícios (deslocamento + alimentação)</span>
+                          <span className="text-xs font-normal text-muted-foreground ml-auto">Fees + Benefícios (deslocamento + alimentação + Raiô)</span>
                         </div>
                         <div className="space-y-1.5 text-xs">
                           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center border rounded-md px-3 py-2">
