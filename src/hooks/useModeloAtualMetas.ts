@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fixPossibleDateInversion, shouldForceAssinaturaDate } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 
