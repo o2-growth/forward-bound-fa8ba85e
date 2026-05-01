@@ -683,9 +683,11 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
     });
   };
 
-  const ACTIVE_PHASES_LOCAL = ['Onboarding', 'Em Operação Recorrente'];
+  // Carteira do CFO = todos os clientes ainda ativos (não-terminais).
+  // Inclui clientes em tratativa (Triagem, Em Tratativa com CS, Plano de Ação, etc.),
+  // pois o CFO continua atendendo esses clientes. Exclui apenas Churn / Arquivado / Desistência.
   const activeClientes = useMemo(() => {
-    return clientes.filter(c => ACTIVE_PHASES_LOCAL.includes(c.faseAtual));
+    return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
   }, [clientes]);
 
   // A1: Count churns per CFO

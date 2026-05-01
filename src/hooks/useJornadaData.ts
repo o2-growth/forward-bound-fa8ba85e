@@ -457,9 +457,14 @@ export function useJornadaData() {
       return oa - ob;
     });
 
-    // === 4. Build CFOs (only active clients) ===
+    // === 4. Build CFOs (carteira = todos os não-terminais; tratativa segue na carteira) ===
+    // Carteira do CFO inclui Onboarding, Em Operação Recorrente E qualquer fase de tratativa
+    // (Triagem, Em Tratativa com CS, Plano de Ação, Conclusão, Financeiro), pois o CFO continua atendendo.
+    // Exclui apenas terminais: Churn, Atividades finalizadas, Desistência, Arquivado.
+    const carteiraClientes = allClientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
+
     const cfoMap = new Map<string, JornadaCfo>();
-    for (const c of activeClientes) {
+    for (const c of carteiraClientes) {
       if (!c.cfo) continue;
       const existing = cfoMap.get(c.cfo) || {
         nome: c.cfo,
@@ -468,7 +473,7 @@ export function useJornadaData() {
         tarefasAtrasadas: 0, taxaEntrega: 0, npsMediaClientes: null, healthScoreMedio: 0,
       };
       existing.clientes++;
-      existing.clientesAtivos++;
+      if (ACTIVE_PHASES.includes(c.faseAtual)) existing.clientesAtivos++;
       existing.mrrTotal += c.mrr;
       if (c.faseAtual === 'Onboarding') existing.clientesSetup++;
       if (c.tratativaAtiva) { existing.clientesTratativa++; existing.mrrEmRisco += c.mrr; }
@@ -485,11 +490,11 @@ export function useJornadaData() {
       }
     });
 
-    // Calculate averages (only from active clients)
+    // Calculate averages (from carteira)
     for (const [cfo, data] of cfoMap) {
-      const cfoActive = activeClientes.filter(c => c.cfo === cfo);
-      data.healthScoreMedio = cfoActive.length > 0 ? Math.round(cfoActive.reduce((s, c) => s + c.healthScore, 0) / cfoActive.length) : 0;
-      const withNps = cfoActive.filter(c => c.npsClassificacao !== null);
+      const cfoCarteira = carteiraClientes.filter(c => c.cfo === cfo);
+      data.healthScoreMedio = cfoCarteira.length > 0 ? Math.round(cfoCarteira.reduce((s, c) => s + c.healthScore, 0) / cfoCarteira.length) : 0;
+      const withNps = cfoCarteira.filter(c => c.npsClassificacao !== null);
       if (withNps.length > 0) {
         const promotores = withNps.filter(c => c.npsClassificacao === 'promotor').length;
         const detratores = withNps.filter(c => c.npsClassificacao === 'detrator').length;
@@ -503,9 +508,9 @@ export function useJornadaData() {
 
     const cfos = Array.from(cfoMap.values()).sort((a, b) => b.mrrTotal - a.mrrTotal);
 
-    // === 5. Build Alertas (only active clients) ===
+    // === 5. Build Alertas (carteira inteira; tratativa continua sendo atendida) ===
     const alertas: JornadaAlerta[] = [];
-    for (const c of activeClientes) {
+    for (const c of carteiraClientes) {
       if (c.setupStatus === 'atrasado') {
         alertas.push({ tipo: 'setup_atrasado', severidade: 'critico', cliente: c.titulo, clienteId: c.id, cfo: c.cfo, descricao: `Setup há ${c.setupDias} dias (fase: ${c.setupFase})`, dias: c.setupDias, valor: c.mrr });
       }
