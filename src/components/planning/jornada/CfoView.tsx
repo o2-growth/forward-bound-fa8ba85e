@@ -69,7 +69,7 @@ const CFO_SQUADS: Record<string, {
       { nome: 'Sergio Pereira Piva Junior', cargo: 'Analista FP&A', fee: 7500, beneficios: 690 },
       { nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000, beneficios: 0 },
       { nome: 'Eric Alves da Silveira', cargo: 'Analista Financeiro', fee: 7000, beneficios: 60 },
-      { nome: 'Pedro Oppermann Michelucci', cargo: 'Estagiário FP&A', fee: 0, beneficios: 0 },
+      { nome: 'Pedro Oppermann Michelucci', cargo: 'Estagiário FP&A', fee: 1500, beneficios: 0 },
     ],
   },
   'Everton Bisinella': {
@@ -78,7 +78,7 @@ const CFO_SQUADS: Record<string, {
     beneficios: 959,
     membros: [
       { nome: 'Anderson Felizardo Mendes', cargo: 'Analista FP&A', fee: 0, beneficios: 0 },
-      { nome: 'Maria Eduarda Nery Reckziegel', cargo: 'Estagiária FP&A', fee: 0, beneficios: 618 },
+      { nome: 'Maria Eduarda Nery Reckziegel', cargo: 'Estagiária FP&A', fee: 1500, beneficios: 618 },
     ],
   },
   'Gustavo Cochlar': {
@@ -104,7 +104,7 @@ const CFO_SQUADS: Record<string, {
     beneficios: 947,
     membros: [
       { nome: 'Roberta Costa Curta Lirio', cargo: 'Analista FP&A', fee: 7500, beneficios: 623 },
-      { nome: 'Raissa Bonamigo Daros', cargo: 'Estagiária FP&A', fee: 0, beneficios: 447 },
+      { nome: 'Raissa Bonamigo Daros', cargo: 'Estagiária FP&A', fee: 1500, beneficios: 447 },
     ],
   },
   'Rafael Marchioretto': {
