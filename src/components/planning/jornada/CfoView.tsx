@@ -67,8 +67,8 @@ const CFO_SQUADS: Record<string, {
     beneficios: 300,
     membros: [
       { nome: 'Sergio Pereira Piva Junior', cargo: 'Analista FP&A', fee: 7500, beneficios: 990 },
-      { nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000, beneficios: 690 },
-      { nome: 'Eric Alves da Silveira', cargo: 'Analista Financeiro', fee: 7000, beneficios: 600 },
+      { nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000, beneficios: 950 },
+      { nome: 'Eric Alves da Silveira', cargo: 'Analista Financeiro', fee: 7000, beneficios: 1039.80 },
       { nome: 'Pedro Oppermann Michelucci', cargo: 'Estagiário FP&A', fee: 1500, beneficios: 889 },
     ],
   },
