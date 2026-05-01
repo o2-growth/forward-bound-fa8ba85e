@@ -1,73 +1,49 @@
-## Objetivo
+## Problema
 
-Aplicar override por código no card "Ashia Andrade" para que apareça como **Oxy Hacker** com valor de **R$ 32.000**, em vez de Franquia (que é como está classificado no Pipefy hoje).
+Clientes do Everton como **União Tecnica**, **AVML** e **CAPTABLE** não aparecem nem na aba **CFOs** (ao clicar no card) nem na aba **Reuniões**.
 
-## Abordagem
+A causa é regra de negócio: hoje o sistema considera "ativo" apenas quem está em `Onboarding` ou `Em Operação Recorrente`. Quem está em fases de tratativa (Triagem, Em Tratativa com CS, Plano de Ação, Conclusão, Financeiro) é tratado como inativo e **some da carteira do CFO**, mesmo que o CFO continue atendendo normalmente.
 
-Criar um mapa centralizado de exceções (`CARD_OVERRIDES`) no hook `useExpansaoAnalytics.ts`, indexado pelo **ID do card no Pipefy**, que sobrescreve `produto` e/ou valores monetários (`taxaFranquia`, `valorMRR`, `valorSetup`, `valorPontual`) na função `parseRawCard`.
+A pessoa em tratativa **continua sendo atendida** — então tem que aparecer na carteira do CFO e nas reuniões dele.
 
-Assim:
-- O card migra automaticamente da view de Franquia para a view de Oxy Hacker.
-- O valor exibido em drill-downs, gauges e somatórios passa a ser R$ 32.000.
-- Futuros casos similares só precisam de uma linha nova no mapa.
+## Mudança
 
-## Pré-requisito
+Tratar clientes "em tratativa" como ativos para efeito de **carteira do CFO** e **reuniões**, mantendo o destaque visual de risco. Não mexe em churn (esses continuam fora).
 
-Preciso do **ID do card no Pipefy** da "Ashia Andrade". Como não consigo acessar o banco externo daqui, na implementação eu vou:
+## Arquivos afetados
 
-1. Adicionar um lookup temporário por **título normalizado** (`"ashia andrade"`) como fallback, já cobrindo o caso agora.
-2. Logar no console o ID do card quando o override por título disparar, para você me passar o ID e a gente trocar para match exato (mais seguro contra cards homônimos no futuro).
+**1. `src/hooks/useJornadaData.ts`**
+- Trocar `ACTIVE_PHASES = ['Onboarding', 'Em Operação Recorrente']` por uma noção de "ainda na carteira" = qualquer fase **exceto** as terminais (`Churn`, `Atividades finalizadas`, `Desistência`, `Arquivado`).
+- Aplicar essa nova definição na construção de:
+  - `activeClientes` (carteira do CFO)
+  - agregados por CFO (`cfoMap`: contagem de clientes, MRR total, MRR em risco, taxa de entrega, health médio, NPS médio)
+  - alertas (continuam só para clientes "ainda na carteira")
+- Pipeline (PipelineView) continua mostrando só `Onboarding` / `Em Operação Recorrente` + a coluna virtual "Em Tratativa", já que essas são as fases visuais do funil. Sem mudança aqui.
 
-## Mudanças (arquivo único)
+**2. `src/components/planning/jornada/CfoView.tsx`**
+- Trocar `ACTIVE_PHASES_LOCAL = ['Onboarding', 'Em Operação Recorrente']` pela mesma nova definição (excluir só as terminais).
+- Resultado: ao clicar no card do Everton, clientes em tratativa aparecem na lista, com o badge "Risco de Churn" que já existe (`deriveStatus` já marca tratativa como `risco`).
 
-**`src/hooks/useExpansaoAnalytics.ts`**
+**3. `src/components/planning/jornada/ReunioesView.tsx`**
+- Sem mudança no filtro de tipo (continua só `Reuniões com Cliente`), mas o universo de clientes que alimenta a aba já vem do `useJornadaData`. Como `reunioes` lê direto de `pipefy_moviment_rotinas` (não depende de `activeClientes`), a aba já deveria mostrar — confirmar que esses 3 têm card de rotina do mês com `Tipo de Entrega = "Reuniões com Cliente"`. Se não tiverem, o problema é dado faltando no Pipefy, não código.
 
-1. Adicionar no topo do arquivo:
-   ```ts
-   // Overrides de classificação/valor para cards específicos do Pipefy
-   // que estão com dados incorretos na origem e ainda não foram corrigidos lá.
-   // Preferir match por ID. Match por título é fallback temporário.
-   const CARD_OVERRIDES_BY_ID: Record<string, Partial<{ produto: string; taxaFranquia: number }>> = {
-     // "1234567890": { produto: "Oxy Hacker", taxaFranquia: 32000 },
-   };
+## Efeito esperado
 
-   const CARD_OVERRIDES_BY_TITLE: Record<string, Partial<{ produto: string; taxaFranquia: number }>> = {
-     "ashia andrade": { produto: "Oxy Hacker", taxaFranquia: 32000 },
-   };
+- Card do Everton em **CFOs** passa a mostrar União Tecnica, AVML e CAPTABLE (e qualquer outro em tratativa) na lista de clientes.
+- Contagem de clientes do CFO, MRR total e MRR em risco passam a refletir a carteira real (incluindo tratativa).
+- Aba **Reuniões**: se o card de rotina existe no mês selecionado, vai aparecer. Se não aparecer mesmo assim, é porque não há card de rotina criado no Pipefy para o mês.
+- Quem está em **Churn / Atividades finalizadas / Desistência / Arquivado** continua fora da carteira ativa (sem mudança).
 
-   function normalizeTitle(s: string): string {
-     return (s || "").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-   }
-   ```
+## Validação
 
-2. Em `parseRawCard`, antes do `return`, aplicar override:
-   - Lê `produto` e `taxaFranquia` do row normalmente.
-   - Se houver override por ID, sobrescreve.
-   - Senão, se houver override por título normalizado, sobrescreve e loga `console.warn` com o ID para registro.
-   - Recalcula `valor` final usando o `taxaFranquia` (eventualmente sobrescrito) seguindo a mesma regra atual (taxaFranquia > soma > defaultTicket).
-
-3. Importante para o filtro de produto funcionar: a comparação `if (rowProduto !== produto) continue;` (linhas 217–218 e 234–235) usa o `Produtos` cru do row, **não** o card já parseado. Para o override surtir efeito no filtro, vou trocar essas comparações para usar o `produto` **após** o override — ou seja, fazer o override antes do filtro, parseando o card e descartando-o se o produto resultante não bater.
-
-## Efeitos esperados
-
-- Card "Ashia Andrade" some da aba Franquia.
-- Aparece na aba Oxy Hacker, contando em Leads/MQL/RM/RR/Proposta/Venda conforme as fases por que passou.
-- Valor de R$ 32.000 aparece em pipeline, ticket médio, vendas e drill-downs.
-- Funil cumulativo de Expansão Oxy Hacker passa a incluir esse card.
+1. Abrir aba Jornada → CFOs → clicar no Everton.
+2. Conferir se União Tecnica, AVML e CAPTABLE aparecem na lista, marcados como "Risco de Churn".
+3. Conferir contadores no card do Everton (clientes / MRR total / MRR em risco) — devem subir.
+4. Aba Reuniões com filtro CFO = Everton: conferir se passam a aparecer (se não aparecerem, é porque não há card de rotina no Pipefy).
 
 ## Não muda
 
-- Nada no Pipefy (continua marcado como Franquia lá até alguém corrigir).
-- Nenhum outro card.
-- Lógica de Modelo Atual, O2 TAX, Marketing, NPS etc. permanece intacta.
-- Estrutura dos componentes UI permanece intacta.
-
-## Validação após implementação
-
-1. Abrir aba Expansão → Oxy Hacker no período em que o card existe — deve aparecer "Ashia Andrade" com R$ 32k.
-2. Abrir aba Expansão → Franquia no mesmo período — não deve mais aparecer.
-3. Conferir console: deve haver um warn com o ID do card. Você me passa esse ID e na sequência migramos para `CARD_OVERRIDES_BY_ID` (mais robusto que título).
-
-## Dívida técnica registrada
-
-Esse mapa é uma exceção manual. Toda vez que o time de operação corrigir o card no Pipefy, a entrada correspondente deve ser removida daqui. Sugiro revisão trimestral do mapa.
+- Pipeline continua com Onboarding / Em Operação / Em Tratativa.
+- Aba Alertas continua igual.
+- Lógica de churn, NPS, setup, rotinas — intactas.
+- Nenhuma outra tela do dashboard.
