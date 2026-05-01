@@ -1,44 +1,40 @@
 ## Objetivo
 
-Forçar os 8 cards específicos a serem contabilizados como venda em **Abril/2026** (mês passado), ignorando qualquer data de movimentação ou de assinatura no Pipefy.
+Forçar **Valor Pontual** fixo para 2 cards de Expansão (Franquia), sobrescrevendo o que vier do Pipefy:
 
-## Cards alvo
+- **ALEXANDRE CORREA** → Valor Pontual = R$ 43.000
+- **JEAN MORBIS** → Valor Pontual = R$ 36.000
 
-- **Expansão**: JEAN MORBIS, MONICA SPINELLI, RICARDO REIS, ALEXANDRE CORREA, ELIZETH
-- **Modelo Atual**: EDIOURO, COTRIM ENTERPRISES, FUJITEC
+Os outros valores (MRR, Setup, Taxa de franquia) destes cards passam a ser zerados, para que o cálculo de venda use apenas o Pontual forçado. Demais cards da lista (Monica, Ricardo, Elizeth) ficam intocados — continuam usando os valores do banco.
 
-Identificação por correspondência no Título (case e acento insensitive), reusando a lista já existente em `dateUtils.ts`.
-
-## Regra
-
-Para qualquer card cujo título corresponda à lista, sobrescrever a `dataEntrada` (data efetiva da venda) para uma data fixa dentro de Abril/2026 (ex.: `2026-04-15`). Isso garante:
-
-- Conta como venda em Abril/2026 em todos os KPIs, gráficos e drill-downs
-- Independe de movimentação/assinatura registrada no Pipefy (resolve o caso onde `Data de assinatura do contrato` está `null`)
-- Nenhum outro card é afetado
-
-## Mudanças técnicas
+## Mudança técnica
 
 1. **`src/hooks/dateUtils.ts`**
-   - Manter a lista `FORCE_ASSINATURA_TITLES` e a função `shouldForceAssinaturaDate` (mesmos nomes para minimizar diff).
-   - Adicionar constante `FORCED_SALE_DATE = new Date(2026, 3, 15)` (mês 3 = Abril em JS) e helper `getForcedSaleDate()`.
-
-2. **Hooks de Expansão** (`useExpansaoMetas.ts`, `useExpansaoAnalytics.ts`)
-   - Substituir o bloco atual de override (que hoje seta `dataEntrada = dataAssinatura`) por:
+   - Adicionar `FORCED_PONTUAL_VALUES: Record<string, number>` com mapa título → valor:
      ```
-     if (shouldForceAssinaturaDate(titulo, 'expansao')) {
-       dataEntrada = getForcedSaleDate(); // 2026-04-15
-     } else {
-       dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+     { 'ALEXANDRE CORREA': 43000, 'JEAN MORBIS': 36000 }
+     ```
+   - Adicionar helper `getForcedPontualValue(titulo: string): number | null` que normaliza o título (NFD, lowercase, trim) e retorna o valor forçado ou `null`.
+
+2. **`src/hooks/useExpansaoMetas.ts`**
+   - Após montar o objeto `movement` (linha ~119), aplicar o override:
+     ```
+     const forcedPontual = getForcedPontualValue(titulo);
+     if (forcedPontual !== null) {
+       movement.valorPontual = forcedPontual;
+       movement.valorMRR = 0;
+       movement.valorSetup = 0;
+       movement.taxaFranquia = 0;
      }
      ```
-   - Aplicar o mesmo bloco também nos pontos onde a fase é **`Ganho`** (não só `Contrato assinado`), para cobrir cards que pularam direto para Ganho.
+   - Como o cálculo em `getValueForPeriod` faz `taxaFranquia > 0 ? taxaFranquia : (pontual + setup + mrr)`, com taxaFranquia=0 ele somará `0 + 0 + 43000 = R$ 43.000` corretamente.
 
-3. **Hooks de Modelo Atual** (`useModeloAtualMetas.ts`, `useModeloAtualAnalytics.ts`)
-   - Mesma substituição nos blocos de override existentes na fase `Contrato assinado`.
+3. **`src/hooks/useExpansaoAnalytics.ts`**
+   - Mesmo override aplicado dentro de `parseRawCard`, antes de retornar o `ExpansaoCard`, garantindo que drill-downs e detalhamentos exibam o valor correto.
 
-## Comportamento esperado depois
+## Comportamento esperado
 
-- Os 8 cards aparecerão somados em Abril/2026 nas métricas de venda, MRR, Setup, Pontual e nos gráficos por mês das respectivas BUs.
-- Todos os demais cards continuam com a lógica padrão (`fixPossibleDateInversion` entre data de movimentação e data de assinatura).
-- Funciona mesmo com `Data de assinatura do contrato` ausente no Pipefy.
+- Em Abril/2026 (já forçado pela mudança anterior), Alexandre Correa entra como venda de R$ 43.000 (Pontual) e Jean Morbis como R$ 36.000 (Pontual).
+- MRR/Setup/Taxa Franquia desses 2 cards = R$ 0 (não somam em outras métricas).
+- Aparecem corretamente em: card de Vendas, gráfico mensal, drill-down, GMV.
+- Os outros 6 cards forçados (Monica, Ricardo, Elizeth, Ediouro, Cotrim, Fujitec) permanecem com valores do banco.
