@@ -1,49 +1,65 @@
 ## Diagnóstico
 
-Confirmei direto no banco Pipefy externo (tabelas `pipefy_central_projetos`, `pipefy_moviment_rotinas`, `pipefy_moviment_setup`):
+Confirmei: você está certa — **100% dos clientes ativos da Mariana Luz estão em produtos pontuais** (Diagnóstico Estratégico, Valuation). Conferi no Pipefy:
 
+| Cliente | Produto (DB) | Valor CFOaaS | Outros |
+|---|---|---|---|
+| Samba Decor | Diagnóstico Estratégico | **R$ 9.000** | — |
+| ESPÓLIO DE MÁRCIO | Diagnóstico Estratégico | **R$ 15.000** | — |
+| UFFA | Diagnóstico Estratégico | **R$ 45.000** | — |
+| ARA | Diagnóstico Estratégico | R$ 7.870 | — |
+| IDB Hospitais | Setup + Valuation | 0 | Valuation R$ 18.000 |
+| (15 outros) | Diagnóstico Estratégico | 0 | — |
+
+A causa do erro de cadastro no Pipefy (CFOaaS preenchido em vez de Valor Diagnóstico) **já está sendo corrigida no hook** `useJornadaData.ts` (linha 302): quando `isPontualOnly = true`, o `Valor CFOaaS` é redirecionado de `mrr` para `pontual`. Ou seja, internamente o Samba Decor já chega na UI como `mrr=0, pontual=9000`. ✅
+
+## Onde está o bug de verdade
+
+Em `src/components/planning/jornada/CfoView.tsx` (linhas 1370-1375), a renderização das colunas está trocada:
+
+```tsx
+{/* Coluna "Fee Mensal" */}
+<TableCell className="text-right">
+  {c.mrr > 0 ? formatBRL(c.mrr) 
+    : c.pontual > 0 ? <span className="text-purple-600">{formatBRL(c.pontual)}</span>  // ← MOSTRA PONTUAL AQUI
+    : "—"}
+</TableCell>
+
+{/* Coluna "Pontual" */}
+<TableCell className="text-right text-purple-600">
+  {c.mrr > 0 && c.pontual > 0 ? formatBRL(c.pontual) 
+    : c.mrr > 0 ? "—" 
+    : "—"}  // ← SEMPRE "—" quando não há MRR
+</TableCell>
 ```
-ID 1299643591 | Garantia Br | CFO Responsavel = "Oliveira"
-                            | Responsavel    = "Adivilso Souza de Oliveira Junior"
-                            | Fase Atual     = "Em Operação Recorrente"
-                            | updated_at     = 2026-05-01 15:29
+
+**Resultado**: clientes 100% pontuais (sem MRR) têm o pontual renderizado **na coluna "Fee Mensal"** (em roxo), e a coluna "Pontual" mostra `—`. Por isso o screenshot tem Samba R$ 9.000 / Espólio R$ 15.000 em Fee Mensal (em roxo) e `—` em Pontual.
+
+## Correção
+
+Separar limpamente as duas colunas, sem a "fusão" condicional:
+
+```tsx
+{/* Fee Mensal: só MRR recorrente */}
+<TableCell className="text-right">
+  {c.mrr > 0 ? formatBRL(c.mrr) : "—"}
+</TableCell>
+
+{/* Pontual: só pontual */}
+<TableCell className="text-right text-purple-600">
+  {c.pontual > 0 ? formatBRL(c.pontual) : "—"}
+</TableCell>
 ```
 
-**O dado no banco está correto: Garantia Br pertence ao Oliveira.** Não existe nenhum registro com "Everton" para esse cliente em nenhuma das tabelas auxiliares.
+Com isso, a Mariana passará a mostrar **todos os fees corretamente em "Pontual"** (Samba R$ 9k, Espólio R$ 15k, UFFA R$ 45k, ARA R$ 7,87k, IDB R$ 18k) e Fee Mensal vai aparecer `—` para todos eles, refletindo a realidade (carteira 100% de serviços pontuais).
 
-Logo, o motivo de ainda aparecer no Everton é **cache do front-end** — não é bug de lógica nem dado errado.
+## Observação adicional (não é bug, só esclarecimento)
 
-### Onde está o cache
+- O **ARA** está em fase "Em Tratativa" (não "Serviços Pontuais") e por isso aparece com `Valor CFOaaS = 7.870` que será redirecionado para Pontual com a correção, **desde que** o produto continue sendo "Diagnóstico Estratégico" (está). ✅
+- O **IDB Hospitais** tem produtos "Setup + Valuation". Como "Setup" não está na lista `PONTUAL_ONLY_PRODUCTS`, `isPontualOnly` retorna `false`, mas como o Valor CFOaaS é zero e o Valor Valuation = 18k, ele acaba indo certo para `pontual`. Funcionará bem.
 
-`src/hooks/useJornadaData.ts` (linha 87) usa React Query com:
-```ts
-staleTime: 5 * 60 * 1000   // 5 minutos
-```
+## Arquivos alterados
 
-Como sua sessão do navegador foi aberta **antes** do `updated_at = 15:29`, o React Query devolveu a versão antiga em memória. Não há `refetchOnWindowFocus`, então só atualiza:
-- ao recarregar a página (F5), ou
-- após 5 min de inatividade da query, ou
-- ao fechar/abrir o navegador.
+- `src/components/planning/jornada/CfoView.tsx` (apenas as 2 células de tabela, linhas 1370-1375)
 
-Não há mapa de override no código que jogue Garantia Br para o Everton — confirmado em `CFO_NAME_NORMALIZE` (só normaliza nomes longos, não muda CFO).
-
-## O que fazer
-
-Três opções, em ordem do mais simples ao mais robusto:
-
-### Opção A — Verificação imediata (sem código)
-Apertar **Cmd/Ctrl + Shift + R** (hard reload) na aba do dashboard. Garantia Br deve sumir do Everton e aparecer no Oliveira na hora.
-
-### Opção B — Botão "Atualizar dados" na aba Jornada
-Adicionar um botão de refresh no header das views (CFOs, Reuniões, Clientes) que invalida a query `['jornada-data']` via `queryClient.invalidateQueries`. Útil para o time não depender de hard reload.
-
-### Opção C — Reduzir `staleTime` ou habilitar `refetchOnWindowFocus`
-Mudar `staleTime` de 5 min para algo como 60 s, ou ativar `refetchOnWindowFocus: true` no `useQuery`. Trade-off: mais chamadas ao Edge Function `query-external-db` (que faz consulta SQL pesada às 7 tabelas Pipefy).
-
-## Recomendação
-
-Como a divergência é **percepção causada por cache**, sugiro:
-1. Hard reload agora para confirmar (Opção A).
-2. Implementar **Opção B** (botão de refresh manual visível) — mantém custo baixo no Edge Function e dá controle ao time quando alguém altera algo no Pipefy.
-
-Confirma se quer que eu implemente o botão de refresh, ou se prefere que eu reduza o `staleTime` (Opção C)?
+Não há mudança de lógica de negócio nem de hook — é puramente correção da renderização nas colunas do diálogo.

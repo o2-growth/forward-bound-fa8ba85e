@@ -1366,12 +1366,13 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
                         </div>
                       </TableCell>
                       <TableCell><Badge variant="outline" className="text-[10px]">{c.faseAtual}</Badge></TableCell>
-                      {/* Feature 3: Fee mensal (MRR or pontual-only) */}
+                      {/* Fee Mensal: apenas MRR recorrente */}
                       <TableCell className="text-right">
-                        {c.mrr > 0 ? formatBRL(c.mrr) : c.pontual > 0 ? <span className="text-purple-600">{formatBRL(c.pontual)}</span> : "—"}
+                        {c.mrr > 0 ? formatBRL(c.mrr) : "—"}
                       </TableCell>
+                      {/* Pontual: apenas valores pontuais */}
                       <TableCell className="text-right text-purple-600">
-                        {c.mrr > 0 && c.pontual > 0 ? formatBRL(c.pontual) : c.mrr > 0 ? "—" : "—"}
+                        {c.pontual > 0 ? formatBRL(c.pontual) : "—"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
