@@ -227,7 +227,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         let shouldCount = false;
         
         if (indicator === 'venda') {
-          if (movement.fase === 'Contrato assinado') {
+          if (movement.fase === 'Contrato assinado' || shouldForceAssinaturaDate(movement.titulo, 'expansao')) {
             shouldCount = true;
           }
         } else if (indicator === 'proposta') {
