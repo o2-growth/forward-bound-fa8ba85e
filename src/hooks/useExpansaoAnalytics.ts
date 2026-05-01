@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
-import { fixPossibleDateInversion } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate } from "./dateUtils";
 
 export interface ExpansaoCard {
   id: string;
@@ -128,9 +128,14 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
   let dataEntrada = parseDate(row['Entrada']) || new Date();
   const dataSaida = parseDate(row['Saída']);
   const fase = row['Fase'] || '';
+  const tituloRaw = row['Título'] || '';
   const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
   if (fase === 'Contrato assinado' && dataAssinatura) {
-    dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+    if (shouldForceAssinaturaDate(tituloRaw, 'expansao')) {
+      dataEntrada = dataAssinatura;
+    } else {
+      dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+    }
   }
   
   // Calculate duration dynamically

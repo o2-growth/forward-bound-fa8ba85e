@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
-import { fixPossibleDateInversion } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate } from "./dateUtils";
 
 export type ExpansaoIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -88,14 +88,21 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         if (produto !== 'Franquia') continue;
         
         let dataEntrada = parseDate(row['Entrada']) || new Date();
+        const titulo = row['Título'] || '';
         
         // For "Contrato assinado", use signature date like other hooks
         if ((row['Fase'] || '') === 'Contrato assinado') {
           const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
           if (dataAssinatura) {
-            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+            // Force override for specific cards (lista em dateUtils)
+            if (shouldForceAssinaturaDate(titulo, 'expansao')) {
+              dataEntrada = dataAssinatura;
+            } else {
+              dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+            }
           }
         }
+
 
         // Lê com fallback de variações de nome de campo (Pipefy às vezes tem
         // colunas com acentuação/capitalização diferente)

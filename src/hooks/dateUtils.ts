@@ -137,3 +137,32 @@ export function fixPossibleDateInversion(assinatura: Date, entrada: Date): Date 
 
   return diffSwapped < diffOriginal ? swapped : assinatura;
 }
+
+/**
+ * Lista de cards (por correspondência no Título) para os quais devemos
+ * SEMPRE usar a "Data de assinatura do contrato" como data efetiva da venda,
+ * ignorando a data de movimentação no Pipefy. Match é case/acento-insensitive
+ * via `includes` do título normalizado.
+ */
+const FORCE_ASSINATURA_TITLES: Record<'expansao' | 'modelo_atual', string[]> = {
+  expansao: ['JEAN MORBIS', 'MONICA SPINELLI', 'RICARDO REIS', 'ALEXANDRE CORREA', 'ELIZETH'],
+  modelo_atual: ['EDIOURO', 'COTRIM ENTERPRISES', 'FUJITEC'],
+};
+
+function normalizeTitle(s: string): string {
+  return (s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+export function shouldForceAssinaturaDate(
+  titulo: string,
+  bu: 'expansao' | 'modelo_atual'
+): boolean {
+  if (!titulo) return false;
+  const t = normalizeTitle(titulo);
+  return FORCE_ASSINATURA_TITLES[bu].some(name => t.includes(normalizeTitle(name)));
+}
+
