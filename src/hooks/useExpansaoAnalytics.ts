@@ -494,7 +494,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
           const movementIndicator = PHASE_TO_INDICATOR[m.fase];
           
           if (indicator === 'venda') {
-            return m.fase === 'Contrato assinado';
+            return m.fase === 'Contrato assinado' || m.fase === 'Ganho' || shouldForceAssinaturaDate(m.titulo, 'expansao');
           } else if (indicator === 'proposta') {
             return movementIndicator === 'proposta';
           }
