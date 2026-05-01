@@ -341,12 +341,10 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
           const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
           let dataEntrada = parseDate(row['Entrada'] || row['entrada']) || new Date();
           const tituloMerge = row['Título'] || row['titulo'] || row['Nome'] || '';
-          if (fase === 'Contrato assinado' && dataAssinatura) {
-            if (shouldForceAssinaturaDate(tituloMerge, 'modelo_atual')) {
-              dataEntrada = dataAssinatura;
-            } else {
-              dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
-            }
+          if (shouldForceAssinaturaDate(tituloMerge, 'modelo_atual')) {
+            dataEntrada = getForcedSaleDate();
+          } else if (fase === 'Contrato assinado' && dataAssinatura) {
+            dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
           }
           const valorMRR = parseNumericValue(row['Valor MRR'] || 0);
           const valorPontual = parseNumericValue(row['Valor Pontual'] || 0);
