@@ -70,7 +70,7 @@ async function fetchTable(table: string, limit = 2000) {
 }
 
 export function useJornadaData() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ['jornada-data'],
     queryFn: async () => {
       const [projetos, setup, tratativas, nps, rotinas, clientes, connections] = await Promise.all([
@@ -634,5 +634,5 @@ export function useJornadaData() {
     return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync };
   }, [data]);
 
-  return { ...result, isLoading, error };
+  return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };
 }
