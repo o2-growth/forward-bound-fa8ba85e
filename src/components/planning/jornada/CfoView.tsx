@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowUpDown, ExternalLink, Info, ChevronDown, ChevronRight, Users, DollarSign, Plus, Minus, X, Calculator, Zap, Trash2 } from "lucide-react";
+import { ArrowUpDown, ExternalLink, Info, ChevronDown, ChevronRight, ChevronUp, Users, DollarSign, Plus, Minus, X, Calculator, Zap, Trash2 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from "recharts";
 import type { JornadaCfo, JornadaCliente } from "./types";
