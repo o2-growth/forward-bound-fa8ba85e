@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
-import { fixPossibleDateInversion, shouldForceAssinaturaDate } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 
 export interface ExpansaoCard {
   id: string;
