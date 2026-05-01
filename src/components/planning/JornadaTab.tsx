@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Filter, X, Info } from "lucide-react";
+import { Loader2, Filter, X, Info, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useJornadaData } from "@/hooks/useJornadaData";
 import { PipelineView } from "./jornada/PipelineView";
@@ -14,7 +14,11 @@ import { ReunioesView } from "./jornada/ReunioesView";
 import type { JornadaFilter, JornadaCliente, JornadaCfo, PipelineFase } from "./jornada/types";
 
 export function JornadaTab() {
-  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading, error } = useJornadaData();
+  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading, error, refetch, isFetching, dataUpdatedAt } = useJornadaData();
+
+  const lastUpdatedLabel = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : null;
 
   const [filters, setFilters] = useState<JornadaFilter>({ cfo: [], produto: [], healthLevel: [] });
 
@@ -176,6 +180,32 @@ export function JornadaTab() {
             </Button>
           </>
         )}
+
+        {/* Refresh button — busca dados frescos do Pipefy ignorando cache */}
+        <div className="ml-auto flex items-center gap-2">
+          {lastUpdatedLabel && (
+            <span className="text-xs text-muted-foreground hidden md:inline">
+              Atualizado às {lastUpdatedLabel}
+            </span>
+          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="gap-1.5"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Atualizar</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs max-w-xs">
+              Busca dados atualizados do Pipefy. Use após alterar CFO/fase de um cliente.
+            </TooltipContent>
+          </Tooltip>
+        </div>
 
       </div>
 
