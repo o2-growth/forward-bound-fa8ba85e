@@ -302,8 +302,9 @@ export function useJornadaData() {
       let mrr = isPontualOnly ? 0 : (valorCfoaas + valorOxy);
       let pontual = valorDiagnostico + valorTurnaround + valorValuation + valorEducacao + (isPontualOnly ? valorCfoaas : 0);
 
-      // Override específico Libracom (Dago): valor lançado como pontual é, na verdade, recorrente (MRR)
-      if (tituloLower.includes('libracom')) {
+      // Override específico (Dago): valor lançado como pontual é, na verdade, recorrente (MRR)
+      const PONTUAL_TO_MRR_OVERRIDES = ['libracom', 'rgo', 'guará', 'guara'];
+      if (PONTUAL_TO_MRR_OVERRIDES.some(k => tituloLower.includes(k))) {
         mrr = mrr + pontual;
         pontual = 0;
       }
