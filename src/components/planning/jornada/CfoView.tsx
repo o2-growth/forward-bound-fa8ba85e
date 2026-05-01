@@ -1307,15 +1307,34 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Fase</TableHead>
-                  <TableHead className="text-right">Fee Mensal</TableHead>
-                  <TableHead className="text-right">Pontual</TableHead>
-                  <TableHead className="text-right">Health</TableHead>
-                  <TableHead className="text-right">NPS</TableHead>
-                  <TableHead>Tratativa</TableHead>
+                  {([
+                    ['cliente', 'Cliente', 'left'],
+                    ['status', 'Status', 'left'],
+                    ['produto', 'Produto', 'left'],
+                    ['fase', 'Fase', 'left'],
+                    ['feeMensal', 'Fee Mensal', 'right'],
+                    ['pontual', 'Pontual', 'right'],
+                    ['health', 'Health', 'right'],
+                    ['nps', 'NPS', 'right'],
+                    ['tratativa', 'Tratativa', 'left'],
+                  ] as [ClientSortCol, string, 'left' | 'right'][]).map(([col, label, align]) => {
+                    const active = clientSortCol === col;
+                    const Icon = active ? (clientSortAsc ? ChevronUp : ChevronDown) : ArrowUpDown;
+                    return (
+                      <TableHead key={col} className={align === 'right' ? 'text-right' : ''}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`gap-1 h-7 px-2 ${align === 'right' ? '-mr-2' : '-ml-2'} ${active ? 'text-primary font-semibold' : ''}`}
+                          onClick={() => toggleClientSort(col)}
+                        >
+                          {align === 'right' && <Icon className="h-3 w-3" />}
+                          {label}
+                          {align === 'left' && <Icon className="h-3 w-3" />}
+                        </Button>
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
               </TableHeader>
               <TableBody>
