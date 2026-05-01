@@ -1,15 +1,34 @@
-## Ajustar fee dos estagiários para R$ 1.500
+## Tratar receita Pontual da Mariana como MRR no clicável
 
-Em `src/components/planning/jornada/CfoView.tsx`, no array `SQUADS`, alterar o campo `fee` de `0` para `1500` nestes 3 membros:
+A Mariana atende muitos clientes pontuais (Diagnóstico, Turnaround, Valuation) onde `cliente.mrr = 0` e `cliente.pontual > 0`. Hoje o `mrrTotal` agregado por CFO só soma `c.mrr`, então a Mariana aparece com MRR/margem zerados no card e dialog.
 
-| Linha | Membro | Squad |
-|---|---|---|
-| 72 | Pedro Oppermann Michelucci (Estagiário FP&A) | (squad linha 66) |
-| 81 | Maria Eduarda Nery Reckziegel (Estagiária FP&A) | (squad linha 77) |
-| 107 | Raissa Bonamigo Daros (Estagiária FP&A) | (squad linha 103) |
+Solução cirúrgica: somar o `pontual` como se fosse MRR **apenas** na agregação por CFO da Mariana, sem mexer na lógica geral nem nos dados dos clientes.
+
+### Mudança
+
+Em `src/hooks/useJornadaData.ts`, na construção do `cfoMap` (linha ~477):
+
+```ts
+// antes
+existing.mrrTotal += c.mrr;
+
+// depois
+const cfoNome = c.cfo ?? '';
+const tratarPontualComoMrr = cfoNome.includes('Mariana');
+existing.mrrTotal += c.mrr + (tratarPontualComoMrr ? (c.pontual ?? 0) : 0);
+if (c.tratativaAtiva) {
+  existing.mrrEmRisco += c.mrr + (tratarPontualComoMrr ? (c.pontual ?? 0) : 0);
+}
+```
+
+(o `mrrEmRisco` segue a mesma regra para manter consistência no dialog)
 
 ### Efeito
-O custo total do squad (`sq.fee + Σ membros.fee + benefícios`, linha 218-220) passa a incluir +R$ 1.500 por estagiário, refletindo automaticamente nos cards/dialogs de margem dos respectivos CFOs.
+
+- Card da Mariana, ranking, dialog (MRR Total, P&L, margem, ticket médio) e ordenação passam a refletir a receita pontual como se fosse recorrente.
+- Demais CFOs ficam exatamente iguais.
+- Nenhuma alteração em clientes individuais, simulador, totais globais ou outras telas.
 
 ### Arquivos alterados
-- `src/components/planning/jornada/CfoView.tsx` — apenas o valor `fee` dos 3 membros
+
+- `src/hooks/useJornadaData.ts` — apenas o bloco de agregação por CFO
