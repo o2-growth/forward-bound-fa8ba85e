@@ -299,8 +299,14 @@ export function useJornadaData() {
       const valorEducacao = parseNum(row['Valor Educação'] || row['Valor Educacao']);
 
       // If pontual-only product, CFOaaS goes to pontual (data entry error in Pipefy)
-      const mrr = isPontualOnly ? 0 : (valorCfoaas + valorOxy);
-      const pontual = valorDiagnostico + valorTurnaround + valorValuation + valorEducacao + (isPontualOnly ? valorCfoaas : 0);
+      let mrr = isPontualOnly ? 0 : (valorCfoaas + valorOxy);
+      let pontual = valorDiagnostico + valorTurnaround + valorValuation + valorEducacao + (isPontualOnly ? valorCfoaas : 0);
+
+      // Override específico Libracom (Dago): valor lançado como pontual é, na verdade, recorrente (MRR)
+      if (tituloLower.includes('libracom')) {
+        mrr = mrr + pontual;
+        pontual = 0;
+      }
       const entrada = parseDate(row['Entrada']) || new Date();
       const diasNaFase = daysBetween(entrada, now);
 
