@@ -58,7 +58,7 @@ const CFO_SQUADS: Record<string, {
     fee: 17500,
     beneficios: 503,
     membros: [
-      { nome: 'Tainara Sofia Konzen', cargo: 'Analista FP&A', fee: 7500, beneficios: 90 },
+      { nome: 'Tainara Sofia Konzen', cargo: 'Analista FP&A', fee: 7500, beneficios: 624.20 },
     ],
   },
   'Eduardo Milani Pedrolo': {
