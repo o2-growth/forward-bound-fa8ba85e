@@ -177,3 +177,22 @@ export function getForcedSaleDate(): Date {
   return new Date(FORCED_SALE_DATE.getTime());
 }
 
+/**
+ * Override de Valor Pontual fixo para cards específicos (Expansão).
+ * Quando aplicado, zera MRR/Setup/TaxaFranquia para que o cálculo de venda
+ * use somente o Pontual aqui definido.
+ */
+const FORCED_PONTUAL_VALUES: Record<string, number> = {
+  'ALEXANDRE CORREA': 43000,
+  'JEAN MORBIS': 36000,
+};
+
+export function getForcedPontualValue(titulo: string): number | null {
+  if (!titulo) return null;
+  const t = normalizeTitle(titulo);
+  for (const [name, value] of Object.entries(FORCED_PONTUAL_VALUES)) {
+    if (t.includes(normalizeTitle(name))) return value;
+  }
+  return null;
+}
+
