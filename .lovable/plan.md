@@ -1,73 +1,44 @@
-## Contexto
+## Objetivo
 
-Hoje, no Funil de Expansão (`useExpansaoMetas`, `useExpansaoAnalytics`) e no Modelo Atual (`useModeloAtualMetas`, `useModeloAtualAnalytics`), a `Data de assinatura do contrato` só substitui a data de movimentação de "Contrato assinado / Ganho" quando há **inversão dia/mês** (via `fixPossibleDateInversion`). Em todos os outros casos, vale a data da movimentação no Pipefy.
+Forçar os 8 cards específicos a serem contabilizados como venda em **Abril/2026** (mês passado), ignorando qualquer data de movimentação ou de assinatura no Pipefy.
 
-Você quer que, **apenas para os 8 cards listados**, a data efetiva da venda seja **sempre** a `Data de assinatura do contrato` (ignorando a movimentação), preservando o comportamento atual para todos os demais.
+## Cards alvo
 
-## Cards alvo (match por título — case/acento-insensitive, contém)
+- **Expansão**: JEAN MORBIS, MONICA SPINELLI, RICARDO REIS, ALEXANDRE CORREA, ELIZETH
+- **Modelo Atual**: EDIOURO, COTRIM ENTERPRISES, FUJITEC
 
-**Funil de Expansão:**
-- JEAN MORBIS
-- MONICA SPINELLI
-- RICARDO REIS
-- ALEXANDRE CORREA
-- ELIZETH
+Identificação por correspondência no Título (case e acento insensitive), reusando a lista já existente em `dateUtils.ts`.
 
-**Modelo Atual:**
-- EDIOURO
-- COTRIM ENTERPRISES
-- FUJITEC
+## Regra
 
-## Mudanças propostas
+Para qualquer card cujo título corresponda à lista, sobrescrever a `dataEntrada` (data efetiva da venda) para uma data fixa dentro de Abril/2026 (ex.: `2026-04-15`). Isso garante:
 
-### 1. Novo helper compartilhado em `src/hooks/dateUtils.ts`
+- Conta como venda em Abril/2026 em todos os KPIs, gráficos e drill-downs
+- Independe de movimentação/assinatura registrada no Pipefy (resolve o caso onde `Data de assinatura do contrato` está `null`)
+- Nenhum outro card é afetado
 
-```ts
-const FORCE_ASSINATURA_TITLES = {
-  expansao: ['JEAN MORBIS','MONICA SPINELLI','RICARDO REIS','ALEXANDRE CORREA','ELIZETH'],
-  modelo_atual: ['EDIOURO','COTRIM ENTERPRISES','FUJITEC'],
-};
+## Mudanças técnicas
 
-export function shouldForceAssinaturaDate(
-  titulo: string,
-  bu: 'expansao' | 'modelo_atual'
-): boolean {
-  const norm = (s: string) =>
-    s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
-  const t = norm(titulo);
-  return FORCE_ASSINATURA_TITLES[bu].some(name => t.includes(norm(name)));
-}
-```
+1. **`src/hooks/dateUtils.ts`**
+   - Manter a lista `FORCE_ASSINATURA_TITLES` e a função `shouldForceAssinaturaDate` (mesmos nomes para minimizar diff).
+   - Adicionar constante `FORCED_SALE_DATE = new Date(2026, 3, 15)` (mês 3 = Abril em JS) e helper `getForcedSaleDate()`.
 
-(Usa as regras de normalização padrão do projeto.)
+2. **Hooks de Expansão** (`useExpansaoMetas.ts`, `useExpansaoAnalytics.ts`)
+   - Substituir o bloco atual de override (que hoje seta `dataEntrada = dataAssinatura`) por:
+     ```
+     if (shouldForceAssinaturaDate(titulo, 'expansao')) {
+       dataEntrada = getForcedSaleDate(); // 2026-04-15
+     } else {
+       dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
+     }
+     ```
+   - Aplicar o mesmo bloco também nos pontos onde a fase é **`Ganho`** (não só `Contrato assinado`), para cobrir cards que pularam direto para Ganho.
 
-### 2. Aplicar nos hooks de Expansão
+3. **Hooks de Modelo Atual** (`useModeloAtualMetas.ts`, `useModeloAtualAnalytics.ts`)
+   - Mesma substituição nos blocos de override existentes na fase `Contrato assinado`.
 
-Em `useExpansaoMetas.ts` (linhas ~93-97) e `useExpansaoAnalytics.ts` (linhas ~131-133), na fase `'Contrato assinado'`:
+## Comportamento esperado depois
 
-- Se `shouldForceAssinaturaDate(titulo, 'expansao')` e existe `dataAssinatura` → `dataEntrada = dataAssinatura` (override total).
-- Caso contrário, manter o comportamento atual com `fixPossibleDateInversion`.
-
-### 3. Aplicar nos hooks de Modelo Atual
-
-Em `useModeloAtualMetas.ts` (linhas ~278-279, 341-342) e `useModeloAtualAnalytics.ts` (linhas ~130-133, 385-390, 438-440), nos pontos onde se decide a `effectiveDate` para `venda`:
-
-- Se `shouldForceAssinaturaDate(titulo, 'modelo_atual')` e existe `dataAssinatura` → usar `dataAssinatura` como data efetiva, sem passar pela checagem de inversão.
-- Caso contrário, manter o comportamento atual.
-
-### 4. Não mexer em
-
-- `useOxyHackerMetas.ts` (não está na lista).
-- `sync-pipefy-funnel/index.ts` Edge Function — ela já usa `Data de assinatura` como `saleDate` para a tabela `funnel_realized`, então não precisa de ajuste.
-- Nenhuma migração de DB.
-
-## Impacto esperado
-
-- Os 8 cards passarão a contar a venda no mês da assinatura do contrato em todos os gráficos/KPIs/funil de Expansão e Modelo Atual (Indicadores, Drill-downs, Sales Goals, Plan Growth, etc.).
-- Os demais cards continuam exatamente com o comportamento atual.
-- Lista de exceções fica centralizada em `dateUtils.ts`, fácil de editar no futuro.
-
-## Risco / atenção
-
-- Match por título é sensível a renomes futuros no Pipefy. Se algum card for renomeado, a regra deixa de aplicar — basta atualizar a lista.
-- Se houver mais de um card com título contendo o mesmo nome (homônimos), todos serão afetados. Hoje os nomes parecem únicos o suficiente.
+- Os 8 cards aparecerão somados em Abril/2026 nas métricas de venda, MRR, Setup, Pontual e nos gráficos por mês das respectivas BUs.
+- Todos os demais cards continuam com a lógica padrão (`fixPossibleDateInversion` entre data de movimentação e data de assinatura).
+- Funciona mesmo com `Data de assinatura do contrato` ausente no Pipefy.
