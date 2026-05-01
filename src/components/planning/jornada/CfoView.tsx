@@ -734,10 +734,46 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
     });
   }, [cfos, sortCol, sortAsc, churnsPerCfo]);
 
+  // Sort state for dialog client table
+  type ClientSortCol = 'cliente' | 'status' | 'produto' | 'fase' | 'feeMensal' | 'pontual' | 'health' | 'nps' | 'tratativa';
+  const [clientSortCol, setClientSortCol] = useState<ClientSortCol>('feeMensal');
+  const [clientSortAsc, setClientSortAsc] = useState(false);
+  const STRING_COLS: ClientSortCol[] = ['cliente', 'produto', 'fase'];
+
+  const toggleClientSort = (col: ClientSortCol) => {
+    if (clientSortCol === col) setClientSortAsc(prev => !prev);
+    else { setClientSortCol(col); setClientSortAsc(STRING_COLS.includes(col)); }
+  };
+
   const dialogClientes = useMemo(() => {
     if (!selectedCfo) return [];
-    return activeClientes.filter(c => c.cfo === selectedCfo).sort((a, b) => b.mrr - a.mrr);
-  }, [activeClientes, selectedCfo]);
+    const base = activeClientes.filter(c => c.cfo === selectedCfo);
+    const statusOrder: Record<ClienteStatus, number> = { risco: 0, novo: 1, controlado: 2 };
+    const dir = clientSortAsc ? 1 : -1;
+    const cmpStr = (a: string, b: string) => a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });
+    return [...base].sort((a, b) => {
+      switch (clientSortCol) {
+        case 'cliente': return cmpStr(a.titulo || '', b.titulo || '') * dir;
+        case 'status': return (statusOrder[deriveStatus(a)] - statusOrder[deriveStatus(b)]) * dir;
+        case 'produto': return cmpStr(a.produtos[0] || '', b.produtos[0] || '') * dir;
+        case 'fase': return cmpStr(a.faseAtual || '', b.faseAtual || '') * dir;
+        case 'feeMensal': return (a.mrr - b.mrr) * dir;
+        case 'pontual': return (a.pontual - b.pontual) * dir;
+        case 'health': return (a.healthScore - b.healthScore) * dir;
+        case 'nps': {
+          // null sempre no fim
+          const av = a.ultimoNps;
+          const bv = b.ultimoNps;
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          return (av - bv) * dir;
+        }
+        case 'tratativa': return ((a.tratativaAtiva ? 1 : 0) - (b.tratativaAtiva ? 1 : 0)) * dir;
+        default: return 0;
+      }
+    });
+  }, [activeClientes, selectedCfo, clientSortCol, clientSortAsc]);
 
   const selectedCfoData = cfos.find(c => c.nome === selectedCfo);
 
