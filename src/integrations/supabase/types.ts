@@ -246,10 +246,15 @@ export type Database = {
         Row: {
           bu: string
           created_at: string
+          faturamento_meta: number
+          faturamento_vender: number
           id: string
+          investimento: number
+          is_locked: boolean
           leads: number
           month: string
           mqls: number
+          mrr_base_planejamento: number
           propostas: number
           rms: number
           rrs: number
@@ -260,10 +265,15 @@ export type Database = {
         Insert: {
           bu: string
           created_at?: string
+          faturamento_meta?: number
+          faturamento_vender?: number
           id?: string
+          investimento?: number
+          is_locked?: boolean
           leads?: number
           month: string
           mqls?: number
+          mrr_base_planejamento?: number
           propostas?: number
           rms?: number
           rrs?: number
@@ -274,10 +284,15 @@ export type Database = {
         Update: {
           bu?: string
           created_at?: string
+          faturamento_meta?: number
+          faturamento_vender?: number
           id?: string
+          investimento?: number
+          is_locked?: boolean
           leads?: number
           month?: string
           mqls?: number
+          mrr_base_planejamento?: number
           propostas?: number
           rms?: number
           rrs?: number
