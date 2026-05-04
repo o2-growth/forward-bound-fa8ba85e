@@ -139,13 +139,9 @@ export function AdminTab() {
           <Target className="h-4 w-4" />
           Metas por Closer
         </TabsTrigger>
-        <TabsTrigger value="monetary-metas" className="gap-2">
-          <DollarSign className="h-4 w-4" />
-          Metas Monetárias
-        </TabsTrigger>
-        <TabsTrigger value="cost-stage-metas" className="gap-2">
-          <Gauge className="h-4 w-4" />
-          Metas CPx
+        <TabsTrigger value="sdr-metas" className="gap-2">
+          <Users className="h-4 w-4" />
+          Metas por SDR
         </TabsTrigger>
         <TabsTrigger value="logs" className="gap-2">
           <History className="h-4 w-4" />
