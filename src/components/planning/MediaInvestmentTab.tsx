@@ -1323,19 +1323,26 @@ export function MediaInvestmentTab() {
 
     const fixedRows = hasFunnelForBU('modelo_atual') ? getFunnelForBU('modelo_atual') : [];
 
+    const ticketMedio = indicadoresPorBU.modeloAtual.ticketMedio || 17000;
+    const cpvVal = indicadoresPorBU.modeloAtual.cpv;
+    const m = funnelMetrics.modeloAtual;
+
     return calculated.map(d => {
       const realMrr = mrrBaseRealPorMes[d.month];
       const fixed = fixedRows.find(f => f.month === d.month);
       const isLocked = fixed?.is_locked === true;
+      const projetado = d.mrrBase; // MRR sintético antes do override
+      const aVenderOriginal = d.faturamentoVender;
 
       // Mês locked: snapshot manda em metas/quantidades; mrrBase mostra Oxy real (verdade visual)
       if (isLocked && fixed) {
         const fatMeta = Number(fixed.faturamento_meta) || d.faturamentoMeta;
         const fatVender = Number(fixed.faturamento_vender) || d.faturamentoVender;
         const invest = Number(fixed.investimento) || d.investimento;
+        const mrrShown = realMrr > 0 ? realMrr : d.mrrBase;
         return {
           ...d,
-          mrrBase: realMrr > 0 ? realMrr : d.mrrBase,
+          mrrBase: mrrShown,
           faturamentoMeta: fatMeta,
           faturamentoVender: fatVender,
           investimento: invest,
@@ -1345,13 +1352,44 @@ export function MediaInvestmentTab() {
           rrs: fixed.rrs ?? d.rrs,
           propostas: fixed.propostas ?? d.propostas,
           vendas: fixed.vendas ?? d.vendas,
+          mrrBaseProjetado: projetado,
+          mrrBaseGap: projetado - mrrShown,
+          aVenderOriginal,
         };
       }
 
-      // Mês não locked: só sobrescreve mrrBase quando houver Oxy real
-      return realMrr > 0 ? { ...d, mrrBase: realMrr } : d;
+      // Mês não locked sem Oxy real: nada muda
+      if (!(realMrr > 0)) {
+        return d;
+      }
+
+      // Mês não locked com Oxy real: preserva Meta original e recalcula A Vender + funil
+      const novoVender = Math.max(0, d.faturamentoMeta - realMrr);
+      const vendas = novoVender / ticketMedio;
+      const propostas = vendas / m.propToVenda;
+      const rrs = propostas / m.rrToProp;
+      const rms = rrs / m.rmToRr;
+      const mqls = rms / m.mqlToRm;
+      const leads = mqls / m.leadToMql;
+      const investimento = Math.round(vendas * cpvVal);
+
+      return {
+        ...d,
+        mrrBase: realMrr,
+        faturamentoVender: novoVender,
+        vendas: Math.ceil(vendas),
+        propostas: Math.ceil(propostas),
+        rrs: Math.ceil(rrs),
+        rms: Math.ceil(rms),
+        mqls: Math.ceil(mqls),
+        leads: Math.ceil(leads),
+        investimento,
+        mrrBaseProjetado: projetado,
+        mrrBaseGap: projetado - realMrr,
+        aVenderOriginal,
+      };
     });
-  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU]);
+  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU]);
   
   const o2TaxFunnel = useMemo(() => 
     calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 10000),
