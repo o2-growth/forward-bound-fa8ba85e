@@ -18,6 +18,7 @@ import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useCloserMetas, BU_CLOSERS, BuType, CloserType } from "@/hooks/useCloserMetas";
+import { useSdrMetas } from "@/hooks/useSdrMetas";
 import { LossAnalysisSection } from "./indicators/LossAnalysisSection";
 import { format, startOfYear, endOfYear, endOfDay, differenceInDays, eachMonthOfInterval, addDays, eachDayOfInterval, getMonth, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { DateRangePickerGA } from "./DateRangePickerGA";
@@ -470,6 +471,72 @@ export function IndicatorsTab() {
   
   // Get closer metas for filtering goals by closer percentage
   const { getFilteredMeta } = useCloserMetas(currentYear);
+  const { metas: sdrMetasList } = useSdrMetas(currentYear);
+
+  /**
+   * Soma metas RM/RR de sdr_metas para uma BU/SDRs em um período (com fração proporcional ao mês).
+   * Retorna { value, hasData } — quando hasData=false, o caller deve usar fallback (funnel).
+   */
+  const getSdrMetaForPeriod = (
+    indicatorKey: 'rm' | 'rr',
+    bu: string,
+    start: Date,
+    end: Date,
+    sdrFilter?: string[]
+  ): { value: number; hasData: boolean } => {
+    if (!sdrMetasList || sdrMetasList.length === 0) return { value: 0, hasData: false };
+    const monthsInPeriod = eachMonthOfInterval({ start, end });
+    let total = 0;
+    let hasData = false;
+
+    for (const monthDate of monthsInPeriod) {
+      const monthName = monthNames[getMonth(monthDate)];
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const overlapStart = start > monthStart ? start : monthStart;
+      const overlapEnd = end < monthEnd ? end : monthEnd;
+      if (overlapStart > overlapEnd) continue;
+      const overlapDays = differenceInDays(overlapEnd, overlapStart) + 1;
+      const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
+      const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
+
+      const records = sdrMetasList.filter(m =>
+        m.bu === bu &&
+        m.month === monthName &&
+        (!sdrFilter || sdrFilter.length === 0 || sdrFilter.includes(m.sdr))
+      );
+      for (const r of records) {
+        const v = indicatorKey === 'rm' ? (r.rm_meta || 0) : (r.rr_meta || 0);
+        if (v > 0) hasData = true;
+        total += v * fraction;
+      }
+    }
+
+    return { value: total, hasData };
+  };
+
+  /** Versão para uso por mês (retorna apenas o valor inteiro do mês, sem fração) */
+  const getSdrMetaForMonth = (
+    indicatorKey: 'rm' | 'rr',
+    bu: string,
+    monthName: string,
+    sdrFilter?: string[]
+  ): { value: number; hasData: boolean } => {
+    if (!sdrMetasList || sdrMetasList.length === 0) return { value: 0, hasData: false };
+    const records = sdrMetasList.filter(m =>
+      m.bu === bu &&
+      m.month === monthName &&
+      (!sdrFilter || sdrFilter.length === 0 || sdrFilter.includes(m.sdr))
+    );
+    let total = 0;
+    let hasData = false;
+    for (const r of records) {
+      const v = indicatorKey === 'rm' ? (r.rm_meta || 0) : (r.rr_meta || 0);
+      if (v > 0) hasData = true;
+      total += v;
+    }
+    return { value: total, hasData };
+  };
 
   // Derive helper flags from multi-selection
   const isConsolidado = selectedBUs.length === 4;
@@ -545,6 +612,14 @@ export function IndicatorsTab() {
     return selectedSDRs;
   }, [selectedSDRs, availableSDRs]);
 
+  // Returns the SDRs (from the active filter) that operate in a given BU.
+  // Returns undefined if no SDR filter is active (no override), or [] if filter is on but
+  // no selected SDR operates in this BU (caller should treat as "exclude this BU").
+  const sdrFilterForBU = (bu: BuType): string[] | undefined => {
+    if (effectiveSelectedSDRs.length === 0) return undefined;
+    return effectiveSelectedSDRs.filter(s => BU_SDRS[bu]?.includes(s));
+  };
+
   // Filter function - checks if a responsavel matches selected closers (partial match, case-insensitive)
   const matchesCloserFilter = (closerValue?: string | null): boolean => {
     if (effectiveSelectedClosers.length === 0) return true; // No filter = show all
@@ -582,8 +657,15 @@ export function IndicatorsTab() {
     start: Date,
     end: Date,
     bu?: string,
-    closerFilter?: string[]
+    closerFilter?: string[],
+    sdrFilter?: string[]
   ): number => {
+    // Override RM/RR by sdr_metas when an SDR filter is active and we have data for this BU
+    if (bu && (indicatorKey === 'rm' || indicatorKey === 'rr') && sdrFilter && sdrFilter.length > 0) {
+      const { value, hasData } = getSdrMetaForPeriod(indicatorKey, bu, start, end, sdrFilter);
+      if (hasData) return Math.round(value);
+    }
+
     if (!funnelItems || funnelItems.length === 0) return 0;
 
     const getItemValue = (item: FunnelDataItem): number => {
@@ -619,7 +701,6 @@ export function IndicatorsTab() {
 
       let monthMeta = getItemValue(item) * fraction;
       
-      // Apply closer percentage filter if BU and closers are provided
       if (bu && closerFilter && closerFilter.length > 0) {
         monthMeta = getFilteredMeta(monthMeta, bu, monthName, closerFilter);
       }
@@ -630,22 +711,29 @@ export function IndicatorsTab() {
     return Math.round(total);
   };
   
-  // Helper function to get monthly metas array from funnelData for charts
-  // Optionally applies closer percentage filter per month for a specific BU
   const getMonthlyMetasFromFunnel = (
     funnelItems: FunnelDataItem[] | undefined,
     indicatorKey: IndicatorType,
     start: Date,
     end: Date,
     bu?: string,
-    closerFilter?: string[]
+    closerFilter?: string[],
+    sdrFilter?: string[]
   ): number[] => {
-    if (!funnelItems || funnelItems.length === 0) return [];
-    
     const monthsInPeriod = eachMonthOfInterval({ start, end });
+
+    // Override per-month using sdr_metas if SDR filter active and data present
+    const useSdrOverride = !!(bu && (indicatorKey === 'rm' || indicatorKey === 'rr') && sdrFilter && sdrFilter.length > 0);
+
     return monthsInPeriod.map(monthDate => {
       const monthName = monthNames[getMonth(monthDate)];
-      const item = funnelItems.find(f => f.month === monthName);
+
+      if (useSdrOverride) {
+        const { value, hasData } = getSdrMetaForMonth(indicatorKey as 'rm' | 'rr', bu!, monthName, sdrFilter);
+        if (hasData) return Math.round(value);
+      }
+
+      const item = funnelItems?.find(f => f.month === monthName);
       if (!item) return 0;
       
       let value = 0;
@@ -658,7 +746,6 @@ export function IndicatorsTab() {
         default: value = 0;
       }
       
-      // Apply closer percentage filter if BU and closers are provided
       if (bu && closerFilter && closerFilter.length > 0) {
         value = getFilteredMeta(value, bu, monthName, closerFilter);
       }
@@ -716,76 +803,38 @@ export function IndicatorsTab() {
   // Applies closer percentage filter for Modelo Atual when closers are selected
   const getMetaForIndicator = (indicator: IndicatorConfig) => {
     if (!funnelData) return Math.round(indicator.annualMeta * periodFraction);
-    
+
     let total = 0;
-    
-    // Modelo Atual - apply closer filter only if selected closers operate in this BU
-    if (includesModeloAtual && funnelData.modeloAtual) {
-      const closersForBU = effectiveSelectedClosers.filter(c => 
-        BU_CLOSERS.modelo_atual.includes(c as CloserType)
+
+    const buBlocks: { bu: BuType; items?: FunnelDataItem[] }[] = [
+      { bu: 'modelo_atual', items: funnelData.modeloAtual },
+      { bu: 'o2_tax', items: funnelData.o2Tax },
+      { bu: 'oxy_hacker', items: funnelData.oxyHacker },
+      { bu: 'franquia', items: funnelData.franquia },
+    ];
+
+    for (const { bu, items } of buBlocks) {
+      if (!selectedBUs.includes(bu) || !items) continue;
+
+      // Closer filter for this BU
+      const closersForBU = effectiveSelectedClosers.filter(c => BU_CLOSERS[bu]?.includes(c as CloserType));
+      if (effectiveSelectedClosers.length > 0 && closersForBU.length === 0) continue;
+
+      // SDR filter for this BU
+      const sdrsForBU = sdrFilterForBU(bu);
+      if (sdrsForBU !== undefined && sdrsForBU.length === 0) continue;
+
+      total += calcularMetaDoPeriodo(
+        items,
+        indicator.key,
+        startDate,
+        endDate,
+        bu,
+        closersForBU.length > 0 ? closersForBU : undefined,
+        sdrsForBU,
       );
-      
-      if (closersForBU.length > 0) {
-        total += calcularMetaDoPeriodo(
-          funnelData.modeloAtual, 
-          indicator.key, 
-          startDate, 
-          endDate,
-          'modelo_atual',
-          closersForBU
-        );
-      } else if (effectiveSelectedClosers.length > 0) {
-        // Closer selecionado não atua nesta BU - não contar meta
-        total += 0;
-      } else {
-        // Sem filtro - contar tudo
-        total += calcularMetaDoPeriodo(funnelData.modeloAtual, indicator.key, startDate, endDate);
-      }
     }
-    // O2 TAX - apply closer filter only if Lucas is selected
-    if (includesO2Tax && funnelData.o2Tax) {
-      const closersForBU = effectiveSelectedClosers.filter(c => 
-        BU_CLOSERS.o2_tax.includes(c as CloserType)
-      );
-      
-      if (closersForBU.length > 0) {
-        total += calcularMetaDoPeriodo(
-          funnelData.o2Tax, 
-          indicator.key, 
-          startDate, 
-          endDate,
-          'o2_tax',
-          closersForBU
-        );
-      } else if (effectiveSelectedClosers.length > 0) {
-        // Pedro ou Daniel selecionados - não contar O2 TAX
-        total += 0;
-      } else {
-        // Sem filtro - contar tudo
-        total += calcularMetaDoPeriodo(funnelData.o2Tax, indicator.key, startDate, endDate);
-      }
-    }
-    if (includesOxyHacker && funnelData.oxyHacker) {
-      const closersForBU = effectiveSelectedClosers.filter(c => 
-        BU_CLOSERS.oxy_hacker.includes(c as CloserType)
-      );
-      
-      if (closersForBU.length > 0 || effectiveSelectedClosers.length === 0) {
-        total += calcularMetaDoPeriodo(funnelData.oxyHacker, indicator.key, startDate, endDate);
-      }
-      // Se closer selecionado não atua nesta BU, não conta
-    }
-    if (includesFranquia && funnelData.franquia) {
-      const closersForBU = effectiveSelectedClosers.filter(c => 
-        BU_CLOSERS.franquia.includes(c as CloserType)
-      );
-      
-      if (closersForBU.length > 0 || effectiveSelectedClosers.length === 0) {
-        total += calcularMetaDoPeriodo(funnelData.franquia, indicator.key, startDate, endDate);
-      }
-      // Se closer selecionado não atua nesta BU, não conta
-    }
-    
+
     return total > 0 ? total : Math.round(indicator.annualMeta * periodFraction);
   };
 
@@ -939,8 +988,8 @@ export function IndicatorsTab() {
     // For single BU selection - Franquia
     if (hasSingleBU && includesFranquia) {
       const expansaoData = getExpansaoGroupedData(indicator.key as ExpansaoIndicator, startDate, endDate, grouping);
-      const funnelMetasMensais = funnelData?.franquia ? getMonthlyMetasFromFunnel(funnelData.franquia, indicator.key, startDate, endDate) : [];
-      const metaPeriodo = funnelData?.franquia ? calcularMetaDoPeriodo(funnelData.franquia, indicator.key, startDate, endDate) : 0;
+      const funnelMetasMensais = funnelData?.franquia ? getMonthlyMetasFromFunnel(funnelData.franquia, indicator.key, startDate, endDate, 'franquia', undefined, sdrFilterForBU('franquia')) : [];
+      const metaPeriodo = funnelData?.franquia ? calcularMetaDoPeriodo(funnelData.franquia, indicator.key, startDate, endDate, 'franquia', undefined, sdrFilterForBU('franquia')) : 0;
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       return chartLabels.map((label, index) => ({
@@ -955,8 +1004,8 @@ export function IndicatorsTab() {
 
     // For single BU selection - O2 TAX (use analytics hook with first-entry for consistency with gauges)
     if (hasSingleBU && includesO2Tax) {
-      const funnelMetasMensais = funnelData?.o2Tax ? getMonthlyMetasFromFunnel(funnelData.o2Tax, indicator.key, startDate, endDate) : [];
-      const metaPeriodo = funnelData?.o2Tax ? calcularMetaDoPeriodo(funnelData.o2Tax, indicator.key, startDate, endDate) : 0;
+      const funnelMetasMensais = funnelData?.o2Tax ? getMonthlyMetasFromFunnel(funnelData.o2Tax, indicator.key, startDate, endDate, 'o2_tax', undefined, sdrFilterForBU('o2_tax')) : [];
+      const metaPeriodo = funnelData?.o2Tax ? calcularMetaDoPeriodo(funnelData.o2Tax, indicator.key, startDate, endDate, 'o2_tax', undefined, sdrFilterForBU('o2_tax')) : 0;
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       // Build realized data from o2TaxAnalytics (first-entry logic) grouped by period
@@ -1009,8 +1058,8 @@ export function IndicatorsTab() {
     // For single BU selection - Oxy Hacker
     if (hasSingleBU && includesOxyHacker) {
       const oxyHackerData = getOxyHackerGroupedData(indicator.key as OxyHackerIndicator, startDate, endDate, grouping);
-      const funnelMetasMensais = funnelData?.oxyHacker ? getMonthlyMetasFromFunnel(funnelData.oxyHacker, indicator.key, startDate, endDate) : [];
-      const metaPeriodo = funnelData?.oxyHacker ? calcularMetaDoPeriodo(funnelData.oxyHacker, indicator.key, startDate, endDate) : 0;
+      const funnelMetasMensais = funnelData?.oxyHacker ? getMonthlyMetasFromFunnel(funnelData.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker')) : [];
+      const metaPeriodo = funnelData?.oxyHacker ? calcularMetaDoPeriodo(funnelData.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker')) : 0;
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       return chartLabels.map((label, index) => ({
@@ -1029,8 +1078,8 @@ export function IndicatorsTab() {
       
       // Apply closer filter to metas if closers are selected
       const closerFilter = selectedClosers.length > 0 ? selectedClosers : undefined;
-      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter);
-      const metaPeriodo = calcularMetaDoPeriodo(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter);
+      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual'));
+      const metaPeriodo = calcularMetaDoPeriodo(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual'));
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       return chartLabels.map((label, index) => ({
@@ -1054,16 +1103,16 @@ export function IndicatorsTab() {
       const closerFilter = selectedClosers.length > 0 ? selectedClosers : undefined;
       
       // Get monthly metas for each selected BU (with closer filter for Modelo Atual)
-      const metasModeloAtual = (includesModeloAtual && funnelData?.modeloAtual) ? getMonthlyMetasFromFunnel(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter) : [];
-      const metasO2Tax = (includesO2Tax && funnelData?.o2Tax) ? getMonthlyMetasFromFunnel(funnelData.o2Tax, indicator.key, startDate, endDate) : [];
-      const metasOxyHacker = (includesOxyHacker && funnelData?.oxyHacker) ? getMonthlyMetasFromFunnel(funnelData.oxyHacker, indicator.key, startDate, endDate) : [];
-      const metasFranquia = (includesFranquia && funnelData?.franquia) ? getMonthlyMetasFromFunnel(funnelData.franquia, indicator.key, startDate, endDate) : [];
+      const metasModeloAtual = (includesModeloAtual && funnelData?.modeloAtual) ? getMonthlyMetasFromFunnel(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual')) : [];
+      const metasO2Tax = (includesO2Tax && funnelData?.o2Tax) ? getMonthlyMetasFromFunnel(funnelData.o2Tax, indicator.key, startDate, endDate, 'o2_tax', undefined, sdrFilterForBU('o2_tax')) : [];
+      const metasOxyHacker = (includesOxyHacker && funnelData?.oxyHacker) ? getMonthlyMetasFromFunnel(funnelData.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker')) : [];
+      const metasFranquia = (includesFranquia && funnelData?.franquia) ? getMonthlyMetasFromFunnel(funnelData.franquia, indicator.key, startDate, endDate, 'franquia', undefined, sdrFilterForBU('franquia')) : [];
       
       // Get period metas for prorating (with closer filter for Modelo Atual)
-      const metaPeriodoModeloAtual = (includesModeloAtual && funnelData?.modeloAtual) ? calcularMetaDoPeriodo(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter) : 0;
-      const metaPeriodoO2Tax = (includesO2Tax && funnelData?.o2Tax) ? calcularMetaDoPeriodo(funnelData.o2Tax, indicator.key, startDate, endDate) : 0;
-      const metaPeriodoOxyHacker = (includesOxyHacker && funnelData?.oxyHacker) ? calcularMetaDoPeriodo(funnelData.oxyHacker, indicator.key, startDate, endDate) : 0;
-      const metaPeriodoFranquia = (includesFranquia && funnelData?.franquia) ? calcularMetaDoPeriodo(funnelData.franquia, indicator.key, startDate, endDate) : 0;
+      const metaPeriodoModeloAtual = (includesModeloAtual && funnelData?.modeloAtual) ? calcularMetaDoPeriodo(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual')) : 0;
+      const metaPeriodoO2Tax = (includesO2Tax && funnelData?.o2Tax) ? calcularMetaDoPeriodo(funnelData.o2Tax, indicator.key, startDate, endDate, 'o2_tax', undefined, sdrFilterForBU('o2_tax')) : 0;
+      const metaPeriodoOxyHacker = (includesOxyHacker && funnelData?.oxyHacker) ? calcularMetaDoPeriodo(funnelData.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker')) : 0;
+      const metaPeriodoFranquia = (includesFranquia && funnelData?.franquia) ? calcularMetaDoPeriodo(funnelData.franquia, indicator.key, startDate, endDate, 'franquia', undefined, sdrFilterForBU('franquia')) : 0;
       const totalMetaPeriodo = metaPeriodoModeloAtual + metaPeriodoO2Tax + metaPeriodoOxyHacker + metaPeriodoFranquia;
       
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(totalMetaPeriodo) : [];
