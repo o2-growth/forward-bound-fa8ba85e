@@ -3,6 +3,7 @@ import { useMediaMetas } from "@/contexts/MediaMetasContext";
 import { useMonetaryMetas, BuType, isPontualOnlyBU } from "./useMonetaryMetas";
 import { useFunnelMetas } from "./useFunnelMetas";
 import { useBUIndicatorsConfig } from "./useBUIndicatorsConfig";
+import { useMrrBase } from "./useMrrBase";
 
 // Indicadores de 2025 (base para projeção)
 const indicators2025 = {
