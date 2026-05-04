@@ -1,22 +1,33 @@
-## Adicionar Matheus como SDR de Modelo Atual
+## Bug
 
-### Mudanças
+Na tabela de "Resultado da simulação" (Aba CFO), a Margem Bruta e Margem % são calculadas como `(MRR - Custo Squad)` / `MRR`, **ignorando os 18% de impostos**. No dialog de P&L do mesmo arquivo a fórmula correta já existe (`computeMargem` + `IMPOSTOS_RATE = 0.18`).
 
-1. **`src/hooks/useSdrMetas.ts`**:
-   - Adicionar `'Matheus'` à constante `SDRS`.
-   - Em `BU_SDRS.modelo_atual`, incluir `'Matheus'` (lista final: `['Amanda', 'Carol', 'Matheus']`).
-   - Refletir no aba Admin → Metas SDR: Matheus passa a aparecer com colunas RM/RR para preencher por mês.
+## Correção
 
-2. **`src/components/planning/IndicatorsTab.tsx`**:
-   - Adicionar `'Matheus'` em `BU_SDRS.modelo_atual` (linha 88) → entra no filtro de SDR do dashboard quando Modelo Atual está selecionada.
-   - Adicionar `{ value: 'Matheus', label: 'Matheus' }` em `sdrOptions` (linha 95) → aparece no MultiSelect de SDR.
+Em `src/components/planning/jornada/CfoView.tsx`, no `useMemo` `simResult` (linhas ~358-398):
 
-### Resultado
+1. Adicionar nova linha **"Impostos (18%)"** logo abaixo de **"Receita (MRR)"**, mostrando `-mrr * 0.18` para atual e simulado.
+2. Adicionar linha **"Receita Líquida"** (= MRR × 0.82) para deixar explícito.
+3. Recalcular `atualMargemBruta` / `simMargemBruta` como `receitaLiquida - custoSquad` (em vez de `mrr - custoSquad`).
+4. Recalcular `atualMargem` / `simMargem` usando o helper já existente `computeMargem(mrr, custoSquad)` para garantir consistência com o P&L do dialog.
 
-- Aba Admin → Metas SDR mostra Matheus na BU Modelo Atual com campos RM/RR editáveis por mês.
-- Filtro de SDR no Dashboard Comercial passa a listar Matheus quando Modelo Atual está selecionada.
-- Quando o usuário filtra por Matheus, as metas RM/RR somam apenas as metas dele (vinda de `sdr_metas`), e o realizado já filtra cards via `responsavel/sdr === Matheus` (lógica existente).
+Ordem final das linhas:
+- Clientes
+- Receita (MRR)
+- Impostos (18%)  ← nova
+- Receita Líquida ← nova
+- Receita (Pontual)
+- Custo Squad
+- Margem Bruta (agora líquida de impostos)
+- Margem %
+- Ticket Médio
 
-### Fora de escopo
+## Arquivo afetado
 
-- Não criar registros iniciais em `sdr_metas` para Matheus — eles serão criados via UI quando o admin editar. O hook já lida com upsert.
+- `src/components/planning/jornada/CfoView.tsx` — apenas o bloco `simResult` (~15 linhas). Sem mudança em hooks, banco ou outros componentes.
+
+## Garantias
+
+- Mudança 100% local de UI/cálculo apresentacional.
+- Fórmula passa a bater com o P&L do dialog (`computeMargem`), eliminando inconsistência.
+- Sem efeito em outras abas, hooks de dados, persistência ou metas.

@@ -371,19 +371,26 @@ function SimuladorCarteira({ mrrTotal, custoSquad, clientes, totalClientes }: Si
     const simMrr = atualMrr + addedMrr - removedMrr;
     const simPontual = atualPontual + addedPontual;
 
-    const atualMargem = atualMrr > 0 ? ((atualMrr - custoSquad) / atualMrr) * 100 : 0;
-    const simMargem = simMrr > 0 ? ((simMrr - custoSquad) / simMrr) * 100 : 0;
+    const atualImpostos = atualMrr * IMPOSTOS_RATE;
+    const simImpostos = simMrr * IMPOSTOS_RATE;
+    const atualReceitaLiquida = atualMrr - atualImpostos;
+    const simReceitaLiquida = simMrr - simImpostos;
+
+    const atualMargemBruta = atualReceitaLiquida - custoSquad;
+    const simMargemBruta = simReceitaLiquida - custoSquad;
+
+    const atualMargem = computeMargem(atualMrr, custoSquad);
+    const simMargem = computeMargem(simMrr, custoSquad);
 
     const atualTicket = atualClientes > 0 ? atualMrr / atualClientes : 0;
     const simTicket = simClientes > 0 ? simMrr / simClientes : 0;
-
-    const atualMargemBruta = atualMrr - custoSquad;
-    const simMargemBruta = simMrr - custoSquad;
 
     return {
       rows: [
         { metrica: 'Clientes', atual: atualClientes, simulado: simClientes, impacto: simClientes - atualClientes, format: 'int' as const },
         { metrica: 'Receita (MRR)', atual: atualMrr, simulado: simMrr, impacto: simMrr - atualMrr, format: 'brl' as const },
+        { metrica: 'Impostos (18%)', atual: -atualImpostos, simulado: -simImpostos, impacto: -(simImpostos - atualImpostos), format: 'brl' as const },
+        { metrica: 'Receita Líquida', atual: atualReceitaLiquida, simulado: simReceitaLiquida, impacto: simReceitaLiquida - atualReceitaLiquida, format: 'brl' as const },
         { metrica: 'Receita (Pontual)', atual: atualPontual, simulado: simPontual, impacto: simPontual - atualPontual, format: 'brl' as const },
         { metrica: 'Custo Squad', atual: custoSquad, simulado: custoSquad, impacto: 0, format: 'brl' as const },
         { metrica: 'Margem Bruta', atual: atualMargemBruta, simulado: simMargemBruta, impacto: simMargemBruta - atualMargemBruta, format: 'brl' as const },
