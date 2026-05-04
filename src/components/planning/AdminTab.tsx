@@ -320,12 +320,8 @@ export function AdminTab() {
         <CloserMetasTab />
       </TabsContent>
 
-      <TabsContent value="monetary-metas">
-        <MonetaryMetasTab />
-      </TabsContent>
-
-      <TabsContent value="cost-stage-metas">
-        <CostStageMetasTab />
+      <TabsContent value="sdr-metas">
+        <SdrMetasTab />
       </TabsContent>
 
       <TabsContent value="logs">
