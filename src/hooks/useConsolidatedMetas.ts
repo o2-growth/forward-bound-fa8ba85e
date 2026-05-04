@@ -113,16 +113,12 @@ export function useConsolidatedMetas() {
       }
     }
 
-    // Para modelo_atual NÃO locked: pular DB pois monetary_metas guarda Total
-    // (acelerômetros precisam do Incremento). Usar Plan Growth ao vivo.
-    const skipDb = bu === 'modelo_atual';
-
-    // 1. Tentar banco de dados primeiro (exceto modelo_atual não-locked)
-    if (!skipDb) {
-      const dbValue = getMeta(bu, month, metric as MetricType);
-      if (dbValue > 0) {
-        return { value: dbValue, source: 'database' };
-      }
+    // 1. Tentar banco de dados (monetary_metas) para TODAS as BUs, inclusive modelo_atual não-locked.
+    // monetary_metas é a fonte única de verdade compartilhada com useEffectiveMetas e Plan Growth,
+    // refletindo o valor salvo pelo usuário. Elimina a divergência com o reverse funnel projetado.
+    const dbValue = getMeta(bu, month, metric as MetricType);
+    if (dbValue > 0) {
+      return { value: dbValue, source: 'database' };
     }
 
     // 2. Fallback para Plan Growth
