@@ -2226,7 +2226,7 @@ export function IndicatorsTab() {
 
   // Get meta for monetary indicators using consolidated metas (database > Plan Growth)
   const getMetaMonetaryForIndicator = (indicator: MonetaryIndicatorConfig): number => {
-    const closerFilter = selectedClosers.length > 0 ? selectedClosers : undefined;
+    const closerFilter = effectiveSelectedClosers.length > 0 ? effectiveSelectedClosers : undefined;
     
     // Use hook consolidado que mescla banco + Plan Growth
     return getMetaMonetaryForPeriod(
