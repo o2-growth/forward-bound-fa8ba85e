@@ -1,28 +1,34 @@
-## Bug
+## Objetivo
 
-Em `usePlanGrowthData.ts` (~linhas 481-508), quando existe registro em `funnel_metas` para a BU, o merge **sempre** sobrescreve `leads/mqls/rms/rrs/propostas/vendas` com o snapshot — mesmo para meses não-locked. O `if (fixed.is_locked)` só protege os campos monetários (`faturamento_meta`, `faturamento_vender`, `investimento`), criando uma assimetria que faz Maio/2026 mostrar **398 MQLs** (snapshot antigo) em vez dos **558** vindos do reverse funnel ao vivo.
+Na tabela **Consolidado Anual** (aba Investimento de Mídia), substituir o formato compacto (R$ 1.7M, R$ 80k) pelo valor completo formatado em reais com separador de milhar, para permitir distinguir, por exemplo, R$ 1.701.234 de R$ 1.799.876.
 
-## Correção
+## Escopo
 
-Em `src/hooks/usePlanGrowthData.ts`, no `useMemo` `modeloAtualFunnel`, aplicar a mesma regra de lock para quantidades:
+Apenas a tabela Consolidado Anual em `src/components/planning/MediaInvestmentTab.tsx` (linhas ~2628–2698). Demais cards e gráficos da página continuam com `formatCompact` (mantém legibilidade).
 
-- **Mês locked** (`fixed.is_locked === true`): usa o snapshot completo de `funnel_metas` (quantidades + monetários). Comportamento atual preservado para Jan–Abr/26.
-- **Mês não-locked** (`fixed.is_locked === false` ou ausente): ignora o snapshot e usa o `calc` (reverse funnel ao vivo). Maio/26 passa a mostrar 558.
+## Mudanças
 
-## Arquivo afetado
+1. Substituir `formatCompact(...)` por uma formatação completa em todas as células de valor da tabela:
+   - Linhas mensais: Modelo Atual, O2 TAX, Oxy Hacker, Franquia, Meta Total, DRE Total
+   - Linha Total (rodapé): mesmas colunas
+2. Usar `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })` → resultado: `R$ 1.701.234`.
+3. Manter `text-xs font-mono` e `text-right` para o alinhamento ficar limpo. Se necessário, reduzir levemente padding horizontal das células (`px-2`) para caber sem quebrar — a tabela já tem `overflow-x-auto`.
+4. Coluna **Ating. %** permanece igual (já é percentual).
 
-- `src/hooks/usePlanGrowthData.ts` — apenas o bloco de merge dentro do `useMemo modeloAtualFunnel` (~10 linhas). Sem mudança em hooks de banco, edge functions ou outros componentes.
+## Detalhe técnico
 
-## Garantias de reversibilidade e integridade
+```ts
+const formatBRL = (v: number) =>
+  new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    maximumFractionDigits: 0,
+  }).format(v || 0);
+```
 
-- **Nenhum dado é apagado ou alterado** em `funnel_metas`, `monetary_metas`, `mrr_base_monthly`, `bu_indicators_config`.
-- O snapshot atual de Maio (`mqls=398`) **continua gravado** em `funnel_metas` — só deixa de ser usado para meses não-locked.
-- Meses locked (Jan–Abr/26) ficam idênticos.
-- `useConsolidatedMetas`, fluxo de save do Plan Growth, auto-seed de meses futuros e outras BUs não são afetados.
-- Para reverter: clicar em revert na mensagem ou usar History — o 398 reaparece imediatamente.
+Aplicado nas 7 colunas monetárias × 13 linhas (12 meses + Total).
 
-## Resultado esperado
+## Fora do escopo
 
-- Maio/2026 Modelo Atual MQLs: **558** (reverse funnel ao vivo).
-- Demais quantidades de Maio (`leads`, `rms`, `rrs`, `propostas`, `vendas`) também passam a refletir o cálculo ao vivo.
-- Jan–Abr/26 inalterados (locked).
+- Outros componentes/abas que usam `formatCompact`.
+- Gráfico "Meta vs DRE por Mês" abaixo da tabela (eixo Y continua compacto para não poluir).

@@ -2642,6 +2642,12 @@ export function MediaInvestmentTab() {
                       </TableHeader>
                       <TableBody>
                         {(() => {
+                          const formatBRL = (v: number) =>
+                            new Intl.NumberFormat('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                              maximumFractionDigits: 0,
+                            }).format(v || 0);
                           let sumMA = 0, sumO2 = 0, sumOH = 0, sumFR = 0, sumMeta = 0, sumDre = 0;
                           const rows = months.map((m) => {
                             const maMonth = effectiveModeloAtualFunnel.find((d: FunnelData) => d.month === m);
@@ -2661,13 +2667,13 @@ export function MediaInvestmentTab() {
                             return (
                               <TableRow key={m}>
                                 <TableCell className="text-xs font-medium">{m}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(ma)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(o2)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(oh)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(fr)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono font-bold">{formatCompact(metaTotal)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono font-bold">{formatCompact(dreTotal)}</TableCell>
-                                <TableCell className={`text-xs text-right font-mono font-bold ${ating >= 100 ? 'text-emerald-600' : ating > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(ma)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(o2)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(oh)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(fr)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono font-bold px-2">{formatBRL(metaTotal)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono font-bold px-2">{formatBRL(dreTotal)}</TableCell>
+                                <TableCell className={`text-xs text-right font-mono font-bold px-2 ${ating >= 100 ? 'text-emerald-600' : ating > 0 ? 'text-amber-600' : 'text-muted-foreground'}`}>
                                   {dreTotal > 0 ? `${ating.toFixed(1)}%` : '-'}
                                 </TableCell>
                               </TableRow>
@@ -2679,13 +2685,13 @@ export function MediaInvestmentTab() {
                               {rows}
                               <TableRow className="border-t-2 font-bold bg-muted/30">
                                 <TableCell className="text-xs font-bold">Total</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumMA)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumO2)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumOH)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumFR)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumMeta)}</TableCell>
-                                <TableCell className="text-xs text-right font-mono">{formatCompact(sumDre)}</TableCell>
-                                <TableCell className={`text-xs text-right font-mono ${totalAting >= 100 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(sumMA)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(sumO2)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(sumOH)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(sumFR)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(sumMeta)}</TableCell>
+                                <TableCell className="text-xs text-right font-mono px-2">{formatBRL(sumDre)}</TableCell>
+                                <TableCell className={`text-xs text-right font-mono px-2 ${totalAting >= 100 ? 'text-emerald-600' : 'text-amber-600'}`}>
                                   {sumDre > 0 ? `${totalAting.toFixed(1)}%` : '-'}
                                 </TableCell>
                               </TableRow>
