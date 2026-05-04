@@ -612,6 +612,14 @@ export function IndicatorsTab() {
     return selectedSDRs;
   }, [selectedSDRs, availableSDRs]);
 
+  // Returns the SDRs (from the active filter) that operate in a given BU.
+  // Returns undefined if no SDR filter is active (no override), or [] if filter is on but
+  // no selected SDR operates in this BU (caller should treat as "exclude this BU").
+  const sdrFilterForBU = (bu: BuType): string[] | undefined => {
+    if (effectiveSelectedSDRs.length === 0) return undefined;
+    return effectiveSelectedSDRs.filter(s => BU_SDRS[bu]?.includes(s));
+  };
+
   // Filter function - checks if a responsavel matches selected closers (partial match, case-insensitive)
   const matchesCloserFilter = (closerValue?: string | null): boolean => {
     if (effectiveSelectedClosers.length === 0) return true; // No filter = show all
