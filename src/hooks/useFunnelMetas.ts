@@ -12,6 +12,11 @@ export interface FunnelMeta {
   rrs: number;
   propostas: number;
   vendas: number;
+  faturamento_meta?: number;
+  faturamento_vender?: number;
+  mrr_base_planejamento?: number;
+  investimento?: number;
+  is_locked?: boolean;
   created_at: string;
   updated_at: string;
 }
