@@ -1,32 +1,30 @@
-## Adicionar Thiago e Amanda Serafim como Closers de Modelo Atual
+## Sobrescrever MRR Base (Jan–Abr/2026) com valores reais da Oxy + backup
 
-### Estado atual
-- Closers cadastrados em `src/hooks/useCloserMetas.ts`: **Pedro Albite**, **Daniel Trindade**, **Lucas Ilha**.
-- `BU_CLOSERS.modelo_atual` = `['Pedro Albite', 'Daniel Trindade']`.
-- "Amanda" hoje aparece apenas como **SDR** de Modelo Atual em `IndicatorsTab.tsx` (mantém-se nessa lista).
-- Metas de closer (`closer_metas`) já são auto-seedadas; precisam ganhar linhas para os novos closers.
+### Diagnóstico
+Os 4 meses no DB estão com `is_total_override = true` e divergentes da Oxy:
 
-### Mudanças
+| Mês | DB atual | Oxy (regra CaaS+SaaS sem Setup/Serv. Esp.) | Δ |
+|---|---:|---:|---:|
+| Jan | R$ 967.968,89 | **R$ 705.268,07** | −R$ 262.700 |
+| Fev | R$ 809.975,81 | **R$ 746.847,17** | −R$ 63.128 |
+| Mar | R$ 667.987,00 | **R$ 755.281,13** | +R$ 87.294 |
+| Abr | R$ 667.987,00 | **R$ 700.152,57** | +R$ 32.165 |
 
-**1. `src/hooks/useCloserMetas.ts`**
-- Expandir constante `CLOSERS` para incluir `'Thiago'` e `'Amanda Serafim'`.
-- Atualizar `BU_CLOSERS.modelo_atual` para `['Pedro Albite', 'Daniel Trindade', 'Thiago', 'Amanda Serafim']`.
-- Default de `getPercentage` permanece 50% quando BU tem >1 closer (ficará 25% efetivo se todos selecionados, ajustável depois pelo Admin).
+### Passos
 
-**2. `src/components/planning/IndicatorsTab.tsx`**
-- Lista `allClosers` (linha ~488) já é construída a partir de `BU_CLOSERS`, mas há um array fixo de labels — adicionar entradas `{ value: 'Thiago', label: 'Thiago' }` e `{ value: 'Amanda Serafim', label: 'Amanda Serafim' }` no array de opções de closer.
-- Não tocar em `BU_SDRS` — Amanda continua como SDR de Modelo Atual.
+**1. Backup CSV (`/mnt/documents/`)**
+- Exportar `mrr_base_monthly` (year=2026) atual para `mrr_base_backup_2026-05-04.csv` com colunas: `month, year, value, is_total_override, updated_at`.
+- Mostrar o caminho via `<lov-artifact>` para o usuário baixar.
 
-**3. Banco — `closer_metas` (via tool de insert, não migration)**
-- Inserir 12 linhas (Jan–Dez/2026) para `bu='modelo_atual'`, `closer='Thiago'`, `percentage=50`.
-- Inserir 12 linhas (Jan–Dez/2026) para `bu='modelo_atual'`, `closer='Amanda Serafim'`, `percentage=50`.
-- (Os percentuais reais são editáveis pelo Admin > Metas de Closers depois.)
+**2. Update no DB (via tool de insert/update)**
+- Atualizar Jan, Fev, Mar, Abr/2026 com os valores Oxy acima.
+- Setar `is_total_override = false` (reabilita sync automático no futuro).
+- Setar `updated_at = now()`.
 
-### Pontos a confirmar antes de aplicar
-- **Sobrenome do Thiago**: por enquanto fica `'Thiago'`. Quando confirmar, basta um pequeno rename no array + UPDATE em `closer_metas`.
-- **Percentual inicial**: 50% para cada novo closer. Ajustes finos serão feitos via Admin.
+**3. Verificação**
+- Re-query `mrr_base_monthly` ano 2026 para confirmar os 4 meses atualizados.
 
 ### Fora de escopo
-- Não altero `BU_SDRS` (Amanda permanece SDR também).
-- Não altero `StructureTab.tsx` (estrutura visual da equipe — pode ser feito em request separado se quiser exibir lá).
-- Não altero analytics hooks (`useModeloAtualAnalytics` etc.) — o filtro de closer já é dinâmico via `matchesCloserFilter` (partial match case-insensitive), funciona out-of-the-box.
+- Não rodar a edge function `sync-mrr-base` (faria a mesma coisa, mas direto via SQL é mais auditável e rápido aqui).
+- Não tocar em `monetary_metas`, `funnel_metas`, ou cálculos de Plan Growth (que vão refletir automaticamente).
+- Não alterar memória `MRR Base 2026 Starting Point` (R$ 667.987 era um valor histórico de Mar; agora a fonte da verdade vira a Oxy real).
