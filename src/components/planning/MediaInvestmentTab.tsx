@@ -1043,11 +1043,22 @@ export function MediaInvestmentTab() {
   const { mrrBaseData } = useMrrBase();
   const { hasFunnelForBU, getFunnelForBU } = useFunnelMetas();
 
+  // MRR Base de cada mês = MRR realizado do mês ANTERIOR (Oxy truth).
+  // Ex.: MRR Base de Fev/26 = MRR de Jan/26; MRR Base de Jan/26 = MRR de Dez/25.
   const mrrBaseRealPorMes = useMemo(() => {
+    const MONTHS_ORDER = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const PLAN_YEAR = 2026;
+    const lookup = new Map<string, number>();
+    (mrrBaseData || []).forEach((r: any) => {
+      lookup.set(`${r.year}-${r.month}`, Number(r.value) || 0);
+    });
     const map: Record<string, number> = {};
-    (mrrBaseData || [])
-      .filter((r: any) => r.year === 2026)
-      .forEach((r: any) => { map[r.month] = Number(r.value) || 0; });
+    MONTHS_ORDER.forEach((m, idx) => {
+      const prevMonth = idx === 0 ? 'Dez' : MONTHS_ORDER[idx - 1];
+      const prevYear = idx === 0 ? PLAN_YEAR - 1 : PLAN_YEAR;
+      const v = lookup.get(`${prevYear}-${prevMonth}`);
+      if (v && v > 0) map[m] = v;
+    });
     return map;
   }, [mrrBaseData]);
 
