@@ -61,6 +61,24 @@ export function useFunnelMetas(year = 2026) {
     return funnelMetas.some(m => m.bu === bu && (m.mqls > 0 || m.vendas > 0));
   };
 
+  // Check if a specific BU/month is locked (used to freeze accelerator metas
+  // for closed months so they don't change when MRR Base or Plan Growth is edited)
+  const isMonthLocked = (bu: string, month: string): boolean => {
+    return funnelMetas.some(m => m.bu === bu && m.month === month && m.is_locked === true);
+  };
+
+  // Returns the locked snapshot (faturamento_meta + mrr_base_planejamento) for a BU/month,
+  // or null if not locked or not found.
+  const getLockedSnapshot = (bu: string, month: string): { faturamento_meta: number; mrr_base_planejamento: number; faturamento_vender: number } | null => {
+    const meta = funnelMetas.find(m => m.bu === bu && m.month === month && m.is_locked === true);
+    if (!meta) return null;
+    return {
+      faturamento_meta: Number(meta.faturamento_meta || 0),
+      mrr_base_planejamento: Number(meta.mrr_base_planejamento || 0),
+      faturamento_vender: Number(meta.faturamento_vender || 0),
+    };
+  };
+
   // Bulk upsert funnel metas
   const bulkUpsert = useMutation({
     mutationFn: async (items: FunnelMetaUpsert[]) => {
@@ -96,6 +114,8 @@ export function useFunnelMetas(year = 2026) {
     isLoading,
     getFunnelForBU,
     hasFunnelForBU,
+    isMonthLocked,
+    getLockedSnapshot,
     bulkUpsert,
   };
 }
