@@ -2705,7 +2705,7 @@ export function MediaInvestmentTab() {
 
                 <Card className="glass-card">
                   <CardHeader>
-                    <CardTitle className="text-base">Meta vs DRE por Mês (Empilhado por BU)</CardTitle>
+                    <CardTitle className="text-base">Meta vs Realizado por Mês (Empilhado por BU)</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
