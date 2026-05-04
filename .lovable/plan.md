@@ -1,40 +1,50 @@
-## Objetivo
+## MRR Base do Plan Growth puxando da Oxy (Modelo Atual)
 
-Forçar **Valor Pontual** fixo para 2 cards de Expansão (Franquia), sobrescrevendo o que vier do Pipefy:
+### Escopo confirmado
+- **CaaS + SaaS = Modelo Atual** (única BU afetada — O2 TAX, Oxy Hacker e Franquia continuam com a lógica atual).
+- **Sobrescrita apenas de meses fechados**: Jan, Fev, Mar e Abr/2026. Maio em diante (mês corrente + futuros) continua projetado via churn 6% / retenção 25% no funil reverso.
+- **Override manual** sempre prevalece (`is_total_override = true` na `mrr_base_monthly` é respeitado pelo sync).
 
-- **ALEXANDRE CORREA** → Valor Pontual = R$ 43.000
-- **JEAN MORBIS** → Valor Pontual = R$ 36.000
+### Subcategorias Oxy = MRR (a confirmar antes do código)
+**CaaS — incluir:** Enterprise, Corporate, BPO Financeiro
+**SaaS — incluir:** Enterprise, Corporate, BPO Financeiro
+**EXCLUIR de ambos:** Serviços Especializados, Setup, qualquer one-shot
+> Confirma se "BPO Financeiro" entra ou se quer só Enterprise+Corporate.
 
-Os outros valores (MRR, Setup, Taxa de franquia) destes cards passam a ser zerados, para que o cálculo de venda use apenas o Pontual forçado. Demais cards da lista (Monica, Ricardo, Elizeth) ficam intocados — continuam usando os valores do banco.
+---
 
-## Mudança técnica
+### Alterações no Plan Growth
 
-1. **`src/hooks/dateUtils.ts`**
-   - Adicionar `FORCED_PONTUAL_VALUES: Record<string, number>` com mapa título → valor:
-     ```
-     { 'ALEXANDRE CORREA': 43000, 'JEAN MORBIS': 36000 }
-     ```
-   - Adicionar helper `getForcedPontualValue(titulo: string): number | null` que normaliza o título (NFD, lowercase, trim) e retorna o valor forçado ou `null`.
+**Arquivo único de UI:** `src/components/planning/MediaInvestmentTab.tsx`
 
-2. **`src/hooks/useExpansaoMetas.ts`**
-   - Após montar o objeto `movement` (linha ~119), aplicar o override:
-     ```
-     const forcedPontual = getForcedPontualValue(titulo);
-     if (forcedPontual !== null) {
-       movement.valorPontual = forcedPontual;
-       movement.valorMRR = 0;
-       movement.valorSetup = 0;
-       movement.taxaFranquia = 0;
-     }
-     ```
-   - Como o cálculo em `getValueForPeriod` faz `taxaFranquia > 0 ? taxaFranquia : (pontual + setup + mrr)`, com taxaFranquia=0 ele somará `0 + 0 + 43000 = R$ 43.000` corretamente.
+1. **Hidratar `mrrDynamic` (linhas 1247–1257)** — antes de chamar `calculateMrrAndRevenueToSell`, ler `mrr_base_monthly` via `useMrrBase` e montar um `mrrRealizadoPorMes` apenas com Jan–Abr.
 
-3. **`src/hooks/useExpansaoAnalytics.ts`**
-   - Mesmo override aplicado dentro de `parseRawCard`, antes de retornar o `ExpansaoCard`, garantindo que drill-downs e detalhamentos exibam o valor correto.
+2. **Refatorar `calculateMrrAndRevenueToSell` (linhas 138–181)** — aceitar parâmetro novo `mrrRealizadoPorMes`. Dentro do loop:
+   - Se mês ∈ {Jan, Fev, Mar, Abr} e tem valor → `mrrAtual = mrrRealizadoPorMes[month]` (ignora churn/retenção).
+   - Mai em diante → segue fórmula atual, partindo do MRR real de Abril como ponto de partida (não mais do `mrrInicial` manual).
 
-## Comportamento esperado
+3. **Indicador visual de origem** na coluna "MRR Base" da tabela (linha 541):
+   - 🔄 Oxy (sync) | ✏️ Manual (override) | 📈 Projetado (Mai+)
+   - Tooltip com data do último sync.
 
-- Em Abril/2026 (já forçado pela mudança anterior), Alexandre Correa entra como venda de R$ 43.000 (Pontual) e Jean Morbis como R$ 36.000 (Pontual).
-- MRR/Setup/Taxa Franquia desses 2 cards = R$ 0 (não somam em outras métricas).
-- Aparecem corretamente em: card de Vendas, gráfico mensal, drill-down, GMV.
-- Os outros 6 cards forçados (Monica, Ricardo, Elizeth, Ediouro, Cotrim, Fujitec) permanecem com valores do banco.
+4. **Botão "Sincronizar com Oxy"** acima da tabela do Modelo Atual — chama edge function `sync-mrr-base` e invalida cache.
+
+5. **Inputs manuais (linhas 1803–1830)**:
+   - **MRR Inicial** vira read-only mostrando valor sincronizado de Jan/Oxy (com botão "Editar" para criar override).
+   - **Valor A Vender Inicial (Jan)** = `Meta Jan − MRR Base Jan (Oxy)`, ainda editável.
+   - Sliders de churn/retenção continuam afetando só Mai–Dez.
+
+---
+
+### Backend (já no plano anterior aprovado)
+
+- **Edge function `sync-mrr-base`**: chama `fetch-oxy-finance` action `dre_categories` para Jan–Abr/2026, soma só as subcategorias acima, e faz upsert em `mrr_base_monthly` (pulando linhas com `is_total_override = true`).
+- **`useMrrBase.ts`**: ganha mutation `syncFromOxy(year)`.
+
+### O que NÃO muda
+- Outras BUs (O2/Oxy Hacker/Franquia).
+- Funil reverso vendas → propostas → leads.
+- Sistema de batch save / pendingChanges / redistribuição.
+- Aba Admin > Metas Monetárias (recebe o mesmo botão de sync).
+
+**Próximo passo:** confirma se BPO Financeiro entra no MRR e eu implemento.
