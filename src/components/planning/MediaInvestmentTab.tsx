@@ -195,6 +195,10 @@ interface FunnelData {
   mqls: number;
   leads: number;
   investimento: number;
+  // Diagnóstico Oxy vs projetado
+  mrrBaseProjetado?: number;   // MRR sintético calculado pela cadeia churn/retenção
+  mrrBaseGap?: number;         // projetado - real (positivo => Oxy ficou abaixo)
+  aVenderOriginal?: number;    // A Vender que existia antes do recálculo (com MRR sintético)
 }
 
 interface FunnelMetrics {
@@ -662,6 +666,39 @@ function BUInvestmentTable({
                       <TableRow key={`${data.month}-realized`} className="bg-muted/30 border-b-0">
                         <TableCell colSpan={colCount} className="py-3 px-6">
                           <div className="space-y-4">
+                            {/* Aviso de gap MRR Base (Oxy real vs projetado) */}
+                            {typeof data.mrrBaseGap === 'number' && Math.abs(data.mrrBaseGap) > 1 && (
+                              <div
+                                className={`flex items-start gap-3 rounded-md border px-3 py-2 text-xs ${
+                                  data.mrrBaseGap > 0
+                                    ? 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400'
+                                    : 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400'
+                                }`}
+                              >
+                                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                <div className="space-y-1">
+                                  <p className="font-semibold">
+                                    {data.mrrBaseGap > 0
+                                      ? 'MRR Base abaixo do projetado'
+                                      : 'MRR Base acima do projetado'}
+                                  </p>
+                                  <p className="text-muted-foreground">
+                                    Projetado: <span className="font-medium text-foreground">{formatCurrency(data.mrrBaseProjetado || 0)}</span>
+                                    {'  •  '}
+                                    Real (Oxy): <span className="font-medium text-foreground">{formatCurrency(data.mrrBase)}</span>
+                                    {'  •  '}
+                                    Δ: <span className="font-medium">{data.mrrBaseGap > 0 ? '−' : '+'}{formatCurrency(Math.abs(data.mrrBaseGap))}</span>
+                                  </p>
+                                  {typeof data.aVenderOriginal === 'number' && Math.abs((data.aVenderOriginal || 0) - data.faturamentoVender) > 1 && (
+                                    <p className="text-muted-foreground">
+                                      A Vender ajustado de <span className="font-medium text-foreground">{formatCurrency(data.aVenderOriginal)}</span> para{' '}
+                                      <span className="font-medium text-foreground">{formatCurrency(data.faturamentoVender)}</span> para preservar a Meta de{' '}
+                                      <span className="font-medium text-foreground">{formatCurrency(data.faturamentoMeta)}</span>.
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                             {/* Incremento (A Vender) */}
                             <div className="flex items-center gap-6 flex-wrap">
                               <div className="flex items-center gap-2">
@@ -1319,19 +1356,26 @@ export function MediaInvestmentTab() {
 
     const fixedRows = hasFunnelForBU('modelo_atual') ? getFunnelForBU('modelo_atual') : [];
 
+    const ticketMedio = indicadoresPorBU.modeloAtual.ticketMedio || 17000;
+    const cpvVal = indicadoresPorBU.modeloAtual.cpv;
+    const m = funnelMetrics.modeloAtual;
+
     return calculated.map(d => {
       const realMrr = mrrBaseRealPorMes[d.month];
       const fixed = fixedRows.find(f => f.month === d.month);
       const isLocked = fixed?.is_locked === true;
+      const projetado = d.mrrBase; // MRR sintético antes do override
+      const aVenderOriginal = d.faturamentoVender;
 
       // Mês locked: snapshot manda em metas/quantidades; mrrBase mostra Oxy real (verdade visual)
       if (isLocked && fixed) {
         const fatMeta = Number(fixed.faturamento_meta) || d.faturamentoMeta;
         const fatVender = Number(fixed.faturamento_vender) || d.faturamentoVender;
         const invest = Number(fixed.investimento) || d.investimento;
+        const mrrShown = realMrr > 0 ? realMrr : d.mrrBase;
         return {
           ...d,
-          mrrBase: realMrr > 0 ? realMrr : d.mrrBase,
+          mrrBase: mrrShown,
           faturamentoMeta: fatMeta,
           faturamentoVender: fatVender,
           investimento: invest,
@@ -1341,13 +1385,44 @@ export function MediaInvestmentTab() {
           rrs: fixed.rrs ?? d.rrs,
           propostas: fixed.propostas ?? d.propostas,
           vendas: fixed.vendas ?? d.vendas,
+          mrrBaseProjetado: projetado,
+          mrrBaseGap: projetado - mrrShown,
+          aVenderOriginal,
         };
       }
 
-      // Mês não locked: só sobrescreve mrrBase quando houver Oxy real
-      return realMrr > 0 ? { ...d, mrrBase: realMrr } : d;
+      // Mês não locked sem Oxy real: nada muda
+      if (!(realMrr > 0)) {
+        return d;
+      }
+
+      // Mês não locked com Oxy real: preserva Meta original e recalcula A Vender + funil
+      const novoVender = Math.max(0, d.faturamentoMeta - realMrr);
+      const vendas = novoVender / ticketMedio;
+      const propostas = vendas / m.propToVenda;
+      const rrs = propostas / m.rrToProp;
+      const rms = rrs / m.rmToRr;
+      const mqls = rms / m.mqlToRm;
+      const leads = mqls / m.leadToMql;
+      const investimento = Math.round(vendas * cpvVal);
+
+      return {
+        ...d,
+        mrrBase: realMrr,
+        faturamentoVender: novoVender,
+        vendas: Math.ceil(vendas),
+        propostas: Math.ceil(propostas),
+        rrs: Math.ceil(rrs),
+        rms: Math.ceil(rms),
+        mqls: Math.ceil(mqls),
+        leads: Math.ceil(leads),
+        investimento,
+        mrrBaseProjetado: projetado,
+        mrrBaseGap: projetado - realMrr,
+        aVenderOriginal,
+      };
     });
-  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU]);
+  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU]);
   
   const o2TaxFunnel = useMemo(() => 
     calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 10000),
