@@ -803,76 +803,38 @@ export function IndicatorsTab() {
   // Applies closer percentage filter for Modelo Atual when closers are selected
   const getMetaForIndicator = (indicator: IndicatorConfig) => {
     if (!funnelData) return Math.round(indicator.annualMeta * periodFraction);
-    
+
     let total = 0;
-    
-    // Modelo Atual - apply closer filter only if selected closers operate in this BU
-    if (includesModeloAtual && funnelData.modeloAtual) {
-      const closersForBU = effectiveSelectedClosers.filter(c => 
-        BU_CLOSERS.modelo_atual.includes(c as CloserType)
+
+    const buBlocks: { bu: BuType; items?: FunnelDataItem[] }[] = [
+      { bu: 'modelo_atual', items: funnelData.modeloAtual },
+      { bu: 'o2_tax', items: funnelData.o2Tax },
+      { bu: 'oxy_hacker', items: funnelData.oxyHacker },
+      { bu: 'franquia', items: funnelData.franquia },
+    ];
+
+    for (const { bu, items } of buBlocks) {
+      if (!selectedBUs.includes(bu) || !items) continue;
+
+      // Closer filter for this BU
+      const closersForBU = effectiveSelectedClosers.filter(c => BU_CLOSERS[bu]?.includes(c as CloserType));
+      if (effectiveSelectedClosers.length > 0 && closersForBU.length === 0) continue;
+
+      // SDR filter for this BU
+      const sdrsForBU = sdrFilterForBU(bu);
+      if (sdrsForBU !== undefined && sdrsForBU.length === 0) continue;
+
+      total += calcularMetaDoPeriodo(
+        items,
+        indicator.key,
+        startDate,
+        endDate,
+        bu,
+        closersForBU.length > 0 ? closersForBU : undefined,
+        sdrsForBU,
       );
-      
-      if (closersForBU.length > 0) {
-        total += calcularMetaDoPeriodo(
-          funnelData.modeloAtual, 
-          indicator.key, 
-          startDate, 
-          endDate,
-          'modelo_atual',
-          closersForBU
-        );
-      } else if (effectiveSelectedClosers.length > 0) {
-        // Closer selecionado não atua nesta BU - não contar meta
-        total += 0;
-      } else {
-        // Sem filtro - contar tudo
-        total += calcularMetaDoPeriodo(funnelData.modeloAtual, indicator.key, startDate, endDate);
-      }
     }
-    // O2 TAX - apply closer filter only if Lucas is selected
-    if (includesO2Tax && funnelData.o2Tax) {
-      const closersForBU = effectiveSelectedClosers.filter(c => 
-        BU_CLOSERS.o2_tax.includes(c as CloserType)
-      );
-      
-      if (closersForBU.length > 0) {
-        total += calcularMetaDoPeriodo(
-          funnelData.o2Tax, 
-          indicator.key, 
-          startDate, 
-          endDate,
-          'o2_tax',
-          closersForBU
-        );
-      } else if (effectiveSelectedClosers.length > 0) {
-        // Pedro ou Daniel selecionados - não contar O2 TAX
-        total += 0;
-      } else {
-        // Sem filtro - contar tudo
-        total += calcularMetaDoPeriodo(funnelData.o2Tax, indicator.key, startDate, endDate);
-      }
-    }
-    if (includesOxyHacker && funnelData.oxyHacker) {
-      const closersForBU = effectiveSelectedClosers.filter(c => 
-        BU_CLOSERS.oxy_hacker.includes(c as CloserType)
-      );
-      
-      if (closersForBU.length > 0 || effectiveSelectedClosers.length === 0) {
-        total += calcularMetaDoPeriodo(funnelData.oxyHacker, indicator.key, startDate, endDate);
-      }
-      // Se closer selecionado não atua nesta BU, não conta
-    }
-    if (includesFranquia && funnelData.franquia) {
-      const closersForBU = effectiveSelectedClosers.filter(c => 
-        BU_CLOSERS.franquia.includes(c as CloserType)
-      );
-      
-      if (closersForBU.length > 0 || effectiveSelectedClosers.length === 0) {
-        total += calcularMetaDoPeriodo(funnelData.franquia, indicator.key, startDate, endDate);
-      }
-      // Se closer selecionado não atua nesta BU, não conta
-    }
-    
+
     return total > 0 ? total : Math.round(indicator.annualMeta * periodFraction);
   };
 
