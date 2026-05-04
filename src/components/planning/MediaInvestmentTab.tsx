@@ -195,6 +195,10 @@ interface FunnelData {
   mqls: number;
   leads: number;
   investimento: number;
+  // Diagnóstico Oxy vs projetado
+  mrrBaseProjetado?: number;   // MRR sintético calculado pela cadeia churn/retenção
+  mrrBaseGap?: number;         // projetado - real (positivo => Oxy ficou abaixo)
+  aVenderOriginal?: number;    // A Vender que existia antes do recálculo (com MRR sintético)
 }
 
 interface FunnelMetrics {
