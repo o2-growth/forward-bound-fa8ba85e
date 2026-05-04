@@ -12,7 +12,7 @@ export interface CloserMeta {
 
 const BUS = ['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia'] as const;
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
-const CLOSERS = ['Pedro Albite', 'Daniel Trindade', 'Lucas Ilha'] as const;
+const CLOSERS = ['Pedro Albite', 'Daniel Trindade', 'Lucas Ilha', 'Thiago', 'Amanda Serafim'] as const;
 
 export type BuType = typeof BUS[number];
 export type MonthType = typeof MONTHS[number];
@@ -20,7 +20,7 @@ export type CloserType = typeof CLOSERS[number];
 
 // Mapeamento de closers por BU - define quais closers atuam em cada unidade de negócio
 export const BU_CLOSERS: Record<BuType, readonly CloserType[]> = {
-  modelo_atual: ['Pedro Albite', 'Daniel Trindade'],
+  modelo_atual: ['Pedro Albite', 'Daniel Trindade', 'Thiago', 'Amanda Serafim'],
   o2_tax: ['Lucas Ilha'],
   oxy_hacker: ['Pedro Albite', 'Daniel Trindade'],
   franquia: ['Pedro Albite', 'Daniel Trindade'],
