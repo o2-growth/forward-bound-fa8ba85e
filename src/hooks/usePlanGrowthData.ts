@@ -482,29 +482,27 @@ export function usePlanGrowthData() {
       const fixed = getFunnelForBU('modelo_atual').find(f => f.month === calc.month);
       if (!fixed) return calc;
 
-      const merged = {
-        ...calc,
-        leads: fixed.leads,
-        mqls: fixed.mqls,
-        rms: fixed.rms,
-        rrs: fixed.rrs,
-        propostas: fixed.propostas,
-        vendas: fixed.vendas,
-      };
-
+      // Only locked months use the snapshot (quantities + monetary).
+      // Unlocked months ignore the snapshot and use the live reverse funnel calc.
       if (fixed.is_locked) {
         const fatMeta = Number(fixed.faturamento_meta) || 0;
         const fatVender = Number(fixed.faturamento_vender) || 0;
         const invest = Number(fixed.investimento) || 0;
         return {
-          ...merged,
+          ...calc,
+          leads: fixed.leads,
+          mqls: fixed.mqls,
+          rms: fixed.rms,
+          rrs: fixed.rrs,
+          propostas: fixed.propostas,
+          vendas: fixed.vendas,
           ...(fatMeta > 0 ? { faturamentoMeta: fatMeta } : {}),
           ...(fatVender > 0 ? { faturamentoVender: fatVender } : {}),
           ...(invest > 0 ? { investimento: invest } : {}),
         };
       }
 
-      return merged;
+      return calc;
     });
 
     // Override mrrBase column with Oxy truth (mrr_base_monthly) when available.
