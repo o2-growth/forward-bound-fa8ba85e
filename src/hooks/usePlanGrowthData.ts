@@ -322,7 +322,17 @@ export function usePlanGrowthData() {
   const { metas, isLoading: isLoadingMetas } = useMonetaryMetas();
   const { funnelMetas, isLoading: isLoadingFunnel, hasFunnelForBU, getFunnelForBU, bulkUpsert } = useFunnelMetas();
   const { getIndicatorsMap, isLoading: isLoadingIndicators } = useBUIndicatorsConfig();
+  const { mrrBaseData } = useMrrBase();
   const hasSeeded = useRef(false);
+
+  // Build a map of MRR Base real (Oxy truth) by month for the current planning year (2026)
+  const mrrBaseRealPorMes = useMemo(() => {
+    const map: Record<string, number> = {};
+    (mrrBaseData || [])
+      .filter(r => r.year === 2026)
+      .forEach(r => { map[r.month] = Number(r.value) || 0; });
+    return map;
+  }, [mrrBaseData]);
 
   // Default values (same as MediaInvestmentTab)
   const mrrInicial = 700000;
