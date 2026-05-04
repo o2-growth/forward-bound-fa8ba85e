@@ -489,6 +489,8 @@ export function IndicatorsTab() {
       { value: 'Pedro Albite', label: 'Pedro' },
       { value: 'Daniel Trindade', label: 'Daniel' },
       { value: 'Lucas Ilha', label: 'Lucas' },
+      { value: 'Thiago', label: 'Thiago' },
+      { value: 'Amanda Serafim', label: 'Amanda Serafim' },
     ];
     
     return allClosers.filter(c => closersSet.has(c.value));
