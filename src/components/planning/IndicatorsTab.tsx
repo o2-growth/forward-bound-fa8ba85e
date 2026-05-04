@@ -85,7 +85,7 @@ const buOptions: MultiSelectOption[] = [
 
 // SDR mapping by BU
 const BU_SDRS: Record<BuType, string[]> = {
-  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Carol'],
+  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Carol', 'Matheus'],
   o2_tax: ['Carlos'],
   oxy_hacker: ['Carlos', 'Carol'],
   franquia: ['Carlos', 'Carol'],
@@ -97,6 +97,7 @@ const sdrOptions: MultiSelectOption[] = [
   { value: 'Erica', label: 'Erica' },
   { value: 'Amanda', label: 'Amanda' },
   { value: 'Carol', label: 'Carol' },
+  { value: 'Matheus', label: 'Matheus' },
 ];
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
