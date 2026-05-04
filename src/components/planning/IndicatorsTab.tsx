@@ -1004,8 +1004,8 @@ export function IndicatorsTab() {
 
     // For single BU selection - O2 TAX (use analytics hook with first-entry for consistency with gauges)
     if (hasSingleBU && includesO2Tax) {
-      const funnelMetasMensais = funnelData?.o2Tax ? getMonthlyMetasFromFunnel(funnelData.o2Tax, indicator.key, startDate, endDate) : [];
-      const metaPeriodo = funnelData?.o2Tax ? calcularMetaDoPeriodo(funnelData.o2Tax, indicator.key, startDate, endDate) : 0;
+      const funnelMetasMensais = funnelData?.o2Tax ? getMonthlyMetasFromFunnel(funnelData.o2Tax, indicator.key, startDate, endDate, 'o2_tax', undefined, sdrFilterForBU('o2_tax')) : [];
+      const metaPeriodo = funnelData?.o2Tax ? calcularMetaDoPeriodo(funnelData.o2Tax, indicator.key, startDate, endDate, 'o2_tax', undefined, sdrFilterForBU('o2_tax')) : 0;
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       // Build realized data from o2TaxAnalytics (first-entry logic) grouped by period
