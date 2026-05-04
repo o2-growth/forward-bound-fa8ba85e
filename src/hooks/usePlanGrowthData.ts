@@ -451,17 +451,19 @@ export function usePlanGrowthData() {
   );
 
   // Build the final Modelo Atual funnel: use fixed DB values for funnel stages if available,
-  // otherwise use the calculated reverse funnel values
+  // otherwise use the calculated reverse funnel values.
+  // When is_locked = true, ALSO override monetary fields (faturamentoMeta, faturamentoVender,
+  // mrrBase, investimento) so the original plan is preserved even if MRR Base changes later.
   const modeloAtualFunnel = useMemo(() => {
     const hasFixedFunnel = hasFunnelForBU('modelo_atual');
     if (!hasFixedFunnel) return modeloAtualFunnelCalculated;
     
     const fixedMetas = getFunnelForBU('modelo_atual');
-    // Merge: use fixed funnel stages (mqls, rms, etc.) but keep revenue data from calculated funnel
     return modeloAtualFunnelCalculated.map(calc => {
       const fixed = fixedMetas.find(f => f.month === calc.month);
       if (!fixed) return calc;
-      return {
+
+      const merged = {
         ...calc,
         leads: fixed.leads,
         mqls: fixed.mqls,
@@ -469,8 +471,24 @@ export function usePlanGrowthData() {
         rrs: fixed.rrs,
         propostas: fixed.propostas,
         vendas: fixed.vendas,
-        // Keep faturamentoMeta, faturamentoVender, mrrBase, investimento from calculated
       };
+
+      // If month is locked, snapshot wins over dynamic calculation
+      if (fixed.is_locked) {
+        const fatMeta = Number(fixed.faturamento_meta) || 0;
+        const fatVender = Number(fixed.faturamento_vender) || 0;
+        const mrrBasePlan = Number(fixed.mrr_base_planejamento) || 0;
+        const invest = Number(fixed.investimento) || 0;
+        return {
+          ...merged,
+          ...(fatMeta > 0 ? { faturamentoMeta: fatMeta } : {}),
+          ...(fatVender > 0 ? { faturamentoVender: fatVender } : {}),
+          ...(mrrBasePlan > 0 ? { mrrBase: mrrBasePlan } : {}),
+          ...(invest > 0 ? { investimento: invest } : {}),
+        };
+      }
+
+      return merged;
     });
   }, [modeloAtualFunnelCalculated, funnelMetas]);
 
