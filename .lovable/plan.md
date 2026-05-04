@@ -1,92 +1,95 @@
+## Diagnóstico
+
+A coluna **MRR Base** na tabela do Plan Growth (Modelo Atual) **não está lendo da tabela `mrr_base_monthly`** (verdade Oxy). Ela exibe um valor **calculado sinteticamente** no frontend:
+
+- Janeiro: `Meta − 400.000` (constante hardcoded `valorVenderInicial = 400000`)
+- Fev em diante: cascata `MRR_anterior × (1 − 6% churn) + (a_vender_anterior × 25% retenção)`
+
+Por isso a tela mostra:
+- Jan: R$ 725.000 (Oxy real: R$ 705.268,07 — diferença R$ 19.732)
+- Fev: R$ 781.500 (Oxy real: R$ 746.847,17 — diferença R$ 34.653)
+- Mar: R$ 834.610 (Oxy real: R$ 733.281,13 — diferença R$ 101.329)
+- Abr: R$ 909.533 (Oxy real: R$ 700.152,57 — diferença R$ 209.380)
+
+A divergência cresce mês a mês porque é uma projeção teórica que diverge cada vez mais do real.
+
+**Implicação importante:** o snapshot que congelamos ontem (`is_locked = true` em `funnel_metas`) gravou o `mrr_base_planejamento` desses 4 meses com valores Oxy (ex.: Mar = 755.281,13 pré-correção; Jan = 705.268,07). Ou seja, **o lock está correto e protege as quantidades de funil** — só a coluna visual é que está usando outra fonte. Como `mrrBase` no objeto do funnel é só exibido (não cascateia para mqls/rms), trocar a fonte não vai mexer nas metas congeladas.
+
 ## Objetivo
 
-Garantir que **as metas de Jan, Fev, Mar e Abr/2026 nunca mais mudem**, mesmo que o MRR Base desses meses seja corrigido futuramente (como aconteceu agora com Mar = R$ 733.281,13 vindo da Oxy).
+Fazer a coluna **MRR Base** dos meses fechados (Jan–Abr/2026) mostrar exatamente o valor real da Oxy lido de `mrr_base_monthly`, mantendo:
+- Metas congeladas (Jan–Abr) intocadas — quantidades, faturamento_meta, faturamento_vender
+- Lógica de projeção sintética para meses futuros (Mai+) inalterada
+- "A Vender" dos meses congelados continua vindo do snapshot `funnel_metas.faturamento_vender`
 
-A verdade financeira (MRR Base = Oxy) e o planejamento original (metas) precisam coexistir de forma independente para meses já fechados.
+## Solução
 
-## Diagnóstico do que aconteceu
+### 1. Ler `mrr_base_monthly` no `usePlanGrowthData`
 
-Quando o MRR Base de Mar caiu de R$ 755k → R$ 733k (correção Oxy), o gauge de MQL ficou vermelho porque parte da cadeia de metas é **calculada em tempo real** a partir do MRR Base, em vez de ler 100% dos valores fixos da tabela `funnel_metas`:
+Adicionar leitura de `mrr_base_monthly` (year=2026) via novo hook `useMrrBase` (já existe — só importar). Construir `mrrBaseRealPorMes: Record<string, number>` a partir dos registros do DB.
 
-- ✅ **MQLs, RMs, RRs, Propostas, Vendas (quantidade)** — já vêm fixos de `funnel_metas` (não deveriam mudar)
-- ❌ **Faturamento Meta / "A Vender" / Investimento** — recalculados em tempo real via `mrrDynamic` e `calculateReverseFunnel`, que dependem do MRR Base
-- ❌ **Auto-seed** — pode reescrever Mai/2026 (mês "futuro" no momento do seed) com base em MRR Base já desatualizado
+### 2. Sobrescrever `mrrBase` no funnel quando houver valor real
 
-A cadeia recalcula: novo MRR Base → novo `revenueToSell` → novo `faturamentoMeta` por mês → novo `investimento` → e indiretamente novos cálculos derivados em outras telas que usam esses campos.
+No merge do `modeloAtualFunnel`, para CADA mês:
 
-## Solução: snapshot imutável das metas de meses fechados
+- Se existe valor em `mrr_base_monthly` para o mês → `mrrBase = valor_oxy` (sempre, independente de lock)
+- Senão → mantém o valor da projeção sintética (meses futuros)
 
-### 1. Estender `funnel_metas` para guardar os campos monetários
+Isso garante que a coluna mostre Oxy para Jan–Abr (valores reais) e a projeção para Mai–Dez (planejamento).
 
-Hoje `funnel_metas` só guarda **quantidades** (leads, mqls, rms, rrs, propostas, vendas). Vamos adicionar:
+### 3. Garantir que metas congeladas continuem intactas
 
-- `faturamento_meta` (numeric) — meta de faturamento original do mês
-- `faturamento_vender` (numeric) — "A Vender" original (Meta − MRR Base usado no planejamento)
-- `mrr_base_planejamento` (numeric) — MRR Base que foi usado quando a meta foi planejada (referência histórica)
-- `investimento` (numeric) — investimento de mídia planejado
-- `is_locked` (boolean, default false) — quando true, o mês é tratado como **congelado**
+O snapshot `is_locked` continua sobrescrevendo `faturamentoMeta`, `faturamentoVender`, `investimento` e quantidades. A única mudança é que o `mrrBase` exibido passa a ser o real (Oxy), não o planejado de quando a meta foi montada. Isso é **exatamente o que o usuário quer**: ver a verdade Oxy na coluna, sem afetar o resto do plano.
 
-### 2. Popular o snapshot para Jan–Abr/2026
+### 4. (Opcional) Tooltip explicativo
 
-Para os 4 meses, gravar:
-- Quantidades já existentes (mantém os valores atuais de `funnel_metas`)
-- `mrr_base_planejamento` = valor que o MRR Base tinha ANTES da correção Oxy (ex.: Mar = 755.281,13)
-- `faturamento_meta` = meta original do plano
-- `faturamento_vender` = `faturamento_meta − mrr_base_planejamento`
-- `investimento` = valor planejado original
-- `is_locked = true`
-
-Para Mar/2026 especificamente: usar **R$ 755.281,13** como `mrr_base_planejamento` (o valor que estava em uso quando o plano foi montado), preservando assim o cálculo original.
-
-### 3. Ajustar `usePlanGrowthData` para respeitar o lock
-
-No merge do `modeloAtualFunnel` (e na publicação para `MediaMetasContext`):
-
-- Se o mês tem `is_locked = true` → usar **100% dos valores da DB** (quantidades + monetários), ignorando completamente o cálculo dinâmico (`mrrDynamic`, `revenueToSell`, etc.)
-- Se o mês não tem lock → comportamento atual (cálculo dinâmico)
-
-Resultado: o MRR Base na tabela `mrr_base_monthly` continua sendo a verdade Oxy (R$ 733k para Mar), mas a meta de Mar permanece igual ao que estava antes (calculada com base em R$ 755k).
-
-### 4. Proteger o auto-seed
-
-O bloco de auto-seed (`hasSeeded.current`) só deve criar/atualizar meses que **não tenham lock**. Meses locked nunca são tocados pelo seed, mesmo se algum outro recálculo rodar.
-
-### 5. UI mínima de transparência (opcional, recomendado)
-
-Na aba Plan Growth, mostrar um **cadeado** discreto ao lado do mês quando `is_locked = true`, com tooltip: *"Meta congelada — planejamento original preservado. MRR Base real (Oxy): R$ X."* Sem botão de unlock no UI por enquanto (proteção contra acidentes).
+Em meses com `is_locked = true` e onde `mrrBase exibido (Oxy real) ≠ mrr_base_planejamento (snapshot)`, mostrar tooltip discreto: *"MRR Base real (Oxy): R$ X. Planejamento original usou: R$ Y."*
 
 ## Detalhes técnicos
 
-**Migration:**
-```sql
-ALTER TABLE funnel_metas
-  ADD COLUMN faturamento_meta numeric DEFAULT 0,
-  ADD COLUMN faturamento_vender numeric DEFAULT 0,
-  ADD COLUMN mrr_base_planejamento numeric DEFAULT 0,
-  ADD COLUMN investimento numeric DEFAULT 0,
-  ADD COLUMN is_locked boolean DEFAULT false;
+**Arquivo a editar:** `src/hooks/usePlanGrowthData.ts`
+
+```typescript
+// Adicionar:
+import { useMrrBase } from './useMrrBase';
+
+// Dentro do hook:
+const { mrrBaseData } = useMrrBase(2026); // já existe
+const mrrBaseRealPorMes = useMemo(() => {
+  const map: Record<string, number> = {};
+  (mrrBaseData || []).forEach(r => { map[r.month] = Number(r.value) || 0; });
+  return map;
+}, [mrrBaseData]);
+
+// No merge final do modeloAtualFunnel, após aplicar lock:
+return modeloAtualFunnel.map(d => {
+  const real = mrrBaseRealPorMes[d.month];
+  return real > 0 ? { ...d, mrrBase: real } : d;
+});
 ```
 
-**Insert/update (Jan–Abr/2026, modelo_atual):** valores de `mrr_base_planejamento` virão de:
-- Jan, Fev, Abr → valor atual de `mrr_base_monthly` (já bate com Oxy, sem mudança)
-- Mar → **R$ 755.281,13** (valor pré-correção, recuperável do backup `/mnt/documents/mrr_base_backup_2026-05-04_v2.csv`)
-
-`faturamento_meta` e `investimento` virão dos valores atualmente publicados em `modeloAtualFunnel` para esses meses (snapshot do estado atual).
-
-**Arquivos a editar:**
-- `src/hooks/usePlanGrowthData.ts` — adicionar branch que usa valores locked direto da DB
-- `src/hooks/useFunnelMetas.ts` — expor novos campos no tipo `FunnelMetaRow`
-- `src/integrations/supabase/types.ts` — atualizado automaticamente pela migration
-
 **Arquivos NÃO afetados:**
-- `mrr_base_monthly` permanece com valores Oxy (verdade financeira)
-- `monetary_metas` e `funnel_metas` (quantidades) permanecem inalterados
-- Tabela MRR Base no UI continua mostrando R$ 733k para Mar
+- `funnel_metas` (snapshot mantido)
+- `monetary_metas` (metas mantidas)
+- `mrr_base_monthly` (já está com valores Oxy corretos)
+- Cálculo de `faturamentoVender` para meses futuros (mantido)
 
 ## Resultado esperado
 
-- ✅ MRR Base mostra Oxy (R$ 733.281,13 em Mar)
-- ✅ Meta MQL Mar = 395 (não muda nunca mais)
-- ✅ Meta de faturamento, "A Vender" e investimento de Jan–Abr ficam congelados
-- ✅ Gauge MQL volta a mostrar a cor original (amarelo no caso de Mar)
-- ✅ Meses futuros (Mai+) continuam funcionando dinamicamente como hoje
+Após o fix, a tabela vai mostrar:
+
+| Mês | Meta | MRR Base (Oxy) | A Vender |
+|-----|------|----------------|----------|
+| Jan | 1.125.000 | **705.268** | 419.732 (do snapshot) |
+| Fev | 1.181.500 | **746.847** | 434.653 (do snapshot) |
+| Mar | 1.334.610 | **733.281** | 579.329 (do snapshot) |
+| Abr | 1.509.533 | **700.153** | 809.381 (do snapshot) |
+
+E as metas (MQL, RM, RR, propostas, vendas) **continuam idênticas** porque o lock já está ativo.
+
+## Verificação pós-fix
+
+1. Conferir que MRR Base na tela = valores Oxy do DB
+2. Conferir que MQL Mar continua = 395 (não pode mudar)
+3. Conferir que gauges de MQL voltam à cor original (amarelo/verde, não vermelho)
+4. Conferir que "A Vender" Mar = 579.329 (snapshot, não recalculado)
