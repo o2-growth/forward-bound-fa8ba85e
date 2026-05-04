@@ -1,30 +1,39 @@
-## Sobrescrever MRR Base (Jan–Abr/2026) com valores reais da Oxy + backup
+## Corrigir shift de 1 mês no MRR Base (Jan–Abr/2026)
 
 ### Diagnóstico
-Os 4 meses no DB estão com `is_total_override = true` e divergentes da Oxy:
+O Marco preencheu os valores com label deslocado: o que ele rotulou como "Mar" era o MRR real de **Abr**, e o que rotulou como "Abr" era o de **Mai**. A correção é re-alinhar usando os valores oficiais da Oxy para cada mês correto.
 
-| Mês | DB atual | Oxy (regra CaaS+SaaS sem Setup/Serv. Esp.) | Δ |
+### Valores Oxy (CaaS+SaaS, sem Setup/Serv. Especializados) por mês competência
+
+| Mês | Cálculo | Total Oxy |
+|---|---|---:|
+| **Jan/26** | 567.257,36 + 74.255,29 + 0 + 3.180,71 + 0 + 12.776 + 47.799 + 0 | **R$ 705.268,36** |
+| **Fev/26** | 611.730,17 + 74.255,29 + 1.800 + 3.180,71 + 0 + 11.779 + 44.102 + 0 | **R$ 746.847,17** |
+| **Mar/26** | 626.506,13 + 52.685,29 + 4.797 + 3.180,71 + 0 + 10.282 + 35.830 + 0 | **R$ 733.281,13** |
+| **Abr/26** | 600.919,17 + 52.685,29 + 4.797 + 3.180,71 + 0 + 6.088 + 32.482,40 + 0 | **R$ 700.152,57** |
+
+### Comparação com DB atual
+
+| Mês | DB atual | Oxy correto | Δ |
 |---|---:|---:|---:|
-| Jan | R$ 967.968,89 | **R$ 705.268,07** | −R$ 262.700 |
-| Fev | R$ 809.975,81 | **R$ 746.847,17** | −R$ 63.128 |
-| Mar | R$ 667.987,00 | **R$ 755.281,13** | +R$ 87.294 |
-| Abr | R$ 667.987,00 | **R$ 700.152,57** | +R$ 32.165 |
+| Jan | 705.268,07 | 705.268,36 | +0,29 ✅ ok (arredondamento) |
+| Fev | 746.847,17 | 746.847,17 | 0 ✅ ok |
+| **Mar** | **755.281,13** | **733.281,13** | **−22.000** ❌ |
+| Abr | 700.152,57 | 700.152,57 | 0 ✅ ok |
+
+**Conclusão:** o shift afeta **somente Mar**. Jan, Fev e Abr já estão corretos. O valor 755.281 que está em Mar foi um erro de digitação meu na rodada anterior (somei errado), não shift do Marco.
 
 ### Passos
 
-**1. Backup CSV (`/mnt/documents/`)**
-- Exportar `mrr_base_monthly` (year=2026) atual para `mrr_base_backup_2026-05-04.csv` com colunas: `month, year, value, is_total_override, updated_at`.
-- Mostrar o caminho via `<lov-artifact>` para o usuário baixar.
+**1. Backup CSV (`/mnt/documents/mrr_base_backup_2026-05-04_v2.csv`)**
 
-**2. Update no DB (via tool de insert/update)**
-- Atualizar Jan, Fev, Mar, Abr/2026 com os valores Oxy acima.
-- Setar `is_total_override = false` (reabilita sync automático no futuro).
-- Setar `updated_at = now()`.
+**2. Update apenas Mar/2026**
+- `Mar = 733.281,13`, `is_total_override = false`, `updated_at = now()`
 
-**3. Verificação**
-- Re-query `mrr_base_monthly` ano 2026 para confirmar os 4 meses atualizados.
+**3. Verificação final**
+- Re-query `mrr_base_monthly` 2026 e confirmar que os 4 meses batem 100% com a Oxy.
 
 ### Fora de escopo
-- Não rodar a edge function `sync-mrr-base` (faria a mesma coisa, mas direto via SQL é mais auditável e rápido aqui).
-- Não tocar em `monetary_metas`, `funnel_metas`, ou cálculos de Plan Growth (que vão refletir automaticamente).
-- Não alterar memória `MRR Base 2026 Starting Point` (R$ 667.987 era um valor histórico de Mar; agora a fonte da verdade vira a Oxy real).
+- Não tocar em Jan/Fev/Abr (já corretos).
+- Não buscar Mai/2026 da Oxy (não é necessário — a regra é label = competência da Oxy, não shift).
+- Não alterar `monetary_metas`, `funnel_metas`, ou hooks.
