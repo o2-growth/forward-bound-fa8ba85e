@@ -140,7 +140,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
         
         const movement: OxyHackerMovement = {
           id: String(row.ID),
-          titulo: row['Título'] || '',
+          titulo,
           fase,
           faseAtual: row['Fase Atual'] || '',
           dataEntrada,
