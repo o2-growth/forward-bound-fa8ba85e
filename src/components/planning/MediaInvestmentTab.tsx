@@ -2750,7 +2750,7 @@ export function MediaInvestmentTab() {
                                 metaO2: 'O2 TAX',
                                 metaOH: 'Oxy Hacker',
                                 metaFR: 'Franquia',
-                                dreTotal: 'DRE Total',
+                                dreTotal: 'Realizado Total',
                               };
                               return labels[value] || value;
                             }}
