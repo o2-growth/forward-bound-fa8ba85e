@@ -201,10 +201,12 @@ export function useConsolidatedMetas() {
       bus.forEach(bu => {
         let faturamento = getConsolidatedMeta(bu, monthName, 'faturamento').value;
 
-        if (bu === 'modelo_atual' && closerFilter && closerFilter.length > 0 && getFilteredMeta) {
-          const vendas = faturamento / BU_TICKETS[bu];
+        // Aplicar rateio de % por closer (closer_metas) para TODAS as BUs quando filtro estiver ativo
+        if (closerFilter && closerFilter.length > 0 && getFilteredMeta) {
+          const ticket = BU_TICKETS[bu] || 1;
+          const vendas = faturamento / ticket;
           const filteredVendas = getFilteredMeta(vendas, bu, monthName, closerFilter);
-          faturamento = filteredVendas * BU_TICKETS[bu];
+          faturamento = filteredVendas * ticket;
         }
 
         total += faturamento * fraction;

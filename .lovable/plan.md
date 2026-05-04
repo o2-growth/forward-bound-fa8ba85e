@@ -1,57 +1,41 @@
-## Objetivo
+## Problema
 
-1. Criar aba **"Metas por SDR"** no Admin com metas de **Reunião Agendada (RM)** e **Reunião Realizada (RR)** por SDR/BU/mês.
-2. Ocultar as abas **"Metas Monetárias"** e **"Metas CPx"** do menu do Admin.
-3. **Refletir** essas metas no Dashboard Comercial (`IndicatorsTab`) quando o filtro de SDR estiver ativo: ao selecionar um ou mais SDRs, as metas de RM e RR mostradas (gauges/funil) passam a ser a **soma das metas dos SDRs selecionados** (interseccionadas com as BUs ativas), em vez da meta cheia da(s) BU(s).
+Os acelerômetros monetários (Faturamento, MRR, Setup, Pontual) **não respeitam o filtro de Closer** corretamente. Hoje o filtro só atua em Modelo Atual; em O2 TAX, Oxy Hacker e Franquia tanto o realizado quanto a meta são exibidos cheios, ignorando o filtro.
 
-## Atribuição de SDRs por BU
+## Causas raiz (em `IndicatorsTab.tsx` + `useConsolidatedMetas.ts`)
 
-- Modelo Atual / Oxy Hacker / Franquia → Amanda, Carol
-- O2 TAX → Carlos
+1. **Realizado de O2 TAX/Oxy Hacker/Franquia ignora `selectedClosers`** — soma todos os cards de venda da BU sem aplicar `matchesCloserFilter`.
+2. **Meta de O2 TAX/Oxy Hacker/Franquia ignora rateio por closer** — `getFilteredFaturamentoMeta` em `useConsolidatedMetas.ts` só aplica % de `closer_metas` quando `bu === 'modelo_atual'`. Para as outras BUs devolve a meta inteira.
+3. **Inconsistência "todos selecionados"** — o bloco monetário usa `selectedClosers` cru em vez de `effectiveSelectedClosers`. Se o usuário marca todos os closers disponíveis, deveria valer como "sem filtro" (igual aos demais indicadores), mas hoje entra no ramo filtrado.
 
-## Banco de dados — nova tabela `sdr_metas`
+## Mudanças
 
-```
-id         uuid pk default gen_random_uuid()
-bu         text not null      -- modelo_atual | o2_tax | oxy_hacker | franquia
-month      text not null      -- jan..dez
-year       int  not null default 2026
-sdr        text not null      -- Amanda | Carol | Carlos
-rm_meta    int  not null default 0   -- Reuniões Agendadas
-rr_meta    int  not null default 0   -- Reuniões Realizadas
-created_at, updated_at timestamptz default now()
-unique (bu, month, year, sdr)
-```
+### 1. `IndicatorsTab.tsx` — função `getRealizedMonetaryForIndicator` (linhas ~2050-2192)
 
-- RLS: leitura para autenticados; insert/update/delete somente `admin` (espelho de `closer_metas`).
-- Trigger `audit_log_trigger_fn` anexado.
+- Trocar todas as ocorrências de `selectedClosers` por `effectiveSelectedClosers` nos cases `faturamento`, `mrr`, `setup`, `pontual`.
+- **Aplicar filtro de closer também em O2 TAX**: usar `o2TaxAnalytics.getCardsForIndicator('venda').filter(card => matchesCloserFilter(card.closer || card.responsavel || ''))` quando o filtro estiver ativo.
+- **Aplicar filtro de closer em Oxy Hacker e Franquia**: substituir `getOxyHackerValue('venda', …)` e `getExpansaoValue('venda', …)` por uma soma sobre os cards de venda do hook de analytics correspondente (`useOxyHackerAnalytics` / `useExpansaoAnalytics`) filtrados por `matchesCloserFilter`. Quando não houver filtro, manter o caminho atual (helpers de período).
 
-## Novos arquivos
+### 2. `useConsolidatedMetas.ts` — função `getFilteredFaturamentoMeta` (linhas ~178-218)
 
-- `src/hooks/useSdrMetas.ts` — espelho de `useCloserMetas`: expõe `BU_SDRS`, `getSdrsForBU(bu)`, leitura/atualização em lote de `rm_meta` e `rr_meta`, helper `getSdrMetaTotals({ bus, months, sdrs })` que retorna `{ rm, rr }` somando os registros que casam com o filtro.
-- `src/components/planning/SdrMetasTab.tsx` — UI com seletor de BU, tabela `meses × SDRs` mostrando duas colunas por SDR (RM Meta e RR Meta), Salvar/Resetar (modelado a partir de `CloserMetasTab.tsx`).
+- Remover a restrição `if (bu === 'modelo_atual')` e aplicar o rateio por % do closer (`getFilteredMeta`) para **todas as BUs** quando `closerFilter` estiver presente.
+- Lógica unificada: para cada BU no período, calcular `vendas = faturamento / BU_TICKETS[bu]`, aplicar `getFilteredMeta(vendas, bu, mes, closers)`, multiplicar de volta pelo ticket.
+- O rateio depende de `closer_metas` ter percentuais para cada BU/mês/closer. Se não houver entry, o `getPercentage` retorna o `defaultPercentage` (igual entre closers da BU), o que mantém comportamento previsível.
 
-## Edições
+### 3. `IndicatorsTab.tsx` — `getMetaMonetaryForIndicator` (linha ~2195)
 
-- `src/components/planning/AdminTab.tsx`:
-  - Remover `TabsTrigger`/`TabsContent` de `monetary-metas` e `cost-stage-metas` e seus imports.
-  - Adicionar `TabsTrigger value="sdr-metas"` + `<SdrMetasTab />`.
-- `src/components/planning/IndicatorsTab.tsx`:
-  - Onde hoje as metas de **RM e RR** são lidas de `funnel_metas` agregadas por BU/mês, passar a usar `useSdrMetas`:
-    - Se `effectiveSelectedSDRs.length > 0` → meta RM/RR = soma de `sdr_metas` para `(BUs ativas, meses ativos, SDRs selecionados)`.
-    - Se nenhum SDR selecionado → soma de TODOS os SDRs daquelas BUs/meses (mantém comportamento equivalente ao atual). **Fallback**: se `sdr_metas` estiver vazia para o recorte, manter o valor de `funnel_metas` atual para não zerar a meta.
-  - Apenas RM e RR são afetadas. Leads, MQLs, RR→Prop, Vendas e metas monetárias permanecem como hoje.
-
-## Ordem final das abas no Admin
-
-1. Usuários
-2. Metas Closers
-3. **Metas SDR** (nova)
-4. Logs
-
-Os arquivos `MonetaryMetasTab.tsx` e `CostStageMetasTab.tsx` permanecem no repositório (apenas escondidos do menu).
+- Trocar `selectedClosers.length > 0 ? selectedClosers : undefined` por `effectiveSelectedClosers.length > 0 ? effectiveSelectedClosers : undefined` para consistência.
 
 ## Fora de escopo
 
-- Rateio de metas de Vendas/Pontual/Setup por SDR.
-- Ajustes em Marketing/Plan Growth.
+- Filtro de SDR sobre acelerômetros monetários (continua não aplicado, pois receita é atribuída a closer e não a SDR).
+- SLA (não é monetário e não depende de closer).
+- Mudanças no card de Vendas (volume) — já filtra corretamente.
+- Edição de `closer_metas` (estrutura permanece).
+
+## Resultado esperado
+
+Quando o usuário ativar o filtro de Closer:
+- **Realizado monetário** soma apenas vendas onde o closer do card está na seleção, em todas as BUs do filtro de BUs.
+- **Meta monetária** é rateada pela soma dos % dos closers selecionados (de `closer_metas`) para cada BU/mês.
+- Marcar todos os closers disponíveis = mesmo comportamento que nenhum filtro (consistente com leads, MQLs, RM, RR, vendas).
