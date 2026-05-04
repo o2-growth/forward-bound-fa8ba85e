@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useMonetaryMetas, BuType, MonthType, MetricType } from './useMonetaryMetas';
 import { useMediaMetas, FunnelDataItem } from '@/contexts/MediaMetasContext';
+import { useFunnelMetas } from './useFunnelMetas';
 import { eachMonthOfInterval, differenceInDays, startOfMonth, endOfMonth, getMonth } from 'date-fns';
 
 export type ConsolidatedMetricType = 'faturamento' | 'mrr' | 'setup' | 'pontual';
@@ -34,6 +35,7 @@ const MONTH_NAMES: MonthType[] = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul
 export function useConsolidatedMetas() {
   const { metas, getMeta, isLoading: isLoadingDb } = useMonetaryMetas();
   const { funnelData, isLoaded: isPlanGrowthLoaded } = useMediaMetas();
+  const { isMonthLocked, getLockedSnapshot } = useFunnelMetas(2026);
 
   // Verifica se há overrides no banco para uma BU específica
   const hasDbOverridesForBU = useMemo(() => {
@@ -94,12 +96,28 @@ export function useConsolidatedMetas() {
     month: MonthType,
     metric: ConsolidatedMetricType
   ): ConsolidatedMetaResult => {
-    // Para modelo_atual, todas as métricas monetárias devem usar Plan Growth
-    // O DB armazena valores baseados no faturamento TOTAL, mas os acelerômetros
-    // precisam do INCREMENTO (A Vender = Total - MRR Base)
+    // 🔒 LOCK-AWARE: Para Modelo Atual, se o mês está locked em funnel_metas,
+    // usar snapshot congelado (faturamento_vender = Meta Original − MRR Base do momento do lock)
+    // em vez de recalcular via funnelData ao vivo. Isso protege as metas dos acelerômetros
+    // de mudanças retroativas quando o usuário edita MRR Base ou Plan Growth.
+    if (bu === 'modelo_atual' && isMonthLocked('modelo_atual', month)) {
+      const snapshot = getLockedSnapshot('modelo_atual', month);
+      if (snapshot && snapshot.faturamento_vender > 0) {
+        const fatIncremento = snapshot.faturamento_vender;
+        switch (metric) {
+          case 'faturamento': return { value: fatIncremento, source: 'database' };
+          case 'mrr':         return { value: Math.round(fatIncremento * 0.25), source: 'database' };
+          case 'setup':       return { value: Math.round(fatIncremento * 0.60), source: 'database' };
+          case 'pontual':     return { value: Math.round(fatIncremento * 0.15), source: 'database' };
+        }
+      }
+    }
+
+    // Para modelo_atual NÃO locked: pular DB pois monetary_metas guarda Total
+    // (acelerômetros precisam do Incremento). Usar Plan Growth ao vivo.
     const skipDb = bu === 'modelo_atual';
 
-    // 1. Tentar banco de dados primeiro (exceto modelo_atual)
+    // 1. Tentar banco de dados primeiro (exceto modelo_atual não-locked)
     if (!skipDb) {
       const dbValue = getMeta(bu, month, metric as MetricType);
       if (dbValue > 0) {
