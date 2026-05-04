@@ -9,14 +9,13 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Pencil, Save, Shield, Trash2, User, Target, DollarSign, History, Gauge } from 'lucide-react';
+import { Loader2, Pencil, Save, Shield, Trash2, User, Target, History, Users } from 'lucide-react';
 import { CreateUserForm } from './CreateUserForm';
 import { EditUserDialog } from './EditUserDialog';
 import { DeleteUserDialog } from './DeleteUserDialog';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { CloserMetasTab } from './CloserMetasTab';
-import { MonetaryMetasTab } from './MonetaryMetasTab';
-import { CostStageMetasTab } from './CostStageMetasTab';
+import { SdrMetasTab } from './SdrMetasTab';
 import { AdminLogsTab } from './AdminLogsTab';
 
 const TAB_OPTIONS: { key: TabKey; label: string }[] = [
