@@ -2738,7 +2738,7 @@ export function MediaInvestmentTab() {
                                 metaO2: 'Meta O2 TAX',
                                 metaOH: 'Meta Oxy Hacker',
                                 metaFR: 'Meta Franquia',
-                                dreTotal: 'DRE Total',
+                                dreTotal: 'Realizado Total',
                               };
                               return [formatCompact(value), labels[name] || name];
                             }}
