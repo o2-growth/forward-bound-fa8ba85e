@@ -28,13 +28,13 @@ export interface BUIndicatorsInput {
 const BU_KEYS = ['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia'] as const;
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] as const;
 
-/** Returns true if the given month (Jan-Dez) is in the past or is the current month */
+/** Returns true if the given month (Jan-Dez) is in the past (current month stays editable) */
 export function isMonthLocked(month: string): boolean {
   const now = new Date();
   const currentMonthIdx = now.getMonth(); // 0-based
   const monthIdx = MONTHS.indexOf(month as typeof MONTHS[number]);
   if (monthIdx === -1) return false;
-  return monthIdx <= currentMonthIdx; // current month and past months are locked
+  return monthIdx < currentMonthIdx; // only past months are locked; current month stays editable
 }
 
 export function useBUIndicatorsConfig() {
