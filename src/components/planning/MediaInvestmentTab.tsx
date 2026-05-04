@@ -1039,6 +1039,18 @@ export function MediaInvestmentTab() {
     return result;
   };
 
+  // MRR Base real (Oxy truth) e funnel_metas snapshot (lock)
+  const { mrrBaseData } = useMrrBase();
+  const { hasFunnelForBU, getFunnelForBU } = useFunnelMetas();
+
+  const mrrBaseRealPorMes = useMemo(() => {
+    const map: Record<string, number> = {};
+    (mrrBaseData || [])
+      .filter((r: any) => r.year === 2026)
+      .forEach((r: any) => { map[r.month] = Number(r.value) || 0; });
+    return map;
+  }, [mrrBaseData]);
+
   // Estados editáveis - Taxas gerais (Modelo Atual)
   const [mrrInicial, setMrrInicial] = useState(700000);
   const [valorVenderInicial, setValorVenderInicial] = useState(400000);
