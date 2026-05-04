@@ -26,6 +26,8 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { MetaRedistributionPanel } from "./MetaRedistributionPanel";
 import { ArrowRightLeft } from "lucide-react";
 import { useBUIndicatorsConfig } from "@/hooks/useBUIndicatorsConfig";
+import { useMrrBase } from "@/hooks/useMrrBase";
+import { useFunnelMetas } from "@/hooks/useFunnelMetas";
 
 // Indicadores de 2025 (base para projeção)
 const indicators2025 = {
