@@ -18,6 +18,7 @@ import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useCloserMetas, BU_CLOSERS, BuType, CloserType } from "@/hooks/useCloserMetas";
+import { useSdrMetas } from "@/hooks/useSdrMetas";
 import { LossAnalysisSection } from "./indicators/LossAnalysisSection";
 import { format, startOfYear, endOfYear, endOfDay, differenceInDays, eachMonthOfInterval, addDays, eachDayOfInterval, getMonth, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { DateRangePickerGA } from "./DateRangePickerGA";
