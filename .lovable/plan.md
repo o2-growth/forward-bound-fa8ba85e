@@ -1,79 +1,79 @@
-## Problema
+## Regra
 
-Hoje a coluna **MRR Base** mostra o **MRR realizado do próprio mês** (Oxy):
+- **Meta de Faturamento permanece a meta original** (ex.: Jan = R$ 1.125.000). Não muda.
+- **A Vender = Meta − MRR Base (Oxy)** → cobre o gap automaticamente quando o MRR real ficou abaixo do projetado.
+- **MRR Base** segue mostrando a verdade Oxy (já está correto).
+- **Drill-down expansível** ganha um aviso visual quando o MRR Base real ficou abaixo do projetado, com o delta.
 
-- Jan/26 = 705.268 (MRR de Jan)
-- Fev/26 = 746.847 (MRR de Fev)
-- Mar/26 = 733.281 (MRR de Mar)
-- Abr/26 = 700.152 (MRR de Abr)
+## Resultado esperado (Modelo Atual)
 
-Mas a definição correta é: **MRR Base de um mês = MRR realizado do mês ANTERIOR** (a base com a qual você começa o mês, antes de churn/vendas/retenção).
+| Mês | Meta | MRR Base (Oxy) | A Vender (novo) | A Vender (antes) |
+|---|---:|---:|---:|---:|
+| Jan | 1.125.000 | 622.469 | **502.531** | 400.000 |
+| Fev | 1.237.500 | 705.268 | **532.232** | 456.000 |
+| Mar | 1.387.500 | 746.847 | _locked: 579.329_ | 538.890 |
+| Abr | 1.350.000 | 733.281 | **616.719** | 417.584 |
+| Mai | 1.485.000 | 700.153 | **784.847** | 504.133 |
+| Jun+ | … | projeção (cadeia) | Meta − MRR projetado | … |
 
-Ou seja, o que está em `mrr_base_monthly` hoje é, na verdade, o **MRR fechado do mês**, não o MRR Base. A coluna está deslocada em 1 mês.
+(Mar continua usando o snapshot lockado em `funnel_metas`.)
 
-## Definição correta
+Vendas e funil reverso (propostas, RR, RM, MQL, Leads, Investimento) recalculam automaticamente a partir do novo A Vender, usando o ticket médio e as taxas de conversão atuais — preservando coerência com o aumento de meta.
 
-| Mês exibido | MRR Base correto = MRR do mês anterior |
-|---|---|
-| Jan/26 | MRR de **Dez/25** |
-| Fev/26 | MRR de **Jan/26** = 705.268 |
-| Mar/26 | MRR de **Fev/26** = 746.847 |
-| Abr/26 | MRR de **Mar/26** = 733.281 |
-| Mai/26 | MRR de **Abr/26** = 700.152 |
-| Jun/26+ | projeção (mês anterior com churn + retenção) |
+## Alterações técnicas
 
-## Solução
+**Arquivo único:** `src/components/planning/MediaInvestmentTab.tsx`
 
-### 1. Sincronizar Dez/2025 da Oxy
+### 1. Novo cálculo de `modeloAtualFunnel` (linhas ~1310–1350)
 
-Hoje o `sync-mrr-base` só sincroniza a partir de Janeiro do ano solicitado. Vou rodar o sync para `year: 2025` (que já está fechado e vai buscar até Dez/25). Isso popula a linha `Dez/2025` em `mrr_base_monthly`.
+Para cada mês não lockado:
+- Se houver `mrrBaseRealPorMes[month]` (Oxy):
+  - `faturamentoMeta` = `metasMensaisModeloAtual[month]` (meta original, intocada)
+  - `mrrBase` = valor Oxy
+  - `aVender` = `max(0, faturamentoMeta − mrrBase)` ← recalcula
+  - `vendas` = `ceil(aVender / ticketMedio)`, e funil reverso recalcula `propostas`, `rrs`, `rms`, `mqls`, `leads`
+  - `investimento` = `vendas × cpv` (mesma fórmula atual)
+  - Adicionar campos auxiliares:
+    - `mrrBaseProjetado`: o `mrrBase` que o cálculo sintético produziria (já é `d.mrrBase` antes do override)
+    - `mrrBaseGap`: `mrrBaseProjetado − mrrBaseReal` (positivo = MRR ficou abaixo do plano)
+- Se não houver Oxy (Jun+): mantém comportamento atual (sintético via `mrrComChurn`).
 
-Resultado esperado: nova linha `mrr_base_monthly` com `month='Dez', year=2025, value=<MRR Dez/25 da Oxy>`.
+Para meses lockados (Mar): mantém snapshot do `funnel_metas` exatamente como hoje, mas anexa `mrrBaseProjetado` e `mrrBaseGap` calculados a partir do `d.mrrBase` original (informativo no expandido).
 
-### 2. Ajustar a leitura do hook (deslocamento de -1 mês)
+### 2. Bloco expandido (linhas ~661–700)
 
-Em `src/components/planning/MediaInvestmentTab.tsx` (e em `src/hooks/usePlanGrowthData.ts`), trocar a forma de construir o map `mrrBaseRealPorMes`:
+Adicionar uma faixa nova no topo do conteúdo expandido, condicionada a `mrrBaseGap > 0`:
 
-**Antes** (errado):
-```ts
-mrrBaseRealPorMes['Jan'] = mrr_base_monthly[Jan/2026]  // MRR de Jan = errado
+```
+⚠️ MRR Base abaixo do projetado
+MRR Projetado: R$ 725.000  |  MRR Real (Oxy): R$ 622.469  |  Δ: −R$ 102.531
+A Vender ajustado de R$ 400.000 para R$ 502.531 para preservar a Meta de R$ 1.125.000.
 ```
 
-**Depois** (correto):
+Visual: card amarelo/âmbar discreto com ícone de info/warning, usando tokens semânticos do design system (`border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400`).
+
+Se `mrrBaseGap < 0` (Oxy veio acima do plano, raro): mostra como info azul/verde, "MRR Base superou o projetado em X, A Vender reduzido."
+
+### 3. Tipo `FunnelData`
+
+Adicionar dois campos opcionais:
 ```ts
-mrrBaseRealPorMes['Jan'] = mrr_base_monthly[Dez/2025]  // MRR de Dez/25 = base de Jan
-mrrBaseRealPorMes['Fev'] = mrr_base_monthly[Jan/2026]
-mrrBaseRealPorMes['Mar'] = mrr_base_monthly[Fev/2026]
-mrrBaseRealPorMes['Abr'] = mrr_base_monthly[Mar/2026]
-mrrBaseRealPorMes['Mai'] = mrr_base_monthly[Abr/2026]
+mrrBaseProjetado?: number;
+mrrBaseGap?: number; // projetado − real (positivo quando Oxy ficou abaixo)
 ```
 
-Implementação: para cada mês `M` do ano de planejamento (2026), buscar `mrr_base_monthly` do mês imediatamente anterior (com rollover de Jan → Dez do ano anterior).
+### 4. Não alterar
 
-### 3. Manter inalterado
-
-- **Metas/quantidades em meses lockados** (Mar: MQL=395, A Vender=579.329) seguem vindo do snapshot `funnel_metas`.
-- **Cadeia projetada Mai+**: `mrrComChurn` continua calculando MRR projetado para Jun/Jul/.../Dez. O override por Oxy só se aplica até o último mês fechado (que vira base do mês seguinte).
-- O cálculo de `faturamentoMeta = mrrBase + faturamentoVender` continua coerente, mas agora `mrrBase` é o número correto.
-
-## Detalhes técnicos
-
-**Arquivos a alterar:**
-- `src/components/planning/MediaInvestmentTab.tsx` — lógica do `mrrBaseRealPorMes` (linhas ~1043–1052)
-- `src/hooks/usePlanGrowthData.ts` — mesma lógica de map (linhas ~285–292)
-
-**Edge function executada (não alterada):**
-- `sync-mrr-base` chamada com `{ year: 2025 }` para popular Dez/25.
-
-**Memória a atualizar:**
-- `mem://logic/plan-growth/mrr-projection-source-logic` — refletir que MRR Base = MRR do mês anterior (Oxy), com Jan/26 = Dez/25.
+- `usePlanGrowthData.ts` (não é renderizado nessa aba; já refletirá pois A Vender vem de `faturamentoVender`).
+- `funnel_metas` no DB (Mar continua intocado).
+- Lógica de pendingChanges, redistribution, save (todas operam sobre `faturamentoVender` já recalculado).
+- Coluna Meta exibida — continua sendo `data.faturamentoMeta` original.
 
 ## Validação
 
-Após implementar, conferir na tabela:
-- Jan/26: MRR Base = valor de Dez/25 (Oxy)
-- Fev/26: MRR Base = 705.268
-- Mar/26: MRR Base = 746.847
-- Abr/26: MRR Base = 733.281
-- Mai/26: MRR Base = 700.152
-- Jun/26 em diante: cadeia projetada, partindo de 700.152 com churn e retenção
+Após implementar:
+1. Jan: Meta=1.125.000, MRR Base=622.469, A Vender=502.531 (soma bate com Meta)
+2. Expandir Jan: aviso âmbar mostra "MRR Real ficou R$ 102.531 abaixo do projetado"
+3. Fev: A Vender ≈ 532.232 (soma bate)
+4. Mar: continua locked (579.329) e expandido mostra info do gap
+5. Total anual (Meta) mantém R$ 23.625.000 (= soma trimestral antiga)
