@@ -471,6 +471,72 @@ export function IndicatorsTab() {
   
   // Get closer metas for filtering goals by closer percentage
   const { getFilteredMeta } = useCloserMetas(currentYear);
+  const { metas: sdrMetasList } = useSdrMetas(currentYear);
+
+  /**
+   * Soma metas RM/RR de sdr_metas para uma BU/SDRs em um período (com fração proporcional ao mês).
+   * Retorna { value, hasData } — quando hasData=false, o caller deve usar fallback (funnel).
+   */
+  const getSdrMetaForPeriod = (
+    indicatorKey: 'rm' | 'rr',
+    bu: string,
+    start: Date,
+    end: Date,
+    sdrFilter?: string[]
+  ): { value: number; hasData: boolean } => {
+    if (!sdrMetasList || sdrMetasList.length === 0) return { value: 0, hasData: false };
+    const monthsInPeriod = eachMonthOfInterval({ start, end });
+    let total = 0;
+    let hasData = false;
+
+    for (const monthDate of monthsInPeriod) {
+      const monthName = monthNames[getMonth(monthDate)];
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const overlapStart = start > monthStart ? start : monthStart;
+      const overlapEnd = end < monthEnd ? end : monthEnd;
+      if (overlapStart > overlapEnd) continue;
+      const overlapDays = differenceInDays(overlapEnd, overlapStart) + 1;
+      const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
+      const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
+
+      const records = sdrMetasList.filter(m =>
+        m.bu === bu &&
+        m.month === monthName &&
+        (!sdrFilter || sdrFilter.length === 0 || sdrFilter.includes(m.sdr))
+      );
+      for (const r of records) {
+        const v = indicatorKey === 'rm' ? (r.rm_meta || 0) : (r.rr_meta || 0);
+        if (v > 0) hasData = true;
+        total += v * fraction;
+      }
+    }
+
+    return { value: total, hasData };
+  };
+
+  /** Versão para uso por mês (retorna apenas o valor inteiro do mês, sem fração) */
+  const getSdrMetaForMonth = (
+    indicatorKey: 'rm' | 'rr',
+    bu: string,
+    monthName: string,
+    sdrFilter?: string[]
+  ): { value: number; hasData: boolean } => {
+    if (!sdrMetasList || sdrMetasList.length === 0) return { value: 0, hasData: false };
+    const records = sdrMetasList.filter(m =>
+      m.bu === bu &&
+      m.month === monthName &&
+      (!sdrFilter || sdrFilter.length === 0 || sdrFilter.includes(m.sdr))
+    );
+    let total = 0;
+    let hasData = false;
+    for (const r of records) {
+      const v = indicatorKey === 'rm' ? (r.rm_meta || 0) : (r.rr_meta || 0);
+      if (v > 0) hasData = true;
+      total += v;
+    }
+    return { value: total, hasData };
+  };
 
   // Derive helper flags from multi-selection
   const isConsolidado = selectedBUs.length === 4;
