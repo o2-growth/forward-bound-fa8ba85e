@@ -1296,17 +1296,47 @@ export function MediaInvestmentTab() {
   }, [metas]);
 
   // Calculate funnel data for each BU
-  const modeloAtualFunnel = useMemo(() => 
-    calculateReverseFunnel(
-      mrrDynamic.revenueToSell, 
-      funnelMetrics.modeloAtual, 
-      mrrDynamic.mrrPorMes, 
-      true, 
+  const modeloAtualFunnel = useMemo(() => {
+    const calculated = calculateReverseFunnel(
+      mrrDynamic.revenueToSell,
+      funnelMetrics.modeloAtual,
+      mrrDynamic.mrrPorMes,
+      true,
       metasMensaisModeloAtual,
       indicadoresPorBU.modeloAtual.cpv
-    ),
-    [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv]
-  );
+    );
+
+    const fixedRows = hasFunnelForBU('modelo_atual') ? getFunnelForBU('modelo_atual') : [];
+
+    return calculated.map(d => {
+      const realMrr = mrrBaseRealPorMes[d.month];
+      const fixed = fixedRows.find(f => f.month === d.month);
+      const isLocked = fixed?.is_locked === true;
+
+      // Mês locked: snapshot manda em metas/quantidades; mrrBase mostra Oxy real (verdade visual)
+      if (isLocked && fixed) {
+        const fatMeta = Number(fixed.faturamento_meta) || d.faturamentoMeta;
+        const fatVender = Number(fixed.faturamento_vender) || d.faturamentoVender;
+        const invest = Number(fixed.investimento) || d.investimento;
+        return {
+          ...d,
+          mrrBase: realMrr > 0 ? realMrr : d.mrrBase,
+          faturamentoMeta: fatMeta,
+          faturamentoVender: fatVender,
+          investimento: invest,
+          leads: fixed.leads ?? d.leads,
+          mqls: fixed.mqls ?? d.mqls,
+          rms: fixed.rms ?? d.rms,
+          rrs: fixed.rrs ?? d.rrs,
+          propostas: fixed.propostas ?? d.propostas,
+          vendas: fixed.vendas ?? d.vendas,
+        };
+      }
+
+      // Mês não locked: só sobrescreve mrrBase quando houver Oxy real
+      return realMrr > 0 ? { ...d, mrrBase: realMrr } : d;
+    });
+  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU]);
   
   const o2TaxFunnel = useMemo(() => 
     calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 10000),
