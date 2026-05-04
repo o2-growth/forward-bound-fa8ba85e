@@ -649,8 +649,15 @@ export function IndicatorsTab() {
     start: Date,
     end: Date,
     bu?: string,
-    closerFilter?: string[]
+    closerFilter?: string[],
+    sdrFilter?: string[]
   ): number => {
+    // Override RM/RR by sdr_metas when an SDR filter is active and we have data for this BU
+    if (bu && (indicatorKey === 'rm' || indicatorKey === 'rr') && sdrFilter && sdrFilter.length > 0) {
+      const { value, hasData } = getSdrMetaForPeriod(indicatorKey, bu, start, end, sdrFilter);
+      if (hasData) return Math.round(value);
+    }
+
     if (!funnelItems || funnelItems.length === 0) return 0;
 
     const getItemValue = (item: FunnelDataItem): number => {
@@ -686,7 +693,6 @@ export function IndicatorsTab() {
 
       let monthMeta = getItemValue(item) * fraction;
       
-      // Apply closer percentage filter if BU and closers are provided
       if (bu && closerFilter && closerFilter.length > 0) {
         monthMeta = getFilteredMeta(monthMeta, bu, monthName, closerFilter);
       }
@@ -697,22 +703,29 @@ export function IndicatorsTab() {
     return Math.round(total);
   };
   
-  // Helper function to get monthly metas array from funnelData for charts
-  // Optionally applies closer percentage filter per month for a specific BU
   const getMonthlyMetasFromFunnel = (
     funnelItems: FunnelDataItem[] | undefined,
     indicatorKey: IndicatorType,
     start: Date,
     end: Date,
     bu?: string,
-    closerFilter?: string[]
+    closerFilter?: string[],
+    sdrFilter?: string[]
   ): number[] => {
-    if (!funnelItems || funnelItems.length === 0) return [];
-    
     const monthsInPeriod = eachMonthOfInterval({ start, end });
+
+    // Override per-month using sdr_metas if SDR filter active and data present
+    const useSdrOverride = !!(bu && (indicatorKey === 'rm' || indicatorKey === 'rr') && sdrFilter && sdrFilter.length > 0);
+
     return monthsInPeriod.map(monthDate => {
       const monthName = monthNames[getMonth(monthDate)];
-      const item = funnelItems.find(f => f.month === monthName);
+
+      if (useSdrOverride) {
+        const { value, hasData } = getSdrMetaForMonth(indicatorKey as 'rm' | 'rr', bu!, monthName, sdrFilter);
+        if (hasData) return Math.round(value);
+      }
+
+      const item = funnelItems?.find(f => f.month === monthName);
       if (!item) return 0;
       
       let value = 0;
@@ -725,7 +738,6 @@ export function IndicatorsTab() {
         default: value = 0;
       }
       
-      // Apply closer percentage filter if BU and closers are provided
       if (bu && closerFilter && closerFilter.length > 0) {
         value = getFilteredMeta(value, bu, monthName, closerFilter);
       }
