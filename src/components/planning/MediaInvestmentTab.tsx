@@ -666,6 +666,39 @@ function BUInvestmentTable({
                       <TableRow key={`${data.month}-realized`} className="bg-muted/30 border-b-0">
                         <TableCell colSpan={colCount} className="py-3 px-6">
                           <div className="space-y-4">
+                            {/* Aviso de gap MRR Base (Oxy real vs projetado) */}
+                            {typeof data.mrrBaseGap === 'number' && Math.abs(data.mrrBaseGap) > 1 && (
+                              <div
+                                className={`flex items-start gap-3 rounded-md border px-3 py-2 text-xs ${
+                                  data.mrrBaseGap > 0
+                                    ? 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400'
+                                    : 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400'
+                                }`}
+                              >
+                                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                <div className="space-y-1">
+                                  <p className="font-semibold">
+                                    {data.mrrBaseGap > 0
+                                      ? 'MRR Base abaixo do projetado'
+                                      : 'MRR Base acima do projetado'}
+                                  </p>
+                                  <p className="text-muted-foreground">
+                                    Projetado: <span className="font-medium text-foreground">{formatCurrency(data.mrrBaseProjetado || 0)}</span>
+                                    {'  •  '}
+                                    Real (Oxy): <span className="font-medium text-foreground">{formatCurrency(data.mrrBase)}</span>
+                                    {'  •  '}
+                                    Δ: <span className="font-medium">{data.mrrBaseGap > 0 ? '−' : '+'}{formatCurrency(Math.abs(data.mrrBaseGap))}</span>
+                                  </p>
+                                  {typeof data.aVenderOriginal === 'number' && Math.abs((data.aVenderOriginal || 0) - data.faturamentoVender) > 1 && (
+                                    <p className="text-muted-foreground">
+                                      A Vender ajustado de <span className="font-medium text-foreground">{formatCurrency(data.aVenderOriginal)}</span> para{' '}
+                                      <span className="font-medium text-foreground">{formatCurrency(data.faturamentoVender)}</span> para preservar a Meta de{' '}
+                                      <span className="font-medium text-foreground">{formatCurrency(data.faturamentoMeta)}</span>.
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                             {/* Incremento (A Vender) */}
                             <div className="flex items-center gap-6 flex-wrap">
                               <div className="flex items-center gap-2">
