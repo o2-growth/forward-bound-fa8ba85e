@@ -1,90 +1,57 @@
-## Resumo
+## Objetivo
 
-1. Backup completo das 3 tabelas críticas antes de qualquer alteração.
-2. Corrigir vazamento de R$ 108k em Maio (Oxy Hacker — cards Jean Morbis e Alexandre Corrêa).
-3. Travar metas dos acelerômetros para meses fechados (Jan, Fev, Mar, Abr/2026) para que **não mudem mais** quando MRR Base ou Plan Growth forem editados.
+1. Criar aba **"Metas por SDR"** no Admin com metas de **Reunião Agendada (RM)** e **Reunião Realizada (RR)** por SDR/BU/mês.
+2. Ocultar as abas **"Metas Monetárias"** e **"Metas CPx"** do menu do Admin.
+3. **Refletir** essas metas no Dashboard Comercial (`IndicatorsTab`) quando o filtro de SDR estiver ativo: ao selecionar um ou mais SDRs, as metas de RM e RR mostradas (gauges/funil) passam a ser a **soma das metas dos SDRs selecionados** (interseccionadas com as BUs ativas), em vez da meta cheia da(s) BU(s).
 
----
+## Atribuição de SDRs por BU
 
-## Etapa 1 — Backup (antes de qualquer mudança)
+- Modelo Atual / Oxy Hacker / Franquia → Amanda, Carol
+- O2 TAX → Carlos
 
-Criar tabelas de backup com snapshot completo do estado atual:
+## Banco de dados — nova tabela `sdr_metas`
 
-```sql
-CREATE TABLE backups.monetary_metas_2026_05_04 AS SELECT * FROM public.monetary_metas;
-CREATE TABLE backups.funnel_metas_2026_05_04   AS SELECT * FROM public.funnel_metas;
-CREATE TABLE backups.mrr_base_monthly_2026_05_04 AS SELECT * FROM public.mrr_base_monthly;
-CREATE TABLE backups.bu_indicators_config_2026_05_04 AS SELECT * FROM public.bu_indicators_config;
+```
+id         uuid pk default gen_random_uuid()
+bu         text not null      -- modelo_atual | o2_tax | oxy_hacker | franquia
+month      text not null      -- jan..dez
+year       int  not null default 2026
+sdr        text not null      -- Amanda | Carol | Carlos
+rm_meta    int  not null default 0   -- Reuniões Agendadas
+rr_meta    int  not null default 0   -- Reuniões Realizadas
+created_at, updated_at timestamptz default now()
+unique (bu, month, year, sdr)
 ```
 
-Schema `backups` será criado na primeira migration. Esses backups ficam disponíveis indefinidamente para rollback manual.
+- RLS: leitura para autenticados; insert/update/delete somente `admin` (espelho de `closer_metas`).
+- Trigger `audit_log_trigger_fn` anexado.
 
----
+## Novos arquivos
 
-## Etapa 2 — Vazamento R$ 108k (Oxy Hacker)
+- `src/hooks/useSdrMetas.ts` — espelho de `useCloserMetas`: expõe `BU_SDRS`, `getSdrsForBU(bu)`, leitura/atualização em lote de `rm_meta` e `rr_meta`, helper `getSdrMetaTotals({ bus, months, sdrs })` que retorna `{ rm, rr }` somando os registros que casam com o filtro.
+- `src/components/planning/SdrMetasTab.tsx` — UI com seletor de BU, tabela `meses × SDRs` mostrando duas colunas por SDR (RM Meta e RR Meta), Salvar/Resetar (modelado a partir de `CloserMetasTab.tsx`).
 
-**Causa**: `useOxyHackerMetas.ts` não aplica `shouldForceAssinaturaDate('expansao')` ao parsear movements. Isso já existe em `useExpansaoMetas.ts:95–103`. Os 2 cards (Jean Morbis 1328563759, Alexandre Corrêa 1343086683) ficam em Maio com fallback de R$ 54k cada → R$ 108k vazando como Pontual.
+## Edições
 
-**Correção** (1 arquivo, ~6 linhas):
-- Em `src/hooks/useOxyHackerMetas.ts`, replicar o bloco que `useExpansaoMetas.ts` já usa para forçar `dataEntrada = getForcedSaleDate()` quando `shouldForceAssinaturaDate(titulo, 'expansao')` retorna true.
+- `src/components/planning/AdminTab.tsx`:
+  - Remover `TabsTrigger`/`TabsContent` de `monetary-metas` e `cost-stage-metas` e seus imports.
+  - Adicionar `TabsTrigger value="sdr-metas"` + `<SdrMetasTab />`.
+- `src/components/planning/IndicatorsTab.tsx`:
+  - Onde hoje as metas de **RM e RR** são lidas de `funnel_metas` agregadas por BU/mês, passar a usar `useSdrMetas`:
+    - Se `effectiveSelectedSDRs.length > 0` → meta RM/RR = soma de `sdr_metas` para `(BUs ativas, meses ativos, SDRs selecionados)`.
+    - Se nenhum SDR selecionado → soma de TODOS os SDRs daquelas BUs/meses (mantém comportamento equivalente ao atual). **Fallback**: se `sdr_metas` estiver vazia para o recorte, manter o valor de `funnel_metas` atual para não zerar a meta.
+  - Apenas RM e RR são afetadas. Leads, MQLs, RR→Prop, Vendas e metas monetárias permanecem como hoje.
 
-**Resultado**: Pontual 01–04/Mai cai de R$ 108k para R$ 0; cards passam a contar em 15/Abr/2026 no monetário Oxy.
+## Ordem final das abas no Admin
 
----
+1. Usuários
+2. Metas Closers
+3. **Metas SDR** (nova)
+4. Logs
 
-## Etapa 3 — Congelar metas dos acelerômetros para Jan–Abr/2026
+Os arquivos `MonetaryMetasTab.tsx` e `CostStageMetasTab.tsx` permanecem no repositório (apenas escondidos do menu).
 
-### Diagnóstico confirmado
+## Fora de escopo
 
-- `useConsolidatedMetas.ts:100` força `skipDb = true` para Modelo Atual → ignora `monetary_metas` e usa `funnelData` ao vivo.
-- `funnelData` é gerado em `usePlanGrowthData.ts:556` a partir de `mrrDynamic.revenueToSell` → muda quando MRR Base muda.
-- **Mas**: `monetary_metas` **já tem snapshot correto** dos valores de Jan–Abr/26 para as 4 BUs (consultado agora). Modelo Atual: 1125k / 1181k / 1334k / 1509k. Franquia Abril: 420k Pontual. Oxy Abril: 108k Pontual. O2 TAX Abril: 40k.
-- E `funnel_metas` para Modelo Atual já está com `is_locked=true` em Jan–Abr/26, com `faturamento_meta` + `mrr_base_planejamento` snapshotados.
-
-### Correção (sem nova tabela, sem novo seed)
-
-Em `src/hooks/useConsolidatedMetas.ts`:
-
-1. **Remover `skipDb = true` para Modelo Atual** quando o mês estiver locked. Ou seja: se `funnel_metas.is_locked = true` para `(modelo_atual, mes, ano)`, **prioriza `monetary_metas.faturamento − mrr_base_planejamento` (do `funnel_metas`)** como Fat Incremento congelado, em vez de `funnelData` ao vivo.
-2. **Para todas as outras BUs** (Franquia, Oxy, O2 TAX): `monetary_metas` já vence `funnelData` quando há valor > 0. Já está correto. Apenas garantir que o caminho não seja afetado.
-
-**Comportamento resultante**:
-- Mês locked (Jan/Fev/Mar/Abr/26): meta lê de `monetary_metas` + `funnel_metas` snapshot. **Não muda mais** mesmo se MRR Base for editado.
-- Mês aberto (Mai/26 em diante): comportamento atual — calcula ao vivo via Plan Growth.
-
-**UI** (opcional, pequena adição em `IndicatorsTab.tsx`): badge discreto "🔒 Meta congelada" no card quando o período selecionado cai inteiramente em meses locked.
-
-### Validação esperada após implementação
-
-Cenário Abril/2026, filtro Franquia (print 1):
-- MQLs Meta: 30 ✓ (vem de `funnelData` via `distributeAnnualToMonthly`)
-- Vendas Meta: 1 ✓
-- Pontual Meta: R$ 420k ✓ (vem de `monetary_metas.franquia.Abr.pontual`, já existe)
-- Fat Incremento Meta: R$ 420k ✓
-
-Cenário Abril/2026, Consolidado (print 2):
-- Fat Meta: R$ 1,2M = soma 4 BUs (1509k + 40k + 108k + 420k = ~2,07M total faturamento → mas Fat **Incremento** = total − MRR Base, então com MRR Base de Modelo Atual 700k = ~1,37M; valor exato dependerá do snapshot do `funnel_metas`)
-- MRR Meta: R$ 160k, Setup Meta: R$ 384k, Pontual Meta: R$ 624k
-
-Após implementação, alterar `mrr_base_monthly` de Mar/26 ou Abr/26 **não muda** nenhuma dessas metas.
-
----
-
-## Arquivos alterados
-
-- **Migration 1**: `CREATE SCHEMA backups` + 4 backups.
-- **Migration 2** (sem mudança de schema): nada — já está tudo na tabela.
-- **`src/hooks/useOxyHackerMetas.ts`**: aplicar `shouldForceAssinaturaDate` no parsing.
-- **`src/hooks/useConsolidatedMetas.ts`**: respeitar `is_locked` do `funnel_metas` para Modelo Atual.
-- **`src/hooks/useFunnelMetas.ts`**: expor função `isMonthLocked(bu, month, year)` e `getLockedSnapshot(bu, month, year)` para o consolidado consumir.
-- **`src/components/planning/IndicatorsTab.tsx`** (opcional): badge "Meta congelada".
-
----
-
-## Ordem de execução
-
-1. Migration de backup (4 tabelas em schema `backups`).
-2. Edit `useOxyHackerMetas.ts` (vazamento R$ 108k).
-3. Edit `useFunnelMetas.ts` + `useConsolidatedMetas.ts` (lock-aware).
-4. (opcional) Badge na UI.
-5. Validação manual: usuário recarrega, conferimos que Abr/26 nos prints permanece igual; depois faz edit em MRR Base de Mar/26 e confirma que metas não mudaram.
+- Rateio de metas de Vendas/Pontual/Setup por SDR.
+- Ajustes em Marketing/Plan Growth.

@@ -571,6 +571,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sdr_metas: {
+        Row: {
+          bu: string
+          created_at: string
+          id: string
+          month: string
+          rm_meta: number
+          rr_meta: number
+          sdr: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          bu: string
+          created_at?: string
+          id?: string
+          month: string
+          rm_meta?: number
+          rr_meta?: number
+          sdr: string
+          updated_at?: string
+          year?: number
+        }
+        Update: {
+          bu?: string
+          created_at?: string
+          id?: string
+          month?: string
+          rm_meta?: number
+          rr_meta?: number
+          sdr?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
