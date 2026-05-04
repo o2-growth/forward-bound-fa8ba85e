@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { fixPossibleDateInversion } from "./dateUtils";
+import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 
@@ -125,11 +125,16 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
         if (produto !== 'Oxy Hacker') continue;
         
         const fase = row['Fase'] || '';
+        const titulo = row['Título'] || '';
         const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
         
         // Para vendas (Contrato assinado), priorizar data de assinatura sobre data de entrada
         let dataEntrada = parseDate(row['Entrada']) || new Date();
-        if (fase === 'Contrato assinado' && dataAssinatura) {
+        // Se o card está na lista de "forçar data de assinatura" para Expansão (Oxy + Franquia),
+        // usar data forçada (15/Abr/2026) — alinhar com useExpansaoMetas para consistência
+        if (shouldForceAssinaturaDate(titulo, 'expansao')) {
+          dataEntrada = getForcedSaleDate();
+        } else if (fase === 'Contrato assinado' && dataAssinatura) {
           dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
         }
         
