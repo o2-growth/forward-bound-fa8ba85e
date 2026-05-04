@@ -463,15 +463,13 @@ export function usePlanGrowthData() {
 
   // Build the final Modelo Atual funnel: use fixed DB values for funnel stages if available,
   // otherwise use the calculated reverse funnel values.
-  // When is_locked = true, ALSO override monetary fields (faturamentoMeta, faturamentoVender,
-  // mrrBase, investimento) so the original plan is preserved even if MRR Base changes later.
+  // When is_locked = true, snapshot wins for faturamentoMeta/Vender/investimento.
+  // For mrrBase displayed: Oxy truth (mrr_base_monthly) ALWAYS wins when present,
+  // regardless of lock — the lock only protects the PLAN, not the real number shown.
   const modeloAtualFunnel = useMemo(() => {
     const hasFixedFunnel = hasFunnelForBU('modelo_atual');
-    if (!hasFixedFunnel) return modeloAtualFunnelCalculated;
-    
-    const fixedMetas = getFunnelForBU('modelo_atual');
-    return modeloAtualFunnelCalculated.map(calc => {
-      const fixed = fixedMetas.find(f => f.month === calc.month);
+    const base = !hasFixedFunnel ? modeloAtualFunnelCalculated : modeloAtualFunnelCalculated.map(calc => {
+      const fixed = getFunnelForBU('modelo_atual').find(f => f.month === calc.month);
       if (!fixed) return calc;
 
       const merged = {
@@ -484,24 +482,28 @@ export function usePlanGrowthData() {
         vendas: fixed.vendas,
       };
 
-      // If month is locked, snapshot wins over dynamic calculation
       if (fixed.is_locked) {
         const fatMeta = Number(fixed.faturamento_meta) || 0;
         const fatVender = Number(fixed.faturamento_vender) || 0;
-        const mrrBasePlan = Number(fixed.mrr_base_planejamento) || 0;
         const invest = Number(fixed.investimento) || 0;
         return {
           ...merged,
           ...(fatMeta > 0 ? { faturamentoMeta: fatMeta } : {}),
           ...(fatVender > 0 ? { faturamentoVender: fatVender } : {}),
-          ...(mrrBasePlan > 0 ? { mrrBase: mrrBasePlan } : {}),
           ...(invest > 0 ? { investimento: invest } : {}),
         };
       }
 
       return merged;
     });
-  }, [modeloAtualFunnelCalculated, funnelMetas]);
+
+    // Override mrrBase column with Oxy truth (mrr_base_monthly) when available.
+    // For months without DB entry (future months), keep the synthetic projection.
+    return base.map(d => {
+      const realMrrBase = mrrBaseRealPorMes[d.month];
+      return realMrrBase > 0 ? { ...d, mrrBase: realMrrBase } : d;
+    });
+  }, [modeloAtualFunnelCalculated, funnelMetas, mrrBaseRealPorMes]);
 
   // Auto-seed funnel_metas on first load if table is empty
   // NEVER overwrite past/current months — only seed future months that don't exist yet
