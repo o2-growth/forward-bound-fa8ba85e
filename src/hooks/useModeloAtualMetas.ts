@@ -59,6 +59,7 @@ const TEST_CARD_IDS = new Set([
   '1320177174', // 123
   '1308003007', // Empresa Teste
   '1320175421', // teste duda
+  '1342531906', // G4 (card de teste - Abril/26)
 ]);
 
 export function isTestCard(id?: string): boolean {
