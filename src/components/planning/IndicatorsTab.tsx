@@ -988,8 +988,8 @@ export function IndicatorsTab() {
     // For single BU selection - Franquia
     if (hasSingleBU && includesFranquia) {
       const expansaoData = getExpansaoGroupedData(indicator.key as ExpansaoIndicator, startDate, endDate, grouping);
-      const funnelMetasMensais = funnelData?.franquia ? getMonthlyMetasFromFunnel(funnelData.franquia, indicator.key, startDate, endDate) : [];
-      const metaPeriodo = funnelData?.franquia ? calcularMetaDoPeriodo(funnelData.franquia, indicator.key, startDate, endDate) : 0;
+      const funnelMetasMensais = funnelData?.franquia ? getMonthlyMetasFromFunnel(funnelData.franquia, indicator.key, startDate, endDate, 'franquia', undefined, sdrFilterForBU('franquia')) : [];
+      const metaPeriodo = funnelData?.franquia ? calcularMetaDoPeriodo(funnelData.franquia, indicator.key, startDate, endDate, 'franquia', undefined, sdrFilterForBU('franquia')) : 0;
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       return chartLabels.map((label, index) => ({
