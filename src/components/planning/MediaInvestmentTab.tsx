@@ -2705,7 +2705,7 @@ export function MediaInvestmentTab() {
 
                 <Card className="glass-card">
                   <CardHeader>
-                    <CardTitle className="text-base">Meta vs DRE por Mês (Empilhado por BU)</CardTitle>
+                    <CardTitle className="text-base">Meta vs Realizado por Mês (Empilhado por BU)</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="h-[350px]">
@@ -2738,7 +2738,7 @@ export function MediaInvestmentTab() {
                                 metaO2: 'Meta O2 TAX',
                                 metaOH: 'Meta Oxy Hacker',
                                 metaFR: 'Meta Franquia',
-                                dreTotal: 'DRE Total',
+                                dreTotal: 'Realizado Total',
                               };
                               return [formatCompact(value), labels[name] || name];
                             }}
@@ -2750,7 +2750,7 @@ export function MediaInvestmentTab() {
                                 metaO2: 'O2 TAX',
                                 metaOH: 'Oxy Hacker',
                                 metaFR: 'Franquia',
-                                dreTotal: 'DRE Total',
+                                dreTotal: 'Realizado Total',
                               };
                               return labels[value] || value;
                             }}
