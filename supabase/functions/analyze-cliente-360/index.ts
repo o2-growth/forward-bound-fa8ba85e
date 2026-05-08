@@ -58,7 +58,6 @@ Deno.serve(async (req) => {
       database: Deno.env.get("EXTERNAL_PG_DATABASE"),
       user: Deno.env.get("EXTERNAL_PG_USER"),
       password: Deno.env.get("EXTERNAL_PG_PASSWORD"),
-      ssl: { rejectUnauthorized: false },
     });
     await pgClient.connect();
     const rpcResult = await pgClient.query("SELECT get_cliente_360($1) AS result", [clienteId]);
