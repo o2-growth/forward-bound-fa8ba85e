@@ -52,8 +52,9 @@ export function LeadsMqlsStackedChart({ startDate, endDate, selectedBU, selected
   const { funnelMetas: dbFunnelMetas } = useFunnelMetas(2026);
 
   // Helper function to calculate MQL meta for a given period (pro-rated for partial months).
-  // Prioriza valor salvo em funnel_metas (DB) sobre Plan Growth ao vivo, eliminando oscilação
-  // de meses não-locked (ex.: Maio) cuja meta no contexto depende do MRR Base recalculado.
+  // Regra de fonte da verdade:
+  //   - mês LOCKED em funnel_metas → DB (snapshot oficial congelado)
+  //   - mês aberto → Plan Growth ao vivo (funnelItems), pois o DB pode estar stale.
   const calcularMetaDoPeriodo = (bu: string, funnelItems: FunnelDataItem[] | undefined): number => {
     const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
     let total = 0;
@@ -61,14 +62,14 @@ export function LeadsMqlsStackedChart({ startDate, endDate, selectedBU, selected
     for (const monthDate of monthsInPeriod) {
       const monthName = monthNames[getMonth(monthDate)];
 
-      // 🎯 DB primeiro
+      // 🎯 DB só vence se o mês estiver locked
       const dbRow = dbFunnelMetas.find(m => m.bu === bu && m.month === monthName);
-      const dbMqls = dbRow?.mqls;
+      const isLocked = dbRow?.is_locked === true;
       const item = funnelItems?.find(f => f.month === monthName);
 
       let baseValue: number | null = null;
-      if (typeof dbMqls === 'number') {
-        baseValue = dbMqls;
+      if (isLocked && typeof dbRow?.mqls === 'number') {
+        baseValue = dbRow.mqls;
       } else if (item) {
         baseValue = item.mqls;
       }
