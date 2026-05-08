@@ -14,9 +14,6 @@ const BUS = ['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia'] as const;
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
 const CLOSERS = ['Pedro Albite', 'Daniel Trindade', 'Lucas Ilha', 'Thiago', 'Amanda Serafim', 'Bruna'] as const;
 
-// Closers recém-adicionados — default 0% até receberem metas no DB
-const ZERO_DEFAULT_CLOSERS = new Set<string>(['Bruna']);
-
 export type BuType = typeof BUS[number];
 export type MonthType = typeof MONTHS[number];
 export type CloserType = typeof CLOSERS[number];

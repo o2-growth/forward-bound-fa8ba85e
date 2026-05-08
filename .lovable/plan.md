@@ -1,41 +1,62 @@
+# Plano — Metas por Closer com N closers + percentuais decimais
+
 ## Objetivo
+Tornar a aba **Admin → Metas por Closer** funcional para qualquer quantidade de closers por BU (hoje até 5 em Modelo Atual) e permitir percentuais decimais (ex: 12,5%).
 
-Corrigir o cálculo do **Fat Incremento** para o Modelo Atual em meses **não-lockados** (Mai em diante), que hoje mostram o Faturamento Meta Total (MRR Base + A Vender) em vez do Incremento puro (A Vender).
+## Mudanças
 
-## Causa raiz
+### 1. `src/components/planning/CloserMetasTab.tsx`
 
-`src/hooks/useConsolidatedMetas.ts` → `getConsolidatedMeta`:
-- **Meses lockados:** usa snapshot `funnel_metas.faturamento_vender` → correto.
-- **Meses não-lockados:** lê `monetary_metas.faturamento`, que guarda o **total** (MRR Base + A Vender), tratando como se fosse Incremento.
+**a) Edição livre (sem auto-ajuste)**
+- Em `updateLocalPercentage`, remover o bloco que escolhe um "outro closer" e força `100 - valor`. Apenas atualizar a célula editada (clamp 0–100, sem `Math.floor`) e marcar `hasChanges`.
+- Manter caso especial: BU com 1 closer → trava em 100.
 
-Resultado em Maio: mostra R$ 1.100.152 (700k MRR Base + 400k A Vender) em vez de R$ 400.000.
+**b) Suporte a decimais no Input**
+- Trocar `parseInt(e.target.value)` por `parseFloat(e.target.value.replace(',', '.'))` para aceitar vírgula brasileira.
+- Adicionar `step="0.1"` no `<Input type="number">`.
+- Exibir valor formatado em pt-BR (ex: `12,5`) — usar um state local de string por célula ou `toLocaleString('pt-BR')` na exibição.
+- Clamp: `Math.max(0, Math.min(100, valor))`, sem arredondar.
 
-## Mudança
+**c) Default exibido na tabela**
+- Em `getLocalPercentage`, quando não há valor no DB nem local, retornar **0** (em vez de 50).
+- Manter 100 quando `validClosers.length === 1`.
 
-Em `useConsolidatedMetas.ts`, no bloco de `getConsolidatedMeta`, antes do fallback `monetary_metas`, adicionar tratamento para **Modelo Atual em qualquer mês**:
+**d) Validação de soma com tolerância**
+- `getMonthTotal` continua somando todos os closers válidos.
+- `allMonthsValid`: comparar com tolerância de ponto flutuante → `Math.abs(total - 100) < 0.01`.
+- Badge do total exibe valor com 1 casa decimal quando necessário.
 
-1. Buscar o registro de `funnel_metas` daquele mês (Modelo Atual + ano).
-2. Se existir e tiver `faturamento_vender > 0`, usar esse valor como Incremento (e os 25%/60%/15% derivados para mrr/setup/pontual).
-3. Caso contrário, manter o fluxo atual (cai em `monetary_metas` ou Plan Growth).
+**e) Botão "Resetar 50/50" → "Zerar BU"**
+- Renomear botão e toast.
+- Chamar nova mutation `resetBuToZero`.
 
-Isso unifica a lógica: lockado ou não, Incremento do Modelo Atual = `funnel_metas.faturamento_vender`, alinhado com a definição oficial em `mem://logic/indicators/incremento-definition-v4`.
+**f) Texto "Como funciona"**
+- Atualizar exemplo para refletir N closers e mencionar suporte a decimais (ex: "Pedro 30%, Daniel 20%, Thiago 17,5%, Amanda 17,5%, Bruna 15%").
+
+### 2. `src/hooks/useCloserMetas.ts`
+
+**a) Default em `getPercentage`**
+- Default 0 quando não há registro e BU tem mais de 1 closer.
+- Manter 100 para BU com 1 closer.
+- Remover bloco especial de `ZERO_DEFAULT_CLOSERS` (Bruna).
+
+**b) Substituir `resetBuToDefault` por `resetBuToZero`**
+- Iterar apenas sobre `BU_CLOSERS[bu]` (não a constante global `CLOSERS`).
+- Upsert `percentage = 0` para todos os meses dos closers válidos.
+
+**c) Coluna `percentage`**
+- Tipo no DB já é `numeric`, então decimais persistem sem migração.
+- Garantir que `bulkUpdateMetas` envie o número como está (sem arredondar).
+
+### 3. Logs de auditoria
+- Em `handleSave`, formatar valores no log com `.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })` para ler "12,5%" no histórico.
 
 ## Detalhes técnicos
-
-- Arquivo: `src/hooks/useConsolidatedMetas.ts`
-- O hook já carrega `funnelData` (usado em `getPlanGrowthMeta`); reutilizar essa fonte para evitar nova query.
-- Não mudar nada para O2 TAX, Oxy Hacker e Franquia (continuam usando `monetary_metas.faturamento` como hoje, conforme definição da memória).
-- Não alterar schema do banco nem rótulos da UI.
-
-## Validação
-
-Após a mudança, na aba Indicadores, BU Modelo Atual:
-- Mai: Fat Incremento deve mostrar **R$ 400.000** (= valor "A Vender" do Plan Growth).
-- Jun+: deve mostrar `funnel_metas.faturamento_vender` correspondente (hoje 0 no banco, então cairá no fallback até o Plan Growth gerar valores).
-- Jan-Abr: continuam inalterados (já corretos via snapshot).
+- Sem mudanças de schema; `closer_metas.percentage` já é `numeric`.
+- `getFilteredMeta` não muda — soma de decimais funciona naturalmente.
+- Botão Salvar bloqueado enquanto soma ≠ 100 (com tolerância 0,01) em qualquer mês.
 
 ## Fora de escopo
-
-- Renomear coluna `monetary_metas.faturamento` ou ajustar como ela é populada.
-- Mudar comportamento das outras BUs.
-- Mexer no Plan Growth ou nas metas de funil.
+- Não alterar lógica do dashboard (consumo do `getFilteredMeta` permanece igual).
+- Não tocar em `useClosersMetas.ts` (arquivo distinto).
+- Não mexer em `SdrMetasTab` (não usa percentuais).
