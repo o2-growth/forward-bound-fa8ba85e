@@ -454,9 +454,10 @@ export function useJornadaData() {
 
     const activeClientes = allClientes.filter(c => ACTIVE_PHASES.includes(c.faseAtual));
 
-    // === 3. Build Pipeline (active only, no churn) ===
+    // === 3. Build Pipeline (active only, no churn) — exclui clones do Pedrolo p/ não duplicar
     const pipelineMap = new Map<string, JornadaCliente[]>();
     for (const c of activeClientes) {
+      if (c.id.endsWith('__pedrolo')) continue;
       if (!pipelineMap.has(c.faseAtual)) pipelineMap.set(c.faseAtual, []);
       pipelineMap.get(c.faseAtual)!.push(c);
     }
