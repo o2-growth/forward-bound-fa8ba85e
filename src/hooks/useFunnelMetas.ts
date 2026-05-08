@@ -169,5 +169,6 @@ export function useFunnelMetas(year = 2026) {
     isMonthLocked,
     getLockedSnapshot,
     bulkUpsert,
+    lockMonths,
   };
 }
