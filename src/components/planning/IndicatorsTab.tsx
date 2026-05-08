@@ -838,7 +838,6 @@ export function IndicatorsTab() {
   // Applies closer percentage filter for Modelo Atual when closers are selected
   const getMetaForIndicator = (indicator: IndicatorConfig) => {
     let total = 0;
-    let usedAnyBu = false;
 
     const buBlocks: { bu: BuType; items?: FunnelDataItem[] }[] = [
       { bu: 'modelo_atual', items: funnelData?.modeloAtual },
