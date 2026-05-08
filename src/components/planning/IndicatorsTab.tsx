@@ -857,7 +857,7 @@ export function IndicatorsTab() {
       const sdrsForBU = sdrFilterForBU(bu);
       if (sdrsForBU !== undefined && sdrsForBU.length === 0) continue;
 
-      usedAnyBu = true;
+      
       total += calcularMetaDoPeriodo(
         items,
         indicator.key,
