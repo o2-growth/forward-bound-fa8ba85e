@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { JornadaCliente, JornadaCfo, JornadaAlerta, PipelineFase, JornadaFilter } from "@/components/planning/jornada/types";
 import { parsePipefyDate, parsePipefyDateOnly, parseRotinaDateOnly } from "./dateUtils";
+import { useOxyFinance } from "./useOxyFinance";
+import { MONTHS, type MonthType } from "./useMonetaryMetas";
 
 function parseDate(val: string | null | undefined): Date | null {
   return parsePipefyDate(val);
