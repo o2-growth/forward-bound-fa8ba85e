@@ -847,7 +847,7 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>Receita = MRR (CFOaaS + OXY). Custo = Fee CFO + Fee analistas. Margem = (Receita - Custo) / Receita × 100. Ticket = MRR / Clientes. Health Score = média ponderada NPS 30pts + Reuniões 30pts + Tratativa 20pts + Setup 20pts. Fonte: Pipefy + Squad data</p>
+              <p>Receita = MRR (CFOaaS + OXY). Squad Pedrolo = Setup + Oxy por cliente (mês passado) + produtos OXY/Gênio/Especialista do DRE. Custo = Fee CFO + Fee analistas. Margem = (Receita - Custo) / Receita × 100. Ticket = MRR / Clientes. Health Score = média ponderada NPS 30pts + Reuniões 30pts + Tratativa 20pts + Setup 20pts. Fonte: Pipefy + Squad data + Oxy Finance</p>
             </TooltipContent>
           </Tooltip>
         </h3>
