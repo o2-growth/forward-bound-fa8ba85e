@@ -578,7 +578,7 @@ export function usePlanGrowthData() {
 
     type FunnelRow = typeof modeloAtualFunnelCalculated[number];
     const buSources: Array<{ bu: string; rows: FunnelRow[] }> = [
-      { bu: 'modelo_atual', rows: modeloAtualFunnelCalculated },
+      { bu: 'modelo_atual', rows: modeloAtualFunnel },
       { bu: 'o2_tax', rows: o2TaxFunnel },
       { bu: 'oxy_hacker', rows: oxyHackerFunnel },
       { bu: 'franquia', rows: franquiaFunnel },
