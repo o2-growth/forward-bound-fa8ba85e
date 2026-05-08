@@ -763,8 +763,8 @@ export function IndicatorsTab() {
         if (hasData) return Math.round(value);
       }
 
-      // 🎯 Fonte estável: prioriza valor salvo em funnel_metas (DB) sobre Plan Growth ao vivo.
-      const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
+      // 🎯 Fonte da verdade: DB para mês LOCKED, Plan Growth ao vivo para mês aberto.
+      const dbVal = getLockedDbFunnelValue(bu, monthName, indicatorKey);
       let value = 0;
       if (dbVal !== null) {
         value = dbVal;
