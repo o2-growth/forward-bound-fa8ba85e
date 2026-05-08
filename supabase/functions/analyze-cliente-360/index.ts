@@ -60,7 +60,46 @@ Deno.serve(async (req) => {
       password: Deno.env.get("EXTERNAL_PG_PASSWORD"),
     });
     await pgClient.connect();
-    const rpcResult = await pgClient.query("SELECT get_cliente_360($1) AS result", [clienteId]);
+
+    // Resolve clienteId: frontend may send either a pipefy_db_clientes ID or a pipefy_central_projetos ID.
+    // get_cliente_360 expects the db_clientes ID.
+    let resolvedId: string = String(clienteId);
+    let resolutionRoute = "direct";
+
+    const directCheck = await pgClient.query(
+      'SELECT 1 FROM pipefy_db_clientes WHERE "ID" = $1::bigint LIMIT 1',
+      [resolvedId],
+    );
+    if (directCheck.rowCount === 0) {
+      const projetoLookup = await pgClient.query(
+        'SELECT infos_do_cliente_database FROM pipefy_central_projetos WHERE "ID" = $1::bigint AND infos_do_cliente_database IS NOT NULL LIMIT 1',
+        [resolvedId],
+      );
+      if (projetoLookup.rowCount && projetoLookup.rows[0].infos_do_cliente_database) {
+        resolvedId = String(projetoLookup.rows[0].infos_do_cliente_database);
+        resolutionRoute = "via_central_projetos";
+      } else {
+        const connLookup = await pgClient.query(
+          "SELECT connected_card_id FROM pipefy_card_connections WHERE card_id::text = $1 AND LOWER(connected_pipe_name) LIKE '%clientes%' LIMIT 1",
+          [resolvedId],
+        );
+        if (connLookup.rowCount && connLookup.rows[0].connected_card_id) {
+          resolvedId = String(connLookup.rows[0].connected_card_id);
+          resolutionRoute = "via_card_connections";
+        } else {
+          await pgClient.end();
+          pgClient = null;
+          return new Response(
+            JSON.stringify({ error: "Cliente não vinculado a um registro em DB Clientes" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+      }
+    }
+
+    console.log(`[analyze-cliente-360] input=${clienteId} resolved=${resolvedId} route=${resolutionRoute}`);
+
+    const rpcResult = await pgClient.query("SELECT get_cliente_360($1::bigint) AS result", [resolvedId]);
     await pgClient.end();
     pgClient = null;
 
