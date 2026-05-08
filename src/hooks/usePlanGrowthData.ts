@@ -320,10 +320,11 @@ function calculateReverseFunnel(
 export function usePlanGrowthData() {
   const { setMetasPorBU, setFunnelData, isLoaded } = useMediaMetas();
   const { metas, isLoading: isLoadingMetas } = useMonetaryMetas();
-  const { funnelMetas, isLoading: isLoadingFunnel, hasFunnelForBU, getFunnelForBU, bulkUpsert } = useFunnelMetas();
+  const { funnelMetas, isLoading: isLoadingFunnel, hasFunnelForBU, getFunnelForBU, bulkUpsert, lockMonths } = useFunnelMetas();
   const { getIndicatorsMap, isLoading: isLoadingIndicators } = useBUIndicatorsConfig();
   const { mrrBaseData } = useMrrBase();
   const hasSeeded = useRef(false);
+  const hasAutoLocked = useRef(false);
 
   // Build a map of MRR Base real (Oxy truth) by month for the current planning year (2026)
   // MRR Base de cada mês = MRR realizado do mês ANTERIOR (Oxy truth).
