@@ -85,10 +85,10 @@ const buOptions: MultiSelectOption[] = [
 
 // SDR mapping by BU
 const BU_SDRS: Record<BuType, string[]> = {
-  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Carol', 'Matheus', 'Ana'],
+  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Matheus', 'Ana'],
   o2_tax: ['Carlos'],
-  oxy_hacker: ['Carlos', 'Carol'],
-  franquia: ['Carlos', 'Carol'],
+  oxy_hacker: ['Carlos'],
+  franquia: ['Carlos'],
 };
 
 // SDR options for MultiSelect
@@ -96,7 +96,6 @@ const sdrOptions: MultiSelectOption[] = [
   { value: 'Carlos', label: 'Carlos' },
   { value: 'Erica', label: 'Erica' },
   { value: 'Amanda', label: 'Amanda' },
-  { value: 'Carol', label: 'Carol' },
   { value: 'Matheus', label: 'Matheus' },
   { value: 'Ana', label: 'Ana' },
 ];
