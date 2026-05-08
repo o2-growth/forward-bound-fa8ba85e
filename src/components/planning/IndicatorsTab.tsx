@@ -692,8 +692,6 @@ export function IndicatorsTab() {
       if (hasData) return Math.round(value);
     }
 
-    if (!funnelItems || funnelItems.length === 0) return 0;
-
     const getItemValue = (item: FunnelDataItem): number => {
       switch (indicatorKey) {
         case 'mql': return item.mqls;
@@ -710,8 +708,13 @@ export function IndicatorsTab() {
 
     for (const monthDate of monthsInPeriod) {
       const monthName = monthNames[getMonth(monthDate)];
-      const item = funnelItems.find(f => f.month === monthName);
-      if (!item) continue;
+
+      // 🎯 Fonte estável: prioriza valor salvo em funnel_metas (DB) sobre Plan Growth ao vivo.
+      // Isso elimina oscilação de meses não-locked (ex.: Maio) cuja meta no contexto depende
+      // do MRR Base + reverse funnel recalculado a cada sync diário.
+      const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
+      const item = funnelItems?.find(f => f.month === monthName);
+      if (dbVal === null && !item) continue;
 
       const monthStart = startOfMonth(monthDate);
       const monthEnd = endOfMonth(monthDate);
@@ -725,8 +728,9 @@ export function IndicatorsTab() {
       const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
       const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
 
-      let monthMeta = getItemValue(item) * fraction;
-      
+      const baseValue = dbVal !== null ? dbVal : getItemValue(item!);
+      let monthMeta = baseValue * fraction;
+
       if (bu && closerFilter && closerFilter.length > 0) {
         monthMeta = getFilteredMeta(monthMeta, bu, monthName, closerFilter);
       }
