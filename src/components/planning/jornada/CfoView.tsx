@@ -45,72 +45,73 @@ const CFO_SQUADS: Record<string, {
   beneficios: number;
   membros: { nome: string; cargo: string; fee: number; beneficios: number }[];
 }> = {
+  // Salários e benefícios atualizados (Deslocamento + Alimentação + R$ 300 raio)
   'Oliveira': {
     nome: 'Adivilso Souza de Oliveira Junior',
     fee: 12000,
     beneficios: 1375,
     membros: [
-      { nome: 'Pedro Fuzer Garcia', cargo: 'Analista FP&A', fee: 6000, beneficios: 1070 },
+      { nome: 'Pedro Fuzer Garcia', cargo: 'Analista FP&A', fee: 6000, beneficios: 1045.89 },
     ],
   },
   'Douglas Schossler': {
     nome: 'Douglas Pinheiro Schossler',
-    fee: 17500,
-    beneficios: 803,
+    fee: 25164.02,
+    beneficios: 1076.80,
     membros: [
-      { nome: 'Tainara Sofia Konzen', cargo: 'Analista FP&A', fee: 7500, beneficios: 924.20 },
+      { nome: 'Tainara Sofia Konzen', cargo: 'Analista FP&A', fee: 7500, beneficios: 993.60 },
     ],
   },
   'Eduardo Milani Pedrolo': {
     nome: 'Eduardo Milani Pedrolo',
     fee: 13000,
-    beneficios: 900,
+    beneficios: 930,
     membros: [
-      { nome: 'Sergio Pereira Piva Junior', cargo: 'Analista FP&A', fee: 7500, beneficios: 990 },
-      { nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000, beneficios: 950 },
-      { nome: 'Eric Alves da Silveira', cargo: 'Analista Financeiro', fee: 7000, beneficios: 1039.80 },
+      { nome: 'Sergio Pereira Piva Junior', cargo: 'Analista FP&A', fee: 7500, beneficios: 951.40 },
+      { nome: 'Felipe Vargas Brenner', cargo: 'Analista FP&A', fee: 7000, beneficios: 1215 },
+      { nome: 'Eric Alves da Silveira', cargo: 'Analista Financeiro', fee: 7000, beneficios: 920 },
       { nome: 'Pedro Oppermann Michelucci', cargo: 'Estagiário FP&A', fee: 1500, beneficios: 889 },
     ],
   },
   'Everton Bisinella': {
     nome: 'Everton Bisinella',
     fee: 14000,
-    beneficios: 1259,
+    beneficios: 1006.80,
     membros: [
-      { nome: 'Anderson Felizardo Mendes', cargo: 'Analista FP&A', fee: 6933.33, beneficios: 300 },
-      { nome: 'Maria Eduarda Nery Reckziegel', cargo: 'Estagiária FP&A', fee: 1500, beneficios: 918 },
+      { nome: 'Anderson Felizardo Mendes', cargo: 'Analista FP&A', fee: 8000, beneficios: 300 },
+      { nome: 'Maria Eduarda Nery Reckziegel', cargo: 'Estagiária FP&A', fee: 500, beneficios: 1003.60 },
     ],
   },
   'Gustavo Cochlar': {
     nome: 'Gustavo Ferreira Cochlar',
-    fee: 22349,
-    beneficios: 1031,
+    fee: 20000,
+    beneficios: 740,
     membros: [
-      { nome: 'Humberto de Azevedo Behs', cargo: 'Analista FP&A', fee: 7000, beneficios: 1051 },
+      { nome: 'Humberto de Azevedo Behs', cargo: 'Analista FP&A', fee: 7000, beneficios: 987.60 },
     ],
   },
   "Eduardo D'Agostini": {
     nome: 'Luis Eduardo Dagostini',
-    fee: 29254,
-    beneficios: 805,
+    fee: 29063.45,
+    beneficios: 1151.08,
     membros: [
-      { nome: 'Pamela Luiza dos Santos Quadros', cargo: 'Analista FP&A', fee: 7500, beneficios: 853 },
-      { nome: 'Matheus da Silva Besnos', cargo: 'Analista FP&A', fee: 7000, beneficios: 949 },
+      { nome: 'Pamela Luiza dos Santos Quadros', cargo: 'Analista FP&A', fee: 7500, beneficios: 1074.90 },
+      { nome: 'Matheus da Silva Besnos', cargo: 'Analista FP&A', fee: 7000, beneficios: 1417.96 },
     ],
   },
   'Mariana Luz da Silva': {
     nome: 'Mariana Luz da Silva',
     fee: 15000,
-    beneficios: 1247,
+    beneficios: 1231.40,
     membros: [
-      { nome: 'Roberta Costa Curta Lirio', cargo: 'Analista FP&A', fee: 7500, beneficios: 923 },
+      { nome: 'Roberta Costa Curta Lirio', cargo: 'Analista FP&A', fee: 7500, beneficios: 1084.85 },
       { nome: 'Raissa Bonamigo Daros', cargo: 'Estagiária FP&A', fee: 1500, beneficios: 747 },
     ],
   },
   'Rafael Marchioretto': {
     nome: 'Rafael Marchioretto Bokorni',
-    fee: 9000,
-    beneficios: 300,
+    fee: 14000,
+    beneficios: 1321.61,
     membros: [],
   },
 };
