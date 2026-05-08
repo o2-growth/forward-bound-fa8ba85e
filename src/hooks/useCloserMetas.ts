@@ -59,22 +59,16 @@ export function useCloserMetas(year: number = 2026) {
 
   // Get percentage for a specific BU/month/closer
   const getPercentage = (bu: string, month: string, closer: string): number => {
-    // Closers recém-adicionados começam com 0% até receberem metas no DB
-    if (ZERO_DEFAULT_CLOSERS.has(closer)) {
-      const meta = metas?.find(m => m.bu === bu && m.month === month && m.closer === closer);
-      return meta?.percentage ?? 0;
-    }
-
-    // Se BU tem apenas 1 closer, default é 100%
     const closersForBU = BU_CLOSERS[bu as BuType] || [];
-    const defaultPercentage = closersForBU.length === 1 ? 100 : 50;
-    
+    // Se BU tem apenas 1 closer, default é 100%; caso contrário 0% (admin define)
+    const defaultPercentage = closersForBU.length === 1 ? 100 : 0;
+
     if (!metas) return defaultPercentage;
-    
-    const meta = metas.find(m => 
+
+    const meta = metas.find(m =>
       m.bu === bu && m.month === month && m.closer === closer
     );
-    
+
     return meta?.percentage ?? defaultPercentage;
   };
 
