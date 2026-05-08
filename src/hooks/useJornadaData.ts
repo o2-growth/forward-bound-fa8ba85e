@@ -601,6 +601,7 @@ export function useJornadaData() {
     // === 5. Build Alertas (carteira inteira; tratativa continua sendo atendida) ===
     const alertas: JornadaAlerta[] = [];
     for (const c of carteiraClientes) {
+      if (c.id.endsWith('__pedrolo')) continue; // alertas vêm do card original, evita duplicar
       if (c.setupStatus === 'atrasado') {
         alertas.push({ tipo: 'setup_atrasado', severidade: 'critico', cliente: c.titulo, clienteId: c.id, cfo: c.cfo, descricao: `Setup há ${c.setupDias} dias (fase: ${c.setupFase})`, dias: c.setupDias, valor: c.mrr });
       }
