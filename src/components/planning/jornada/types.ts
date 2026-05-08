@@ -6,6 +6,7 @@ export interface JornadaCliente {
   produto: string;
   produtos: string[];    // Individual product parts
   mrr: number;           // Recorrente: CFOaaS + OXY
+  valorOxy: number;      // SaaS Oxy isolado (parte do mrr)
   pontual: number;       // Servicos especiais: Diagnostico + Turnaround + Valuation + Educacao
   valorSetup: number;    // Implantacao (one-time)
   erp: string;

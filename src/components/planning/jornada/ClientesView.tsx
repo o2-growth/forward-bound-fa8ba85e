@@ -5,9 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowUpDown, Search, ChevronDown, ChevronRight, ExternalLink, Filter, Info } from "lucide-react";
+import { ArrowUpDown, Search, ChevronDown, ChevronRight, ExternalLink, Filter, Info, Sparkles } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { PipefyCardLink, PIPEFY_PIPES } from "../nps/PipefyCardLink";
+import { Cliente360Drawer } from "./Cliente360Drawer";
 import type { JornadaCliente } from "./types";
 
 const formatBRL = (value: number) =>
@@ -26,6 +27,7 @@ export function ClientesView({ clientes }: ClientesViewProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterFase, setFilterFase] = useState<string>("all");
   const [filterPeriod, setFilterPeriod] = useState<string>("all");
+  const [drawerCliente, setDrawerCliente] = useState<JornadaCliente | null>(null);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc);
@@ -212,6 +214,19 @@ export function ClientesView({ clientes }: ClientesViewProps) {
                     <span className="inline-flex items-center gap-1 truncate" onClick={(e) => e.stopPropagation()}>
                       {c.titulo}
                       <PipefyCardLink pipeId={PIPEFY_PIPES.CENTRAL_PROJETOS} cardId={c.id} variant="icon" />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={(e) => { e.stopPropagation(); setDrawerCliente(c); }}
+                          >
+                            <Sparkles className="h-3.5 w-3.5 text-primary" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Análise IA do cliente</TooltipContent>
+                      </Tooltip>
                     </span>
                   </TableCell>
                   <TableCell><Badge variant="outline">{c.faseAtual}</Badge></TableCell>
@@ -299,6 +314,11 @@ export function ClientesView({ clientes }: ClientesViewProps) {
         </Table>
       </ScrollArea>
     </div>
+    <Cliente360Drawer
+      cliente={drawerCliente}
+      open={!!drawerCliente}
+      onClose={() => setDrawerCliente(null)}
+    />
     </TooltipProvider>
   );
 }

@@ -85,7 +85,7 @@ const buOptions: MultiSelectOption[] = [
 
 // SDR mapping by BU
 const BU_SDRS: Record<BuType, string[]> = {
-  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Carol', 'Matheus'],
+  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Carol', 'Matheus', 'Ana'],
   o2_tax: ['Carlos'],
   oxy_hacker: ['Carlos', 'Carol'],
   franquia: ['Carlos', 'Carol'],
@@ -98,6 +98,7 @@ const sdrOptions: MultiSelectOption[] = [
   { value: 'Amanda', label: 'Amanda' },
   { value: 'Carol', label: 'Carol' },
   { value: 'Matheus', label: 'Matheus' },
+  { value: 'Ana', label: 'Ana' },
 ];
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -559,6 +560,7 @@ export function IndicatorsTab() {
       { value: 'Lucas Ilha', label: 'Lucas' },
       { value: 'Thiago', label: 'Thiago' },
       { value: 'Amanda Serafim', label: 'Amanda Serafim' },
+      { value: 'Bruna', label: 'Bruna' },
     ];
     
     return allClosers.filter(c => closersSet.has(c.value));

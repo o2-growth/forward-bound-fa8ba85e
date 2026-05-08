@@ -12,7 +12,10 @@ export interface CloserMeta {
 
 const BUS = ['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia'] as const;
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
-const CLOSERS = ['Pedro Albite', 'Daniel Trindade', 'Lucas Ilha', 'Thiago', 'Amanda Serafim'] as const;
+const CLOSERS = ['Pedro Albite', 'Daniel Trindade', 'Lucas Ilha', 'Thiago', 'Amanda Serafim', 'Bruna'] as const;
+
+// Closers recém-adicionados — default 0% até receberem metas no DB
+const ZERO_DEFAULT_CLOSERS = new Set<string>(['Bruna']);
 
 export type BuType = typeof BUS[number];
 export type MonthType = typeof MONTHS[number];
@@ -20,7 +23,7 @@ export type CloserType = typeof CLOSERS[number];
 
 // Mapeamento de closers por BU - define quais closers atuam em cada unidade de negócio
 export const BU_CLOSERS: Record<BuType, readonly CloserType[]> = {
-  modelo_atual: ['Pedro Albite', 'Daniel Trindade', 'Thiago', 'Amanda Serafim'],
+  modelo_atual: ['Pedro Albite', 'Daniel Trindade', 'Thiago', 'Amanda Serafim', 'Bruna'],
   o2_tax: ['Lucas Ilha'],
   oxy_hacker: ['Pedro Albite', 'Daniel Trindade'],
   franquia: ['Pedro Albite', 'Daniel Trindade'],
@@ -59,6 +62,12 @@ export function useCloserMetas(year: number = 2026) {
 
   // Get percentage for a specific BU/month/closer
   const getPercentage = (bu: string, month: string, closer: string): number => {
+    // Closers recém-adicionados começam com 0% até receberem metas no DB
+    if (ZERO_DEFAULT_CLOSERS.has(closer)) {
+      const meta = metas?.find(m => m.bu === bu && m.month === month && m.closer === closer);
+      return meta?.percentage ?? 0;
+    }
+
     // Se BU tem apenas 1 closer, default é 100%
     const closersForBU = BU_CLOSERS[bu as BuType] || [];
     const defaultPercentage = closersForBU.length === 1 ? 100 : 50;

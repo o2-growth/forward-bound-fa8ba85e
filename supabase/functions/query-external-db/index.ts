@@ -808,6 +808,28 @@ Deno.serve(async (req) => {
         rowsAffected: updateResult.rowCount,
       };
       console.log(`Update result: ${updateResult.rowCount} rows affected`);
+    } else if (action === "rpc") {
+      // Run a whitelisted PG function on the external DB.
+      // Body: { action: "rpc", functionName: "get_cliente_360", args: [1280063270] }
+      const RPC_WHITELIST = new Set(["get_cliente_360"]);
+      const { functionName, args = [] } = body;
+      if (!functionName || !RPC_WHITELIST.has(functionName)) {
+        await client.end();
+        return new Response(JSON.stringify({ error: "Invalid or non-whitelisted function" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const argsArr = Array.isArray(args) ? args : [args];
+      const placeholders = argsArr.map((_, i) => `$${i + 1}`).join(", ");
+      const sql = `SELECT ${functionName}(${placeholders}) AS result`;
+      const rpcResult = await client.query(sql, argsArr);
+      result = {
+        action: "rpc",
+        functionName,
+        data: rpcResult.rows[0]?.result ?? null,
+      };
+      console.log(`RPC ${functionName}(${argsArr.join(", ")}): ok`);
     } else {
       await client.end();
       return new Response(JSON.stringify({ error: "Invalid action" }), {

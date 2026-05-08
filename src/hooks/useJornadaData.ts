@@ -390,6 +390,7 @@ export function useJornadaData() {
         cfo,
         produto,
         mrr,
+        valorOxy,
         produtos: produtoParts,
         pontual,
         valorSetup: parseNum(row['Valor Setup']),
@@ -468,7 +469,25 @@ export function useJornadaData() {
     // Carteira do CFO inclui Onboarding, Em Operação Recorrente E qualquer fase de tratativa
     // (Triagem, Em Tratativa com CS, Plano de Ação, Conclusão, Financeiro), pois o CFO continua atendendo.
     // Exclui apenas terminais: Churn, Atividades finalizadas, Desistência, Arquivado.
-    const carteiraClientes = allClientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
+    //
+    // Regra Mariana e Pedrolo: carteira filtrada por assinatura no MÊS PASSADO
+    // (mês calendário anterior ao atual). Cliente "expira" da carteira virando o mês.
+    // - Mariana: serviços pontuais (Diagnóstico, Turnaround, Valuation)
+    // - Pedrolo: setup + SaaS Oxy do mês anterior
+    const mesAnteriorStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const mesAnteriorEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+    const isMariClient = (cfo: string | null | undefined) => (cfo ?? '').includes('Mariana');
+    const isPedroloClient = (cfo: string | null | undefined) => (cfo ?? '').includes('Pedrolo');
+    const isAssinaturaNoMesPassado = (dt: Date | null) =>
+      !!dt && dt >= mesAnteriorStart && dt < mesAnteriorEnd;
+
+    const carteiraClientes = allClientes.filter(c => {
+      if (INACTIVE_PHASES.includes(c.faseAtual)) return false;
+      if (isMariClient(c.cfo) || isPedroloClient(c.cfo)) {
+        return isAssinaturaNoMesPassado(c.dataAssinatura);
+      }
+      return true;
+    });
 
     const cfoMap = new Map<string, JornadaCfo>();
     for (const c of carteiraClientes) {
@@ -481,10 +500,18 @@ export function useJornadaData() {
       };
       existing.clientes++;
       if (ACTIVE_PHASES.includes(c.faseAtual)) existing.clientesAtivos++;
-      // Mariana atende clientes pontuais (Diagnóstico, Turnaround, Valuation): tratamos pontual como MRR
-      // somente para o agregado do CFO, sem alterar dados dos clientes nem outras telas.
-      const tratarPontualComoMrr = (c.cfo ?? '').includes('Mariana');
-      const receitaCliente = c.mrr + (tratarPontualComoMrr ? (c.pontual ?? 0) : 0);
+      // Receita para o agregado do CFO (não altera dados dos clientes nem outras telas):
+      // - Mariana: pontual conta como MRR (serviços especiais)
+      // - Pedrolo: substitui MRR padrão por valorSetup + valorOxy (setup + SaaS do mês anterior)
+      // - Demais: MRR padrão (CFOaaS + Oxy)
+      let receitaCliente: number;
+      if (isPedroloClient(c.cfo)) {
+        receitaCliente = (c.valorSetup ?? 0) + (c.valorOxy ?? 0);
+      } else if (isMariClient(c.cfo)) {
+        receitaCliente = c.mrr + (c.pontual ?? 0);
+      } else {
+        receitaCliente = c.mrr;
+      }
       existing.mrrTotal += receitaCliente;
       if (c.faseAtual === 'Onboarding') existing.clientesSetup++;
       if (c.tratativaAtiva) { existing.clientesTratativa++; existing.mrrEmRisco += receitaCliente; }

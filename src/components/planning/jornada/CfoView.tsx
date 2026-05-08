@@ -693,8 +693,23 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
   // Carteira do CFO = todos os clientes ainda ativos (não-terminais).
   // Inclui clientes em tratativa (Triagem, Em Tratativa com CS, Plano de Ação, etc.),
   // pois o CFO continua atendendo esses clientes. Exclui apenas Churn / Arquivado / Desistência.
+  //
+  // Regra Mariana e Pedrolo: carteira filtrada por assinatura no MÊS PASSADO
+  // (mês calendário anterior ao atual). Cliente "expira" da carteira virando o mês.
   const activeClientes = useMemo(() => {
-    return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
+    const now = new Date();
+    const mesAnteriorStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const mesAnteriorEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+    const isMariOrPedrolo = (cfo: string) =>
+      cfo.includes('Mariana') || cfo.includes('Pedrolo');
+    return clientes.filter(c => {
+      if (INACTIVE_PHASES.includes(c.faseAtual)) return false;
+      if (isMariOrPedrolo(c.cfo)) {
+        const dt = c.dataAssinatura;
+        return !!dt && dt >= mesAnteriorStart && dt < mesAnteriorEnd;
+      }
+      return true;
+    });
   }, [clientes]);
 
   // A1: Count churns per CFO

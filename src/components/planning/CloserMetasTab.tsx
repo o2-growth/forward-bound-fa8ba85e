@@ -59,7 +59,9 @@ export function CloserMetasTab() {
   // Get local percentage value
   const getLocalPercentage = (bu: string, month: string, closer: string): number => {
     const key = `${bu}-${month}-${closer}`;
-    return localMetas[key] ?? (validClosers.length === 1 ? 100 : 50);
+    if (localMetas[key] !== undefined) return localMetas[key];
+    if (closer === 'Bruna') return 0;
+    return validClosers.length === 1 ? 100 : 50;
   };
 
   // Update local percentage
