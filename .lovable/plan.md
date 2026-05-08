@@ -1,37 +1,46 @@
-## Objetivo
+## Diagnóstico
 
-Hoje a linha do **Pedrolo** na CfoView soma ao MRR o faturamento agregado dos 3 produtos OXY do DRE — mas a contagem de clientes e a lista de clientes do squad continuam vazias (ou só com quem tem `CFO Responsável = Pedrolo` no Pipefy assinado no mês passado).
+Você está certo: **são campos diferentes no Pipefy**.
 
-A pedida: os **clientes do Pipefy que possuem os produtos OXY / OXY + Gênio / OXY + Gênio + Especialista** também devem aparecer dentro do squad Pedrolo (contagem, lista no drilldown, alertas, NPS médio etc.), independentemente do CFO Responsável que estiver lançado no card.
+- **Modelo Atual / O2 TAX** → usam o campo `Faixa de faturamento mensal` (ex.: "Entre R$ 200 mil e R$ 350 mil"). É isso que aparece na coluna "Faixa Faturamento" do drilldown.
+- **Franquia / Oxy Hacker (Expansão)** → não têm `Faixa de faturamento mensal`. Eles usam o campo `Investimento disponível` (ex.: "Menos de 36 mil reais", "Entre 36 e 54 mil reais", etc.).
 
-## Escopo
+No código atual (`src/hooks/useExpansaoAnalytics.ts`, função `toDetailItem`, linhas 419-439), o item gerado para cards de Franquia/Oxy Hacker **não preenche o campo `revenueRange`** — por isso a coluna mostra "-" e o gráfico "Por Faixa de Faturamento" agrupa tudo em "Não informado" (foi exatamente o que você viu nos 48 MQLs do print).
 
-- **Fonte dos clientes**: Pipefy (mesmo dataset já carregado em `useJornadaData`), filtrando pelo campo `produto` / `produtos` (ou conexões `DB Produtos`) por nome normalizado: `oxy`, `oxy + genio`, `oxy + genio + especialista`.
-- **Atribuição**: forçar `cfo = "Eduardo Milani Pedrolo"` para esses clientes nas estruturas usadas pela CfoView (sem alterar o card original no Pipefy).
-- **Filtro temporal**: mantém a regra atual do Pedrolo (apenas clientes com **assinatura no mês calendário anterior**) para ficar coerente com o recorte do DRE.
-- **Receita por cliente**: continua usando `valorSetup + valorOxy` do próprio card (regra atual do Pedrolo). O valor extra do DRE (3 produtos OXY agregados) **continua somado por cima** no `mrrTotal`, como já está hoje — esses dois somatórios coexistem (clientes Pipefy + agregado DRE).
-- **Outros squads**: se o cliente já está atribuído a outro CFO no Pipefy, ele continua aparecendo lá também (não removemos do CFO original) — apenas duplicamos para Pedrolo. (Alternativa: mover. Adoto duplicar para não quebrar a contagem dos demais; podemos ajustar depois.)
+Confirmei na base que o dado existe: o card do Heraldo Carvalho (Franquia, Lead/MQL de Maio/2026) tem `Investimento disponível = "Menos de 36 mil reais"`, mas esse valor nunca é repassado pro drilldown.
 
-## Mudanças técnicas
+## Mudança proposta
 
-### `src/hooks/useJornadaData.ts`
+Apenas frontend, mudança cirúrgica em **um único arquivo**:
 
-1. **Constante** com os 3 nomes de produto OXY normalizados: `OXY_PRODUCT_NAMES = ['oxy', 'oxy + genio', 'oxy + genio + especialista']` + helper `normalize(s)`.
-2. Após montar `allClientes` e antes de montar `carteiraClientes`, criar **clones virtuais** dos clientes cujo `produtos` (ou `produto`) contém algum dos OXY_PRODUCT_NAMES e cujo `cfo` ainda **não é** Pedrolo. Para cada um, criar uma cópia com:
-   - `cfo = 'Eduardo Milani Pedrolo'`
-   - `id = `${original.id}__pedrolo`` (evita colisão no `clienteMap`/drawers)
-   - demais campos preservados
-   Anexar ao `allClientes` (ou a um array separado consumido apenas por `cfoMap`/lista do squad). A consulta `Cliente360Drawer` continua usando o id original via prefixo.
-3. A regra `isPedroloClient` + `isAssinaturaNoMesPassado` já existente passa a aplicar também nos clones, então a contagem respeita o recorte mensal.
-4. Nenhuma mudança em alertas/pipeline globais; opcionalmente filtrar clones de `pipeline`/`alertas` para evitar duplicação visual em outras telas.
+### `src/hooks/useExpansaoAnalytics.ts`
 
-### `src/components/planning/jornada/CfoView.tsx`
-- Atualizar tooltip da linha Pedrolo: deixar claro que **clientes** = cards Pipefy com produto OXY/Gênio/Especialista (assinatura no mês anterior); **MRR** = receita Setup+Oxy desses clientes + soma DRE dos 3 produtos OXY.
+Em `toDetailItem` (linha 419), preencher `revenueRange` com o `Investimento disponível` do card (usando o `cardInvestimentoMap` que já existe no hook, com fallback para `card.investimentoDisponivel`):
 
-### Memória
-- Atualizar `mem://logic/operations/mrr-total-definition` com a nova regra de atribuição de clientes do Pedrolo.
+```ts
+const toDetailItem = (card: ExpansaoCard): DetailItem => ({
+  id: card.id,
+  name: card.titulo,
+  company: card.titulo,
+  phase: PHASE_DISPLAY_MAP[card.faseAtual] || card.faseAtual,
+  date: card.dataEntrada.toISOString(),
+  // ... resto igual ...
+  revenueRange: cardInvestimentoMap.get(card.id) || card.investimentoDisponivel || undefined,
+});
+```
 
-## Pontos a validar
-- Confirmar que os nomes exatos dos produtos no Pipefy batem com as 3 strings (logar quantos clientes foram detectados em dev).
-- Decidir se o clone deve aparecer no `ClientesView`/`AlertasView` global ou só no agregado do CFO (sugiro manter visível só no agregado — filtro por id com sufixo `__pedrolo`).
-- Se nenhum produto match → comportamento atual preservado (só agregado DRE).
+Como `toDetailItem` é declarada dentro do hook, ela já tem acesso ao `cardInvestimentoMap` por closure.
+
+## Resultado esperado
+
+No drilldown de MQL (`MQL - De Onde Vêm Nossos Melhores Leads?`):
+
+- Cards de **Modelo Atual / O2 TAX**: continuam mostrando faixas tipo "R$ 200k - 350k" (inalterado).
+- Cards de **Franquia / Oxy Hacker**: passam a mostrar a faixa de investimento (ex.: "Menos de 36 mil reais", "Entre 54 e 140 mil reais", etc.) na coluna "Faixa Faturamento" e no gráfico de distribuição.
+
+A coluna continua se chamando "Faixa Faturamento" — semanticamente é a mesma ideia (a faixa de qualificação do lead), só que o nome do campo na origem é diferente. Se você preferir renomear pra algo neutro tipo "Faixa / Investimento", me avisa que ajusto também.
+
+## Fora de escopo
+
+- Não vou mexer na lógica de qualificação de MQL (já está correta: qualquer `Investimento disponível` preenchido qualifica para Franquia/Oxy Hacker).
+- Não vou tocar em `useExpansaoMetas.ts` nem `useOxyHackerMetas.ts` — só o caminho do drilldown.
