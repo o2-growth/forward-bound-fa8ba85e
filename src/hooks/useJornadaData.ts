@@ -468,7 +468,7 @@ export function useJornadaData() {
     };
 
     // Add tratativa as virtual phase
-    const emTratativa = activeClientes.filter(c => c.tratativaAtiva);
+    const emTratativa = activeClientes.filter(c => c.tratativaAtiva && !c.id.endsWith('__pedrolo'));
 
     const pipeline: PipelineFase[] = [
       ...Array.from(pipelineMap.entries())
