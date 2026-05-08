@@ -549,6 +549,84 @@ export function usePlanGrowthData() {
     }
   }, [isLoadingFunnel, isLoadingMetas, modeloAtualFunnelCalculated, funnelMetas]);
 
+  // Auto-lock months that have already started (startOfMonth <= today).
+  // Captures a snapshot of the live Plan Growth values for ALL 4 BUs and sets is_locked=true.
+  // Runs once per session — guarded by hasAutoLocked.
+  useEffect(() => {
+    if (isLoadingFunnel || isLoadingMetas || isLoadingIndicators) return;
+    if (hasAutoLocked.current) return;
+    if (
+      modeloAtualFunnelCalculated.length === 0 ||
+      o2TaxFunnel.length === 0 ||
+      oxyHackerFunnel.length === 0 ||
+      franquiaFunnel.length === 0
+    ) return;
+
+    const PLAN_YEAR = 2026;
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonthIdx = today.getMonth(); // 0-based
+
+    // Only auto-lock for the planning year
+    if (currentYear < PLAN_YEAR) return;
+
+    // For year > PLAN_YEAR, lock everything; for year == PLAN_YEAR, lock months 0..currentMonthIdx
+    const maxLockableIdx = currentYear > PLAN_YEAR ? 11 : currentMonthIdx;
+
+    const isAlreadyLocked = (bu: string, month: string) =>
+      funnelMetas.some(m => m.bu === bu && m.month === month && m.year === PLAN_YEAR && m.is_locked === true);
+
+    type FunnelRow = typeof modeloAtualFunnelCalculated[number];
+    const buSources: Array<{ bu: string; rows: FunnelRow[] }> = [
+      { bu: 'modelo_atual', rows: modeloAtualFunnelCalculated },
+      { bu: 'o2_tax', rows: o2TaxFunnel },
+      { bu: 'oxy_hacker', rows: oxyHackerFunnel },
+      { bu: 'franquia', rows: franquiaFunnel },
+    ];
+
+    const toLock: Array<Parameters<typeof lockMonths.mutate>[0][number]> = [];
+    for (const { bu, rows } of buSources) {
+      for (let idx = 0; idx <= maxLockableIdx; idx++) {
+        const monthName = months[idx];
+        if (isAlreadyLocked(bu, monthName)) continue;
+        const row = rows.find(r => r.month === monthName);
+        if (!row) continue;
+        toLock.push({
+          bu,
+          month: monthName,
+          year: PLAN_YEAR,
+          leads: row.leads,
+          mqls: row.mqls,
+          rms: row.rms,
+          rrs: row.rrs,
+          propostas: row.propostas,
+          vendas: row.vendas,
+          faturamento_meta: row.faturamentoMeta || 0,
+          faturamento_vender: row.faturamentoVender || 0,
+          mrr_base_planejamento: row.mrrBase || 0,
+          investimento: row.investimento || 0,
+        });
+      }
+    }
+
+    if (toLock.length > 0) {
+      hasAutoLocked.current = true;
+      console.log('[AutoLock] Locking months that already started:', toLock.map(t => `${t.bu}/${t.month}`));
+      lockMonths.mutate(toLock);
+    } else {
+      hasAutoLocked.current = true;
+    }
+  }, [
+    isLoadingFunnel,
+    isLoadingMetas,
+    isLoadingIndicators,
+    funnelMetas,
+    modeloAtualFunnelCalculated,
+    o2TaxFunnel,
+    oxyHackerFunnel,
+    franquiaFunnel,
+  ]);
+
   // Publish data to context whenever funnel data changes
   useEffect(() => {
     
