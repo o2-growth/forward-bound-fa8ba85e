@@ -126,7 +126,11 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
         systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 2048,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     });
 
@@ -139,7 +143,21 @@ Deno.serve(async (req) => {
     }
 
     const geminiData = await geminiResp.json();
-    const analysis = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const candidate = geminiData?.candidates?.[0];
+    const analysis = candidate?.content?.parts
+      ?.map((part: { text?: string }) => part.text ?? "")
+      .join("\n")
+      .trim() ?? "";
+
+    if (candidate?.finishReason && candidate.finishReason !== "STOP") {
+      console.warn("Gemini finishReason:", candidate.finishReason, geminiData?.promptFeedback ?? null);
+    }
+
+    if (!analysis) {
+      return new Response(JSON.stringify({ error: "Gemini não retornou texto para a análise" }), {
+        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     return new Response(
       JSON.stringify({ clienteId, analysis, cliente360 }, (_, v) => typeof v === "bigint" ? v.toString() : v),
