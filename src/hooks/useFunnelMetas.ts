@@ -79,6 +79,58 @@ export function useFunnelMetas(year = 2026) {
     };
   };
 
+  // Lock months: upserts a snapshot with is_locked=true (includes monetary fields)
+  const lockMonths = useMutation({
+    mutationFn: async (
+      items: Array<{
+        bu: string;
+        month: string;
+        year?: number;
+        leads: number;
+        mqls: number;
+        rms: number;
+        rrs: number;
+        propostas: number;
+        vendas: number;
+        faturamento_meta?: number;
+        faturamento_vender?: number;
+        mrr_base_planejamento?: number;
+        investimento?: number;
+      }>
+    ) => {
+      if (items.length === 0) return;
+      const upsertData = items.map(item => ({
+        bu: item.bu,
+        month: item.month,
+        year: item.year || year,
+        leads: Math.round(item.leads || 0),
+        mqls: Math.round(item.mqls || 0),
+        rms: Math.round(item.rms || 0),
+        rrs: Math.round(item.rrs || 0),
+        propostas: Math.round(item.propostas || 0),
+        vendas: Math.round(item.vendas || 0),
+        faturamento_meta: item.faturamento_meta ?? 0,
+        faturamento_vender: item.faturamento_vender ?? 0,
+        mrr_base_planejamento: item.mrr_base_planejamento ?? 0,
+        investimento: item.investimento ?? 0,
+        is_locked: true,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase
+        .from('funnel_metas')
+        .upsert(upsertData, {
+          onConflict: 'bu,month,year',
+          ignoreDuplicates: false,
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['funnel-metas', year] });
+    },
+  });
+
   // Bulk upsert funnel metas
   const bulkUpsert = useMutation({
     mutationFn: async (items: FunnelMetaUpsert[]) => {
