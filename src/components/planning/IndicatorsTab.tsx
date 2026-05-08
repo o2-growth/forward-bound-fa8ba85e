@@ -763,23 +763,28 @@ export function IndicatorsTab() {
         if (hasData) return Math.round(value);
       }
 
-      const item = funnelItems?.find(f => f.month === monthName);
-      if (!item) return 0;
-      
+      // 🎯 Fonte estável: prioriza valor salvo em funnel_metas (DB) sobre Plan Growth ao vivo.
+      const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
       let value = 0;
-      switch (indicatorKey) {
-        case 'mql': value = item.mqls; break;
-        case 'rm': value = item.rms; break;
-        case 'rr': value = item.rrs; break;
-        case 'proposta': value = item.propostas; break;
-        case 'venda': value = item.vendas; break;
-        default: value = 0;
+      if (dbVal !== null) {
+        value = dbVal;
+      } else {
+        const item = funnelItems?.find(f => f.month === monthName);
+        if (!item) return 0;
+        switch (indicatorKey) {
+          case 'mql': value = item.mqls; break;
+          case 'rm': value = item.rms; break;
+          case 'rr': value = item.rrs; break;
+          case 'proposta': value = item.propostas; break;
+          case 'venda': value = item.vendas; break;
+          default: value = 0;
+        }
       }
-      
+
       if (bu && closerFilter && closerFilter.length > 0) {
         value = getFilteredMeta(value, bu, monthName, closerFilter);
       }
-      
+
       return Math.round(value);
     });
   };
