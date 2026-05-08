@@ -35,7 +35,7 @@ const MONTH_NAMES: MonthType[] = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul
 export function useConsolidatedMetas() {
   const { metas, getMeta, isLoading: isLoadingDb } = useMonetaryMetas();
   const { funnelData, isLoaded: isPlanGrowthLoaded } = useMediaMetas();
-  const { isMonthLocked, getLockedSnapshot } = useFunnelMetas(2026);
+  const { isMonthLocked, getLockedSnapshot, funnelMetas } = useFunnelMetas(2026);
 
   // Verifica se há overrides no banco para uma BU específica
   const hasDbOverridesForBU = useMemo(() => {
@@ -112,6 +112,27 @@ export function useConsolidatedMetas() {
         }
       }
     }
+
+    // 🎯 MODELO ATUAL (não-lockado): Incremento ≡ "A Vender" puro, não MRR Base + A Vender.
+    // Fonte de verdade: funnel_metas.faturamento_vender (persistido) OU funnelData.faturamento
+    // (live no Plan Growth, ainda não salvo). NUNCA monetary_metas.faturamento, que armazena
+    // Faturamento Total (MRR Base + A Vender). Alinhado com mem://logic/indicators/incremento-definition-v4.
+    if (bu === 'modelo_atual') {
+      const fm = funnelMetas.find(m => m.bu === 'modelo_atual' && m.month === month);
+      const fatVender = Number(fm?.faturamento_vender || 0);
+      const planGrowthFat = getPlanGrowthMeta('modelo_atual', month, 'faturamento');
+      const incremento = fatVender > 0 ? fatVender : planGrowthFat;
+      if (incremento > 0) {
+        const source = fatVender > 0 ? 'database' : 'plan_growth';
+        switch (metric) {
+          case 'faturamento': return { value: incremento, source };
+          case 'mrr':         return { value: Math.round(incremento * 0.25), source };
+          case 'setup':       return { value: Math.round(incremento * 0.60), source };
+          case 'pontual':     return { value: Math.round(incremento * 0.15), source };
+        }
+      }
+    }
+
 
     // 1. Tentar banco de dados (monetary_metas) para TODAS as BUs, inclusive modelo_atual não-locked.
     // monetary_metas é a fonte única de verdade compartilhada com useEffectiveMetas e Plan Growth,
