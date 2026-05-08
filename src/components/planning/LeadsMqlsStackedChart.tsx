@@ -128,10 +128,10 @@ export function LeadsMqlsStackedChart({ startDate, endDate, selectedBU, selected
   
   // Get total meta from funnelData (Plan Growth) based on selected BUs
   const periodMeta = 
-    (includesModeloAtual ? calcularMetaDoPeriodo(funnelData?.modeloAtual) : 0) +
-    (includesO2Tax ? calcularMetaDoPeriodo(funnelData?.o2Tax) : 0) +
-    (includesOxyHacker ? calcularMetaDoPeriodo(funnelData?.oxyHacker) : 0) +
-    (includesFranquia ? calcularMetaDoPeriodo(funnelData?.franquia) : 0);
+    (includesModeloAtual ? calcularMetaDoPeriodo('modelo_atual', funnelData?.modeloAtual) : 0) +
+    (includesO2Tax ? calcularMetaDoPeriodo('o2_tax', funnelData?.o2Tax) : 0) +
+    (includesOxyHacker ? calcularMetaDoPeriodo('oxy_hacker', funnelData?.oxyHacker) : 0) +
+    (includesFranquia ? calcularMetaDoPeriodo('franquia', funnelData?.franquia) : 0);
     
   // Calculate total realized based on selected BUs using first-entry logic
   const getTotalRealized = (): number => {
