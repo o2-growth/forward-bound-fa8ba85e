@@ -700,7 +700,7 @@ export function useJornadaData() {
       : '';
 
     return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync };
-  }, [data]);
+  }, [data, oxyProductsByMonth]);
 
   return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };
 }
