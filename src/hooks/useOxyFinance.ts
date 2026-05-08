@@ -51,10 +51,21 @@ export interface DailyRevenueRow {
   source: string;
 }
 
+// SaaS group ID in Oxy Finance DRE — contains categories Oxy / Oxy + Gênio / Oxy + Gênio + Especialista / Setup / Parceiros
+const SAAS_GROUP_ID = '6c3f10e6-2d2d-48d5-81ef-18bb6389b159';
+
+const OXY_PRODUCT_LABELS = ['oxy', 'oxy + genio', 'oxy + genio + especialista'];
+
+function normalizeLabel(s: string): string {
+  return (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 export interface OxyFinanceResult {
   dreByBU: Record<BuType, Record<MonthType, number>>;
   /** Receita bruta do grupo "Expansão" (oxy_hacker + franquia combinados) por mês */
   expansaoByMonth: Record<MonthType, number>;
+  /** Soma das categorias SaaS: Oxy + Oxy+Gênio + Oxy+Gênio+Especialista, por mês */
+  oxyProductsByMonth: Record<MonthType, number>;
   dreRaw: any;
   cashflowChart: CashflowChartPoint[];
   cashflowByMonth: Record<MonthType, number>;
