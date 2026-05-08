@@ -431,6 +431,27 @@ export function useJornadaData() {
     }
 
     const allClientes = Array.from(clienteMap.values());
+
+    // === 2.5 Clones virtuais para o squad Pedrolo ===
+    // Clientes Pipefy que possuem produtos OXY / OXY + Gênio / OXY + Gênio + Especialista
+    // são duplicados (com cfo forçado p/ Pedrolo e id sufixado) para aparecerem na carteira
+    // do squad sem alterar o card original. Recorte temporal (assinatura no mês passado)
+    // é aplicado adiante junto com a regra existente do Pedrolo.
+    const normalizeProd = (s: string) =>
+      (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const OXY_PRODUCT_NAMES = ['oxy', 'oxy + genio', 'oxy + genio + especialista'];
+    const hasOxyProduct = (parts: string[]) =>
+      parts.some(p => OXY_PRODUCT_NAMES.includes(normalizeProd(p)));
+    const pedroloClones: typeof allClientes = [];
+    for (const c of allClientes) {
+      if (!hasOxyProduct(c.produtos || [])) continue;
+      if ((c.cfo ?? '').includes('Pedrolo')) continue; // já é Pedrolo
+      pedroloClones.push({ ...c, id: `${c.id}__pedrolo`, cfo: 'Eduardo Milani Pedrolo' });
+    }
+    if (pedroloClones.length > 0) {
+      allClientes.push(...pedroloClones);
+    }
+
     const activeClientes = allClientes.filter(c => ACTIVE_PHASES.includes(c.faseAtual));
 
     // === 3. Build Pipeline (active only, no churn) ===
