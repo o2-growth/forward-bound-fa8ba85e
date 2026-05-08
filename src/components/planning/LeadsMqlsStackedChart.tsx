@@ -46,21 +46,34 @@ export function LeadsMqlsStackedChart({ startDate, endDate, selectedBU, selected
   const franquiaAnalytics = useExpansaoAnalytics(startDate, endDate, 'Franquia');
   const oxyHackerAnalytics = useExpansaoAnalytics(startDate, endDate, 'Oxy Hacker');
   
-  // Get funnelData from MediaMetasContext for dynamic metas
+  // Get funnelData from MediaMetasContext for dynamic metas (Plan Growth ao vivo - fallback)
   const { funnelData } = useMediaMetas();
-  
-  // Helper function to calculate meta from funnelData for a given period (pro-rated for partial months)
-  const calcularMetaDoPeriodo = (funnelItems: FunnelDataItem[] | undefined): number => {
-    if (!funnelItems || funnelItems.length === 0) return 0;
-    
+  // Get DB funnel_metas (fonte estável - prioritária)
+  const { funnelMetas: dbFunnelMetas } = useFunnelMetas(2026);
+
+  // Helper function to calculate MQL meta for a given period (pro-rated for partial months).
+  // Prioriza valor salvo em funnel_metas (DB) sobre Plan Growth ao vivo, eliminando oscilação
+  // de meses não-locked (ex.: Maio) cuja meta no contexto depende do MRR Base recalculado.
+  const calcularMetaDoPeriodo = (bu: string, funnelItems: FunnelDataItem[] | undefined): number => {
     const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
     let total = 0;
     
     for (const monthDate of monthsInPeriod) {
       const monthName = monthNames[getMonth(monthDate)];
-      const item = funnelItems.find(f => f.month === monthName);
-      if (!item) continue;
-      
+
+      // 🎯 DB primeiro
+      const dbRow = dbFunnelMetas.find(m => m.bu === bu && m.month === monthName);
+      const dbMqls = dbRow?.mqls;
+      const item = funnelItems?.find(f => f.month === monthName);
+
+      let baseValue: number | null = null;
+      if (typeof dbMqls === 'number') {
+        baseValue = dbMqls;
+      } else if (item) {
+        baseValue = item.mqls;
+      }
+      if (baseValue === null) continue;
+
       const monthStart = startOfMonth(monthDate);
       const monthEnd = endOfMonth(monthDate);
       
@@ -73,7 +86,7 @@ export function LeadsMqlsStackedChart({ startDate, endDate, selectedBU, selected
       const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
       const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
       
-      total += item.mqls * fraction;
+      total += baseValue * fraction;
     }
     
     return Math.round(total);
