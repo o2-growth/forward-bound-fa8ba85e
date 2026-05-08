@@ -10,6 +10,7 @@ import { useO2TaxMetas } from "@/hooks/useO2TaxMetas";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
 import { useMediaMetas, FunnelDataItem } from "@/contexts/MediaMetasContext";
+import { useFunnelMetas } from "@/hooks/useFunnelMetas";
 import { DetailSheet, DetailItem, columnFormatters } from "./indicators/DetailSheet";
 import { ExternalLink } from "lucide-react";
 import { format, eachDayOfInterval, differenceInDays, addDays, eachMonthOfInterval, getMonth, startOfMonth, endOfMonth, isSameDay, isSameMonth } from "date-fns";
