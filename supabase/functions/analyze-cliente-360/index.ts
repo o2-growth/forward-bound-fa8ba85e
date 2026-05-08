@@ -21,10 +21,16 @@ Produza PT-BR, no máximo 220 palavras, EXATAMENTE neste formato (mantenha os t�
 - **Tratativas:** quantas abertas + tipo + há quantos dias
 
 **⚠️ Sinais de risco**
-Bullets prefixados com [P0]/[P1]/[P2] e CADA bullet termina com (evidência: <data ou ID do JSON>). Se nada qualificar, escrever EXATAMENTE: "Sem sinais relevantes."
+Bullets no formato OBRIGATÓRIO: \`[P0|P1|P2] <sinal observado> → pode causar <impacto provável no negócio/operação>. (evidência: <data ou ID do JSON>)\`
+- O impacto deve ser concreto (ex.: risco de churn, atraso de onboarding, perda de receita recorrente, escalonamento operacional, insatisfação recorrente, quebra de SLA, retrabalho, exposição reputacional). Proibido omitir o "→ pode causar ...".
+- Se nada qualificar, escrever EXATAMENTE: "Sem sinais relevantes."
 
 **🎯 Movimentos sugeridos**
-Máx 3 bullets. Cada um começa com verbo no infinitivo (Agendar, Revisar, Escalar, Confirmar, Documentar, Validar) + objeto + dono sugerido quando óbvio + prazo sugerido se 🟡/🔴. Se Status = 🟢 e nenhum risco P0/P1, escrever EXATAMENTE: "Manter cadência atual. Sem ações requeridas." (acrescentar " Próximo check-in: <data>" SOMENTE se houver data de próxima rotina no JSON; caso contrário, omitir essa frase).
+- REGRA DURA: se houver QUALQUER risco listado em "Sinais de risco" (P0, P1 ou P2), este bloco NUNCA pode ficar vazio. Cada risco listado precisa de pelo menos uma ação correspondente.
+- Máx 3 bullets, no formato: \`<Verbo no infinitivo> <ação concreta> — dono: <CS|CFO|Operação|Head CS|Comercial>; prazo: <24h|3d|7d|15d>; trata risco <P0|P1|P2>\`.
+- Verbos permitidos: Agendar, Revisar, Escalar, Confirmar, Documentar, Validar, Reunir, Acionar, Renegociar, Encerrar.
+- Priorização de prazos: P0 → escalonamento ≤24h; P1 → ação em 3 a 7 dias; P2 → ação preventiva ou monitoramento explícito em até 15 dias.
+- Se Status = 🟢 e NENHUM risco (nem P2) foi listado, escrever EXATAMENTE: "Manter cadência atual. Sem ações requeridas." (acrescentar " Próximo check-in: <data>" SOMENTE se houver data de próxima rotina no JSON; caso contrário, omitir).
 
 CRITÉRIOS DE STATUS (objetivos, sem interpretação subjetiva):
 - 🔴 Crítico: NPS ≤6 recente | NPS caiu ≥3 pontos vs média | tratativa P0 aberta | churn/cancelamento em curso | setup atrasado >90d | ≥2 rotinas vermelhas em 90d | >60d sem interação registrada
