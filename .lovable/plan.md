@@ -1,42 +1,37 @@
 ## Objetivo
 
-Somar ao MRR Total do squad **Pedrolo** (CfoView) o faturamento dos produtos **OXY**, **OXY + Gênio** e **OXY + Gênio + Especialista**, lidos como subcategorias do grupo **SaaS** no DRE da Oxy Finance.
+Hoje a linha do **Pedrolo** na CfoView soma ao MRR o faturamento agregado dos 3 produtos OXY do DRE — mas a contagem de clientes e a lista de clientes do squad continuam vazias (ou só com quem tem `CFO Responsável = Pedrolo` no Pipefy assinado no mês passado).
 
-## Comportamento esperado
+A pedida: os **clientes do Pipefy que possuem os produtos OXY / OXY + Gênio / OXY + Gênio + Especialista** também devem aparecer dentro do squad Pedrolo (contagem, lista no drilldown, alertas, NPS médio etc.), independentemente do CFO Responsável que estiver lançado no card.
 
-- A linha "Eduardo Milani Pedrolo" passa a exibir `mrrTotal = (Setup + valorOxy de cada cliente do mês passado) + (OXY + OXY+Gênio + OXY+Gênio+Especialista do DRE)`.
-- Margem, Ticket Médio, Health Score e demais cálculos derivados refletem automaticamente o novo `mrrTotal` (já que vêm dele).
-- Nenhuma outra carteira de CFO é afetada.
-- Mantém o mesmo recorte temporal já usado para Pedrolo: **mês calendário anterior** ao atual.
+## Escopo
+
+- **Fonte dos clientes**: Pipefy (mesmo dataset já carregado em `useJornadaData`), filtrando pelo campo `produto` / `produtos` (ou conexões `DB Produtos`) por nome normalizado: `oxy`, `oxy + genio`, `oxy + genio + especialista`.
+- **Atribuição**: forçar `cfo = "Eduardo Milani Pedrolo"` para esses clientes nas estruturas usadas pela CfoView (sem alterar o card original no Pipefy).
+- **Filtro temporal**: mantém a regra atual do Pedrolo (apenas clientes com **assinatura no mês calendário anterior**) para ficar coerente com o recorte do DRE.
+- **Receita por cliente**: continua usando `valorSetup + valorOxy` do próprio card (regra atual do Pedrolo). O valor extra do DRE (3 produtos OXY agregados) **continua somado por cima** no `mrrTotal`, como já está hoje — esses dois somatórios coexistem (clientes Pipefy + agregado DRE).
+- **Outros squads**: se o cliente já está atribuído a outro CFO no Pipefy, ele continua aparecendo lá também (não removemos do CFO original) — apenas duplicamos para Pedrolo. (Alternativa: mover. Adoto duplicar para não quebrar a contagem dos demais; podemos ajustar depois.)
 
 ## Mudanças técnicas
 
-### 1. `src/hooks/useOxyFinance.ts`
-- Localizar o `id` do grupo "SaaS" dentro de `dreData.groups` (varredura por `label` normalizado).
-- Adicionar nova `useQuery` que chama `fetch-oxy-finance` com `action: 'dre_categories'` e `groupIds: [saasGroupId]`, dependente do DRE principal (enabled só após resolver o id).
-- Parsear o retorno de categorias e somar, por mês, apenas as labels normalizadas:
-  - `oxy`
-  - `oxy + genio` / `oxy + gênio`
-  - `oxy + genio + especialista` / `oxy + gênio + especialista`
-  Normalização: `trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')`.
-- Expor novo campo no resultado do hook: `oxyProductsByMonth: Record<MonthType, number>` (total dos 3 produtos por mês).
+### `src/hooks/useJornadaData.ts`
 
-### 2. `src/hooks/useJornadaData.ts`
-- Importar `useOxyFinance` (ou aceitar `oxyProductsByMonth` como parâmetro vindo do consumidor).
-- Identificar o mês alvo: o **mês anterior** já calculado em `mesAnteriorStart` → mapear para `MonthType` (Jan…Dez).
-- Após montar `cfoMap`, adicionar o valor `oxyProductsByMonth[mesAnteriorMonth]` ao `mrrTotal` da entrada cujo nome contém "Pedrolo". Se Pedrolo não estiver no mapa (sem clientes), criar a entrada apenas se o valor > 0.
-- Não alterar `mrrEmRisco`, contagem de clientes, NPS ou Health.
+1. **Constante** com os 3 nomes de produto OXY normalizados: `OXY_PRODUCT_NAMES = ['oxy', 'oxy + genio', 'oxy + genio + especialista']` + helper `normalize(s)`.
+2. Após montar `allClientes` e antes de montar `carteiraClientes`, criar **clones virtuais** dos clientes cujo `produtos` (ou `produto`) contém algum dos OXY_PRODUCT_NAMES e cujo `cfo` ainda **não é** Pedrolo. Para cada um, criar uma cópia com:
+   - `cfo = 'Eduardo Milani Pedrolo'`
+   - `id = `${original.id}__pedrolo`` (evita colisão no `clienteMap`/drawers)
+   - demais campos preservados
+   Anexar ao `allClientes` (ou a um array separado consumido apenas por `cfoMap`/lista do squad). A consulta `Cliente360Drawer` continua usando o id original via prefixo.
+3. A regra `isPedroloClient` + `isAssinaturaNoMesPassado` já existente passa a aplicar também nos clones, então a contagem respeita o recorte mensal.
+4. Nenhuma mudança em alertas/pipeline globais; opcionalmente filtrar clones de `pipeline`/`alertas` para evitar duplicação visual em outras telas.
 
-### 3. `src/components/planning/jornada/CfoView.tsx`
-- Atualizar tooltip da linha Pedrolo (ou texto "Receita = MRR…") para deixar explícito: "Pedrolo: Setup + Oxy por cliente (mês passado) + OXY/Gênio/Especialista do DRE".
-- Nenhum cálculo direto aqui — `mrrTotal` já chega pronto do hook.
+### `src/components/planning/jornada/CfoView.tsx`
+- Atualizar tooltip da linha Pedrolo: deixar claro que **clientes** = cards Pipefy com produto OXY/Gênio/Especialista (assinatura no mês anterior); **MRR** = receita Setup+Oxy desses clientes + soma DRE dos 3 produtos OXY.
 
-## Pontos a validar na implementação
+### Memória
+- Atualizar `mem://logic/operations/mrr-total-definition` com a nova regra de atribuição de clientes do Pedrolo.
 
-- O endpoint `dre-table-categories` retorna o mesmo formato `groups[].data[].period/value` esperado pelo parser; se não, ajustar parser.
-- Se o grupo SaaS não for encontrado pelo label, logar warning e devolver zeros (fallback seguro).
-- Cache de 10 min (igual demais queries Oxy) para não estourar quota.
-
-## Memória a atualizar após implementação
-
-Atualizar `mem://logic/operations/mrr-total-definition` para refletir que **MRR Pedrolo = Setup + Oxy (Pipefy, mês passado) + OXY/Gênio/Especialista (DRE Oxy Finance, mês passado)**, mantendo os demais CFOs como CFOaaS + OXY de Pipefy.
+## Pontos a validar
+- Confirmar que os nomes exatos dos produtos no Pipefy batem com as 3 strings (logar quantos clientes foram detectados em dev).
+- Decidir se o clone deve aparecer no `ClientesView`/`AlertasView` global ou só no agregado do CFO (sugiro manter visível só no agregado — filtro por id com sufixo `__pedrolo`).
+- Se nenhum produto match → comportamento atual preservado (só agregado DRE).

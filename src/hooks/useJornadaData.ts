@@ -431,11 +431,33 @@ export function useJornadaData() {
     }
 
     const allClientes = Array.from(clienteMap.values());
+
+    // === 2.5 Clones virtuais para o squad Pedrolo ===
+    // Clientes Pipefy que possuem produtos OXY / OXY + Gênio / OXY + Gênio + Especialista
+    // são duplicados (com cfo forçado p/ Pedrolo e id sufixado) para aparecerem na carteira
+    // do squad sem alterar o card original. Recorte temporal (assinatura no mês passado)
+    // é aplicado adiante junto com a regra existente do Pedrolo.
+    const normalizeProd = (s: string) =>
+      (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const OXY_PRODUCT_NAMES = ['oxy', 'oxy + genio', 'oxy + genio + especialista'];
+    const hasOxyProduct = (parts: string[]) =>
+      parts.some(p => OXY_PRODUCT_NAMES.includes(normalizeProd(p)));
+    const pedroloClones: typeof allClientes = [];
+    for (const c of allClientes) {
+      if (!hasOxyProduct(c.produtos || [])) continue;
+      if ((c.cfo ?? '').includes('Pedrolo')) continue; // já é Pedrolo
+      pedroloClones.push({ ...c, id: `${c.id}__pedrolo`, cfo: 'Eduardo Milani Pedrolo' });
+    }
+    if (pedroloClones.length > 0) {
+      allClientes.push(...pedroloClones);
+    }
+
     const activeClientes = allClientes.filter(c => ACTIVE_PHASES.includes(c.faseAtual));
 
-    // === 3. Build Pipeline (active only, no churn) ===
+    // === 3. Build Pipeline (active only, no churn) — exclui clones do Pedrolo p/ não duplicar
     const pipelineMap = new Map<string, JornadaCliente[]>();
     for (const c of activeClientes) {
+      if (c.id.endsWith('__pedrolo')) continue;
       if (!pipelineMap.has(c.faseAtual)) pipelineMap.set(c.faseAtual, []);
       pipelineMap.get(c.faseAtual)!.push(c);
     }
@@ -446,7 +468,7 @@ export function useJornadaData() {
     };
 
     // Add tratativa as virtual phase
-    const emTratativa = activeClientes.filter(c => c.tratativaAtiva);
+    const emTratativa = activeClientes.filter(c => c.tratativaAtiva && !c.id.endsWith('__pedrolo'));
 
     const pipeline: PipelineFase[] = [
       ...Array.from(pipelineMap.entries())
@@ -579,6 +601,7 @@ export function useJornadaData() {
     // === 5. Build Alertas (carteira inteira; tratativa continua sendo atendida) ===
     const alertas: JornadaAlerta[] = [];
     for (const c of carteiraClientes) {
+      if (c.id.endsWith('__pedrolo')) continue; // alertas vêm do card original, evita duplicar
       if (c.setupStatus === 'atrasado') {
         alertas.push({ tipo: 'setup_atrasado', severidade: 'critico', cliente: c.titulo, clienteId: c.id, cfo: c.cfo, descricao: `Setup há ${c.setupDias} dias (fase: ${c.setupFase})`, dias: c.setupDias, valor: c.mrr });
       }

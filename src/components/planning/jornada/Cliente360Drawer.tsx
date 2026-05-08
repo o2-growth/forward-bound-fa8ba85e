@@ -41,11 +41,13 @@ function renderAnalysis(text: string) {
 
 export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerProps) {
   const queryClient = useQueryClient();
-  const { data, isLoading, error, isFetching } = useCliente360(cliente?.id ?? null, open);
+  // Clones do squad Pedrolo usam id com sufixo "__pedrolo"; usar id original do Pipefy
+  const realId = cliente?.id ? cliente.id.replace(/__pedrolo$/, '') : null;
+  const { data, isLoading, error, isFetching } = useCliente360(realId, open);
 
   const handleRegenerate = () => {
-    if (!cliente?.id) return;
-    queryClient.invalidateQueries({ queryKey: ["cliente-360", cliente.id] });
+    if (!realId) return;
+    queryClient.invalidateQueries({ queryKey: ["cliente-360", realId] });
   };
 
   return (
