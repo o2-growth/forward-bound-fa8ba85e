@@ -1,39 +1,40 @@
-## Contexto
+## Problema
 
-Na aba **Configurações** do Plan Growth (Ticket Médio, CPMQL, CPV, conversões por estágio por BU), o mês de **Maio/2026** aparece bloqueado para edição. Hoje é 04/05/2026.
+A análise IA volta com tudo zerado (NPS, setup, central, rotinas, tratativas) porque a edge function `analyze-cliente-360` está chamando `get_cliente_360(id)` com o **ID errado**:
 
-## Causa-raiz
+- **Frontend envia**: `cliente.id` = ID do card de **Central de Projetos** (ex: `1280100240` para WE do Brasil), construído em `useJornadaData.ts` a partir de `pipefy_central_projetos."ID"`.
+- **Função espera**: o ID do registro em `pipefy_db_clientes."ID"` (parâmetro `p_cliente_id bigint`).
 
-Arquivo `src/hooks/useBUIndicatorsConfig.ts`, função `isMonthLocked` (linhas 32-38):
+Como esses IDs não batem, a função só retorna o bloco `metricas` (que faz `COUNT` em `pipefy_central_projetos WHERE infos_do_cliente_database = id::text` — não encontra nada) e os outros blocos voltam vazios. O Gemini então responde corretamente "tudo zerado", mas o problema é de mapeamento, não de dados.
 
-```ts
-return monthIdx <= currentMonthIdx; // current month and past months are locked
-```
+A relação correta no banco: `pipefy_central_projetos.infos_do_cliente_database` → `pipefy_db_clientes."ID"`.
 
-A regra trava **mês atual + meses passados**. Como hoje é Maio (idx 4) e a regra usa `<=`, Maio fica travado. Esse lock afeta:
-- A UI (campos desabilitados / mês escondido)
-- O `saveMutation` que filtra os meses bloqueados antes do upsert em `bu_indicators_config`
+## Solução
 
-> Importante: este lock é **independente** do `is_locked` em `funnel_metas` (que controla quantidades/monetário do funil). O lock de Configurações é puramente baseado na data atual.
+Resolver o ID **server-side** na edge function, aceitando qualquer um dos dois e mapeando antes de chamar `get_cliente_360`. Mantém o frontend intocado.
 
-## Mudança
+### Alteração em `supabase/functions/analyze-cliente-360/index.ts`
 
-Trocar a regra para travar apenas **meses passados**, mantendo o mês corrente editável:
+Antes de chamar `SELECT get_cliente_360($1)`:
 
-```ts
-return monthIdx < currentMonthIdx; // only past months are locked
-```
+1. Tentar primeiro tratar `clienteId` como ID de `pipefy_db_clientes`:
+   - `SELECT 1 FROM pipefy_db_clientes WHERE "ID" = $1::bigint LIMIT 1`
+2. Se não existir, tratar como ID de projeto e resolver:
+   - `SELECT infos_do_cliente_database FROM pipefy_central_projetos WHERE "ID" = $1::bigint AND infos_do_cliente_database IS NOT NULL LIMIT 1`
+3. Se ainda não achar, tentar fallback via `pipefy_card_connections`:
+   - `SELECT connected_card_id FROM pipefy_card_connections WHERE card_id::text = $1 AND LOWER(connected_pipe_name) LIKE '%clientes%' LIMIT 1`
+4. Se nenhuma rota resolver, retornar 404 com mensagem clara: `"Cliente não vinculado a um registro em DB Clientes"`.
+5. Chamar `get_cliente_360(resolvedId)` e seguir o fluxo normal.
 
-Uma única linha alterada (linha 37 de `useBUIndicatorsConfig.ts`). Comentário acima também atualizado.
+Adicionar `console.log` indicando qual rota resolveu o ID (debug).
 
 ## Resultado esperado
 
-- Maio passa a ser editável em **Plan Growth → Configurações** para todas as BUs.
-- Jan–Abr continuam travados (passados).
-- Jun–Dez continuam editáveis (futuros).
-- A cada virada de mês, o mês recém-encerrado passa automaticamente a ficar travado.
+- Clicar no Sparkles do WE do Brasil agora retorna `cliente_db`, `central_projetos`, `setup`, `tratativas`, `nps`, `rotinas` populados.
+- O Gemini gera diagnóstico real baseado nos dados de processo.
+- Cache de 1h por `clienteId` continua funcionando (chave permanece o ID do projeto enviado pelo frontend).
 
 ## Fora do escopo
 
-- `funnel_metas.is_locked` (lock de quantidades do Plan Growth principal — Abril já está locked lá, segue como está).
-- Adicionar UI de toggle manual para travar/destravar.
+- Não tocar no `useJornadaData.ts` nem em nenhum componente do frontend.
+- Não alterar a função SQL `get_cliente_360`.
