@@ -482,16 +482,6 @@ const initialSalesTeam: TeamMember[] = [
     area: "vendas",
     bu: "modeloAtual"
   },
-  {
-    role: "SDR (Sales Development)",
-    name: "Carol",
-    responsibilities: ["Qualificação de leads", "Agendamento de reuniões", "Follow-up", "CRM"],
-    status: "contratado",
-    quantity: 1,
-    salary: 2500,
-    area: "vendas",
-    bu: "modeloAtual"
-  },
   // Equipe O2 Tax
   {
     role: "Tax Manager",
