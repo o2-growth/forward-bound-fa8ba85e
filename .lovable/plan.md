@@ -1,62 +1,61 @@
-# Plano — Metas por Closer com N closers + percentuais decimais
+## Causa raiz definitiva
 
-## Objetivo
-Tornar a aba **Admin → Metas por Closer** funcional para qualquer quantidade de closers por BU (hoje até 5 em Modelo Atual) e permitir percentuais decimais (ex: 12,5%).
+Existem duas fontes possíveis para as metas do funil (MQL, Leads, RM, RR, Proposta, Venda) no dashboard de Indicadores:
 
-## Mudanças
+1. **`funnel_metas` (banco)** — snapshot oficial, gravado quando o usuário salva ou trava o mês.
+2. **`MediaMetasContext.funnelData`** — cálculo ao vivo do Plan Growth, derivado do MRR Base atualizado diariamente pelo Oxy Finance + funis reversos + ticket médio.
 
-### 1. `src/components/planning/CloserMetasTab.tsx`
+A regra de negócio correta já existe no projeto e é **`is_locked`**:
 
-**a) Edição livre (sem auto-ajuste)**
-- Em `updateLocalPercentage`, remover o bloco que escolhe um "outro closer" e força `100 - valor`. Apenas atualizar a célula editada (clamp 0–100, sem `Math.floor`) e marcar `hasChanges`.
-- Manter caso especial: BU com 1 closer → trava em 100.
+- `is_locked = true` → mês fechado, valor congelado, **DB é a verdade**.
+- `is_locked = false` → mês aberto, valor é dinâmico, **Plan Growth ao vivo é a verdade**.
 
-**b) Suporte a decimais no Input**
-- Trocar `parseInt(e.target.value)` por `parseFloat(e.target.value.replace(',', '.'))` para aceitar vírgula brasileira.
-- Adicionar `step="0.1"` no `<Input type="number">`.
-- Exibir valor formatado em pt-BR (ex: `12,5`) — usar um state local de string por célula ou `toLocaleString('pt-BR')` na exibição.
-- Clamp: `Math.max(0, Math.min(100, valor))`, sem arredondar.
+A correção anterior priorizou o DB em todos os casos, fazendo Maio (não-locked) mostrar 398 (stale) em vez de 537 (Plan Growth atual). Além disso, a oscilação acontecia porque, dependendo de qual fonte carregava primeiro, o componente mostrava 398 ou 537.
 
-**c) Default exibido na tabela**
-- Em `getLocalPercentage`, quando não há valor no DB nem local, retornar **0** (em vez de 50).
-- Manter 100 quando `validClosers.length === 1`.
+## Solução definitiva
 
-**d) Validação de soma com tolerância**
-- `getMonthTotal` continua somando todos os closers válidos.
-- `allMonthsValid`: comparar com tolerância de ponto flutuante → `Math.abs(total - 100) < 0.01`.
-- Badge do total exibe valor com 1 casa decimal quando necessário.
+Adotar uma única função `getMetaFromSource(bu, mês, indicador)` com a seguinte regra, usada em **todos** os pontos que leem meta de funil:
 
-**e) Botão "Resetar 50/50" → "Zerar BU"**
-- Renomear botão e toast.
-- Chamar nova mutation `resetBuToZero`.
+```text
+se (mês está em funnel_metas DB e is_locked = true)
+    retorna valor do DB              // mês fechado, congelado
+senão se (funnelData carregado para a BU)
+    retorna valor do Plan Growth     // ao vivo, fonte da verdade para meses abertos
+senão
+    retorna null  → renderiza skeleton (nunca 0, nunca stale)
+```
 
-**f) Texto "Como funciona"**
-- Atualizar exemplo para refletir N closers e mencionar suporte a decimais (ex: "Pedro 30%, Daniel 20%, Thiago 17,5%, Amanda 17,5%, Bruna 15%").
+Isso elimina a oscilação porque:
+- meses fechados nunca dependem do contexto async,
+- meses abertos sempre esperam o `funnelData` antes de renderizar (skeleton breve, mas estável),
+- o DB stale (398) nunca mais sobrescreve o cálculo correto (537).
 
-### 2. `src/hooks/useCloserMetas.ts`
+## Arquivos alterados
 
-**a) Default em `getPercentage`**
-- Default 0 quando não há registro e BU tem mais de 1 closer.
-- Manter 100 para BU com 1 closer.
-- Remover bloco especial de `ZERO_DEFAULT_CLOSERS` (Bruna).
+### 1. `src/components/planning/IndicatorsTab.tsx`
+- Substituir `getDbFunnelValue` por `getLockedDbFunnelValue` que **só** retorna valor do DB quando `is_locked = true`.
+- Em `calcularMetaDoPeriodo` e `getMonthlyMetasFromFunnel`: usar Plan Growth (`funnelItems`) como fonte primária; DB só vence se o mês estiver locked.
+- Quando `funnelData` está `null` (ainda carregando) e o mês não é locked, propagar `null`/skeleton para os componentes de gauge em vez de cair em 0.
 
-**b) Substituir `resetBuToDefault` por `resetBuToZero`**
-- Iterar apenas sobre `BU_CLOSERS[bu]` (não a constante global `CLOSERS`).
-- Upsert `percentage = 0` para todos os meses dos closers válidos.
+### 2. `src/components/planning/LeadsMqlsStackedChart.tsx`
+- Mesma regra: Plan Growth ao vivo como fonte; DB só para meses locked.
+- Enquanto `funnelData` não chega para uma BU não-locked, exibir estado de carregamento no card (já existe pattern de skeleton no projeto) em vez de calcular com 0.
 
-**c) Coluna `percentage`**
-- Tipo no DB já é `numeric`, então decimais persistem sem migração.
-- Garantir que `bulkUpdateMetas` envie o número como está (sem arredondar).
+### 3. `src/hooks/useConsolidatedMetas.ts`
+- Aplicar a mesma hierarquia para a meta monetária (`faturamento_vender`):
+  - mês locked → `funnel_metas.faturamento_vender` do DB,
+  - mês aberto → cálculo ao vivo do Plan Growth,
+  - nada disponível ainda → não renderizar valor (skeleton).
 
-### 3. Logs de auditoria
-- Em `handleSave`, formatar valores no log com `.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })` para ler "12,5%" no histórico.
+## O que **não** muda
 
-## Detalhes técnicos
-- Sem mudanças de schema; `closer_metas.percentage` já é `numeric`.
-- `getFilteredMeta` não muda — soma de decimais funciona naturalmente.
-- Botão Salvar bloqueado enquanto soma ≠ 100 (com tolerância 0,01) em qualquer mês.
+- `usePlanGrowthData` continua sendo a fonte do cálculo ao vivo (não mexer na lógica reversa).
+- Nenhuma migration. Nenhum INSERT/UPDATE/DELETE. O 398 stale no DB simplesmente para de ser lido para Maio (mês aberto). Quando o usuário travar Maio (`is_locked=true`), o sistema gravará o valor atual e passará a usar o DB.
+- Aba Plan Growth, O2 TAX, Expansão, Oxy Hacker — sem mudanças.
 
-## Fora de escopo
-- Não alterar lógica do dashboard (consumo do `getFilteredMeta` permanece igual).
-- Não tocar em `useClosersMetas.ts` (arquivo distinto).
-- Não mexer em `SdrMetasTab` (não usa percentuais).
+## Validação
+
+Indicadores → Comercial → Modelo Atual → Mai/2026:
+- Recarregar 5×: meta de MQL deve mostrar **537** consistentemente (valor do Plan Growth).
+- Travar Maio em Plan Growth → recarregar: meta deve passar a vir do DB e ficar fixa.
+- Mês passado já travado (ex.: Jan/Fev): valor permanece o do DB, intocado.
