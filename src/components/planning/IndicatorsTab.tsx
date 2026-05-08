@@ -837,19 +837,18 @@ export function IndicatorsTab() {
   // Get meta for indicator - sums metas from selected BUs using funnelData
   // Applies closer percentage filter for Modelo Atual when closers are selected
   const getMetaForIndicator = (indicator: IndicatorConfig) => {
-    if (!funnelData) return Math.round(indicator.annualMeta * periodFraction);
-
     let total = 0;
+    let usedAnyBu = false;
 
     const buBlocks: { bu: BuType; items?: FunnelDataItem[] }[] = [
-      { bu: 'modelo_atual', items: funnelData.modeloAtual },
-      { bu: 'o2_tax', items: funnelData.o2Tax },
-      { bu: 'oxy_hacker', items: funnelData.oxyHacker },
-      { bu: 'franquia', items: funnelData.franquia },
+      { bu: 'modelo_atual', items: funnelData?.modeloAtual },
+      { bu: 'o2_tax', items: funnelData?.o2Tax },
+      { bu: 'oxy_hacker', items: funnelData?.oxyHacker },
+      { bu: 'franquia', items: funnelData?.franquia },
     ];
 
     for (const { bu, items } of buBlocks) {
-      if (!selectedBUs.includes(bu) || !items) continue;
+      if (!selectedBUs.includes(bu)) continue;
 
       // Closer filter for this BU
       const closersForBU = effectiveSelectedClosers.filter(c => BU_CLOSERS[bu]?.includes(c as CloserType));
@@ -859,6 +858,7 @@ export function IndicatorsTab() {
       const sdrsForBU = sdrFilterForBU(bu);
       if (sdrsForBU !== undefined && sdrsForBU.length === 0) continue;
 
+      usedAnyBu = true;
       total += calcularMetaDoPeriodo(
         items,
         indicator.key,
