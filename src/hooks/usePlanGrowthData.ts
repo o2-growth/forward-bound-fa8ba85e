@@ -634,6 +634,8 @@ export function usePlanGrowthData() {
     isLoadingFunnel,
     isLoadingMetas,
     isLoadingIndicators,
+    isLoadingMrrBase,
+    mrrBaseRealPorMes,
     funnelMetas,
     modeloAtualFunnel,
     o2TaxFunnel,
