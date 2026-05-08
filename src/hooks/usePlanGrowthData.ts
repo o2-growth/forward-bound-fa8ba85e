@@ -556,7 +556,7 @@ export function usePlanGrowthData() {
     if (isLoadingFunnel || isLoadingMetas || isLoadingIndicators) return;
     if (hasAutoLocked.current) return;
     if (
-      modeloAtualFunnelCalculated.length === 0 ||
+      modeloAtualFunnel.length === 0 ||
       o2TaxFunnel.length === 0 ||
       oxyHackerFunnel.length === 0 ||
       franquiaFunnel.length === 0
