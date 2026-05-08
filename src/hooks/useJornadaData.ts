@@ -552,6 +552,28 @@ export function useJornadaData() {
       data.taxaEntrega = rotinas && rotinas.ativas > 0 ? Math.round(((rotinas.ativas - rotinas.atrasadas) / rotinas.ativas) * 100) : 100;
     }
 
+    // Adiciona ao MRR Total do squad Pedrolo o faturamento dos produtos OXY
+    // (Oxy + Oxy+Gênio + Oxy+Gênio+Especialista) do DRE — mês calendário anterior.
+    const mesAnteriorIdx = mesAnteriorStart.getMonth();
+    const mesAnteriorName = MONTHS[mesAnteriorIdx] as MonthType | undefined;
+    const oxyExtra = mesAnteriorName ? Number(oxyProductsByMonth?.[mesAnteriorName] || 0) : 0;
+    if (oxyExtra > 0) {
+      let pedroloEntry: JornadaCfo | undefined;
+      for (const [nome, entry] of cfoMap) {
+        if (nome.includes('Pedrolo')) { pedroloEntry = entry; break; }
+      }
+      if (!pedroloEntry) {
+        pedroloEntry = {
+          nome: 'Eduardo Milani Pedrolo',
+          clientes: 0, mrrTotal: 0, mrrEmRisco: 0,
+          clientesAtivos: 0, clientesSetup: 0, clientesTratativa: 0, clientesChurn: 0,
+          tarefasAtrasadas: 0, taxaEntrega: 100, npsMediaClientes: null, healthScoreMedio: 0,
+        };
+        cfoMap.set('Eduardo Milani Pedrolo', pedroloEntry);
+      }
+      pedroloEntry.mrrTotal += oxyExtra;
+    }
+
     const cfos = Array.from(cfoMap.values()).sort((a, b) => b.mrrTotal - a.mrrTotal);
 
     // === 5. Build Alertas (carteira inteira; tratativa continua sendo atendida) ===
