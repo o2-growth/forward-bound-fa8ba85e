@@ -476,18 +476,18 @@ export function IndicatorsTab() {
   const { metas: sdrMetasList } = useSdrMetas(currentYear);
   const { funnelMetas: dbFunnelMetas } = useFunnelMetas(currentYear);
 
-  // Look up the official funnel meta value (mqls/rms/rrs/propostas/vendas/leads) for a BU+month
-  // from the funnel_metas DB table. Returns null when the row doesn't exist for that BU/month,
-  // so the caller can fall back to funnelData (Plan Growth ao vivo). This stabilizes May (and
-  // any non-locked month) by removing the dependency on async-loaded MRR Base + reverse funnel.
-  const getDbFunnelValue = (
+  // Look up the LOCKED funnel meta value (mqls/rms/rrs/propostas/vendas/leads) for a BU+month
+  // from funnel_metas DB. Returns null when the row doesn't exist OR is not locked.
+  // Regra de negócio: meses fechados (is_locked=true) → DB é a verdade (congelado).
+  // Meses abertos → o caller deve usar funnelData (Plan Growth ao vivo) como verdade.
+  const getLockedDbFunnelValue = (
     bu: string | undefined,
     monthName: string,
     indicatorKey: IndicatorType
   ): number | null => {
     if (!bu) return null;
     const row = dbFunnelMetas.find(m => m.bu === bu && m.month === monthName);
-    if (!row) return null;
+    if (!row || row.is_locked !== true) return null;
     switch (indicatorKey) {
       case 'leads': return row.leads ?? null;
       case 'mql': return row.mqls ?? null;
