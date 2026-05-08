@@ -50,7 +50,7 @@ export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerPro
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-hidden flex flex-col p-0">
+      <SheetContent side="right" className="w-full sm:w-[640px] sm:max-w-[90vw] overflow-hidden flex flex-col p-0">
         {cliente && (
           <>
             <SheetHeader className="p-6 pb-4 border-b">
@@ -71,8 +71,8 @@ export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerPro
               </SheetDescription>
             </SheetHeader>
 
-            <ScrollArea className="flex-1 p-6">
-              <div className="space-y-4">
+            <ScrollArea className="flex-1 p-6 w-full min-w-0">
+              <div className="space-y-4 min-w-0">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
@@ -118,17 +118,17 @@ export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerPro
                 )}
 
                 {data?.analysis && (
-                  <div className="rounded-lg border bg-card p-4 space-y-1">
+                  <div className="rounded-lg border bg-card p-4 space-y-1 break-words">
                     {renderAnalysis(data.analysis)}
                   </div>
                 )}
 
                 {data?.cliente360 && (
-                  <details className="rounded-lg border p-3 bg-muted/30">
+                  <details className="rounded-lg border p-3 bg-muted/30 min-w-0 overflow-hidden">
                     <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
                       Ver JSON cru (debug)
                     </summary>
-                    <pre className="text-[10px] mt-3 overflow-auto max-h-96 bg-background p-3 rounded">
+                    <pre className="text-[10px] mt-3 overflow-x-auto max-h-96 max-w-full whitespace-pre bg-background p-3 rounded">
                       {JSON.stringify(data.cliente360, null, 2)}
                     </pre>
                   </details>
