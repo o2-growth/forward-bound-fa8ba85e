@@ -621,7 +621,7 @@ export function usePlanGrowthData() {
     isLoadingMetas,
     isLoadingIndicators,
     funnelMetas,
-    modeloAtualFunnelCalculated,
+    modeloAtualFunnel,
     o2TaxFunnel,
     oxyHackerFunnel,
     franquiaFunnel,
