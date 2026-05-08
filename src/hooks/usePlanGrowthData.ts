@@ -322,7 +322,7 @@ export function usePlanGrowthData() {
   const { metas, isLoading: isLoadingMetas } = useMonetaryMetas();
   const { funnelMetas, isLoading: isLoadingFunnel, hasFunnelForBU, getFunnelForBU, bulkUpsert, lockMonths } = useFunnelMetas();
   const { getIndicatorsMap, isLoading: isLoadingIndicators } = useBUIndicatorsConfig();
-  const { mrrBaseData } = useMrrBase();
+  const { mrrBaseData, isLoading: isLoadingMrrBase } = useMrrBase();
   const hasSeeded = useRef(false);
   const hasAutoLocked = useRef(false);
 
@@ -345,9 +345,21 @@ export function usePlanGrowthData() {
     return map;
   }, [mrrBaseData]);
 
-  // Default values (same as MediaInvestmentTab)
-  const mrrInicial = 700000;
-  const valorVenderInicial = 400000;
+  // MRR inicial real = MRR Base de Dez/2025 (vem de mrr_base_monthly).
+  // Fallback 700k se ainda não carregou.
+  const mrrInicial = useMemo(() => {
+    const v = mrrBaseRealPorMes['Jan']; // Jan/2026 usa MRR de Dez/2025
+    return v && v > 0 ? v : 700000;
+  }, [mrrBaseRealPorMes]);
+
+  // Valor a vender inicial real = faturamento_vender de Jan/2026 (Modelo Atual) em funnel_metas.
+  // Fallback 400k se ainda não tem dado.
+  const valorVenderInicial = useMemo(() => {
+    const janRow = funnelMetas.find(m => m.bu === 'modelo_atual' && m.month === 'Jan' && m.year === 2026);
+    const v = Number(janRow?.faturamento_vender || 0);
+    return v > 0 ? v : 400000;
+  }, [funnelMetas]);
+
   const churnMensal = 0.06;
   const retencaoVendas = 0.25;
 
