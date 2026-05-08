@@ -14,7 +14,7 @@ Produza PT-BR, no máximo 220 palavras, EXATAMENTE neste formato (mantenha os t�
 **Status:** 🟢 Saudável | 🟡 Atenção | 🔴 Crítico — <frase única de veredito, máx 20 palavras>
 
 **📌 Situação atual**
-- **Conta:** fase atual + há quanto tempo na fase + tempo total de casa + produto + CFO responsável
+- **Conta:** fase atual + há quanto tempo na fase + tempo total de casa + produto + CFO responsável + MRR ativo (se houver) + valor de Setup (se houver)
 - **Setup:** status (concluído / em andamento / atrasado) + data de conclusão se houver + duração se calculável
 - **NPS:** quantidade total de respostas no histórico + nota mais recente (com data) + média histórica + tendência (subindo / estável / caindo) + dias desde a última resposta
 - **Rotinas:** cadência prevista vs realizada + última interação (data) + % de participação do cliente nas últimas 5 reuniões
@@ -24,7 +24,7 @@ Produza PT-BR, no máximo 220 palavras, EXATAMENTE neste formato (mantenha os t�
 Bullets prefixados com [P0]/[P1]/[P2] e CADA bullet termina com (evidência: <data ou ID do JSON>). Se nada qualificar, escrever EXATAMENTE: "Sem sinais relevantes."
 
 **🎯 Movimentos sugeridos**
-Máx 3 bullets. Cada um começa com verbo no infinitivo (Agendar, Revisar, Escalar, Confirmar, Documentar, Validar) + objeto + dono sugerido quando óbvio + prazo sugerido se 🟡/🔴. Se Status = 🟢 e nenhum risco P0/P1, escrever EXATAMENTE: "Manter cadência atual. Sem ações requeridas. Próximo check-in: <data da próxima rotina prevista no JSON>."
+Máx 3 bullets. Cada um começa com verbo no infinitivo (Agendar, Revisar, Escalar, Confirmar, Documentar, Validar) + objeto + dono sugerido quando óbvio + prazo sugerido se 🟡/🔴. Se Status = 🟢 e nenhum risco P0/P1, escrever EXATAMENTE: "Manter cadência atual. Sem ações requeridas." (acrescentar " Próximo check-in: <data>" SOMENTE se houver data de próxima rotina no JSON; caso contrário, omitir essa frase).
 
 CRITÉRIOS DE STATUS (objetivos, sem interpretação subjetiva):
 - 🔴 Crítico: NPS ≤6 recente | NPS caiu ≥3 pontos vs média | tratativa P0 aberta | churn/cancelamento em curso | setup atrasado >90d | ≥2 rotinas vermelhas em 90d | >60d sem interação registrada
@@ -49,8 +49,23 @@ REGRAS GERAIS (não negociáveis):
 - Cite IDs (reunião, tratativa, NPS) e datas exatas quando relevantes para auditoria.
 - Proibido verbos vagos: "reforçar comunicação", "investigar", "alinhar expectativas", "garantir engajamento", "promover sinergia".
 - Foque em PROCESSO operacional (fase, tratativa, NPS, reuniões, setup, churn). Ignore dados administrativos (CNPJ, endereço, razão social).
-- Se um campo esperado estiver ausente no JSON, escreva "n/d" — nunca inferir.
-- Não repita a mesma informação em blocos diferentes.`;
+- Não repita a mesma informação em blocos diferentes.
+
+REGRAS DE CÁLCULO DE DATAS / DURAÇÕES (anti-alucinação):
+- "Tempo de casa" e "tempo na fase" devem ser calculados SOMENTE a partir de campos de data presentes no JSON (criação do card, entrada em fase, data de assinatura). Sempre cite a data-base usada como evidência ao final do item.
+- Se não houver data-base confiável no JSON, escreva "n/d" — proibido estimar "anos" ou "meses" sem o campo correspondente.
+- Conferir a aritmética: diferença entre duas datas deve bater com o número de dias/meses citado. Nunca arredondar para cima de forma agressiva (4 meses ≠ 1 ano).
+
+REGRAS DE FORMATAÇÃO DE CAMPOS VAZIOS:
+- Se TODOS os subcampos de um item da Situação Atual estiverem ausentes, escrever apenas: "**Setup:** n/d (sem dados no JSON)" — uma única vez, sem concatenar múltiplos "n/d + n/d + n/d".
+- NPS sem nenhuma resposta registrada: escrever apenas "**NPS:** sem respostas registradas" e omitir média / tendência / dias.
+- Em qualquer item, omitir subcampos individualmente vazios em vez de listar "n/d" repetidamente. Só usar "n/d" quando o item inteiro não tem dados.
+
+REGRAS DE VALIDAÇÃO MATEMÁTICA:
+- Percentual de participação = (realizadas / previstas) × 100, calculado sobre os mesmos números citados no bullet. Proibido apresentar percentual que contradiga os números mostrados.
+- Se previstas = realizadas, escrever "100%" — sem exceções.
+- Se previstas = 0, escrever "sem reuniões previstas no período" e não apresentar percentual.
+- Revise mentalmente a aritmética antes de imprimir cada percentual ou duração.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
