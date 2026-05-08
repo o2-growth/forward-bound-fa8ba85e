@@ -35,7 +35,7 @@ const MONTH_NAMES: MonthType[] = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul
 export function useConsolidatedMetas() {
   const { metas, getMeta, isLoading: isLoadingDb } = useMonetaryMetas();
   const { funnelData, isLoaded: isPlanGrowthLoaded } = useMediaMetas();
-  const { isMonthLocked, getLockedSnapshot } = useFunnelMetas(2026);
+  const { isMonthLocked, getLockedSnapshot, funnelMetas } = useFunnelMetas(2026);
 
   // Verifica se há overrides no banco para uma BU específica
   const hasDbOverridesForBU = useMemo(() => {
