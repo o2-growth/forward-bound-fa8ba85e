@@ -90,8 +90,14 @@ export function useJornadaData() {
     retry: 1,
   });
 
+  // Receita extra de produtos OXY (Oxy + Oxy+Gênio + Oxy+Gênio+Especialista) do DRE Oxy Finance
+  // — adicionada ao MRR Total do squad Pedrolo (mês calendário anterior)
+  const oxyYear = new Date().getFullYear();
+  const { oxyProductsByMonth } = useOxyFinance(oxyYear);
+
   const result = useMemo(() => {
     if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '' };
+
 
     const { projetos, setup, tratativas, nps, rotinas, clientes, connections } = data;
     const now = new Date();
