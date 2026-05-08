@@ -474,7 +474,30 @@ export function IndicatorsTab() {
   // Get closer metas for filtering goals by closer percentage
   const { getFilteredMeta } = useCloserMetas(currentYear);
   const { metas: sdrMetasList } = useSdrMetas(currentYear);
+  const { funnelMetas: dbFunnelMetas } = useFunnelMetas(currentYear);
 
+  // Look up the official funnel meta value (mqls/rms/rrs/propostas/vendas/leads) for a BU+month
+  // from the funnel_metas DB table. Returns null when the row doesn't exist for that BU/month,
+  // so the caller can fall back to funnelData (Plan Growth ao vivo). This stabilizes May (and
+  // any non-locked month) by removing the dependency on async-loaded MRR Base + reverse funnel.
+  const getDbFunnelValue = (
+    bu: string | undefined,
+    monthName: string,
+    indicatorKey: IndicatorType
+  ): number | null => {
+    if (!bu) return null;
+    const row = dbFunnelMetas.find(m => m.bu === bu && m.month === monthName);
+    if (!row) return null;
+    switch (indicatorKey) {
+      case 'leads': return row.leads ?? null;
+      case 'mql': return row.mqls ?? null;
+      case 'rm': return row.rms ?? null;
+      case 'rr': return row.rrs ?? null;
+      case 'proposta': return row.propostas ?? null;
+      case 'venda': return row.vendas ?? null;
+      default: return null;
+    }
+  };
   /**
    * Soma metas RM/RR de sdr_metas para uma BU/SDRs em um período (com fração proporcional ao mês).
    * Retorna { value, hasData } — quando hasData=false, o caller deve usar fallback (funnel).
