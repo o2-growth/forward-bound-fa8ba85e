@@ -565,8 +565,10 @@ export function usePlanGrowthData() {
   // Captures a snapshot of the live Plan Growth values for ALL 4 BUs and sets is_locked=true.
   // Runs once per session — guarded by hasAutoLocked.
   useEffect(() => {
-    if (isLoadingFunnel || isLoadingMetas || isLoadingIndicators) return;
+    if (isLoadingFunnel || isLoadingMetas || isLoadingIndicators || isLoadingMrrBase) return;
     if (hasAutoLocked.current) return;
+    // Garantir que o MRR Base real (Oxy) chegou — sem ele o cálculo usa hardcode 700k e gera snapshot errado.
+    if (!mrrBaseRealPorMes['Jan'] || mrrBaseRealPorMes['Jan'] <= 0) return;
     if (
       modeloAtualFunnel.length === 0 ||
       o2TaxFunnel.length === 0 ||
