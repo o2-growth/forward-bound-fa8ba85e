@@ -14,9 +14,6 @@ const BUS = ['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia'] as const;
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
 const CLOSERS = ['Pedro Albite', 'Daniel Trindade', 'Lucas Ilha', 'Thiago', 'Amanda Serafim', 'Bruna'] as const;
 
-// Closers recém-adicionados — default 0% até receberem metas no DB
-const ZERO_DEFAULT_CLOSERS = new Set<string>(['Bruna']);
-
 export type BuType = typeof BUS[number];
 export type MonthType = typeof MONTHS[number];
 export type CloserType = typeof CLOSERS[number];
@@ -62,22 +59,16 @@ export function useCloserMetas(year: number = 2026) {
 
   // Get percentage for a specific BU/month/closer
   const getPercentage = (bu: string, month: string, closer: string): number => {
-    // Closers recém-adicionados começam com 0% até receberem metas no DB
-    if (ZERO_DEFAULT_CLOSERS.has(closer)) {
-      const meta = metas?.find(m => m.bu === bu && m.month === month && m.closer === closer);
-      return meta?.percentage ?? 0;
-    }
-
-    // Se BU tem apenas 1 closer, default é 100%
     const closersForBU = BU_CLOSERS[bu as BuType] || [];
-    const defaultPercentage = closersForBU.length === 1 ? 100 : 50;
-    
+    // Se BU tem apenas 1 closer, default é 100%; caso contrário 0% (admin define)
+    const defaultPercentage = closersForBU.length === 1 ? 100 : 0;
+
     if (!metas) return defaultPercentage;
-    
-    const meta = metas.find(m => 
+
+    const meta = metas.find(m =>
       m.bu === bu && m.month === month && m.closer === closer
     );
-    
+
     return meta?.percentage ?? defaultPercentage;
   };
 
@@ -151,28 +142,24 @@ export function useCloserMetas(year: number = 2026) {
     },
   });
 
-  // Reset all metas for a BU to 50/50
-  const resetBuToDefault = useMutation({
+  // Zera todas as metas dos closers válidos para uma BU
+  const resetBuToZero = useMutation({
     mutationFn: async (bu: string) => {
-      const updates = MONTHS.flatMap(month => 
-        CLOSERS.map(closer => ({
-          bu,
-          month,
-          closer,
-          percentage: 50,
-        }))
-      );
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('closer_metas')
-          .update({ percentage: 50, updated_at: new Date().toISOString() })
-          .eq('bu', update.bu)
-          .eq('month', update.month)
-          .eq('closer', update.closer)
-          .eq('year', year);
-
-        if (error) throw error;
+      const closersForBu = BU_CLOSERS[bu as BuType] || [];
+      for (const month of MONTHS) {
+        for (const closer of closersForBu) {
+          const { error } = await supabase
+            .from('closer_metas')
+            .upsert({
+              bu,
+              month,
+              closer,
+              percentage: 0,
+              year,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'bu,month,closer,year' });
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => {
@@ -188,7 +175,8 @@ export function useCloserMetas(year: number = 2026) {
     getFilteredMeta,
     updateMeta,
     bulkUpdateMetas,
-    resetBuToDefault,
+    resetBuToZero,
+    resetBuToDefault: resetBuToZero,
     BUS,
     MONTHS,
     CLOSERS,

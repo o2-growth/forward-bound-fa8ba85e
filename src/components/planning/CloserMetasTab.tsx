@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useCloserMetas, BuType, MonthType, CloserType, BU_CLOSERS, getClosersForBU } from '@/hooks/useCloserMetas';
+import { useCloserMetas, BuType, BU_CLOSERS, getClosersForBU } from '@/hooks/useCloserMetas';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -18,100 +18,92 @@ const BU_LABELS: Record<BuType, string> = {
   franquia: 'Franquia',
 };
 
+const formatPct = (n: number): string => {
+  if (!isFinite(n)) return '0';
+  // até 2 casas, sem zeros à direita; vírgula como decimal
+  const rounded = Math.round(n * 100) / 100;
+  return rounded.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+};
+
 export function CloserMetasTab() {
   const { toast } = useToast();
   const { logAction } = useAuditLogs();
   const {
-    metas, 
-    isLoading, 
-    getPercentage, 
-    bulkUpdateMetas, 
-    resetBuToDefault,
+    metas,
+    isLoading,
+    bulkUpdateMetas,
+    resetBuToZero,
     BUS,
     MONTHS,
-    CLOSERS 
   } = useCloserMetas();
 
   const [selectedBu, setSelectedBu] = useState<BuType>('modelo_atual');
   const [localMetas, setLocalMetas] = useState<Record<string, number>>({});
+  // Texto bruto do input enquanto o usuário digita (permite "12,", "12.5", etc.)
+  const [inputText, setInputText] = useState<Record<string, string>>({});
   const [hasChanges, setHasChanges] = useState(false);
   const dbMetasSnapshot = useRef<Record<string, number>>({});
 
-  // Initialize local metas from fetched data
   useEffect(() => {
     if (metas.length > 0) {
       const metasMap: Record<string, number> = {};
       metas.forEach(m => {
         const key = `${m.bu}-${m.month}-${m.closer}`;
-        metasMap[key] = m.percentage;
+        metasMap[key] = Number(m.percentage) || 0;
       });
       setLocalMetas(metasMap);
       dbMetasSnapshot.current = { ...metasMap };
+      setInputText({});
       setHasChanges(false);
     }
   }, [metas]);
 
-  // Get closers valid for the selected BU
-  const validClosers = useMemo(() => {
-    return getClosersForBU(selectedBu);
-  }, [selectedBu]);
+  const validClosers = useMemo(() => getClosersForBU(selectedBu), [selectedBu]);
 
-  // Get local percentage value
   const getLocalPercentage = (bu: string, month: string, closer: string): number => {
     const key = `${bu}-${month}-${closer}`;
     if (localMetas[key] !== undefined) return localMetas[key];
-    if (closer === 'Bruna') return 0;
-    return validClosers.length === 1 ? 100 : 50;
+    const closersForBU = BU_CLOSERS[bu as BuType] || [];
+    return closersForBU.length === 1 ? 100 : 0;
   };
 
-  // Update local percentage
-  const updateLocalPercentage = (bu: string, month: string, closer: string, value: number) => {
+  const updateLocalPercentage = (bu: string, month: string, closer: string, rawText: string) => {
     const key = `${bu}-${month}-${closer}`;
-    const clampedValue = Math.max(0, Math.min(100, value));
-    
-    // If only one closer for this BU, set to 100%
+    setInputText(prev => ({ ...prev, [key]: rawText }));
+
+    // BU com 1 só closer trava em 100
     if (validClosers.length === 1) {
-      setLocalMetas(prev => ({
-        ...prev,
-        [key]: 100,
-      }));
+      setLocalMetas(prev => ({ ...prev, [key]: 100 }));
       return;
     }
-    
-    // Auto-adjust the other closer to maintain 100% total
-    const otherCloser = validClosers.find(c => c !== closer);
-    if (otherCloser) {
-      const otherKey = `${bu}-${month}-${otherCloser}`;
-      const otherValue = 100 - clampedValue;
-      
-      setLocalMetas(prev => ({
-        ...prev,
-        [key]: clampedValue,
-        [otherKey]: otherValue,
-      }));
+
+    const normalized = rawText.replace(',', '.').trim();
+    const parsed = parseFloat(normalized);
+    if (rawText === '' || isNaN(parsed)) {
+      setLocalMetas(prev => ({ ...prev, [key]: 0 }));
     } else {
-      setLocalMetas(prev => ({
-        ...prev,
-        [key]: clampedValue,
-      }));
+      const clamped = Math.max(0, Math.min(100, parsed));
+      setLocalMetas(prev => ({ ...prev, [key]: clamped }));
     }
-    
     setHasChanges(true);
   };
 
-  // Calculate total for a month
+  const getInputValue = (bu: string, month: string, closer: string): string => {
+    const key = `${bu}-${month}-${closer}`;
+    if (inputText[key] !== undefined) return inputText[key];
+    return formatPct(getLocalPercentage(bu, month, closer));
+  };
+
   const getMonthTotal = (bu: string, month: string): number => {
     return validClosers.reduce((sum, closer) => sum + getLocalPercentage(bu, month, closer), 0);
   };
 
-  // Check if all months have valid totals (100%)
   const allMonthsValid = useMemo(() => {
-    return MONTHS.every(month => getMonthTotal(selectedBu, month) === 100);
+    return MONTHS.every(month => Math.abs(getMonthTotal(selectedBu, month) - 100) < 0.01);
   }, [localMetas, selectedBu, validClosers]);
 
-  // Save changes
   const handleSave = async () => {
-    const updates = MONTHS.flatMap(month => 
+    const updates = MONTHS.flatMap(month =>
       validClosers.map(closer => ({
         bu: selectedBu,
         month,
@@ -122,47 +114,49 @@ export function CloserMetasTab() {
 
     try {
       await bulkUpdateMetas.mutateAsync(updates);
-      
-      // Log changes
+
       const buLabel = BU_LABELS[selectedBu] || selectedBu;
       for (const month of MONTHS) {
         for (const closer of validClosers) {
           const key = `${selectedBu}-${month}-${closer}`;
-          const oldVal = dbMetasSnapshot.current[key] ?? 50;
+          const oldVal = dbMetasSnapshot.current[key] ?? 0;
           const newVal = getLocalPercentage(selectedBu, month, closer);
-          if (oldVal !== newVal) {
+          if (Math.abs(oldVal - newVal) > 0.001) {
             const closerName = closer.split(' ')[0];
-            await logAction('closer_meta', `${buLabel} ${month}: ${closerName} de ${oldVal}% para ${newVal}%`, { bu: selectedBu, month, closer, old_value: oldVal, new_value: newVal });
+            await logAction(
+              'closer_meta',
+              `${buLabel} ${month}: ${closerName} de ${formatPct(oldVal)}% para ${formatPct(newVal)}%`,
+              { bu: selectedBu, month, closer, old_value: oldVal, new_value: newVal },
+            );
           }
         }
       }
-      
-      // Update snapshot
+
       const newSnapshot: Record<string, number> = {};
       updates.forEach(u => { newSnapshot[`${u.bu}-${u.month}-${u.closer}`] = u.percentage; });
       dbMetasSnapshot.current = { ...dbMetasSnapshot.current, ...newSnapshot };
-      
+
       toast({ title: 'Metas salvas com sucesso!' });
+      setInputText({});
       setHasChanges(false);
     } catch (error) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Erro ao salvar', 
-        description: 'Não foi possível atualizar as metas' 
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar',
+        description: 'Não foi possível atualizar as metas',
       });
     }
   };
 
-  // Reset to 50/50
   const handleReset = async () => {
     try {
-      await resetBuToDefault.mutateAsync(selectedBu);
-      toast({ title: 'Metas resetadas para 50/50!' });
+      await resetBuToZero.mutateAsync(selectedBu);
+      toast({ title: 'Metas zeradas para esta BU!' });
     } catch (error) {
-      toast({ 
-        variant: 'destructive', 
-        title: 'Erro ao resetar', 
-        description: 'Não foi possível resetar as metas' 
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao zerar',
+        description: 'Não foi possível zerar as metas',
       });
     }
   };
@@ -182,46 +176,44 @@ export function CloserMetasTab() {
           Metas por Closer
         </h2>
         <p className="text-muted-foreground">
-          Configure a porcentagem de responsabilidade de cada closer para as metas de vendas
+          Configure a porcentagem de responsabilidade de cada closer. A soma de cada mês deve fechar 100% (decimais permitidos, ex: 12,5%).
         </p>
       </div>
 
       <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Unidade de Negócio</label>
-                <Select value={selectedBu} onValueChange={(v) => setSelectedBu(v as BuType)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BUS.map(bu => (
-                      <SelectItem key={bu} value={bu}>
-                        {BU_LABELS[bu]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Unidade de Negócio</label>
+              <Select value={selectedBu} onValueChange={(v) => setSelectedBu(v as BuType)}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BUS.map(bu => (
+                    <SelectItem key={bu} value={bu}>
+                      {BU_LABELS[bu]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size="sm"
                 onClick={handleReset}
-                disabled={resetBuToDefault.isPending}
+                disabled={resetBuToZero.isPending}
               >
-                {resetBuToDefault.isPending ? (
+                {resetBuToZero.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 ) : (
                   <RotateCcw className="h-4 w-4 mr-2" />
                 )}
-                Resetar 50/50
+                Zerar BU
               </Button>
-              <Button 
+              <Button
                 size="sm"
                 onClick={handleSave}
                 disabled={!hasChanges || !allMonthsValid || bulkUpdateMetas.isPending}
@@ -260,17 +252,16 @@ export function CloserMetasTab() {
                       <TableCell key={`${closer}-${month}`} className="text-center p-1">
                         <div className="flex items-center justify-center">
                           <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={getLocalPercentage(selectedBu, month, closer)}
+                            type="text"
+                            inputMode="decimal"
+                            value={getInputValue(selectedBu, month, closer)}
                             onChange={(e) => updateLocalPercentage(
-                              selectedBu, 
-                              month, 
-                              closer, 
-                              parseInt(e.target.value) || 0
+                              selectedBu,
+                              month,
+                              closer,
+                              e.target.value,
                             )}
-                            className="w-16 h-8 text-center text-sm"
+                            className="w-20 h-8 text-center text-sm"
                             disabled={validClosers.length === 1}
                           />
                           <span className="text-muted-foreground ml-1 text-xs">%</span>
@@ -279,18 +270,17 @@ export function CloserMetasTab() {
                     ))}
                   </TableRow>
                 ))}
-                {/* Total row */}
                 <TableRow className="bg-muted/50">
                   <TableCell className="sticky left-0 bg-muted/50 z-10 font-medium">
                     Total
                   </TableCell>
                   {MONTHS.map(month => {
                     const total = getMonthTotal(selectedBu, month);
-                    const isValid = total === 100;
+                    const isValid = Math.abs(total - 100) < 0.01;
                     return (
                       <TableCell key={`total-${month}`} className="text-center">
                         <Badge variant={isValid ? "secondary" : "destructive"}>
-                          {total}%
+                          {formatPct(total)}%
                         </Badge>
                       </TableCell>
                     );
@@ -318,13 +308,14 @@ export function CloserMetasTab() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>
-            <strong>Exemplo:</strong> Se a meta de MQL para Janeiro é 100 e você definir Pedro com 60%:
+            <strong>Exemplo:</strong> Se a meta de MQL para Janeiro é 100 e Modelo Atual estiver dividida como Pedro 30%, Daniel 20%, Thiago 17,5%, Amanda 17,5% e Bruna 15%:
           </p>
           <ul className="list-disc list-inside space-y-1 ml-2">
-            <li>Filtrar só por Pedro → Meta = 60</li>
-            <li>Filtrar só por Daniel → Meta = 40</li>
-            <li>Filtrar por ambos (ou sem filtro) → Meta = 100</li>
+            <li>Filtrar só Pedro → Meta = 30</li>
+            <li>Filtrar Pedro + Daniel → Meta = 50</li>
+            <li>Sem filtro → Meta = 100 (soma de todos)</li>
           </ul>
+          <p className="pt-2">Decimais são permitidos (ex: 12,5%). A soma de cada mês precisa fechar 100% para liberar o botão Salvar.</p>
         </CardContent>
       </Card>
     </div>
