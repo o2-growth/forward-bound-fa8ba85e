@@ -113,6 +113,22 @@ export function useConsolidatedMetas() {
       }
     }
 
+    // 🎯 MODELO ATUAL (não-lockado): Incremento ≡ funnel_metas.faturamento_vender (A Vender),
+    // NÃO o monetary_metas.faturamento (que armazena MRR Base + A Vender = Faturamento Total).
+    // Alinhado com mem://logic/indicators/incremento-definition-v4.
+    if (bu === 'modelo_atual') {
+      const fm = funnelMetas.find(m => m.bu === 'modelo_atual' && m.month === month);
+      const fatVender = Number(fm?.faturamento_vender || 0);
+      if (fatVender > 0) {
+        switch (metric) {
+          case 'faturamento': return { value: fatVender, source: 'database' };
+          case 'mrr':         return { value: Math.round(fatVender * 0.25), source: 'database' };
+          case 'setup':       return { value: Math.round(fatVender * 0.60), source: 'database' };
+          case 'pontual':     return { value: Math.round(fatVender * 0.15), source: 'database' };
+        }
+      }
+    }
+
     // 1. Tentar banco de dados (monetary_metas) para TODAS as BUs, inclusive modelo_atual não-locked.
     // monetary_metas é a fonte única de verdade compartilhada com useEffectiveMetas e Plan Growth,
     // refletindo o valor salvo pelo usuário. Elimina a divergência com o reverse funnel projetado.
