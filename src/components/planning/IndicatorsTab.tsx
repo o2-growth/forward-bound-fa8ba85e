@@ -1093,8 +1093,8 @@ export function IndicatorsTab() {
     // For single BU selection - Oxy Hacker
     if (hasSingleBU && includesOxyHacker) {
       const oxyHackerData = getOxyHackerGroupedData(indicator.key as OxyHackerIndicator, startDate, endDate, grouping);
-      const funnelMetasMensais = funnelData?.oxyHacker ? getMonthlyMetasFromFunnel(funnelData.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker')) : [];
-      const metaPeriodo = funnelData?.oxyHacker ? calcularMetaDoPeriodo(funnelData.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker')) : 0;
+      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData?.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker'));
+      const metaPeriodo = calcularMetaDoPeriodo(funnelData?.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker'));
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       return chartLabels.map((label, index) => ({
