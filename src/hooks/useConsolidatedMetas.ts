@@ -113,21 +113,26 @@ export function useConsolidatedMetas() {
       }
     }
 
-    // 🎯 MODELO ATUAL (não-lockado): Incremento ≡ funnel_metas.faturamento_vender (A Vender),
-    // NÃO o monetary_metas.faturamento (que armazena MRR Base + A Vender = Faturamento Total).
-    // Alinhado com mem://logic/indicators/incremento-definition-v4.
+    // 🎯 MODELO ATUAL (não-lockado): Incremento ≡ "A Vender" puro, não MRR Base + A Vender.
+    // Fonte de verdade: funnel_metas.faturamento_vender (persistido) OU funnelData.faturamento
+    // (live no Plan Growth, ainda não salvo). NUNCA monetary_metas.faturamento, que armazena
+    // Faturamento Total (MRR Base + A Vender). Alinhado com mem://logic/indicators/incremento-definition-v4.
     if (bu === 'modelo_atual') {
       const fm = funnelMetas.find(m => m.bu === 'modelo_atual' && m.month === month);
       const fatVender = Number(fm?.faturamento_vender || 0);
-      if (fatVender > 0) {
+      const planGrowthFat = getPlanGrowthMeta('modelo_atual', month, 'faturamento');
+      const incremento = fatVender > 0 ? fatVender : planGrowthFat;
+      if (incremento > 0) {
+        const source = fatVender > 0 ? 'database' : 'plan_growth';
         switch (metric) {
-          case 'faturamento': return { value: fatVender, source: 'database' };
-          case 'mrr':         return { value: Math.round(fatVender * 0.25), source: 'database' };
-          case 'setup':       return { value: Math.round(fatVender * 0.60), source: 'database' };
-          case 'pontual':     return { value: Math.round(fatVender * 0.15), source: 'database' };
+          case 'faturamento': return { value: incremento, source };
+          case 'mrr':         return { value: Math.round(incremento * 0.25), source };
+          case 'setup':       return { value: Math.round(incremento * 0.60), source };
+          case 'pontual':     return { value: Math.round(incremento * 0.15), source };
         }
       }
     }
+
 
     // 1. Tentar banco de dados (monetary_metas) para TODAS as BUs, inclusive modelo_atual não-locked.
     // monetary_metas é a fonte única de verdade compartilhada com useEffectiveMetas e Plan Growth,
