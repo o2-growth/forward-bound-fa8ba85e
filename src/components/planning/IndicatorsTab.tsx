@@ -709,10 +709,10 @@ export function IndicatorsTab() {
     for (const monthDate of monthsInPeriod) {
       const monthName = monthNames[getMonth(monthDate)];
 
-      // 🎯 Fonte estável: prioriza valor salvo em funnel_metas (DB) sobre Plan Growth ao vivo.
-      // Isso elimina oscilação de meses não-locked (ex.: Maio) cuja meta no contexto depende
-      // do MRR Base + reverse funnel recalculado a cada sync diário.
-      const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
+      // 🎯 Fonte da verdade:
+      //   - mês LOCKED → DB (congelado, snapshot oficial)
+      //   - mês aberto → Plan Growth ao vivo (funnelItems)
+      const dbVal = getLockedDbFunnelValue(bu, monthName, indicatorKey);
       const item = funnelItems?.find(f => f.month === monthName);
       if (dbVal === null && !item) continue;
 
