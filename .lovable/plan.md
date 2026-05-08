@@ -1,30 +1,42 @@
-Plano para ajustar o diagnóstico Cliente 360:
+## Objetivo
 
-1. Reforçar o bloco de sinais de risco
-- Manter o sinal de risco com severidade [P0]/[P1]/[P2] e evidência rastreável.
-- Exigir que cada risco explique também o impacto provável no negócio/operação, por exemplo: risco de churn, atraso de onboarding, queda de adoção, perda de receita, escalonamento operacional ou insatisfação recorrente.
-- Formato proposto para cada bullet: `[P1] <sinal identificado> → pode causar <impacto provável>. (evidência: <data/ID>)`.
+Somar ao MRR Total do squad **Pedrolo** (CfoView) o faturamento dos produtos **OXY**, **OXY + Gênio** e **OXY + Gênio + Especialista**, lidos como subcategorias do grupo **SaaS** no DRE da Oxy Finance.
 
-2. Corrigir o bloco “Movimentos sugeridos”
-- Proibir o bloco de ficar vazio quando houver qualquer risco P0/P1/P2.
-- Para cada risco relevante, gerar pelo menos uma ação correspondente.
-- Cada ação deve ter: verbo no infinitivo + objeto claro + dono sugerido + prazo quando status for amarelo ou vermelho.
-- Formato proposto: `- <Verbo> <ação concreta> — dono: <CS/CFO/Operação/Head CS>; prazo: <24h/3d/7d>; conectado ao risco <P0/P1/P2>`.
+## Comportamento esperado
 
-3. Ajustar regra de priorização
-- Se houver risco P0: obrigar ação de escalonamento em até 24h.
-- Se houver risco P1: obrigar ação em até 3 a 7 dias.
-- Se houver apenas P2: sugerir ação preventiva ou monitoramento explícito.
-- Se não houver risco e status for verde: manter exatamente `Manter cadência atual. Sem ações requeridas.`.
+- A linha "Eduardo Milani Pedrolo" passa a exibir `mrrTotal = (Setup + valorOxy de cada cliente do mês passado) + (OXY + OXY+Gênio + OXY+Gênio+Especialista do DRE)`.
+- Margem, Ticket Médio, Health Score e demais cálculos derivados refletem automaticamente o novo `mrrTotal` (já que vêm dele).
+- Nenhuma outra carteira de CFO é afetada.
+- Mantém o mesmo recorte temporal já usado para Pedrolo: **mês calendário anterior** ao atual.
 
-4. Validar com clientes reais
-- Rodar novamente a função em 5 clientes, incluindo casos com risco amarelo/vermelho.
-- Conferir se nenhum caso com risco retorna “Movimentos sugeridos” vazio.
-- Conferir se cada risco tem impacto e pelo menos uma sugestão conectada.
+## Mudanças técnicas
 
-Arquivos previstos:
-- `supabase/functions/analyze-cliente-360/index.ts`: atualizar somente o `SYSTEM_PROMPT`.
+### 1. `src/hooks/useOxyFinance.ts`
+- Localizar o `id` do grupo "SaaS" dentro de `dreData.groups` (varredura por `label` normalizado).
+- Adicionar nova `useQuery` que chama `fetch-oxy-finance` com `action: 'dre_categories'` e `groupIds: [saasGroupId]`, dependente do DRE principal (enabled só após resolver o id).
+- Parsear o retorno de categorias e somar, por mês, apenas as labels normalizadas:
+  - `oxy`
+  - `oxy + genio` / `oxy + gênio`
+  - `oxy + genio + especialista` / `oxy + gênio + especialista`
+  Normalização: `trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')`.
+- Expor novo campo no resultado do hook: `oxyProductsByMonth: Record<MonthType, number>` (total dos 3 produtos por mês).
 
-Fora de escopo:
-- Alterar a estrutura do JSON `get_cliente_360`.
-- Alterar UI ou banco de dados.
+### 2. `src/hooks/useJornadaData.ts`
+- Importar `useOxyFinance` (ou aceitar `oxyProductsByMonth` como parâmetro vindo do consumidor).
+- Identificar o mês alvo: o **mês anterior** já calculado em `mesAnteriorStart` → mapear para `MonthType` (Jan…Dez).
+- Após montar `cfoMap`, adicionar o valor `oxyProductsByMonth[mesAnteriorMonth]` ao `mrrTotal` da entrada cujo nome contém "Pedrolo". Se Pedrolo não estiver no mapa (sem clientes), criar a entrada apenas se o valor > 0.
+- Não alterar `mrrEmRisco`, contagem de clientes, NPS ou Health.
+
+### 3. `src/components/planning/jornada/CfoView.tsx`
+- Atualizar tooltip da linha Pedrolo (ou texto "Receita = MRR…") para deixar explícito: "Pedrolo: Setup + Oxy por cliente (mês passado) + OXY/Gênio/Especialista do DRE".
+- Nenhum cálculo direto aqui — `mrrTotal` já chega pronto do hook.
+
+## Pontos a validar na implementação
+
+- O endpoint `dre-table-categories` retorna o mesmo formato `groups[].data[].period/value` esperado pelo parser; se não, ajustar parser.
+- Se o grupo SaaS não for encontrado pelo label, logar warning e devolver zeros (fallback seguro).
+- Cache de 10 min (igual demais queries Oxy) para não estourar quota.
+
+## Memória a atualizar após implementação
+
+Atualizar `mem://logic/operations/mrr-total-definition` para refletir que **MRR Pedrolo = Setup + Oxy (Pipefy, mês passado) + OXY/Gênio/Especialista (DRE Oxy Finance, mês passado)**, mantendo os demais CFOs como CFOaaS + OXY de Pipefy.

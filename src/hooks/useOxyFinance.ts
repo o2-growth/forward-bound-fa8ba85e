@@ -51,10 +51,21 @@ export interface DailyRevenueRow {
   source: string;
 }
 
+// SaaS group ID in Oxy Finance DRE — contains categories Oxy / Oxy + Gênio / Oxy + Gênio + Especialista / Setup / Parceiros
+const SAAS_GROUP_ID = '6c3f10e6-2d2d-48d5-81ef-18bb6389b159';
+
+const OXY_PRODUCT_LABELS = ['oxy', 'oxy + genio', 'oxy + genio + especialista'];
+
+function normalizeLabel(s: string): string {
+  return (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 export interface OxyFinanceResult {
   dreByBU: Record<BuType, Record<MonthType, number>>;
   /** Receita bruta do grupo "Expansão" (oxy_hacker + franquia combinados) por mês */
   expansaoByMonth: Record<MonthType, number>;
+  /** Soma das categorias SaaS: Oxy + Oxy+Gênio + Oxy+Gênio+Especialista, por mês */
+  oxyProductsByMonth: Record<MonthType, number>;
   dreRaw: any;
   cashflowChart: CashflowChartPoint[];
   cashflowByMonth: Record<MonthType, number>;
@@ -156,6 +167,37 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
     staleTime: 5 * 60 * 1000,
     retry: 2,
   });
+
+  // SaaS categories — para extrair produtos OXY (Pedrolo)
+  const { data: saasCategoriesData } = useQuery({
+    queryKey: ['oxy-finance-saas-categories', year],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fetch-oxy-finance', {
+        body: { action: 'dre_categories', groupIds: [SAAS_GROUP_ID], startDate, endDate },
+      });
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 10 * 60 * 1000,
+    retry: 2,
+  });
+
+  const oxyProductsByMonth = useMemo<Record<MonthType, number>>(() => {
+    const result: Record<string, number> = {};
+    for (const m of MONTHS) result[m] = 0;
+    const categories = saasCategoriesData?.categories;
+    if (!Array.isArray(categories)) return result as Record<MonthType, number>;
+    for (const cat of categories) {
+      const label = normalizeLabel(cat?.label || '');
+      if (!OXY_PRODUCT_LABELS.includes(label)) continue;
+      const entries = Array.isArray(cat.data) ? cat.data : [];
+      for (const entry of entries) {
+        const monthName = parseMonthFromDate(entry.period || entry.date || '');
+        if (monthName) result[monthName] += Number(entry.value || 0);
+      }
+    }
+    return result as Record<MonthType, number>;
+  }, [saasCategoriesData]);
 
   // Parse DRE into dreByBU + expansaoByMonth
   const { parsedDreByBU, expansaoByMonth } = useMemo(() => {
@@ -296,6 +338,7 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
   return {
     dreByBU: parsedDreByBU,
     expansaoByMonth,
+    oxyProductsByMonth,
     dreRaw: dreData,
     cashflowChart,
     cashflowByMonth,

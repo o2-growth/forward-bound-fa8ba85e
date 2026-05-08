@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { JornadaCliente, JornadaCfo, JornadaAlerta, PipelineFase, JornadaFilter } from "@/components/planning/jornada/types";
 import { parsePipefyDate, parsePipefyDateOnly, parseRotinaDateOnly } from "./dateUtils";
+import { useOxyFinance } from "./useOxyFinance";
+import { MONTHS, type MonthType } from "./useMonetaryMetas";
 
 function parseDate(val: string | null | undefined): Date | null {
   return parsePipefyDate(val);
@@ -88,8 +90,14 @@ export function useJornadaData() {
     retry: 1,
   });
 
+  // Receita extra de produtos OXY (Oxy + Oxy+Gênio + Oxy+Gênio+Especialista) do DRE Oxy Finance
+  // — adicionada ao MRR Total do squad Pedrolo (mês calendário anterior)
+  const oxyYear = new Date().getFullYear();
+  const { oxyProductsByMonth } = useOxyFinance(oxyYear);
+
   const result = useMemo(() => {
     if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '' };
+
 
     const { projetos, setup, tratativas, nps, rotinas, clientes, connections } = data;
     const now = new Date();
@@ -544,6 +552,28 @@ export function useJornadaData() {
       data.taxaEntrega = rotinas && rotinas.ativas > 0 ? Math.round(((rotinas.ativas - rotinas.atrasadas) / rotinas.ativas) * 100) : 100;
     }
 
+    // Adiciona ao MRR Total do squad Pedrolo o faturamento dos produtos OXY
+    // (Oxy + Oxy+Gênio + Oxy+Gênio+Especialista) do DRE — mês calendário anterior.
+    const mesAnteriorIdx = mesAnteriorStart.getMonth();
+    const mesAnteriorName = MONTHS[mesAnteriorIdx] as MonthType | undefined;
+    const oxyExtra = mesAnteriorName ? Number(oxyProductsByMonth?.[mesAnteriorName] || 0) : 0;
+    if (oxyExtra > 0) {
+      let pedroloEntry: JornadaCfo | undefined;
+      for (const [nome, entry] of cfoMap) {
+        if (nome.includes('Pedrolo')) { pedroloEntry = entry; break; }
+      }
+      if (!pedroloEntry) {
+        pedroloEntry = {
+          nome: 'Eduardo Milani Pedrolo',
+          clientes: 0, mrrTotal: 0, mrrEmRisco: 0,
+          clientesAtivos: 0, clientesSetup: 0, clientesTratativa: 0, clientesChurn: 0,
+          tarefasAtrasadas: 0, taxaEntrega: 100, npsMediaClientes: null, healthScoreMedio: 0,
+        };
+        cfoMap.set('Eduardo Milani Pedrolo', pedroloEntry);
+      }
+      pedroloEntry.mrrTotal += oxyExtra;
+    }
+
     const cfos = Array.from(cfoMap.values()).sort((a, b) => b.mrrTotal - a.mrrTotal);
 
     // === 5. Build Alertas (carteira inteira; tratativa continua sendo atendida) ===
@@ -670,7 +700,7 @@ export function useJornadaData() {
       : '';
 
     return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync };
-  }, [data]);
+  }, [data, oxyProductsByMonth]);
 
   return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };
 }
