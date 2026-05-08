@@ -1108,13 +1108,13 @@ export function IndicatorsTab() {
     }
     
     // For single BU selection - Modelo Atual (with closer filter support)
-    if (hasSingleBU && includesModeloAtual && funnelData?.modeloAtual) {
+    if (hasSingleBU && includesModeloAtual) {
       const modeloAtualData = getModeloAtualGroupedData(indicator.key as ModeloAtualIndicator, startDate, endDate, grouping);
       
       // Apply closer filter to metas if closers are selected
       const closerFilter = selectedClosers.length > 0 ? selectedClosers : undefined;
-      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual'));
-      const metaPeriodo = calcularMetaDoPeriodo(funnelData.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual'));
+      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData?.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual'));
+      const metaPeriodo = calcularMetaDoPeriodo(funnelData?.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual'));
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       return chartLabels.map((label, index) => ({
