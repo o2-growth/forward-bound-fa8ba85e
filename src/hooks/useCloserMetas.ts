@@ -142,28 +142,24 @@ export function useCloserMetas(year: number = 2026) {
     },
   });
 
-  // Reset all metas for a BU to 50/50
-  const resetBuToDefault = useMutation({
+  // Zera todas as metas dos closers válidos para uma BU
+  const resetBuToZero = useMutation({
     mutationFn: async (bu: string) => {
-      const updates = MONTHS.flatMap(month => 
-        CLOSERS.map(closer => ({
-          bu,
-          month,
-          closer,
-          percentage: 50,
-        }))
-      );
-
-      for (const update of updates) {
-        const { error } = await supabase
-          .from('closer_metas')
-          .update({ percentage: 50, updated_at: new Date().toISOString() })
-          .eq('bu', update.bu)
-          .eq('month', update.month)
-          .eq('closer', update.closer)
-          .eq('year', year);
-
-        if (error) throw error;
+      const closersForBu = BU_CLOSERS[bu as BuType] || [];
+      for (const month of MONTHS) {
+        for (const closer of closersForBu) {
+          const { error } = await supabase
+            .from('closer_metas')
+            .upsert({
+              bu,
+              month,
+              closer,
+              percentage: 0,
+              year,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'bu,month,closer,year' });
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => {
