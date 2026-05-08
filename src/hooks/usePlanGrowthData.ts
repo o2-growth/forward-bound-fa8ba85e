@@ -421,7 +421,7 @@ export function usePlanGrowthData() {
     return distributeQuarterlyToMonthly(metasTrimestrais);
   }, [metas]);
   // Calculate MRR dynamics for Modelo Atual
-  const mrrDynamic = useMemo(() => {
+  const mrrDynamicRaw = useMemo(() => {
     return calculateMrrAndRevenueToSell(
       mrrInicial, 
       churnMensal, 
@@ -430,7 +430,40 @@ export function usePlanGrowthData() {
       indicadoresPorBU.modeloAtual.ticketMedio,
       valorVenderInicial
     );
-  }, [metasMensaisModeloAtual]);
+  }, [metasMensaisModeloAtual, mrrInicial, valorVenderInicial]);
+
+  // GAP RULE (Modelo Atual only): para cada mês com Oxy real disponível,
+  // gap = mrr_chain_projetado - mrr_oxy_real. O total dos déficits (gap > 0)
+  // é redirecionado para 'a vender' de Dezembro, preservando a meta anual.
+  const mrrDynamic = useMemo(() => {
+    const adjusted = {
+      mrrPorMes: { ...mrrDynamicRaw.mrrPorMes },
+      vendasPorMes: { ...mrrDynamicRaw.vendasPorMes },
+      revenueToSell: { ...mrrDynamicRaw.revenueToSell },
+    };
+    let gapTotal = 0;
+    const gapPorMes: Record<string, number> = {};
+    months.forEach(m => {
+      const oxy = mrrBaseRealPorMes[m];
+      if (!oxy || oxy <= 0) return;
+      const projetado = mrrDynamicRaw.mrrPorMes[m] || 0;
+      const gap = projetado - oxy;
+      gapPorMes[m] = gap;
+      if (gap > 0) gapTotal += gap;
+    });
+    if (gapTotal > 0) {
+      const ticket = indicadoresPorBU.modeloAtual.ticketMedio || 17000;
+      adjusted.revenueToSell['Dez'] = (adjusted.revenueToSell['Dez'] || 0) + gapTotal;
+      adjusted.vendasPorMes['Dez'] = Math.round(adjusted.revenueToSell['Dez'] / ticket);
+    }
+    console.log('[GapMRR ModeloAtual]', {
+      gapPorMes,
+      gapTotal,
+      dezAVenderOriginal: mrrDynamicRaw.revenueToSell['Dez'],
+      dezAVenderAjustado: adjusted.revenueToSell['Dez'],
+    });
+    return adjusted;
+  }, [mrrDynamicRaw, mrrBaseRealPorMes]);
 
   // Calculate monthly values for other BUs - prioritize DB
   const o2TaxMonthly = useMemo(() => {
