@@ -1,47 +1,59 @@
-## Diagnóstico
+## Objetivo
 
-O backup, a coluna `investimento_planejado`, as taxas (0,491 / 0,722 / 0,884 / 0,243), os CPVs por mês (Jan 6.389,25; Fev 7.986,58; Mar 7.667,13; Abr 6.921,69) e os investimentos planejados (153.342 / 191.678 / 230.014 / 249.181) estão corretos no banco para `modelo_atual`.
-
-O cálculo `vendas = round(invest / cpv)` retorna 24/24/30/36 — correto.
-
-**Bug:** dentro de `applyInvestmentDriver` em `src/hooks/usePlanGrowthData.ts`, o restante do funil usa `Math.ceil`, o que arredonda para cima e produz valores 1–5 unidades acima do esperado.
-
-Comparação Janeiro:
+Trocar a lógica de cálculo do funil em `MediaInvestmentTab` para **bottom-up**, exatamente como você descreveu:
 
 ```text
-Etapa       Esperado   Atual (ceil)   Correto (round)
-Propostas   99         99             99
-RRs         112        112            112
-RMs         155        156            155
-MQLs        316        318            316
-Leads       735        740            735
+VENDA     = X (meta do mês)         ← INPUT
+PROPOSTA  = VENDA   / prop_to_venda
+R.R       = PROPOSTA / rr_to_prop
+R.M       = R.R     / rm_to_rr
+MQL       = R.M     / mql_to_rm
+LEAD      = MQL     / lead_to_mql
+MÍDIA     = MQL × CPMQL             ← OUTPUT
 ```
 
-Mesmo desvio em Fev (idêntico a Jan), Mar (Propostas 124→123) e Abr (Propostas 149→148).
+Cada mês usa **suas próprias taxas e CPMQL** vindos de `bu_indicators_config` (já há linha por BU + mês).
 
-## Mudança
+## Mudanças (somente em `src/components/planning/MediaInvestmentTab.tsx`)
 
-Em `src/hooks/usePlanGrowthData.ts`, função `applyInvestmentDriver`, trocar 5 chamadas de `Math.ceil` por `Math.round` em:
+### 1. Origem das Vendas (root)
+Mantém a lógica atual: `vendas = aVender / ticketMedio` por mês (cadeia MRR já existente em `mrrDynamic.revenueToSell` + `ticket_medio` da config do mês). Para BUs sem cadeia MRR (O2 TAX, Oxy Hacker, Franquia) usa `metaMonetaria / ticketMedio` do próprio mês.
 
-- `propostas = Math.round(vendas / propToVenda)`
-- `rrs = Math.round(propostas / rrToProp)`
-- `rms = Math.round(rrs / rmToRr)`
-- `mqls = Math.round(rms / mqlToRm)`
-- `leads = Math.round(mqls / n)`
+### 2. `calculateReverseFunnel` passa a aceitar métricas **por mês**
+Em vez de receber um único `FunnelMetrics`, recebe um `Record<string, FunnelMetrics>` (uma entrada por mês: Jan…Dez). Para cada mês calcula:
 
-Manter `vendas = Math.round(investPlan / cpvMes)` como já está.
+```ts
+const m = metricsByMonth[month];
+const vendas    = aVender / m.ticketMedio;
+const propostas = vendas    / m.propToVenda;
+const rrs       = propostas / m.rrToProp;
+const rms       = rrs       / m.rmToRr;
+const mqls      = rms       / m.mqlToRm;
+const leads     = mqls      / m.leadToMql;
+const investimento = mqls * m.cpmql;   // ← NOVA fórmula (substitui vendas*cpv e vendas*cac)
+```
 
-## Validação esperada
+### 3. Remover regras antigas do investimento
+- Remove `investimentoCalculado = useCpv ? vendas*cpv : vendas*cac`.
+- Remove o "trava de não-decrescente" (`Math.max(investimento, anterior)`) — investimento agora é puro output da cadeia.
+- Remove o **deslocamento de 1 mês** (Jan recebia investimento de Fev). Cada mês mostra seu próprio investimento derivado.
+- Remove o caso especial `investimentoInicialJan` que recalculava vendas a partir de um investimento fixo.
 
-| Mês | Vendas | Propostas | RRs | RMs | MQLs | Leads | Investimento |
-|---|---|---|---|---|---|---|---|
-| Jan | 24 | 99 | 112 | 155 | 316 | 735 | R$ 153.342 |
-| Fev | 24 | 99 | 112 | 155 | 316 | 735 | R$ 191.678 |
-| Mar | 30 | 123 | 140 | 194 | 395 | 918 | R$ 230.014 |
-| Abr | 36 | 148 | 168 | 233 | 474 | 1.102 | R$ 249.181 |
+### 4. Construir `metricsByMonth` por BU
+Novo `useMemo` que monta, para cada BU, um mapa `{ Jan: {...}, Fev: {...}, ... }` lendo de `bu_indicators_config` (já buscado pelo hook `useBUIndicatorsConfig`). Se um mês não tiver linha na config, usa fallback: a config do mês mais próximo anterior, ou os defaults atuais. Mantém `leadToMql` fixo por BU como hoje (não está na tabela).
 
-## Fora do escopo
+### 5. Meses locked (`is_locked = true` em `funnel_metas`)
+Continuam sobrescrevendo o resultado calculado com o snapshot salvo (vendas/propostas/…/investimento), igual hoje. A inversão só afeta meses não-locked.
 
-- Mai–Dez (sem investimento planejado, lógica antiga preservada)
-- Outras BUs
-- Limpeza/regravação dos snapshots antigos em `funnel_metas` (Jan–Abr estão `is_locked=false`, então o driver vivo já sobrescreve a exibição)
+### 6. Texto/UI
+- Atualizar o badge/legenda do card de Investimento para "Investimento = MQL × CPMQL (derivado)".
+- Não mexer em CPV/CAC nos cards de configuração — passam a ser ignorados pelo cálculo de investimento, mas seguem visíveis (CPV ainda é usado no histórico/Context2025).
+
+## Não muda
+- Schema do banco (todas as colunas necessárias já existem em `bu_indicators_config`).
+- Cadeia de MRR/Churn/Retenção que define `aVender`.
+- Lock de meses passados / snapshot de `funnel_metas`.
+- Outras abas (Macro, NPS, Marketing, etc.).
+
+## Resultado esperado
+Quando você muda CPMQL ou qualquer taxa de um mês específico nas Configurações, **só aquele mês** recalcula investimento e quantidades de funil, exatamente como na sua planilha — só que rodando no sentido VENDA → MÍDIA.
