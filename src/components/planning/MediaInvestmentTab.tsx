@@ -1263,6 +1263,38 @@ export function MediaInvestmentTab() {
     },
   }), [indicadoresPorBU]);
 
+  // Métricas POR MÊS, lidas de bu_indicators_config.
+  // Cada mês usa suas próprias taxas + CPMQL; meses sem config caem no default da BU.
+  const metricsByMonthPorBU = useMemo(() => {
+    const buPairs: Array<['modeloAtual'|'o2Tax'|'oxyHacker'|'franquia', string]> = [
+      ['modeloAtual', 'modelo_atual'],
+      ['o2Tax', 'o2_tax'],
+      ['oxyHacker', 'oxy_hacker'],
+      ['franquia', 'franquia'],
+    ];
+    const result: Record<string, Record<string, FunnelMetrics>> = {};
+    for (const [stateKey, dbKey] of buPairs) {
+      const monthMap = getIndicatorsForBU(dbKey);
+      const base = funnelMetrics[stateKey];
+      const perMonth: Record<string, FunnelMetrics> = {};
+      months.forEach(mo => {
+        const cfg = monthMap[mo];
+        perMonth[mo] = cfg ? {
+          ...base,
+          ticketMedio: cfg.ticketMedio || base.ticketMedio,
+          cpmql: cfg.cpmql || base.cpmql,
+          cpv: cfg.cpv || base.cpv,
+          mqlToRm: cfg.mqlToRm || base.mqlToRm,
+          rmToRr: cfg.rmToRr || base.rmToRr,
+          rrToProp: cfg.rrToProp || base.rrToProp,
+          propToVenda: cfg.propToVenda || base.propToVenda,
+        } : base;
+      });
+      result[stateKey] = perMonth;
+    }
+    return result;
+  }, [getIndicatorsForBU, funnelMetrics]);
+
   // Metas mensais distribuídas - prioritize DB, fallback to quarterly distribution
   const metasMensaisModeloAtual = useMemo(() => {
     const dbMetas = getDbMetasForBU('modelo_atual');
