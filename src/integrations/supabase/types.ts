@@ -128,6 +128,42 @@ export type Database = {
         }
         Relationships: []
       }
+      bu_investment_snapshots: {
+        Row: {
+          bu: string
+          created_at: string
+          id: string
+          investimento_anterior: number
+          investimento_novo: number
+          month: string
+          reason: string | null
+          was_locked: boolean
+          year: number
+        }
+        Insert: {
+          bu: string
+          created_at?: string
+          id?: string
+          investimento_anterior?: number
+          investimento_novo?: number
+          month: string
+          reason?: string | null
+          was_locked?: boolean
+          year: number
+        }
+        Update: {
+          bu?: string
+          created_at?: string
+          id?: string
+          investimento_anterior?: number
+          investimento_novo?: number
+          month?: string
+          reason?: string | null
+          was_locked?: boolean
+          year?: number
+        }
+        Relationships: []
+      }
       closer_metas: {
         Row: {
           bu: string
