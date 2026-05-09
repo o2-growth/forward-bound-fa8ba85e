@@ -345,12 +345,11 @@ export function usePlanGrowthData() {
     return map;
   }, [mrrBaseData]);
 
-  // MRR inicial real = MRR Base de Dez/2025 (vem de mrr_base_monthly).
-  // Fallback 700k se ainda não carregou.
-  const mrrInicial = useMemo(() => {
-    const v = mrrBaseRealPorMes['Jan']; // Jan/2026 usa MRR de Dez/2025
-    return v && v > 0 ? v : 700000;
-  }, [mrrBaseRealPorMes]);
+  // Seed do PROJETADO Dez/2025 — decoupled da Oxy real.
+  // Oxy real continua disponível em mrrBaseRealPorMes para o badge de gap por mês,
+  // e a regra de gap (linhas ~438-466) joga o saldo (projetado − real) para Dez.
+  const MRR_PROJECTED_SEED_DEZ_2025 = 725000;
+  const mrrInicial = useMemo(() => MRR_PROJECTED_SEED_DEZ_2025, []);
 
   // Valor a vender inicial real = faturamento_vender de Jan/2026 (Modelo Atual) em funnel_metas.
   // Fallback 400k se ainda não tem dado.
