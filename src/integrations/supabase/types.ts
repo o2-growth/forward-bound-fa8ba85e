@@ -87,6 +87,7 @@ export type Database = {
           cpv: number
           created_at: string
           id: string
+          investimento_planejado: number
           month: string
           mql_to_rm: number
           prop_to_venda: number
@@ -101,6 +102,7 @@ export type Database = {
           cpv?: number
           created_at?: string
           id?: string
+          investimento_planejado?: number
           month: string
           mql_to_rm?: number
           prop_to_venda?: number
@@ -115,6 +117,7 @@ export type Database = {
           cpv?: number
           created_at?: string
           id?: string
+          investimento_planejado?: number
           month?: string
           mql_to_rm?: number
           prop_to_venda?: number

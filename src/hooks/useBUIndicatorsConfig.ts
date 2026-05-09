@@ -13,6 +13,7 @@ export interface BUIndicatorsRow {
   rm_to_rr: number;
   rr_to_prop: number;
   prop_to_venda: number;
+  investimento_planejado: number;
 }
 
 export interface BUIndicatorsInput {
@@ -23,6 +24,7 @@ export interface BUIndicatorsInput {
   rmToRr: number;
   rrToProp: number;
   propToVenda: number;
+  investimentoPlanejado: number;
 }
 
 const BU_KEYS = ['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia'] as const;
@@ -72,6 +74,7 @@ export function useBUIndicatorsConfig() {
             rm_to_rr: indicators.rmToRr,
             rr_to_prop: indicators.rrToProp,
             prop_to_venda: indicators.propToVenda,
+            investimento_planejado: indicators.investimentoPlanejado ?? 0,
           }, { onConflict: 'bu,month' });
         if (error) throw error;
       }
@@ -98,6 +101,7 @@ export function useBUIndicatorsConfig() {
       rmToRr: Number(row.rm_to_rr),
       rrToProp: Number(row.rr_to_prop),
       propToVenda: Number(row.prop_to_venda),
+      investimentoPlanejado: Number((row as any).investimento_planejado || 0),
     };
   };
 
@@ -114,6 +118,7 @@ export function useBUIndicatorsConfig() {
         rmToRr: Number(row.rm_to_rr),
         rrToProp: Number(row.rr_to_prop),
         propToVenda: Number(row.prop_to_venda),
+        investimentoPlanejado: Number((row as any).investimento_planejado || 0),
       };
     });
     return map;
@@ -138,6 +143,7 @@ export function useBUIndicatorsConfig() {
           rmToRr: Number(row.rm_to_rr),
           rrToProp: Number(row.rr_to_prop),
           propToVenda: Number(row.prop_to_venda),
+          investimentoPlanejado: Number((row as any).investimento_planejado || 0),
         };
       }
     }
