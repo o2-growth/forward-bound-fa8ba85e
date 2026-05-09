@@ -682,6 +682,7 @@ export function usePlanGrowthData() {
       for (let idx = 0; idx <= maxLockableIdx; idx++) {
         const monthName = months[idx];
         if (isAlreadyLocked(bu, monthName)) continue;
+        if (isExplicitlyZeroed(bu, monthName)) continue;
         const row = rows.find(r => r.month === monthName);
         if (!row) continue;
         toLock.push({
