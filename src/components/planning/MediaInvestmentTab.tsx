@@ -1350,7 +1350,9 @@ export function MediaInvestmentTab() {
       mrrDynamic.mrrPorMes,
       true,
       metasMensaisModeloAtual,
-      indicadoresPorBU.modeloAtual.cpv
+      indicadoresPorBU.modeloAtual.cpv,
+      0,
+      metricsByMonthPorBU.modeloAtual
     );
 
     const fixedRows = hasFunnelForBU('modelo_atual') ? getFunnelForBU('modelo_atual') : [];
