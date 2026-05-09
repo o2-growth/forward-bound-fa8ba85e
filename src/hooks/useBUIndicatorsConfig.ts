@@ -74,6 +74,7 @@ export function useBUIndicatorsConfig() {
             rm_to_rr: indicators.rmToRr,
             rr_to_prop: indicators.rrToProp,
             prop_to_venda: indicators.propToVenda,
+            investimento_planejado: indicators.investimentoPlanejado ?? 0,
           }, { onConflict: 'bu,month' });
         if (error) throw error;
       }
