@@ -221,35 +221,33 @@ function calculateReverseFunnel(
   netRevenueToSell: Record<string, number>,
   metrics: FunnelMetrics,
   mrrComChurn: Record<string, number> | null = null,
-  useCpv: boolean = false,
+  _useCpv: boolean = false,
   metasMensais: Record<string, number> | null = null,
-  cpvValue: number = indicators2025.cpv,
-  investimentoInicialJan: number = 0
+  _cpvValue: number = indicators2025.cpv,
+  _investimentoInicialJan: number = 0,
+  metricsByMonth: Record<string, FunnelMetrics> | null = null
 ): FunnelData[] {
-  let investimentoAnterior = 0;
-  
-  // Primeiro, calcula todos os dados originais (incluindo investimentos)
-  const dadosOriginais = months.map(month => {
+  // Bottom-up: VENDA é a raiz (vinda de aVender / ticketMedio).
+  // Cada mês usa SUAS próprias taxas e CPMQL (de bu_indicators_config).
+  // MÍDIA = MQL × CPMQL (output derivado).
+  return months.map(month => {
     const faturamentoVender = netRevenueToSell[month];
     const mrrBaseAtual = mrrComChurn ? mrrComChurn[month] : 0;
-    const faturamentoMeta = mrrComChurn 
-      ? (mrrBaseAtual + faturamentoVender) 
+    const m = metricsByMonth?.[month] ?? metrics;
+    const faturamentoMeta = mrrComChurn
+      ? (mrrBaseAtual + faturamentoVender)
       : (metasMensais ? metasMensais[month] : faturamentoVender);
-    
-    const vendas = faturamentoVender / metrics.ticketMedio;
-    const propostas = vendas / metrics.propToVenda;
-    const rrs = propostas / metrics.rrToProp;
-    const rms = rrs / metrics.rmToRr;
-    const mqls = rms / metrics.mqlToRm;
-    const leads = mqls / metrics.leadToMql;
-    
-    // Calcula investimento baseado na fórmula original
-    const investimentoCalculado = useCpv ? vendas * cpvValue : vendas * metrics.cac;
-    
-    // Garante que o investimento nunca diminua (sempre crescente ou estável)
-    const investimento = Math.max(investimentoCalculado, investimentoAnterior);
-    investimentoAnterior = investimento;
-    
+
+    const vendas    = faturamentoVender / m.ticketMedio;
+    const propostas = vendas    / m.propToVenda;
+    const rrs       = propostas / m.rrToProp;
+    const rms       = rrs       / m.rmToRr;
+    const mqls      = rms       / m.mqlToRm;
+    const leads     = mqls      / m.leadToMql;
+
+    // Investimento = MQL × CPMQL (do mês)
+    const investimento = mqls * m.cpmql;
+
     return {
       month,
       faturamentoMeta,
@@ -262,42 +260,6 @@ function calculateReverseFunnel(
       mqls: Math.ceil(mqls),
       leads: Math.ceil(leads),
       investimento: Math.round(investimento),
-    };
-  });
-  
-  // Desloca os investimentos em 1 mês:
-  // Jan recebe o investimento de Fev, Fev recebe o de Mar, etc.
-  // Isso reflete que o investimento de um mês gera resultado no mês seguinte
-  return dadosOriginais.map((dados, index) => {
-    // Se é janeiro e tem investimento inicial definido, recalcula vendas baseado no investimento e CPV
-    if (index === 0 && investimentoInicialJan > 0) {
-      const vendasIniciais = Math.ceil(investimentoInicialJan / cpvValue);
-      const propostas = Math.ceil(vendasIniciais / metrics.propToVenda);
-      const rrs = Math.ceil(propostas / metrics.rrToProp);
-      const rms = Math.ceil(rrs / metrics.rmToRr);
-      const mqls = Math.ceil(rms / metrics.mqlToRm);
-      const leads = Math.ceil(mqls / metrics.leadToMql);
-      
-      return { 
-        ...dados, 
-        investimento: investimentoInicialJan,
-        vendas: vendasIniciais,
-        propostas,
-        rrs,
-        rms,
-        mqls,
-        leads,
-      };
-    }
-    
-    // Pega o investimento do próximo mês, ou mantém o próprio se for dezembro
-    const investimentoDeslocado = index < months.length - 1 
-      ? dadosOriginais[index + 1].investimento 
-      : dados.investimento;
-    
-    return {
-      ...dados,
-      investimento: investimentoDeslocado,
     };
   });
 }
@@ -978,7 +940,7 @@ function BUIndicatorEditor({ indicators, onChange, buName, buIcon, disabled = fa
 
 export function MediaInvestmentTab() {
   // Fetch BU indicators config from database
-  const { getIndicatorsMap, getIndicators, isLoading: isLoadingConfig, saveIndicators, isSaving, isMonthLocked } = useBUIndicatorsConfig();
+  const { getIndicatorsMap, getIndicators, getIndicatorsForBU, isLoading: isLoadingConfig, saveIndicators, isSaving, isMonthLocked } = useBUIndicatorsConfig();
 
   // Fetch monetary metas from database
   const { metas, isLoading: isLoadingMetas, bulkUpdateMetas, getMeta } = useMonetaryMetas();
@@ -1301,6 +1263,38 @@ export function MediaInvestmentTab() {
     },
   }), [indicadoresPorBU]);
 
+  // Métricas POR MÊS, lidas de bu_indicators_config.
+  // Cada mês usa suas próprias taxas + CPMQL; meses sem config caem no default da BU.
+  const metricsByMonthPorBU = useMemo(() => {
+    const buPairs: Array<['modeloAtual'|'o2Tax'|'oxyHacker'|'franquia', string]> = [
+      ['modeloAtual', 'modelo_atual'],
+      ['o2Tax', 'o2_tax'],
+      ['oxyHacker', 'oxy_hacker'],
+      ['franquia', 'franquia'],
+    ];
+    const result: Record<string, Record<string, FunnelMetrics>> = {};
+    for (const [stateKey, dbKey] of buPairs) {
+      const monthMap = getIndicatorsForBU(dbKey);
+      const base = funnelMetrics[stateKey];
+      const perMonth: Record<string, FunnelMetrics> = {};
+      months.forEach(mo => {
+        const cfg = monthMap[mo];
+        perMonth[mo] = cfg ? {
+          ...base,
+          ticketMedio: cfg.ticketMedio || base.ticketMedio,
+          cpmql: cfg.cpmql || base.cpmql,
+          cpv: cfg.cpv || base.cpv,
+          mqlToRm: cfg.mqlToRm || base.mqlToRm,
+          rmToRr: cfg.rmToRr || base.rmToRr,
+          rrToProp: cfg.rrToProp || base.rrToProp,
+          propToVenda: cfg.propToVenda || base.propToVenda,
+        } : base;
+      });
+      result[stateKey] = perMonth;
+    }
+    return result;
+  }, [getIndicatorsForBU, funnelMetrics]);
+
   // Metas mensais distribuídas - prioritize DB, fallback to quarterly distribution
   const metasMensaisModeloAtual = useMemo(() => {
     const dbMetas = getDbMetasForBU('modelo_atual');
@@ -1356,7 +1350,9 @@ export function MediaInvestmentTab() {
       mrrDynamic.mrrPorMes,
       true,
       metasMensaisModeloAtual,
-      indicadoresPorBU.modeloAtual.cpv
+      indicadoresPorBU.modeloAtual.cpv,
+      0,
+      metricsByMonthPorBU.modeloAtual
     );
 
     const fixedRows = hasFunnelForBU('modelo_atual') ? getFunnelForBU('modelo_atual') : [];
@@ -1403,14 +1399,16 @@ export function MediaInvestmentTab() {
 
       // Mês não locked com Oxy real: recalcula A Vender + funil baseado no REAL,
       // mas a coluna mrrBase exibe o PROJETADO (gap aparece no badge).
+      const mm = metricsByMonthPorBU.modeloAtual[d.month] ?? m;
+      const tm = mm.ticketMedio || ticketMedio;
       const novoVender = Math.max(0, d.faturamentoMeta - realMrr);
-      const vendas = novoVender / ticketMedio;
-      const propostas = vendas / m.propToVenda;
-      const rrs = propostas / m.rrToProp;
-      const rms = rrs / m.rmToRr;
-      const mqls = rms / m.mqlToRm;
-      const leads = mqls / m.leadToMql;
-      const investimento = Math.round(vendas * cpvVal);
+      const vendas = novoVender / tm;
+      const propostas = vendas / mm.propToVenda;
+      const rrs = propostas / mm.rrToProp;
+      const rms = rrs / mm.rmToRr;
+      const mqls = rms / mm.mqlToRm;
+      const leads = mqls / mm.leadToMql;
+      const investimento = Math.round(mqls * mm.cpmql);
 
       return {
         ...d,
@@ -1428,21 +1426,21 @@ export function MediaInvestmentTab() {
         aVenderOriginal,
       };
     });
-  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU]);
+  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU, metricsByMonthPorBU]);
   
   const o2TaxFunnel = useMemo(() => 
-    calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 10000),
-    [o2TaxMonthly, funnelMetrics.o2Tax]
+    calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 0, metricsByMonthPorBU.o2Tax),
+    [o2TaxMonthly, funnelMetrics.o2Tax, metricsByMonthPorBU]
   );
   
   const oxyHackerFunnel = useMemo(() => 
-    calculateReverseFunnel(oxyHackerMonthly, funnelMetrics.oxyHacker, null, true, null, funnelMetrics.oxyHacker.cpv, 10000),
-    [oxyHackerMonthly, funnelMetrics.oxyHacker]
+    calculateReverseFunnel(oxyHackerMonthly, funnelMetrics.oxyHacker, null, true, null, funnelMetrics.oxyHacker.cpv, 0, metricsByMonthPorBU.oxyHacker),
+    [oxyHackerMonthly, funnelMetrics.oxyHacker, metricsByMonthPorBU]
   );
   
   const franquiaFunnel = useMemo(() => 
-    calculateReverseFunnel(franquiaMonthly, funnelMetrics.franquia, null, true, null, funnelMetrics.franquia.cpv, 10000),
-    [franquiaMonthly, funnelMetrics.franquia]
+    calculateReverseFunnel(franquiaMonthly, funnelMetrics.franquia, null, true, null, funnelMetrics.franquia.cpv, 0, metricsByMonthPorBU.franquia),
+    [franquiaMonthly, funnelMetrics.franquia, metricsByMonthPorBU]
   );
 
   // Effective funnel data: merge pendingChanges so edits don't revert visually
@@ -1450,8 +1448,9 @@ export function MediaInvestmentTab() {
     originalFunnel: FunnelData[],
     buKey: string,
     metrics: FunnelMetrics,
-    cpvValue: number,
+    _cpvValue: number,
     mrrComChurn: Record<string, number> | null = null,
+    metricsByMonth: Record<string, FunnelMetrics> | null = null,
   ): FunnelData[] => {
     const buPending = pendingChanges[buKey];
     if (!buPending || Object.keys(buPending).length === 0) return originalFunnel;
@@ -1460,14 +1459,15 @@ export function MediaInvestmentTab() {
       const pending = buPending[d.month];
       if (pending === undefined) return d;
       
+      const m = metricsByMonth?.[d.month] ?? metrics;
       const newVender = pending;
-      const vendas = newVender / metrics.ticketMedio;
-      const propostas = vendas / metrics.propToVenda;
-      const rrs = propostas / metrics.rrToProp;
-      const rms = rrs / metrics.rmToRr;
-      const mqls = rms / metrics.mqlToRm;
-      const leads = mqls / metrics.leadToMql;
-      const investimento = vendas * cpvValue;
+      const vendas = newVender / m.ticketMedio;
+      const propostas = vendas / m.propToVenda;
+      const rrs = propostas / m.rrToProp;
+      const rms = rrs / m.rmToRr;
+      const mqls = rms / m.mqlToRm;
+      const leads = mqls / m.leadToMql;
+      const investimento = mqls * m.cpmql;
       const faturamentoMeta = mrrComChurn ? (d.mrrBase + newVender) : newVender;
       
       return {
@@ -1486,23 +1486,23 @@ export function MediaInvestmentTab() {
   }, [pendingChanges]);
 
   const effectiveModeloAtualFunnel = useMemo(() => 
-    applyPendingToFunnel(modeloAtualFunnel, 'modelo_atual', funnelMetrics.modeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrDynamic.mrrPorMes),
-    [modeloAtualFunnel, applyPendingToFunnel, funnelMetrics.modeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrDynamic.mrrPorMes]
+    applyPendingToFunnel(modeloAtualFunnel, 'modelo_atual', funnelMetrics.modeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrDynamic.mrrPorMes, metricsByMonthPorBU.modeloAtual),
+    [modeloAtualFunnel, applyPendingToFunnel, funnelMetrics.modeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrDynamic.mrrPorMes, metricsByMonthPorBU]
   );
 
   const effectiveO2TaxFunnel = useMemo(() => 
-    applyPendingToFunnel(o2TaxFunnel, 'o2_tax', funnelMetrics.o2Tax, funnelMetrics.o2Tax.cpv || indicadoresPorBU.o2Tax.cpv),
-    [o2TaxFunnel, applyPendingToFunnel, funnelMetrics.o2Tax, indicadoresPorBU.o2Tax.cpv]
+    applyPendingToFunnel(o2TaxFunnel, 'o2_tax', funnelMetrics.o2Tax, funnelMetrics.o2Tax.cpv || indicadoresPorBU.o2Tax.cpv, null, metricsByMonthPorBU.o2Tax),
+    [o2TaxFunnel, applyPendingToFunnel, funnelMetrics.o2Tax, indicadoresPorBU.o2Tax.cpv, metricsByMonthPorBU]
   );
 
   const effectiveOxyHackerFunnel = useMemo(() => 
-    applyPendingToFunnel(oxyHackerFunnel, 'oxy_hacker', funnelMetrics.oxyHacker, funnelMetrics.oxyHacker.cpv || indicadoresPorBU.oxyHacker.cpv),
-    [oxyHackerFunnel, applyPendingToFunnel, funnelMetrics.oxyHacker, indicadoresPorBU.oxyHacker.cpv]
+    applyPendingToFunnel(oxyHackerFunnel, 'oxy_hacker', funnelMetrics.oxyHacker, funnelMetrics.oxyHacker.cpv || indicadoresPorBU.oxyHacker.cpv, null, metricsByMonthPorBU.oxyHacker),
+    [oxyHackerFunnel, applyPendingToFunnel, funnelMetrics.oxyHacker, indicadoresPorBU.oxyHacker.cpv, metricsByMonthPorBU]
   );
 
   const effectiveFranquiaFunnel = useMemo(() => 
-    applyPendingToFunnel(franquiaFunnel, 'franquia', funnelMetrics.franquia, funnelMetrics.franquia.cpv || indicadoresPorBU.franquia.cpv),
-    [franquiaFunnel, applyPendingToFunnel, funnelMetrics.franquia, indicadoresPorBU.franquia.cpv]
+    applyPendingToFunnel(franquiaFunnel, 'franquia', funnelMetrics.franquia, funnelMetrics.franquia.cpv || indicadoresPorBU.franquia.cpv, null, metricsByMonthPorBU.franquia),
+    [franquiaFunnel, applyPendingToFunnel, funnelMetrics.franquia, indicadoresPorBU.franquia.cpv, metricsByMonthPorBU]
   );
 
   // Consolidated funnel for 2026 visual
