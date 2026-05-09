@@ -1399,14 +1399,16 @@ export function MediaInvestmentTab() {
 
       // Mês não locked com Oxy real: recalcula A Vender + funil baseado no REAL,
       // mas a coluna mrrBase exibe o PROJETADO (gap aparece no badge).
+      const mm = metricsByMonthPorBU.modeloAtual[d.month] ?? m;
+      const tm = mm.ticketMedio || ticketMedio;
       const novoVender = Math.max(0, d.faturamentoMeta - realMrr);
-      const vendas = novoVender / ticketMedio;
-      const propostas = vendas / m.propToVenda;
-      const rrs = propostas / m.rrToProp;
-      const rms = rrs / m.rmToRr;
-      const mqls = rms / m.mqlToRm;
-      const leads = mqls / m.leadToMql;
-      const investimento = Math.round(vendas * cpvVal);
+      const vendas = novoVender / tm;
+      const propostas = vendas / mm.propToVenda;
+      const rrs = propostas / mm.rrToProp;
+      const rms = rrs / mm.rmToRr;
+      const mqls = rms / mm.mqlToRm;
+      const leads = mqls / mm.leadToMql;
+      const investimento = Math.round(mqls * mm.cpmql);
 
       return {
         ...d,
@@ -1424,21 +1426,21 @@ export function MediaInvestmentTab() {
         aVenderOriginal,
       };
     });
-  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU]);
+  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU, metricsByMonthPorBU]);
   
   const o2TaxFunnel = useMemo(() => 
-    calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 10000),
-    [o2TaxMonthly, funnelMetrics.o2Tax]
+    calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 0, metricsByMonthPorBU.o2Tax),
+    [o2TaxMonthly, funnelMetrics.o2Tax, metricsByMonthPorBU]
   );
   
   const oxyHackerFunnel = useMemo(() => 
-    calculateReverseFunnel(oxyHackerMonthly, funnelMetrics.oxyHacker, null, true, null, funnelMetrics.oxyHacker.cpv, 10000),
-    [oxyHackerMonthly, funnelMetrics.oxyHacker]
+    calculateReverseFunnel(oxyHackerMonthly, funnelMetrics.oxyHacker, null, true, null, funnelMetrics.oxyHacker.cpv, 0, metricsByMonthPorBU.oxyHacker),
+    [oxyHackerMonthly, funnelMetrics.oxyHacker, metricsByMonthPorBU]
   );
   
   const franquiaFunnel = useMemo(() => 
-    calculateReverseFunnel(franquiaMonthly, funnelMetrics.franquia, null, true, null, funnelMetrics.franquia.cpv, 10000),
-    [franquiaMonthly, funnelMetrics.franquia]
+    calculateReverseFunnel(franquiaMonthly, funnelMetrics.franquia, null, true, null, funnelMetrics.franquia.cpv, 0, metricsByMonthPorBU.franquia),
+    [franquiaMonthly, funnelMetrics.franquia, metricsByMonthPorBU]
   );
 
   // Effective funnel data: merge pendingChanges so edits don't revert visually
