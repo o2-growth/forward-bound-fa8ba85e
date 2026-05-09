@@ -321,7 +321,7 @@ export function usePlanGrowthData() {
   const { setMetasPorBU, setFunnelData, isLoaded } = useMediaMetas();
   const { metas, isLoading: isLoadingMetas } = useMonetaryMetas();
   const { funnelMetas, isLoading: isLoadingFunnel, hasFunnelForBU, getFunnelForBU, bulkUpsert, lockMonths } = useFunnelMetas();
-  const { getIndicatorsMap, isLoading: isLoadingIndicators } = useBUIndicatorsConfig();
+  const { getIndicatorsMap, getIndicatorsForBU, isLoading: isLoadingIndicators } = useBUIndicatorsConfig();
   const { mrrBaseData, isLoading: isLoadingMrrBase } = useMrrBase();
   const hasSeeded = useRef(false);
   const hasAutoLocked = useRef(false);
