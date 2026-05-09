@@ -1,83 +1,75 @@
-## Garantias de não-perda
+# Plano: Driver por Investimento para Jan-Abr (Modelo Atual)
 
-Antes de qualquer alteração, salvar 3 backups em `/mnt/documents/`:
+## Objetivo
+Fazer o cálculo do funil produzir naturalmente os valores corretos de Jan-Abr (Modelo Atual) sem sobrescrever o snapshot travado. A lógica que hoje só existe para Janeiro (vendas = invest / CPV) será generalizada para qualquer mês passado/atual que tiver "investimento planejado" definido.
 
-1. `mrr_base_monthly_pre-projetado-real_2026-05-09.csv` — todas as linhas (Oxy real intocada).
-2. `funnel_metas_modelo_atual_pre-projetado-real_2026-05-09.csv` — Jan-Dez/26 modelo_atual.
-3. `usePlanGrowthData.ts.bak-2026-05-09` e `MediaInvestmentTab.tsx.bak-2026-05-09` — cópias dos arquivos antes da edição.
+## Valores-alvo (Modelo Atual)
+| Mês | Vendas | Prop | RR | RM | MQL | Leads | Investimento |
+|---|---|---|---|---|---|---|---|
+| Jan | 24 | 99 | 112 | 155 | 316 | 735 | R$ 153.342 |
+| Fev | 24 | 99 | 112 | 155 | 316 | 735 | R$ 191.678 |
+| Mar | 30 | 123 | 140 | 194 | 395 | 918 | R$ 230.014 |
+| Abr | 36 | 148 | 168 | 233 | 474 | 1.102 | R$ 249.181 |
 
-Validação pós-backup: `wc -l` em cada CSV + comparar contagem com `SELECT COUNT(*)` antes de prosseguir.
+## Backups (antes de qualquer alteração)
+1. `funnel_metas` modelo_atual 2026 → CSV `funnel_metas_modelo_atual_pre-driver-investimento_2026-05-09.csv`
+2. `bu_indicators_config` modelo_atual → CSV `bu_indicators_config_modelo_atual_pre-driver-investimento_2026-05-09.csv`
+3. Cópia dos arquivos `usePlanGrowthData.ts` e `MediaInvestmentTab.tsx` com sufixo `.bak-driver-investimento-2026-05-09`
 
-Apenas após confirmar os 3 backups, executar os passos.
+## Etapas
 
-## Diagnóstico (resumo)
+### 1. Schema: novo campo de Investimento Planejado por mês/BU
+Adicionar coluna `investimento_planejado` (numeric, default 0) em `bu_indicators_config`. Esta coluna armazena o investimento orçado/planejado por mês — diferente de `funnel_metas.investimento` (que é resultado calculado/snapshot).
 
-- `mrr_base_monthly` = MRR Real (Oxy). **Não tocar.**
-- `funnel_metas.mrr_base_planejamento` = deveria ser o **Projetado**, mas o auto-lock e o override em `usePlanGrowthData.ts:558` estão jogando Oxy ali. Por isso Jan-Mai mostram Oxy ao invés do plano.
-- A regra de gap (projetado − real) → "a vender" de Dez já existe (`usePlanGrowthData.ts:438-466`) e fica preservada.
-- A UI já tem o badge "Projetado / Real (Oxy) / Δ" por mês em `MediaInvestmentTab.tsx:670-690`.
+### 2. Dados: popular Jan-Abr
+- `bu_indicators_config` (modelo_atual) Jan/Fev/Mar/Abr:
+  - `mql_to_rm = 0.491`
+  - `rm_to_rr = 0.722`
+  - `rr_to_prop = 0.884`
+  - `prop_to_venda = 0.243`
+  - `cpv` por mês: Jan 6.389,25 / Fev 7.986,58 / Mar 7.667,13 / Abr 6.921,69
+  - `investimento_planejado`: Jan 153.342 / Fev 191.678 / Mar 230.014 / Abr 249.181
+  - `ticket_medio`: mantido como hoje (não influencia mais Jan-Abr quando driver é investimento)
+- (Opcional) novo campo `lead_to_mql = 0.430` se ainda não existir; senão manter cálculo atual de Leads.
 
-## Passo 1 — Código (`src/hooks/usePlanGrowthData.ts`)
+### 3. Lógica em `usePlanGrowthData.ts`: generalizar "modo Janeiro"
+- Substituir o caso especial de Janeiro por uma regra geral: para qualquer mês onde `investimento_planejado > 0`, o funil é **driven por investimento**:
+  ```
+  vendas = round(investimento_planejado / cpv)
+  propostas = ceil(vendas / propToVenda)
+  rrs = ceil(propostas / rrToProp)
+  rms = ceil(rrs / rmToRr)
+  mqls = ceil(rms / mqlToRm)
+  leads = ceil(mqls / leadToMql)
+  investimento = investimento_planejado  // exato, sem recomputar
+  ```
+- Para os demais meses (sem investimento planejado), manter a lógica atual (vendas = aVender / ticket).
+- Importante: as vendas geradas no modo investimento ainda alimentam a cadeia de MRR (mrr próximo mês += vendas × ticket × retenção), mantendo a projeção de MRR consistente.
 
-a) Adicionar constante de seed projetado:
-```ts
-const MRR_PROJECTED_SEED_DEZ_2025 = 725000;
-```
+### 4. Destravar Jan-Abr
+- Setar `is_locked = false` em `funnel_metas` modelo_atual Jan-Abr 2026, para que o cálculo ao vivo seja exibido (em vez do snapshot antigo).
+- Ao salvar/travar novamente no futuro, o snapshot vai refletir os valores calculados pela nova lógica.
 
-b) `mrrInicial` (linha 350-353): trocar leitura de `mrrBaseRealPorMes['Jan']` por `MRR_PROJECTED_SEED_DEZ_2025`. Comentário deixa claro: "Seed do plano, decoupled da Oxy real".
+### 5. UI: aba Plan Growth → Configurações
+- Adicionar campo "Investimento Planejado (R$)" na grade mensal por BU (mesma tela onde já se editam ticket, CPV, taxas).
+- Quando preenchido, mostrar badge "Driver: Investimento" no header do mês.
 
-c) Remover override (linha 555-560) que substitui `mrrBase` projetado pela Oxy real. O campo `mrrBase` em `modeloAtualFunnel` passa a representar **sempre o projetado**. Real continua disponível em `mrrBaseRealPorMes` para o badge de gap.
+### 6. Validação
+- Após o deploy, conferir na UI que Jan-Abr exibem exatamente: 24/99/112/155/316/735, 24/99/112/155/316/735, 30/123/140/194/395/918, 36/148/168/233/474/1.102 e os investimentos exatos.
+- Conferir que Mai-Dez **não** sofreram alteração (não têm investimento planejado preenchido → caem na lógica atual).
 
-d) Auto-lock (linha 641-655): permanece igual — agora `row.mrrBase` é o projetado verdadeiro, então `funnel_metas.mrr_base_planejamento` recebe o plano correto em futuros locks.
+## Detalhes técnicos
 
-e) Regra de gap (438-466): mantida intacta — continua mandando o saldo positivo para `revenueToSell['Dez']`.
+**Arquivos afetados:**
+- `src/hooks/usePlanGrowthData.ts` — generalizar `investimentoInicialJan` → `investimentoPlanejadoPorMes`
+- `src/hooks/useBUIndicatorsConfig.ts` — adicionar `investimentoPlanejado` ao tipo e ao upsert
+- `src/components/planning/MediaInvestmentTab.tsx` — exibir badge e usar nova lógica
+- Migração: `ALTER TABLE bu_indicators_config ADD COLUMN investimento_planejado numeric NOT NULL DEFAULT 0`
+- Updates em `bu_indicators_config` e `funnel_metas` (somente data, via insert tool)
 
-## Passo 2 — Código (`src/components/planning/MediaInvestmentTab.tsx`)
-
-Bloco linhas 1364-1421: ajustar para refletir que `d.mrrBase` agora é projetado puro.
-- `mrrShown` na coluna principal = `d.mrrBase` (projetado).
-- `mrrBaseProjetado` continua = `d.mrrBase`.
-- `mrrBaseGap` = `projetado − realMrr` (sem mudança de fórmula, só de fonte).
-- Badge no expandido continua mostrando os três valores.
-
-## Passo 3 — Banco (corrigir snapshots já salvos)
-
-Atualizar `funnel_metas.mrr_base_planejamento` modelo_atual Jan-Mai/26 para os valores projetados confirmados:
-
-```sql
-UPDATE public.funnel_metas SET mrr_base_planejamento=725000.00,    updated_at=now() WHERE bu='modelo_atual' AND year=2026 AND month='Jan';
-UPDATE public.funnel_metas SET mrr_base_planejamento=781500.00,    updated_at=now() WHERE bu='modelo_atual' AND year=2026 AND month='Fev';
-UPDATE public.funnel_metas SET mrr_base_planejamento=834610.00,    updated_at=now() WHERE bu='modelo_atual' AND year=2026 AND month='Mar';
-UPDATE public.funnel_metas SET mrr_base_planejamento=909533.00,    updated_at=now() WHERE bu='modelo_atual' AND year=2026 AND month='Abr';
-UPDATE public.funnel_metas SET mrr_base_planejamento=1004961.00,   updated_at=now() WHERE bu='modelo_atual' AND year=2026 AND month='Mai';
-```
-
-`mrr_base_monthly` **não é tocada**.
-
-## Passo 4 — Validação visual
-
-- Conferir Plan Growth/Investimento: Jan=725k, Fev=781,5k, Mar=834,6k, Abr=909,5k, Mai=1.004,9k.
-- Cada mês com badge "Projetado / Real (Oxy) / Δ".
-- Saldo positivo dos gaps somado em "a vender" de Dezembro modelo_atual (verificar console: `[GapMRR ModeloAtual]`).
-- Outras BUs sem alterações.
-
-## Reversão
-
-- Código: restaurar dos `.bak`.
-- Banco:
-```sql
-UPDATE public.funnel_metas SET mrr_base_planejamento=622468.60 WHERE bu='modelo_atual' AND year=2026 AND month='Jan';
-UPDATE public.funnel_metas SET mrr_base_planejamento=705268.07 WHERE bu='modelo_atual' AND year=2026 AND month='Fev';
-UPDATE public.funnel_metas SET mrr_base_planejamento=746847.17 WHERE bu='modelo_atual' AND year=2026 AND month='Mar';
-UPDATE public.funnel_metas SET mrr_base_planejamento=733281.13 WHERE bu='modelo_atual' AND year=2026 AND month='Abr';
-UPDATE public.funnel_metas SET mrr_base_planejamento=700152.57 WHERE bu='modelo_atual' AND year=2026 AND month='Mai';
-```
-
-Ou via History do Lovable para o código.
+**Reversão:** restaurar via History tab ou aplicar os CSVs de backup com um INSERT … ON CONFLICT.
 
 ## Fora de escopo
-
-- Sync Oxy permanece ativo e intocado.
-- Outras BUs (O2 TAX, Oxy Hacker, Franquia) sem alterações.
-- Seed projetado fica hardcoded (725k); editar via UI fica para tarefa futura.
-- Atualização de memória do projeto somente após validação visual.
+- Não altera Mai-Dez nem outras BUs.
+- Não mexe em `mrr_base_monthly` nem nos seeds projetados.
+- Não cria sync automático com a planilha "Indicadores 26".
