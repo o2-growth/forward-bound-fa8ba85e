@@ -1,44 +1,30 @@
-Diagnóstico preciso:
+## Objetivo
+Garantir que O2 TAX e Oxy Hacker exibam Investimento = R$ 0 nos meses de Mar a Dez/2026 no Plan Growth, sem afetar Modelo Atual, Franquia ou qualquer outro indicador (MRR Base, A Vender, leads, MQLs, RMs, RRs, propostas, vendas, faturamento, pontual).
 
-1. O backup existe e foi gravado corretamente
-- A tabela `bu_investment_snapshots` tem os snapshots de Mar/Abr/Mai 2026 para `o2_tax` e `oxy_hacker`.
-- Os registros guardam o valor anterior e `investimento_novo = 0`, então há rastreabilidade para rollback.
+## Etapa 1 — Backups (antes de qualquer alteração)
 
-2. O zeramento chegou a acontecer no banco
-- Às 20:39:17, os 6 registros de Mar/Abr/Mai foram atualizados para:
-  - `investimento = 0`
-  - `is_locked = false`
+**1a. Backup do código**
+- Copiar `src/components/planning2026/MediaInvestmentTab.tsx` para `src/components/planning2026/MediaInvestmentTab.tsx.bak-zero-investment-2026-05-09`.
 
-3. O próprio app reverteu os valores 45 segundos depois
-- Às 20:40:02, o `audit_log` mostra um usuário logado (`jv241004@gmail.com`) atualizando novamente os mesmos 6 registros para os valores antigos e travando de novo:
-  - O2 TAX Mar/Abr/Mai: `23321`, `is_locked = true`
-  - Oxy Hacker Mar: `15000`, `is_locked = true`
-  - Oxy Hacker Abr/Mai: `20000`, `is_locked = true`
+**1b. Backup do banco**
+- Criar schema `backups` (se não existir) e tabela `backups.funnel_metas_2026_05_09_pre_zero` com cópia integral dos registros de `public.funnel_metas WHERE year = 2026`.
+- Permite rollback rápido via `UPDATE funnel_metas SET investimento = b.investimento FROM backups.funnel_metas_2026_05_09_pre_zero b WHERE ...`.
 
-4. Causa raiz no código
-- Existe um auto-lock no `usePlanGrowthData.ts` que roda ao carregar a tela.
-- Quando um mês passado/atual está com `is_locked = false`, ele recria o snapshot automaticamente com os valores calculados do funil.
-- Por isso, ao zerarmos e destravarmos Mar/Abr/Mai, o app entendeu que precisava “re-travar” esses meses e regravou os investimentos antigos.
+## Etapa 2 — Ajuste cirúrgico no display
 
-5. Por que Jun–Dez continuam zerados
-- Jun–Dez estão com `investimento = 0` e `is_locked = false`, mas ainda não são meses auto-lockáveis na lógica atual. Por isso não foram revertidos.
+No `MediaInvestmentTab.tsx`, na construção dos funis de O2 TAX e Oxy Hacker:
+- Ler `funnel_metas` para a BU/mês.
+- Se `investimento = 0` e `is_locked = false` → forçar `investimento: 0` no objeto exibido.
+- Caso contrário, manter o cálculo atual.
 
-Conclusão:
-- O problema não é cache nem erro visual.
-- O problema é uma regra automática de front-end que reverte meses já iniciados quando estão destravados.
+Escopo restrito a `o2TaxFunnel` e `oxyHackerFunnel`. `modeloAtualFunnel` e `franquiaFunnel` permanecem intactos. Os agregados (Investimento Total, gráfico mensal, pizza, cards de BU, `setFunnelData`) já derivam dos funis de BU, então refletem automaticamente.
 
-Plano de correção pro próximo passo:
+## Etapa 3 — Validação
+- Confirmar visualmente Mar a Dez/2026: O2 TAX e Oxy Hacker mostram R$ 0 de Investimento.
+- Confirmar Modelo Atual e Franquia inalterados.
+- Confirmar que nenhum outro campo (MRR Base, A Vender, MQLs, vendas etc.) mudou.
 
-1. Corrigir a regra de auto-lock
-- Ajustar `usePlanGrowthData.ts` para não auto-travar novamente O2 TAX e Oxy Hacker nos meses de Mar a Dez/2026 quando o investimento deve permanecer zerado.
-- Isso evita que o app sobrescreva o banco de novo.
-
-2. Reaplicar o zeramento com backup preservado
-- Atualizar novamente `funnel_metas` apenas para O2 TAX e Oxy Hacker, Mar/Abr/Mai 2026:
-  - `investimento = 0`
-  - manter/destravar conforme a nova regra segura
-- Não mexer em Modelo Atual, Franquia, leads, MQLs, RMs, RRs, propostas, vendas ou metas de faturamento.
-
-3. Validar o resultado
-- Conferir no banco que Mar–Dez/2026 estão zerados para O2 TAX e Oxy Hacker.
-- Conferir que a tela não consegue mais reverter automaticamente esses valores.
+## Garantias
+- Apenas O2 TAX e Oxy Hacker afetados.
+- Nenhuma alteração em `monetary_metas`, `mrr_base_monthly`, `closer_metas`, `sdr_metas`, `funnel_realized`.
+- Rollback disponível via backup de código (`.bak-*`) e backup de DB (`backups.funnel_metas_2026_05_09_pre_zero`).
