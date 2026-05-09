@@ -1448,8 +1448,9 @@ export function MediaInvestmentTab() {
     originalFunnel: FunnelData[],
     buKey: string,
     metrics: FunnelMetrics,
-    cpvValue: number,
+    _cpvValue: number,
     mrrComChurn: Record<string, number> | null = null,
+    metricsByMonth: Record<string, FunnelMetrics> | null = null,
   ): FunnelData[] => {
     const buPending = pendingChanges[buKey];
     if (!buPending || Object.keys(buPending).length === 0) return originalFunnel;
@@ -1458,14 +1459,15 @@ export function MediaInvestmentTab() {
       const pending = buPending[d.month];
       if (pending === undefined) return d;
       
+      const m = metricsByMonth?.[d.month] ?? metrics;
       const newVender = pending;
-      const vendas = newVender / metrics.ticketMedio;
-      const propostas = vendas / metrics.propToVenda;
-      const rrs = propostas / metrics.rrToProp;
-      const rms = rrs / metrics.rmToRr;
-      const mqls = rms / metrics.mqlToRm;
-      const leads = mqls / metrics.leadToMql;
-      const investimento = vendas * cpvValue;
+      const vendas = newVender / m.ticketMedio;
+      const propostas = vendas / m.propToVenda;
+      const rrs = propostas / m.rrToProp;
+      const rms = rrs / m.rmToRr;
+      const mqls = rms / m.mqlToRm;
+      const leads = mqls / m.leadToMql;
+      const investimento = mqls * m.cpmql;
       const faturamentoMeta = mrrComChurn ? (d.mrrBase + newVender) : newVender;
       
       return {
@@ -1484,23 +1486,23 @@ export function MediaInvestmentTab() {
   }, [pendingChanges]);
 
   const effectiveModeloAtualFunnel = useMemo(() => 
-    applyPendingToFunnel(modeloAtualFunnel, 'modelo_atual', funnelMetrics.modeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrDynamic.mrrPorMes),
-    [modeloAtualFunnel, applyPendingToFunnel, funnelMetrics.modeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrDynamic.mrrPorMes]
+    applyPendingToFunnel(modeloAtualFunnel, 'modelo_atual', funnelMetrics.modeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrDynamic.mrrPorMes, metricsByMonthPorBU.modeloAtual),
+    [modeloAtualFunnel, applyPendingToFunnel, funnelMetrics.modeloAtual, indicadoresPorBU.modeloAtual.cpv, mrrDynamic.mrrPorMes, metricsByMonthPorBU]
   );
 
   const effectiveO2TaxFunnel = useMemo(() => 
-    applyPendingToFunnel(o2TaxFunnel, 'o2_tax', funnelMetrics.o2Tax, funnelMetrics.o2Tax.cpv || indicadoresPorBU.o2Tax.cpv),
-    [o2TaxFunnel, applyPendingToFunnel, funnelMetrics.o2Tax, indicadoresPorBU.o2Tax.cpv]
+    applyPendingToFunnel(o2TaxFunnel, 'o2_tax', funnelMetrics.o2Tax, funnelMetrics.o2Tax.cpv || indicadoresPorBU.o2Tax.cpv, null, metricsByMonthPorBU.o2Tax),
+    [o2TaxFunnel, applyPendingToFunnel, funnelMetrics.o2Tax, indicadoresPorBU.o2Tax.cpv, metricsByMonthPorBU]
   );
 
   const effectiveOxyHackerFunnel = useMemo(() => 
-    applyPendingToFunnel(oxyHackerFunnel, 'oxy_hacker', funnelMetrics.oxyHacker, funnelMetrics.oxyHacker.cpv || indicadoresPorBU.oxyHacker.cpv),
-    [oxyHackerFunnel, applyPendingToFunnel, funnelMetrics.oxyHacker, indicadoresPorBU.oxyHacker.cpv]
+    applyPendingToFunnel(oxyHackerFunnel, 'oxy_hacker', funnelMetrics.oxyHacker, funnelMetrics.oxyHacker.cpv || indicadoresPorBU.oxyHacker.cpv, null, metricsByMonthPorBU.oxyHacker),
+    [oxyHackerFunnel, applyPendingToFunnel, funnelMetrics.oxyHacker, indicadoresPorBU.oxyHacker.cpv, metricsByMonthPorBU]
   );
 
   const effectiveFranquiaFunnel = useMemo(() => 
-    applyPendingToFunnel(franquiaFunnel, 'franquia', funnelMetrics.franquia, funnelMetrics.franquia.cpv || indicadoresPorBU.franquia.cpv),
-    [franquiaFunnel, applyPendingToFunnel, funnelMetrics.franquia, indicadoresPorBU.franquia.cpv]
+    applyPendingToFunnel(franquiaFunnel, 'franquia', funnelMetrics.franquia, funnelMetrics.franquia.cpv || indicadoresPorBU.franquia.cpv, null, metricsByMonthPorBU.franquia),
+    [franquiaFunnel, applyPendingToFunnel, funnelMetrics.franquia, indicadoresPorBU.franquia.cpv, metricsByMonthPorBU]
   );
 
   // Consolidated funnel for 2026 visual
