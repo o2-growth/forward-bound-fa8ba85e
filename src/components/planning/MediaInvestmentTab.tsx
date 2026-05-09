@@ -221,35 +221,33 @@ function calculateReverseFunnel(
   netRevenueToSell: Record<string, number>,
   metrics: FunnelMetrics,
   mrrComChurn: Record<string, number> | null = null,
-  useCpv: boolean = false,
+  _useCpv: boolean = false,
   metasMensais: Record<string, number> | null = null,
-  cpvValue: number = indicators2025.cpv,
-  investimentoInicialJan: number = 0
+  _cpvValue: number = indicators2025.cpv,
+  _investimentoInicialJan: number = 0,
+  metricsByMonth: Record<string, FunnelMetrics> | null = null
 ): FunnelData[] {
-  let investimentoAnterior = 0;
-  
-  // Primeiro, calcula todos os dados originais (incluindo investimentos)
-  const dadosOriginais = months.map(month => {
+  // Bottom-up: VENDA é a raiz (vinda de aVender / ticketMedio).
+  // Cada mês usa SUAS próprias taxas e CPMQL (de bu_indicators_config).
+  // MÍDIA = MQL × CPMQL (output derivado).
+  return months.map(month => {
     const faturamentoVender = netRevenueToSell[month];
     const mrrBaseAtual = mrrComChurn ? mrrComChurn[month] : 0;
-    const faturamentoMeta = mrrComChurn 
-      ? (mrrBaseAtual + faturamentoVender) 
+    const m = metricsByMonth?.[month] ?? metrics;
+    const faturamentoMeta = mrrComChurn
+      ? (mrrBaseAtual + faturamentoVender)
       : (metasMensais ? metasMensais[month] : faturamentoVender);
-    
-    const vendas = faturamentoVender / metrics.ticketMedio;
-    const propostas = vendas / metrics.propToVenda;
-    const rrs = propostas / metrics.rrToProp;
-    const rms = rrs / metrics.rmToRr;
-    const mqls = rms / metrics.mqlToRm;
-    const leads = mqls / metrics.leadToMql;
-    
-    // Calcula investimento baseado na fórmula original
-    const investimentoCalculado = useCpv ? vendas * cpvValue : vendas * metrics.cac;
-    
-    // Garante que o investimento nunca diminua (sempre crescente ou estável)
-    const investimento = Math.max(investimentoCalculado, investimentoAnterior);
-    investimentoAnterior = investimento;
-    
+
+    const vendas    = faturamentoVender / m.ticketMedio;
+    const propostas = vendas    / m.propToVenda;
+    const rrs       = propostas / m.rrToProp;
+    const rms       = rrs       / m.rmToRr;
+    const mqls      = rms       / m.mqlToRm;
+    const leads     = mqls      / m.leadToMql;
+
+    // Investimento = MQL × CPMQL (do mês)
+    const investimento = mqls * m.cpmql;
+
     return {
       month,
       faturamentoMeta,
@@ -262,42 +260,6 @@ function calculateReverseFunnel(
       mqls: Math.ceil(mqls),
       leads: Math.ceil(leads),
       investimento: Math.round(investimento),
-    };
-  });
-  
-  // Desloca os investimentos em 1 mês:
-  // Jan recebe o investimento de Fev, Fev recebe o de Mar, etc.
-  // Isso reflete que o investimento de um mês gera resultado no mês seguinte
-  return dadosOriginais.map((dados, index) => {
-    // Se é janeiro e tem investimento inicial definido, recalcula vendas baseado no investimento e CPV
-    if (index === 0 && investimentoInicialJan > 0) {
-      const vendasIniciais = Math.ceil(investimentoInicialJan / cpvValue);
-      const propostas = Math.ceil(vendasIniciais / metrics.propToVenda);
-      const rrs = Math.ceil(propostas / metrics.rrToProp);
-      const rms = Math.ceil(rrs / metrics.rmToRr);
-      const mqls = Math.ceil(rms / metrics.mqlToRm);
-      const leads = Math.ceil(mqls / metrics.leadToMql);
-      
-      return { 
-        ...dados, 
-        investimento: investimentoInicialJan,
-        vendas: vendasIniciais,
-        propostas,
-        rrs,
-        rms,
-        mqls,
-        leads,
-      };
-    }
-    
-    // Pega o investimento do próximo mês, ou mantém o próprio se for dezembro
-    const investimentoDeslocado = index < months.length - 1 
-      ? dadosOriginais[index + 1].investimento 
-      : dados.investimento;
-    
-    return {
-      ...dados,
-      investimento: investimentoDeslocado,
     };
   });
 }
