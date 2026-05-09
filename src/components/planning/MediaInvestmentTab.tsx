@@ -348,6 +348,7 @@ interface BUIndicators {
   rmToRr: number;
   rrToProp: number;
   propToVenda: number;
+  investimentoPlanejado?: number;
 }
 
 // Get current month index (0-based, Feb 2026 = 1)
