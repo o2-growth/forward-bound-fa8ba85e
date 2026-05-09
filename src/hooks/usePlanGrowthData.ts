@@ -540,11 +540,11 @@ export function usePlanGrowthData() {
       const leadToMql = indicadoresPorBU.modeloAtual.leadToMql;
 
       const vendas = Math.round(investPlan / cpvMes);
-      const propostas = Math.ceil(vendas / propToVenda);
-      const rrs = Math.ceil(propostas / rrToProp);
-      const rms = Math.ceil(rrs / rmToRr);
-      const mqls = Math.ceil(rms / mqlToRm);
-      const leads = Math.ceil(mqls / leadToMql);
+      const propostas = Math.round(vendas / propToVenda);
+      const rrs = Math.round(propostas / rrToProp);
+      const rms = Math.round(rrs / rmToRr);
+      const mqls = Math.round(rms / mqlToRm);
+      const leads = Math.round(mqls / leadToMql);
 
       return {
         ...calc,
