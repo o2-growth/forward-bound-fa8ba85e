@@ -1364,18 +1364,18 @@ export function MediaInvestmentTab() {
       const realMrr = mrrBaseRealPorMes[d.month];
       const fixed = fixedRows.find(f => f.month === d.month);
       const isLocked = fixed?.is_locked === true;
-      const projetado = d.mrrBase; // MRR sintético antes do override
+      const projetado = d.mrrBase; // chain projetada (vinda do hook)
       const aVenderOriginal = d.faturamentoVender;
 
-      // Mês locked: snapshot manda em metas/quantidades; mrrBase mostra Oxy real (verdade visual)
+      // Mês locked: snapshot manda em metas/quantidades.
+      // Coluna mrrBase exibe SEMPRE o projetado; Real (Oxy) aparece no badge de gap.
       if (isLocked && fixed) {
         const fatMeta = Number(fixed.faturamento_meta) || d.faturamentoMeta;
         const fatVender = Number(fixed.faturamento_vender) || d.faturamentoVender;
         const invest = Number(fixed.investimento) || d.investimento;
-        const mrrShown = realMrr > 0 ? realMrr : d.mrrBase;
         return {
           ...d,
-          mrrBase: mrrShown,
+          mrrBase: projetado,
           faturamentoMeta: fatMeta,
           faturamentoVender: fatVender,
           investimento: invest,
@@ -1386,17 +1386,18 @@ export function MediaInvestmentTab() {
           propostas: fixed.propostas ?? d.propostas,
           vendas: fixed.vendas ?? d.vendas,
           mrrBaseProjetado: projetado,
-          mrrBaseGap: projetado - mrrShown,
+          mrrBaseGap: realMrr > 0 ? projetado - realMrr : 0,
           aVenderOriginal,
         };
       }
 
-      // Mês não locked sem Oxy real: nada muda
+      // Mês não locked sem Oxy real: usa só projetado
       if (!(realMrr > 0)) {
-        return d;
+        return { ...d, mrrBaseProjetado: projetado, mrrBaseGap: 0, aVenderOriginal };
       }
 
-      // Mês não locked com Oxy real: preserva Meta original e recalcula A Vender + funil
+      // Mês não locked com Oxy real: recalcula A Vender + funil baseado no REAL,
+      // mas a coluna mrrBase exibe o PROJETADO (gap aparece no badge).
       const novoVender = Math.max(0, d.faturamentoMeta - realMrr);
       const vendas = novoVender / ticketMedio;
       const propostas = vendas / m.propToVenda;
@@ -1408,7 +1409,7 @@ export function MediaInvestmentTab() {
 
       return {
         ...d,
-        mrrBase: realMrr,
+        mrrBase: projetado,
         faturamentoVender: novoVender,
         vendas: Math.ceil(vendas),
         propostas: Math.ceil(propostas),
