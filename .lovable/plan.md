@@ -1,23 +1,44 @@
-## Estender o zeramento para começar em Março/2026
+Diagnóstico preciso:
 
-Atualmente o investimento de Oxy Hacker e O2 TAX foi zerado de **Abr a Dez/2026**. Você quer estender também para **Mar/2026**, que hoje está locked com:
+1. O backup existe e foi gravado corretamente
+- A tabela `bu_investment_snapshots` tem os snapshots de Mar/Abr/Mai 2026 para `o2_tax` e `oxy_hacker`.
+- Os registros guardam o valor anterior e `investimento_novo = 0`, então há rastreabilidade para rollback.
 
-- **Oxy Hacker Mar/2026**: R$ 15.000 (locked)
-- **O2 TAX Mar/2026**: R$ 23.321 (locked)
+2. O zeramento chegou a acontecer no banco
+- Às 20:39:17, os 6 registros de Mar/Abr/Mai foram atualizados para:
+  - `investimento = 0`
+  - `is_locked = false`
 
-### O que será feito
+3. O próprio app reverteu os valores 45 segundos depois
+- Às 20:40:02, o `audit_log` mostra um usuário logado (`jv241004@gmail.com`) atualizando novamente os mesmos 6 registros para os valores antigos e travando de novo:
+  - O2 TAX Mar/Abr/Mai: `23321`, `is_locked = true`
+  - Oxy Hacker Mar: `15000`, `is_locked = true`
+  - Oxy Hacker Abr/Mai: `20000`, `is_locked = true`
 
-1. **Snapshot de auditoria** em `bu_investment_snapshots` para Mar/2026 (Oxy Hacker e O2 TAX), preservando os valores atuais antes da alteração com `reason = 'Zeramento estendido para Mar-Dez/2026 (somente investimento)'`.
+4. Causa raiz no código
+- Existe um auto-lock no `usePlanGrowthData.ts` que roda ao carregar a tela.
+- Quando um mês passado/atual está com `is_locked = false`, ele recria o snapshot automaticamente com os valores calculados do funil.
+- Por isso, ao zerarmos e destravarmos Mar/Abr/Mai, o app entendeu que precisava “re-travar” esses meses e regravou os investimentos antigos.
 
-2. **Atualizar `funnel_metas`** para `oxy_hacker` e `o2_tax`, mês `Mar`, ano 2026:
-   - `investimento = 0`
-   - `is_locked = false` (destrava para permitir o zeramento)
-   - Demais campos (leads, mqls, rms, rrs, propostas, vendas, faturamento_meta, mrr_base_planejamento, faturamento_vender) **permanecem intactos**.
+5. Por que Jun–Dez continuam zerados
+- Jun–Dez estão com `investimento = 0` e `is_locked = false`, mas ainda não são meses auto-lockáveis na lógica atual. Por isso não foram revertidos.
 
-3. **Atualizar memória** `mem://strategy/oxy-tax-zero-investment-abr-2026` → renomear conceitualmente para refletir período Mar–Dez/2026, e atualizar a entrada correspondente no `mem://index.md`.
+Conclusão:
+- O problema não é cache nem erro visual.
+- O problema é uma regra automática de front-end que reverte meses já iniciados quando estão destravados.
 
-### Escopo preservado
+Plano de correção pro próximo passo:
 
-- Modelo Atual e Franquia: **sem alterações**.
-- Outras métricas de Oxy Hacker e O2 TAX em Mar (funil + monetárias): **sem alterações**.
-- Apenas o campo `investimento` é zerado.
+1. Corrigir a regra de auto-lock
+- Ajustar `usePlanGrowthData.ts` para não auto-travar novamente O2 TAX e Oxy Hacker nos meses de Mar a Dez/2026 quando o investimento deve permanecer zerado.
+- Isso evita que o app sobrescreva o banco de novo.
+
+2. Reaplicar o zeramento com backup preservado
+- Atualizar novamente `funnel_metas` apenas para O2 TAX e Oxy Hacker, Mar/Abr/Mai 2026:
+  - `investimento = 0`
+  - manter/destravar conforme a nova regra segura
+- Não mexer em Modelo Atual, Franquia, leads, MQLs, RMs, RRs, propostas, vendas ou metas de faturamento.
+
+3. Validar o resultado
+- Conferir no banco que Mar–Dez/2026 estão zerados para O2 TAX e Oxy Hacker.
+- Conferir que a tela não consegue mais reverter automaticamente esses valores.
