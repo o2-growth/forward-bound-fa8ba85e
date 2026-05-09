@@ -523,12 +523,47 @@ export function usePlanGrowthData() {
   // regardless of lock — the lock only protects the PLAN, not the real number shown.
   const modeloAtualFunnel = useMemo(() => {
     const hasFixedFunnel = hasFunnelForBU('modelo_atual');
-    const base = !hasFixedFunnel ? modeloAtualFunnelCalculated : modeloAtualFunnelCalculated.map(calc => {
+    const monthlyConfig = getIndicatorsForBU('modelo_atual');
+
+    // Helper: aplica o "driver por investimento" para um mês com investimento_planejado > 0.
+    // vendas = round(invest / CPV); o restante cai pelas taxas mensais (com leadToMql do default).
+    const applyInvestmentDriver = (calc: typeof modeloAtualFunnelCalculated[number]) => {
+      const cfg = monthlyConfig[calc.month];
+      const investPlan = Number(cfg?.investimentoPlanejado || 0);
+      const cpvMes = Number(cfg?.cpv || 0);
+      if (investPlan <= 0 || cpvMes <= 0) return calc;
+
+      const propToVenda = Number(cfg?.propToVenda) || indicadoresPorBU.modeloAtual.propToVenda;
+      const rrToProp = Number(cfg?.rrToProp) || indicadoresPorBU.modeloAtual.rrToProp;
+      const rmToRr = Number(cfg?.rmToRr) || indicadoresPorBU.modeloAtual.rmToRr;
+      const mqlToRm = Number(cfg?.mqlToRm) || indicadoresPorBU.modeloAtual.mqlToRm;
+      const leadToMql = indicadoresPorBU.modeloAtual.leadToMql;
+
+      const vendas = Math.round(investPlan / cpvMes);
+      const propostas = Math.ceil(vendas / propToVenda);
+      const rrs = Math.ceil(propostas / rrToProp);
+      const rms = Math.ceil(rrs / rmToRr);
+      const mqls = Math.ceil(rms / mqlToRm);
+      const leads = Math.ceil(mqls / leadToMql);
+
+      return {
+        ...calc,
+        vendas,
+        propostas,
+        rrs,
+        rms,
+        mqls,
+        leads,
+        investimento: investPlan,
+      };
+    };
+
+    const base = !hasFixedFunnel ? modeloAtualFunnelCalculated.map(applyInvestmentDriver) : modeloAtualFunnelCalculated.map(calc => {
       const fixed = getFunnelForBU('modelo_atual').find(f => f.month === calc.month);
-      if (!fixed) return calc;
+      if (!fixed) return applyInvestmentDriver(calc);
 
       // Only locked months use the snapshot (quantities + monetary).
-      // Unlocked months ignore the snapshot and use the live reverse funnel calc.
+      // Unlocked months: aplica driver por investimento (se houver) e cai no calc ao vivo.
       if (fixed.is_locked) {
         const fatMeta = Number(fixed.faturamento_meta) || 0;
         const fatVender = Number(fixed.faturamento_vender) || 0;
@@ -547,7 +582,7 @@ export function usePlanGrowthData() {
         };
       }
 
-      return calc;
+      return applyInvestmentDriver(calc);
     });
 
     // mrrBase agora representa SEMPRE o projetado (chain). O real (Oxy) fica
@@ -555,7 +590,7 @@ export function usePlanGrowthData() {
     // por mês em MediaInvestmentTab. O saldo (projetado − real) é redirecionado
     // para o "a vender" de Dezembro pela regra de gap acima.
     return base;
-  }, [modeloAtualFunnelCalculated, funnelMetas, mrrBaseRealPorMes]);
+  }, [modeloAtualFunnelCalculated, funnelMetas, mrrBaseRealPorMes, getIndicatorsForBU, indicadoresPorBU]);
 
   // Auto-seed funnel_metas on first load if table is empty
   // NEVER overwrite past/current months — only seed future months that don't exist yet
