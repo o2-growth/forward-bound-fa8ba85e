@@ -656,6 +656,19 @@ export function usePlanGrowthData() {
     const isAlreadyLocked = (bu: string, month: string) =>
       funnelMetas.some(m => m.bu === bu && m.month === month && m.year === PLAN_YEAR && m.is_locked === true);
 
+    // Skip auto-lock for rows explicitly zeroed by admin (investimento=0 + is_locked=false).
+    // This is the "intentionally cleared" signal — the app must NOT re-lock and overwrite
+    // them with computed values. Used for Oxy Hacker / O2 TAX zero-investment plan.
+    const isExplicitlyZeroed = (bu: string, month: string) =>
+      funnelMetas.some(
+        m =>
+          m.bu === bu &&
+          m.month === month &&
+          m.year === PLAN_YEAR &&
+          m.is_locked === false &&
+          Number(m.investimento || 0) === 0
+      );
+
     type FunnelRow = typeof modeloAtualFunnelCalculated[number];
     const buSources: Array<{ bu: string; rows: FunnelRow[] }> = [
       { bu: 'modelo_atual', rows: modeloAtualFunnel },
