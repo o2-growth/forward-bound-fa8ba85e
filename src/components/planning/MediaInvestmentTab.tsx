@@ -1428,14 +1428,34 @@ export function MediaInvestmentTab() {
     });
   }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU, metricsByMonthPorBU]);
   
+  // Override: se funnel_metas tem investimento=0 e is_locked=false para a BU/mês,
+  // força investimento=0 no display (decisão estratégica de zerar Oxy Hacker e O2 TAX).
+  const applyZeroInvestimentoOverride = useCallback((funnel: FunnelData[], buKey: string): FunnelData[] => {
+    const fixedRows = hasFunnelForBU(buKey) ? getFunnelForBU(buKey) : [];
+    if (!fixedRows || fixedRows.length === 0) return funnel;
+    return funnel.map(d => {
+      const fixed = fixedRows.find((f: any) => f.month === d.month);
+      if (fixed && Number(fixed.investimento) === 0 && fixed.is_locked === false) {
+        return { ...d, investimento: 0 };
+      }
+      return d;
+    });
+  }, [hasFunnelForBU, getFunnelForBU]);
+
   const o2TaxFunnel = useMemo(() => 
-    calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 0, metricsByMonthPorBU.o2Tax),
-    [o2TaxMonthly, funnelMetrics.o2Tax, metricsByMonthPorBU]
+    applyZeroInvestimentoOverride(
+      calculateReverseFunnel(o2TaxMonthly, funnelMetrics.o2Tax, null, true, null, funnelMetrics.o2Tax.cpv, 0, metricsByMonthPorBU.o2Tax),
+      'o2_tax'
+    ),
+    [o2TaxMonthly, funnelMetrics.o2Tax, metricsByMonthPorBU, applyZeroInvestimentoOverride]
   );
   
   const oxyHackerFunnel = useMemo(() => 
-    calculateReverseFunnel(oxyHackerMonthly, funnelMetrics.oxyHacker, null, true, null, funnelMetrics.oxyHacker.cpv, 0, metricsByMonthPorBU.oxyHacker),
-    [oxyHackerMonthly, funnelMetrics.oxyHacker, metricsByMonthPorBU]
+    applyZeroInvestimentoOverride(
+      calculateReverseFunnel(oxyHackerMonthly, funnelMetrics.oxyHacker, null, true, null, funnelMetrics.oxyHacker.cpv, 0, metricsByMonthPorBU.oxyHacker),
+      'oxy_hacker'
+    ),
+    [oxyHackerMonthly, funnelMetrics.oxyHacker, metricsByMonthPorBU, applyZeroInvestimentoOverride]
   );
   
   const franquiaFunnel = useMemo(() => 
