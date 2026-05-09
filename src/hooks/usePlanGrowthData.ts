@@ -550,12 +550,11 @@ export function usePlanGrowthData() {
       return calc;
     });
 
-    // Override mrrBase column with Oxy truth (mrr_base_monthly) when available.
-    // For months without DB entry (future months), keep the synthetic projection.
-    return base.map(d => {
-      const realMrrBase = mrrBaseRealPorMes[d.month];
-      return realMrrBase > 0 ? { ...d, mrrBase: realMrrBase } : d;
-    });
+    // mrrBase agora representa SEMPRE o projetado (chain). O real (Oxy) fica
+    // separado em mrrBaseRealPorMes e é exibido como "Real (Oxy)" no badge de gap
+    // por mês em MediaInvestmentTab. O saldo (projetado − real) é redirecionado
+    // para o "a vender" de Dezembro pela regra de gap acima.
+    return base;
   }, [modeloAtualFunnelCalculated, funnelMetas, mrrBaseRealPorMes]);
 
   // Auto-seed funnel_metas on first load if table is empty
