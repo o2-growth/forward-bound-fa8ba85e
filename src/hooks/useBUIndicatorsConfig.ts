@@ -143,6 +143,7 @@ export function useBUIndicatorsConfig() {
           rmToRr: Number(row.rm_to_rr),
           rrToProp: Number(row.rr_to_prop),
           propToVenda: Number(row.prop_to_venda),
+          investimentoPlanejado: Number((row as any).investimento_planejado || 0),
         };
       }
     }
