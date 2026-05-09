@@ -1134,6 +1134,7 @@ export function MediaInvestmentTab() {
       rmToRr: 0.72,
       rrToProp: 0.88,
       propToVenda: 0.24,
+      investimentoPlanejado: 0,
     },
     o2Tax: {
       ticketMedio: 15000,
@@ -1143,6 +1144,7 @@ export function MediaInvestmentTab() {
       rmToRr: 0.65,
       rrToProp: 0.80,
       propToVenda: 0.20,
+      investimentoPlanejado: 0,
     },
     oxyHacker: {
       ticketMedio: 54000,
@@ -1152,6 +1154,7 @@ export function MediaInvestmentTab() {
       rmToRr: 0.60,
       rrToProp: 0.75,
       propToVenda: 0.15,
+      investimentoPlanejado: 0,
     },
     franquia: {
       ticketMedio: 140000,
@@ -1161,6 +1164,7 @@ export function MediaInvestmentTab() {
       rmToRr: 0.55,
       rrToProp: 0.70,
       propToVenda: 0.12,
+      investimentoPlanejado: 0,
     },
   });
 
