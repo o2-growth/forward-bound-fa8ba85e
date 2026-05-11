@@ -2251,7 +2251,33 @@ export function IndicatorsTab() {
   // Get meta for monetary indicators using consolidated metas (database > Plan Growth)
   const getMetaMonetaryForIndicator = (indicator: MonetaryIndicatorConfig): number => {
     const closerFilter = effectiveSelectedClosers.length > 0 ? effectiveSelectedClosers : undefined;
-    
+
+    // Build SDR ratio callback when SDR filter is active
+    let sdrRatio: ((bu: BuType, month: string) => number) | undefined;
+    if (effectiveSelectedSDRs.length > 0) {
+      sdrRatio = (bu: BuType, month: string) => {
+        const sdrsInBU = (BU_SDRS[bu] || []) as readonly string[];
+        if (sdrsInBU.length === 0) return 0;
+        const selectedInBU = effectiveSelectedSDRs.filter(s => sdrsInBU.includes(s));
+        if (selectedInBU.length === 0) return 0;
+
+        // Sum RM+RR meta for the BU/month — selected SDRs vs all SDRs of the BU
+        let selectedSum = 0;
+        let totalSum = 0;
+        for (const m of sdrMetasList) {
+          if (m.bu !== bu || m.month !== month) continue;
+          if (!sdrsInBU.includes(m.sdr)) continue;
+          const v = (m.rm_meta || 0) + (m.rr_meta || 0);
+          totalSum += v;
+          if (selectedInBU.includes(m.sdr)) selectedSum += v;
+        }
+
+        // Fallback: distribuição igualitária quando não há sdr_metas para o mês
+        if (totalSum === 0) return selectedInBU.length / sdrsInBU.length;
+        return selectedSum / totalSum;
+      };
+    }
+
     // Use hook consolidado que mescla banco + Plan Growth
     return getMetaMonetaryForPeriod(
       indicator.key as ConsolidatedMetricType | 'sla',
@@ -2259,9 +2285,11 @@ export function IndicatorsTab() {
       startDate,
       endDate,
       closerFilter,
-      getFilteredMeta
+      getFilteredMeta,
+      sdrRatio as any
     );
   };
+
 
   // Handle monetary card click with strategic narratives
   const handleMonetaryCardClick = (indicator: MonetaryIndicatorConfig) => {
