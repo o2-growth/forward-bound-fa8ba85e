@@ -1,30 +1,46 @@
-## Objetivo
-Garantir que O2 TAX e Oxy Hacker exibam Investimento = R$ 0 nos meses de Mar a Dez/2026 no Plan Growth, sem afetar Modelo Atual, Franquia ou qualquer outro indicador (MRR Base, A Vender, leads, MQLs, RMs, RRs, propostas, vendas, faturamento, pontual).
+## Diagnóstico
 
-## Etapa 1 — Backups (antes de qualquer alteração)
+Filtrei o código em `src/components/planning/IndicatorsTab.tsx` e identifiquei a causa: **os cards monetários (Fat Incremento, MRR, Setup, Pontual) só consideram o filtro de Closer — o filtro de SDR é totalmente ignorado** tanto no realizado quanto na meta.
 
-**1a. Backup do código**
-- Copiar `src/components/planning2026/MediaInvestmentTab.tsx` para `src/components/planning2026/MediaInvestmentTab.tsx.bak-zero-investment-2026-05-09`.
+Os cards de quantidade (MQLs, Reuniões, Propostas, Vendas) já filtram por SDR — por isso "MQLs = 8" mudou ao escolher Amanda. Já os monetários:
 
-**1b. Backup do banco**
-- Criar schema `backups` (se não existir) e tabela `backups.funnel_metas_2026_05_09_pre_zero` com cópia integral dos registros de `public.funnel_metas WHERE year = 2026`.
-- Permite rollback rápido via `UPDATE funnel_metas SET investimento = b.investimento FROM backups.funnel_metas_2026_05_09_pre_zero b WHERE ...`.
+- `getRealizedMonetaryForIndicator` (linhas 2084-2259) só checa `effectiveSelectedClosers`. Quando há só SDR selecionada, cai no `else` e soma o total da BU sem filtro nenhum.
+- `getMetaMonetaryForIndicator` (2262-2274) também só passa `closerFilter` para `getMetaMonetaryForPeriod` — sem rateio por SDR.
 
-## Etapa 2 — Ajuste cirúrgico no display
+Por isso, com Amanda Serafim selecionada em Mai/2026, os 4 cards monetários mostram o valor cheio das BUs (Modelo Atual + outras), e não a fatia atribuível à Amanda.
 
-No `MediaInvestmentTab.tsx`, na construção dos funis de O2 TAX e Oxy Hacker:
-- Ler `funnel_metas` para a BU/mês.
-- Se `investimento = 0` e `is_locked = false` → forçar `investimento: 0` no objeto exibido.
-- Caso contrário, manter o cálculo atual.
+> Obs.: existe regra em memória "Monetary Gauges Closer Filter" (rateio via `closer_metas %`) — porém não há equivalente para SDR. Como a SDR não fecha venda, o "realizado por SDR" precisa vir dos cards de venda em que ela aparece como SDR (campo `card.sdr` já disponível em `useModeloAtualAnalytics` e `useO2TaxAnalytics`).
 
-Escopo restrito a `o2TaxFunnel` e `oxyHackerFunnel`. `modeloAtualFunnel` e `franquiaFunnel` permanecem intactos. Os agregados (Investimento Total, gráfico mensal, pizza, cards de BU, `setFunnelData`) já derivam dos funis de BU, então refletem automaticamente.
+## Plano
 
-## Etapa 3 — Validação
-- Confirmar visualmente Mar a Dez/2026: O2 TAX e Oxy Hacker mostram R$ 0 de Investimento.
-- Confirmar Modelo Atual e Franquia inalterados.
-- Confirmar que nenhum outro campo (MRR Base, A Vender, MQLs, vendas etc.) mudou.
+### 1. Realizado — filtrar vendas por SDR
+Em `getRealizedMonetaryForIndicator` (IndicatorsTab.tsx ~2084-2259), aplicar a SDR de forma análoga ao Closer, em todas as BUs e nos 4 indicadores monetários (`faturamento`, `mrr`, `setup`, `pontual`):
 
-## Garantias
-- Apenas O2 TAX e Oxy Hacker afetados.
-- Nenhuma alteração em `monetary_metas`, `mrr_base_monthly`, `closer_metas`, `sdr_metas`, `funnel_realized`.
-- Rollback disponível via backup de código (`.bak-*`) e backup de DB (`backups.funnel_metas_2026_05_09_pre_zero`).
+- Ler `effectiveSelectedSDRs` e considerar `sdrFilterActive = effectiveSelectedSDRs.length > 0`.
+- Quando `sdrFilterActive` (sozinho ou combinado com closer), trabalhar **sempre via `getCardsForIndicator('venda')`** e aplicar:
+  - `matchesCloserFilter(card.closer)` se houver filtro de closer; 
+  - **`matchesSdrFilter(card.sdr ?? card.responsavel)`** se houver filtro de SDR.
+- Somar `valor` / `valorMRR` / `valorSetup` / `valorPontual` conforme o indicador (Oxy Hacker e Franquia continuam tratando tudo como Pontual).
+- Para Modelo Atual / O2 TAX só somar se a SDR selecionada operar na BU (já existe `BU_SDRS` + `sdrFilterForBU`); se nenhuma SDR selecionada operar na BU, contribui 0.
+
+### 2. Meta — rateio por SDR
+Estender `getMetaMonetaryForIndicator` para passar também `sdrFilter = effectiveSelectedSDRs` e usar `sdr_metas` como base de rateio:
+
+- Em `useConsolidatedMetas.getMetaMonetaryForPeriod`, aceitar parâmetro opcional `sdrFilter`.
+- Quando `sdrFilter` ativo (e closerFilter vazio), calcular **proporção da SDR** por BU/mês usando `useSdrMetas.getSdrMetaTotals` (somando RM+RR ou só RM como proxy de capacidade) sobre o total de RM+RR da BU/mês — esse % multiplica o `faturamento` meta da BU/mês. Mesmo padrão do rateio de Closer.
+- Derivar MRR (25%), Setup (60%), Pontual (15%) sobre o faturamento rateado, igual ao caminho de Closer.
+- Quando SDR e Closer estiverem ativos juntos, aplicar Closer primeiro (comportamento atual) e depois reduzir pelo % de SDR sobre o subset.
+
+### 3. Validação
+- Login na preview com `jv241004@gmail.com` via Playwright.
+- Filtro: Mai/2026 + SDR "Amanda Serafim" (sem closer).
+- Conferir que Fat Incremento, MRR, Setup e Pontual mudam (realizado e meta) em relação ao "Todos SDRs".
+- Conferir caso combinado SDR + Closer e SDR sem operação na BU (deve zerar a contribuição daquela BU).
+
+### Arquivos afetados
+- `src/components/planning/IndicatorsTab.tsx` (funções `getRealizedMonetaryForIndicator` e `getMetaMonetaryForIndicator`).
+- `src/hooks/useConsolidatedMetas.ts` (assinatura e lógica de `getMetaMonetaryForPeriod`).
+- Sem mudanças de schema/DB.
+
+### Observação sobre memória
+Após implementar, atualizar a memória "Monetary Gauges Closer Filter" para "Monetary Gauges Closer/SDR Filter", documentando que SDR também rateia realizado (via campo `card.sdr`) e meta (via `sdr_metas`).
