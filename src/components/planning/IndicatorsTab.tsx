@@ -2083,55 +2083,73 @@ export function IndicatorsTab() {
   // Get realized monetary value for monetary indicators (respecting BU and Closer filters)
   const getRealizedMonetaryForIndicator = (indicator: MonetaryIndicatorConfig): number => {
     const closerFilterActive = effectiveSelectedClosers.length > 0;
+    const sdrFilterActive = effectiveSelectedSDRs.length > 0;
+    const filtersActive = closerFilterActive || sdrFilterActive;
+
+    // Helper: aplica filtros de Closer e SDR aos cards de venda de uma BU.
+    // Retorna null quando não há filtros (caller usa o caminho padrão otimizado).
+    const filteredVendasForBU = (bu: BuType, vendas: any[]): any[] | null => {
+      if (!filtersActive) return null;
+      // Se SDR está ativo mas nenhuma SDR selecionada opera nessa BU, exclui a BU
+      if (sdrFilterActive) {
+        const sdrsForBU = effectiveSelectedSDRs.filter(s => BU_SDRS[bu]?.includes(s as any));
+        if (sdrsForBU.length === 0) return [];
+      }
+      // Se Closer está ativo mas nenhum closer selecionado opera nessa BU, exclui a BU
+      if (closerFilterActive) {
+        const closersForBU = effectiveSelectedClosers.filter(c => BU_CLOSERS[bu]?.includes(c as any));
+        if (closersForBU.length === 0) return [];
+      }
+      return vendas.filter(card => {
+        const matchCloser = !closerFilterActive || matchesCloserFilter((card.closer || '').trim());
+        const matchSdr = !sdrFilterActive || matchesSdrFilter((card.sdr || card.responsavel || '').trim());
+        return matchCloser && matchSdr;
+      });
+    };
+
     switch (indicator.key) {
       case 'faturamento': {
         let total = 0;
-        
-        // For Modelo Atual: apply closer filter if active
+
         if (includesModeloAtual) {
-          if (closerFilterActive) {
-            const salesCards = modeloAtualAnalytics.getCardsForIndicator('venda');
-            const filteredCards = salesCards.filter(card => 
-              matchesCloserFilter((card.closer || '').trim())
-            );
-            total += filteredCards.reduce((acc, card) => acc + (card.valor || 0), 0);
-          } else {
+          const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
             total += getModeloAtualValue('venda', startDate, endDate);
+          } else {
+            total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
           }
         }
-        
-        // O2 TAX
+
         if (includesO2Tax) {
-          let o2TaxVendas = o2TaxAnalytics.getCardsForIndicator('venda');
-          if (closerFilterActive) {
-            o2TaxVendas = o2TaxVendas.filter(card => matchesCloserFilter((card.closer || '').trim()));
+          const filtered = filteredVendasForBU('o2_tax', o2TaxAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
+            total += o2TaxAnalytics.getCardsForIndicator('venda').reduce((acc, card) => acc + (card.valor || 0), 0);
+          } else {
+            total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
           }
-          total += o2TaxVendas.reduce((acc, card) => acc + (card.valor || 0), 0);
         }
-        // Oxy Hacker
+
         if (includesOxyHacker) {
-          if (closerFilterActive) {
-            const oxyVendas = oxyHackerAnalytics.getCardsForIndicator('venda')
-              .filter(card => matchesCloserFilter((card.closer || '').trim()));
-            total += oxyVendas.reduce((acc, card) => acc + (card.valor || 0), 0);
-          } else {
+          const filtered = filteredVendasForBU('oxy_hacker', oxyHackerAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
             total += getOxyHackerValue('venda' as OxyHackerIndicator, startDate, endDate);
-          }
-        }
-        // Franquia
-        if (includesFranquia) {
-          if (closerFilterActive) {
-            const franquiaVendas = franquiaAnalytics.getCardsForIndicator('venda')
-              .filter(card => matchesCloserFilter((card.closer || '').trim()));
-            total += franquiaVendas.reduce((acc, card) => acc + (card.valor || 0), 0);
           } else {
-            total += getExpansaoValue('venda' as ExpansaoIndicator, startDate, endDate);
+            total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
           }
         }
-        
+
+        if (includesFranquia) {
+          const filtered = filteredVendasForBU('franquia', franquiaAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
+            total += getExpansaoValue('venda' as ExpansaoIndicator, startDate, endDate);
+          } else {
+            total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
+          }
+        }
+
         return total;
       }
-      
+
       case 'sla': {
         // SLA: Average time from card creation to first contact attempt
         let totalMinutes = 0;
@@ -2152,107 +2170,79 @@ export function IndicatorsTab() {
         }
         return totalCount > 0 ? totalMinutes / totalCount : 0;
       }
-      
+
       case 'mrr': {
         let total = 0;
-        
         if (includesModeloAtual) {
-          if (closerFilterActive) {
-            const salesCards = modeloAtualAnalytics.getCardsForIndicator('venda');
-            const filteredCards = salesCards.filter(card => 
-              matchesCloserFilter((card.closer || '').trim())
-            );
-            total += filteredCards.reduce((acc, card) => acc + (card.valorMRR || 0), 0);
-          } else {
+          const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
             total += getMrrForPeriod(startDate, endDate);
+          } else {
+            total += filtered.reduce((acc, card) => acc + (card.valorMRR || 0), 0);
           }
         }
-        
         if (includesO2Tax) {
-          let o2TaxVendas = o2TaxAnalytics.getCardsForIndicator('venda');
-          if (closerFilterActive) {
-            o2TaxVendas = o2TaxVendas.filter(card => matchesCloserFilter((card.closer || '').trim()));
-          }
-          total += o2TaxVendas.reduce((acc, card) => acc + (card.valorMRR || 0), 0);
+          const filtered = filteredVendasForBU('o2_tax', o2TaxAnalytics.getCardsForIndicator('venda'));
+          const cards = filtered ?? o2TaxAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valorMRR || 0), 0);
         }
-        
         return total;
       }
-      
+
       case 'setup': {
         let total = 0;
-        
         if (includesModeloAtual) {
-          if (closerFilterActive) {
-            const salesCards = modeloAtualAnalytics.getCardsForIndicator('venda');
-            const filteredCards = salesCards.filter(card => 
-              matchesCloserFilter((card.closer || '').trim())
-            );
-            total += filteredCards.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
-          } else {
+          const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
             total += getSetupForPeriod(startDate, endDate);
+          } else {
+            total += filtered.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
           }
         }
-        
         if (includesO2Tax) {
-          let o2TaxVendas = o2TaxAnalytics.getCardsForIndicator('venda');
-          if (closerFilterActive) {
-            o2TaxVendas = o2TaxVendas.filter(card => matchesCloserFilter((card.closer || '').trim()));
-          }
-          total += o2TaxVendas.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
+          const filtered = filteredVendasForBU('o2_tax', o2TaxAnalytics.getCardsForIndicator('venda'));
+          const cards = filtered ?? o2TaxAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
         }
-        
         return total;
       }
-      
+
       case 'pontual': {
         let total = 0;
-        
         if (includesModeloAtual) {
-          if (closerFilterActive) {
-            const salesCards = modeloAtualAnalytics.getCardsForIndicator('venda');
-            const filteredCards = salesCards.filter(card => 
-              matchesCloserFilter((card.closer || '').trim())
-            );
-            total += filteredCards.reduce((acc, card) => acc + (card.valorPontual || 0), 0);
-          } else {
+          const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
             total += getPontualForPeriod(startDate, endDate);
+          } else {
+            total += filtered.reduce((acc, card) => acc + (card.valorPontual || 0), 0);
           }
         }
-        
         if (includesO2Tax) {
-          let o2TaxVendas = o2TaxAnalytics.getCardsForIndicator('venda');
-          if (closerFilterActive) {
-            o2TaxVendas = o2TaxVendas.filter(card => matchesCloserFilter((card.closer || '').trim()));
-          }
-          total += o2TaxVendas.reduce((acc, card) => acc + (card.valorPontual || 0), 0);
+          const filtered = filteredVendasForBU('o2_tax', o2TaxAnalytics.getCardsForIndicator('venda'));
+          const cards = filtered ?? o2TaxAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valorPontual || 0), 0);
         }
-
         // Oxy Hacker: toda receita é pontual
         if (includesOxyHacker) {
-          if (closerFilterActive) {
-            const oxyVendas = oxyHackerAnalytics.getCardsForIndicator('venda')
-              .filter(card => matchesCloserFilter((card.closer || '').trim()));
-            total += oxyVendas.reduce((acc, card) => acc + (card.valor || 0), 0);
-          } else {
+          const filtered = filteredVendasForBU('oxy_hacker', oxyHackerAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
             total += getOxyHackerValue('venda', startDate, endDate);
+          } else {
+            total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
           }
         }
-
         // Franquia: toda receita é pontual
         if (includesFranquia) {
-          if (closerFilterActive) {
-            const franquiaVendas = franquiaAnalytics.getCardsForIndicator('venda')
-              .filter(card => matchesCloserFilter((card.closer || '').trim()));
-            total += franquiaVendas.reduce((acc, card) => acc + (card.valor || 0), 0);
-          } else {
+          const filtered = filteredVendasForBU('franquia', franquiaAnalytics.getCardsForIndicator('venda'));
+          if (filtered === null) {
             total += getExpansaoValue('venda', startDate, endDate);
+          } else {
+            total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
           }
         }
-        
         return total;
       }
-      
+
       default:
         return 0;
     }
@@ -2261,7 +2251,33 @@ export function IndicatorsTab() {
   // Get meta for monetary indicators using consolidated metas (database > Plan Growth)
   const getMetaMonetaryForIndicator = (indicator: MonetaryIndicatorConfig): number => {
     const closerFilter = effectiveSelectedClosers.length > 0 ? effectiveSelectedClosers : undefined;
-    
+
+    // Build SDR ratio callback when SDR filter is active
+    let sdrRatio: ((bu: BuType, month: string) => number) | undefined;
+    if (effectiveSelectedSDRs.length > 0) {
+      sdrRatio = (bu: BuType, month: string) => {
+        const sdrsInBU = (BU_SDRS[bu] || []) as readonly string[];
+        if (sdrsInBU.length === 0) return 0;
+        const selectedInBU = effectiveSelectedSDRs.filter(s => sdrsInBU.includes(s));
+        if (selectedInBU.length === 0) return 0;
+
+        // Sum RM+RR meta for the BU/month — selected SDRs vs all SDRs of the BU
+        let selectedSum = 0;
+        let totalSum = 0;
+        for (const m of sdrMetasList) {
+          if (m.bu !== bu || m.month !== month) continue;
+          if (!sdrsInBU.includes(m.sdr)) continue;
+          const v = (m.rm_meta || 0) + (m.rr_meta || 0);
+          totalSum += v;
+          if (selectedInBU.includes(m.sdr)) selectedSum += v;
+        }
+
+        // Fallback: distribuição igualitária quando não há sdr_metas para o mês
+        if (totalSum === 0) return selectedInBU.length / sdrsInBU.length;
+        return selectedSum / totalSum;
+      };
+    }
+
     // Use hook consolidado que mescla banco + Plan Growth
     return getMetaMonetaryForPeriod(
       indicator.key as ConsolidatedMetricType | 'sla',
@@ -2269,9 +2285,11 @@ export function IndicatorsTab() {
       startDate,
       endDate,
       closerFilter,
-      getFilteredMeta
+      getFilteredMeta,
+      sdrRatio as any
     );
   };
+
 
   // Handle monetary card click with strategic narratives
   const handleMonetaryCardClick = (indicator: MonetaryIndicatorConfig) => {
