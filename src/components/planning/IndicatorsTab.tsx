@@ -646,30 +646,46 @@ export function IndicatorsTab() {
     return effectiveSelectedSDRs.filter(s => BU_SDRS[bu]?.includes(s));
   };
 
-  // Filter function - checks if a responsavel matches selected closers (partial match, case-insensitive)
+  // Token-based normalization: lowercase, strip diacritics, remove punctuation,
+  // collapse whitespace/newlines, then split into tokens.
+  // Tolerates "Amanda Serafim" (filter) vs "Amanda Teixeira Serafim" (card).
+  const tokenize = (value: string): string[] => {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')      // remove diacritics
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')         // remove punctuation
+      .replace(/\s+/g, ' ')                  // collapse whitespace/newlines
+      .trim()
+      .split(' ')
+      .filter(Boolean);
+  };
+
+  // Filter function - card matches if it contains ALL tokens of any selected closer
   const matchesCloserFilter = (closerValue?: string | null): boolean => {
     if (effectiveSelectedClosers.length === 0) return true; // No filter = show all
     if (!closerValue) return false;
-    
-    // Comparação parcial (case-insensitive) para lidar com variações de nome
-    // Ex: "Lucas" no banco deve corresponder a "Lucas Ilha" no filtro
-    const normalizedCloser = closerValue.toLowerCase().trim();
+    const cardTokens = tokenize(closerValue);
+    if (cardTokens.length === 0) return false;
     return effectiveSelectedClosers.some(selected => {
-      const normalizedSelected = selected.toLowerCase().trim();
-      // Match se o closer do banco está contido no filtro OU vice-versa
-      return normalizedSelected.includes(normalizedCloser) || 
-             normalizedCloser.includes(normalizedSelected);
+      const selectedTokens = tokenize(selected);
+      if (selectedTokens.length === 0) return false;
+      // Card matches if it contains every token of the selected name (any order)
+      return selectedTokens.every(t => cardTokens.includes(t));
     });
   };
 
-  // Filter function - checks if a responsible/SDR matches selected SDRs (partial match)
+  // Filter function - card matches if it contains ALL tokens of any selected SDR
   const matchesSdrFilter = (responsavel?: string | null): boolean => {
     if (effectiveSelectedSDRs.length === 0) return true; // No filter = show all
     if (!responsavel) return false;
-    // Partial match: check if responsavel CONTAINS any selected SDR name
-    return effectiveSelectedSDRs.some(sdr => 
-      responsavel.toLowerCase().includes(sdr.toLowerCase())
-    );
+    const cardTokens = tokenize(responsavel);
+    if (cardTokens.length === 0) return false;
+    return effectiveSelectedSDRs.some(sdr => {
+      const sdrTokens = tokenize(sdr);
+      if (sdrTokens.length === 0) return false;
+      return sdrTokens.every(t => cardTokens.includes(t));
+    });
   };
   
   // Month name mapping for funnelData lookup
