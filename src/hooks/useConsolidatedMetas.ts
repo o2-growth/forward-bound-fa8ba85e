@@ -191,13 +191,15 @@ export function useConsolidatedMetas() {
 
   /**
    * Obtém meta de faturamento com suporte a filtro de closers (para Modelo Atual)
+   * e rateio por SDR (via callback sdrRatio).
    */
   const getFilteredFaturamentoMeta = (
     bus: BuType[],
     startDate: Date,
     endDate: Date,
     closerFilter?: string[],
-    getFilteredMeta?: (value: number, bu: string, month: string, closers: string[]) => number
+    getFilteredMeta?: (value: number, bu: string, month: string, closers: string[]) => number,
+    sdrRatio?: (bu: BuType, month: MonthType) => number
   ): number => {
     const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
     let total = 0;
@@ -226,6 +228,12 @@ export function useConsolidatedMetas() {
           faturamento = filteredVendas * ticket;
         }
 
+        // Aplicar rateio por SDR (multiplicativo, aplicado após o filtro de closer)
+        if (sdrRatio) {
+          const ratio = sdrRatio(bu, monthName);
+          faturamento = faturamento * ratio;
+        }
+
         total += faturamento * fraction;
       });
     }
@@ -242,14 +250,18 @@ export function useConsolidatedMetas() {
     startDate: Date,
     endDate: Date,
     closerFilter?: string[],
-    getFilteredMeta?: (value: number, bu: string, month: string, closers: string[]) => number
+    getFilteredMeta?: (value: number, bu: string, month: string, closers: string[]) => number,
+    sdrRatio?: (bu: BuType, month: MonthType) => number
   ): number => {
     if (indicatorKey === 'sla') return 30;
 
-    // Com filtro de closer ativo, ajustar TODAS as métricas monetárias
-    if (closerFilter && closerFilter.length > 0 && getFilteredMeta) {
-      const filteredFaturamento = getFilteredFaturamentoMeta(bus, startDate, endDate, closerFilter, getFilteredMeta);
-      
+    const closerActive = !!(closerFilter && closerFilter.length > 0 && getFilteredMeta);
+    const sdrActive = !!sdrRatio;
+
+    // Com filtro de closer e/ou SDR ativo, ajustar TODAS as métricas monetárias via faturamento rateado
+    if (closerActive || sdrActive) {
+      const filteredFaturamento = getFilteredFaturamentoMeta(bus, startDate, endDate, closerFilter, getFilteredMeta, sdrRatio);
+
       switch (indicatorKey) {
         case 'faturamento': return filteredFaturamento;
         case 'mrr': return Math.round(filteredFaturamento * 0.25);
