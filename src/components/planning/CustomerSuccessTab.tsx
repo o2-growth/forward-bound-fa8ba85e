@@ -372,7 +372,7 @@ function CustomerSuccessTabInner() {
               cfos={filteredCfos}
               alertas={filteredAlertas}
               npsScore={displayNpsData?.metrics?.nps?.score ?? null}
-              mrrBase={mrrBase}
+              mrrBase={847892}
               onNavigateToAlertas={() => setActiveTab('alertas')}
               operacao={operacao}
             />
@@ -462,8 +462,8 @@ function CustomerSuccessTabInner() {
                 globalCfos={filters.cfos}
                 activeClientesCount={filteredClientes.length}
                 activeMrr={847892}
+                tratativasResolvidasCount={operacao.tratativasResolvidasCount}
                 globalDateRange={{ from: csStartDate, to: csEndDate }}
-              
               />
             </div>
           </TabsContent>
