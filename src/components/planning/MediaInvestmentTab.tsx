@@ -1104,7 +1104,7 @@ export function MediaInvestmentTab() {
   // Estados editáveis - Taxas gerais (Modelo Atual)
   const [mrrInicial, setMrrInicial] = useState(700000);
   const [valorVenderInicial, setValorVenderInicial] = useState(400000);
-  const [churnMensal, setChurnMensal] = useState(0.06);
+  const [churnMensal, setChurnMensal] = useState(0.05);
   const [retencaoVendas, setRetencaoVendas] = useState(0.25);
   
   // Estados editáveis - O2 TAX

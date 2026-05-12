@@ -359,7 +359,7 @@ export function usePlanGrowthData() {
     return v > 0 ? v : 400000;
   }, [funnelMetas]);
 
-  const churnMensal = 0.06;
+  const churnMensal = 0.05;
   const retencaoVendas = 0.25;
 
   // Build indicadoresPorBU: DB values override hardcoded defaults
