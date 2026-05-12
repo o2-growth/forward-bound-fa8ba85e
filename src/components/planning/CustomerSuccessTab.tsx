@@ -458,14 +458,9 @@ function CustomerSuccessTabInner() {
                 data={opsData?.churnDossier || []}
                 selectedProdutos={filters.produtos}
                 globalCfos={filters.cfos}
-                globalDateRange={
-                  selectedPeriod === 'q1' ? { from: new Date('2026-01-01'), to: new Date('2026-03-31') } :
-                  selectedPeriod === 'q2' ? { from: new Date('2026-04-01'), to: new Date('2026-06-30') } :
-                  selectedPeriod === 'q3' ? { from: new Date('2026-07-01'), to: new Date('2026-09-30') } :
-                  selectedPeriod === 'q4' ? { from: new Date('2025-10-01'), to: new Date('2025-12-31') } :
-                  dateRange?.from && dateRange?.to ? { from: dateRange.from, to: dateRange.to } :
-                  undefined
-                }
+                activeClientesCount={filteredClientes.length}
+                activeMrr={mrrBase}
+                globalDateRange={{ from: csStartDate, to: csEndDate }}
               />
             </div>
           </TabsContent>

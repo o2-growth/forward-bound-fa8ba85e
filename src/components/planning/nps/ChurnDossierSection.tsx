@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
-import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info } from 'lucide-react';
+import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 
@@ -52,9 +52,11 @@ interface Props {
   selectedProdutos?: string[];
   globalDateRange?: { from?: Date; to?: Date };
   globalCfos?: string[];
+  activeClientesCount?: number;
+  activeMrr?: number;
 }
 
-export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [] }: Props) {
+export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0 }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
@@ -102,6 +104,16 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   }, [data, filterMotivo, filterTipoChurn, excludeMotivos, globalCfos, selectedProdutos, globalDateRange]);
 
   const totalMrrPerdido = useMemo(() => filtered.reduce((s, d) => s + (d.mrr || 0), 0), [filtered]);
+  // Revenue Churn % = MRR perdido / (MRR ativo + MRR perdido) × 100
+  const revenueChurnPct = useMemo(() => {
+    const base = activeMrr + totalMrrPerdido;
+    return base > 0 ? (totalMrrPerdido / base) * 100 : 0;
+  }, [activeMrr, totalMrrPerdido]);
+  // Logo Churn % = qtd clientes churn / (ativos + churn) × 100
+  const logoChurnPct = useMemo(() => {
+    const base = activeClientesCount + filtered.length;
+    return base > 0 ? (filtered.length / base) * 100 : 0;
+  }, [activeClientesCount, filtered.length]);
   
   const avgLt = useMemo(() => {
     const lts = filtered.map(d => parseFloat(d.ltMeses)).filter(n => !isNaN(n) && n > 0);
@@ -158,46 +170,123 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   return (
     <TooltipProvider>
     <div className="space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-destructive mb-1">
-              <TrendingDown className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Total Churns</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{filtered.length}</p>
-            {hasFilters && <p className="text-xs text-muted-foreground">de {data.length} total</p>}
-          </CardContent>
-        </Card>
-        <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-destructive mb-1">
-              <DollarSign className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">MRR Perdido</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{formatCurrency(totalMrrPerdido)}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-primary mb-1">
-              <Clock className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">LT Médio</span>
-            </div>
-            <p className="text-2xl font-bold text-foreground">{avgLt} <span className="text-sm font-normal text-muted-foreground">meses</span></p>
-          </CardContent>
-        </Card>
-        <Card className="border-warning/30 bg-warning/5">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 text-[hsl(var(--warning))]  mb-1">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-xs font-medium uppercase tracking-wide">Top Motivo</span>
-            </div>
-            <p className="text-lg font-bold text-foreground truncate" title={topMotivo}>{topMotivo}</p>
-          </CardContent>
-        </Card>
+      {/* KPI Cards — 7 métricas (Estado atual + Churn no período) */}
+      {/* Linha 1 — Estado atual (snapshot) */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Estado atual</h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <Card className="border-emerald-500/20 bg-emerald-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
+                <Wallet className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">MRR</span>
+                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Soma de Valor CFOaaS + Valor OXY dos clientes ativos. Snapshot atual (não filtrado por período).</p></TooltipContent></Tooltip>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(activeMrr)}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">MRR ativo no momento</p>
+            </CardContent>
+          </Card>
+          <Card className="border-blue-500/20 bg-blue-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
+                <Users className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Clientes Ativos</span>
+                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Clientes em fase Onboarding ou Em Operação Recorrente. Exclui Churn / Desistência / Arquivado.</p></TooltipContent></Tooltip>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{activeClientesCount}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Carteira atual</p>
+            </CardContent>
+          </Card>
+          <Card className="border-violet-500/20 bg-violet-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 mb-1">
+                <Clock className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">LT Médio (churns)</span>
+                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tempo médio em meses entre Data de assinatura e Data de encerramento dos clientes que caíram no período.</p></TooltipContent></Tooltip>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{avgLt} <span className="text-sm font-normal text-muted-foreground">meses</span></p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">dos clientes que caíram</p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
+
+      {/* Linha 2 — Churn no período */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-destructive" />
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Churn no período
+            {globalDateRange?.from && globalDateRange?.to && (
+              <span className="ml-2 text-muted-foreground/70 normal-case font-normal">
+                · {globalDateRange.from.toLocaleDateString('pt-BR')} → {globalDateRange.to.toLocaleDateString('pt-BR')}
+              </span>
+            )}
+          </h3>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-destructive mb-1">
+                <DollarSign className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Revenue Churn (R$)</span>
+                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Soma do MRR dos clientes que caíram dentro do período selecionado.</p></TooltipContent></Tooltip>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalMrrPerdido)}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido no período</p>
+            </CardContent>
+          </Card>
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-destructive mb-1">
+                <Percent className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Revenue Churn (%)</span>
+                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Revenue Churn / (MRR ativo + Revenue Churn) × 100. Aproxima o % do MRR base inicial que foi perdido.</p></TooltipContent></Tooltip>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{revenueChurnPct.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">sobre MRR base do período</p>
+            </CardContent>
+          </Card>
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-destructive mb-1">
+                <UserMinus className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn (Qtd.)</span>
+                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Quantidade de clientes que caíram dentro do período (Churn + Desistência + Atividades finalizadas).</p></TooltipContent></Tooltip>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{filtered.length}</p>
+              {hasFilters && <p className="text-[10px] text-muted-foreground mt-0.5">de {data.length} total registrado</p>}
+            </CardContent>
+          </Card>
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-destructive mb-1">
+                <Percent className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn (%)</span>
+                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Logo Churn / (Clientes ativos + Logo Churn) × 100. Aproxima o % da base inicial de clientes que caiu no período.</p></TooltipContent></Tooltip>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{logoChurnPct.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">sobre base de clientes</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Top motivo (compacto, fora dos KPIs principais) */}
+      {topMotivo !== '—' && (
+        <Card className="border-warning/30 bg-warning/5">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="flex items-center gap-2 text-[hsl(var(--warning))]">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-[11px] font-medium uppercase tracking-wider">Top motivo de churn no período:</span>
+            </div>
+            <span className="text-sm font-semibold text-foreground">{topMotivo}</span>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts Row */}
       <div className="grid md:grid-cols-3 gap-4">
