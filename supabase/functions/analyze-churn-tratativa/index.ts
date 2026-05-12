@@ -284,10 +284,9 @@ Deno.serve(async (req) => {
         id: String(n.ID),
         data: n["Entrada"],
         fase: n["Fase Atual"],
-        nps: n["NPS"],
-        csat: n["CSAT"],
-        sean_ellis: n["Sean Ellis"],
-        comentario: n["Comentario NPS"],
+        nota: n["Nota NPS"],
+        motivo_nota: n["Motivo da Nota"],
+        sentimento_oxy: n["Sentimento Oxy"],
         cfo_responsavel: n["CFO Responsavel"],
       })),
     };
