@@ -1,34 +1,39 @@
-## Problema
+## Aplicar filtro de data global aos KPIs de Operação
 
-O KPI "Tempo levantar a mão → churn" mostra hoje **44 dias / 1 cliente** porque exige (1) 1ª tratativa registrada E (2) data de churn — só 1 cliente bate as duas no recorte atual. A regra também não respeita o filtro de período do dashboard.
+Hoje os 3 cards seguintes mostram totais acumulados (sem respeitar o filtro de período do CS):
+- Tratativas resolvidas com sucesso
+- Valor isentado (Atendimento O2)
+- Churns com problema na Oxy
 
-## Nova regra
-
-Universo = **todas as tratativas cuja 1ª entrada caiu dentro do período filtrado** (mesmo que o cliente ainda não tenha virado churn).
-
-Para cada uma:
-- Se o cliente **já virou churn** (fase Churn/Desistência/Arquivado e tem `churnDate`): `dias = churnDate − entradaTratativa` → entra na **média/mediana**.
-- Se **ainda não virou churn**: aparece na lista do dialog como **"em andamento"** (`dias = hoje − entradaTratativa`, marcado como ongoing) e **NÃO** entra na média/mediana.
+O CS Tab já tem `csStartDate`/`csEndDate` (passado como `globalDateRange` p/ ChurnDossier). Vamos reusar esse mesmo filtro.
 
 ## Mudanças
 
-**`src/hooks/useJornadaData.ts`** (bloco em ~L776-800)
-- Substituir o loop atual (que itera `allClientes` em fase inativa) por um loop sobre `firstTratativaByTitulo`.
-- Filtrar entradas pela janela do período já existente no hook (mesmo `dateInRange` usado em outros KPIs de Operação — verificar se há `periodStart/periodEnd` no escopo; se não, ler dos parâmetros `selectedPeriod`).
-- Para cada título com 1ª tratativa no período:
-  - Buscar `churnDate = churnDateByTitulo.get(titulo)` e fase atual em `allClientes`.
-  - Se em fase inativa + churnDate válido → push `{ ..., diasAteChurn, status: 'churn' }`.
-  - Senão → push `{ ..., diasAteChurn: hoje−entrada, status: 'ongoing', motivo: 'Em andamento' }`.
-- Manter sanidade: descarta `dias < 0` ou `> 730`.
-- `tempoMedioTratativaChurn` e `tempoMedianoTratativaChurn` calculados **só sobre `status === 'churn'`**.
+### `src/hooks/useJornadaData.ts`
 
-**`src/components/planning/cs/OperacaoKpisStrip.tsx`**
-- Atualizar interface `tempoTratativaChurn` para incluir `status: 'churn' | 'ongoing'`.
-- Card: legenda mostra `"X churns / Y em andamento"` em vez de `"N clientes"`.
-- Dialog: nova coluna **Status** (badge "Churn" vermelho / "Em andamento" cinza). Ordenar churns primeiro, depois em andamento. Texto explicativo do header atualizado.
-- Atualizar tooltip do `Info` no card refletindo a nova regra.
+Anexar a **data de referência** em cada item dos arrays:
+
+- `tratativasResolvidas`: adicionar `data: Date | null` = `parseDate(row['Saída'] || row['Saida'] || row['Data encerramento'] || row['Entrada'])` (data em que a tratativa foi finalizada).
+- `isentamentos`: adicionar `data: Date | null` = mesma regra acima (quando o valor isentado foi registrado/finalizado).
+- `churnsOxy`: adicionar `data: Date | null` = `churnDateByTitulo.get(tituloLower)` (data de encerramento do projeto).
+
+### `src/components/planning/cs/OperacaoKpisStrip.tsx`
+
+- Adicionar prop opcional `dateRange?: { from: Date; to: Date }`.
+- Atualizar interface `OperacaoKpisData` para incluir o novo `data` em cada item.
+- Criar `inRange(d)` helper: `!dateRange || (d && d >= dateRange.from && d <= dateRange.to)` — itens sem data caem fora quando há filtro ativo.
+- Filtrar **antes** de calcular contagens/somas:
+  - `resolvidasFiltered = operacao.tratativasResolvidas.filter(t => inRange(t.data))` → usar `.length` no card e na tabela.
+  - `isentamentosFiltered = operacao.isentamentos.filter(i => inRange(i.data))` → soma e contagem.
+  - `churnsOxyFiltered = operacao.churnsOxy.filter(c => inRange(c.data))` → contagem, soma MRR e tabela.
+- Mostrar pequena legenda no rodapé de cada card quando o filtro estiver ativo: `"no período selecionado"`.
+- Manter o card de "Tempo levantar a mão → churn" inalterado (já tratado anteriormente).
+
+### `src/components/planning/CustomerSuccessTab.tsx`
+
+- Passar `dateRange={{ from: csStartDate, to: csEndDate }}` para `<OperacaoKpisStrip>` (linha ~458).
 
 ## Sem mudança
 
-- Outras métricas do strip de Operação (resolvidas, isentado, churns Oxy) seguem inalteradas.
-- Dossiê de Churn segue inalterado.
+- Lógica de derivação dos itens no hook permanece a mesma; apenas anexamos a data.
+- Outros cards/seções do CS Tab seguem como estão.
