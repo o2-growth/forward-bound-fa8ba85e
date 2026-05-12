@@ -6,11 +6,11 @@ import { TrendingDown, Info, CheckCircle2, Wallet, AlertCircle } from 'lucide-re
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 export interface OperacaoKpisData {
-  tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number }>;
+  tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number; data?: Date | null }>;
   tratativasResolvidasCount: number;
-  isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number }>;
+  isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number; data?: Date | null }>;
   valorIsentadoTotal: number;
-  churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }>;
+  churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number; data?: Date | null }>;
   churnsOxyCount: number;
   tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string; status?: 'churn' | 'ongoing' }>;
   tempoMedioTratativaChurn: number;
@@ -21,11 +21,24 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
 }
 
-interface Props { operacao?: OperacaoKpisData }
+interface Props { operacao?: OperacaoKpisData; dateRange?: { from: Date; to: Date } }
 
-export function OperacaoKpisStrip({ operacao }: Props) {
+export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
   const [opDialog, setOpDialog] = useState<'resolvidas' | 'isentado' | 'oxy' | 'tempo' | null>(null);
   if (!operacao) return null;
+
+  const inRange = (d?: Date | null): boolean => {
+    if (!dateRange) return true;
+    if (!d) return false;
+    return d >= dateRange.from && d <= dateRange.to;
+  };
+  const periodLabel = dateRange ? 'no período selecionado' : 'total';
+
+  const resolvidasFiltered = operacao.tratativasResolvidas.filter(t => inRange(t.data));
+  const isentamentosFiltered = operacao.isentamentos.filter(i => inRange(i.data));
+  const churnsOxyFiltered = operacao.churnsOxy.filter(c => inRange(c.data));
+  const valorIsentadoFiltered = isentamentosFiltered.reduce((s, i) => s + i.valor, 0);
+  const mrrOxyFiltered = churnsOxyFiltered.reduce((s, c) => s + c.mrr, 0);
 
   return (
     <TooltipProvider>
