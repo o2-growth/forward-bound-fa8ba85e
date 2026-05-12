@@ -241,6 +241,18 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               <div className="flex items-center gap-2 mb-1">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
                 <span className="text-xs text-muted-foreground">Tratativas resolvidas com sucesso</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 ml-auto opacity-60 cursor-help" onClick={(e) => e.stopPropagation()} />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm text-xs">
+                    <p className="font-semibold mb-1">De onde vem:</p>
+                    <p>Pipefy → pipe <strong>Tratativas</strong> → tabela <code>pipefy_moviment_tratativas</code></p>
+                    <p className="mt-2 font-semibold">Como conta:</p>
+                    <p>Cards cujo campo <code>Decisão Final</code> contém "sucesso", "retomada", "resolvido" ou "implementada com sucesso", OU campo <code>Solucao Implementada com Sucesso = Sim</code>.</p>
+                    <p className="mt-2 text-muted-foreground">Clique para ver a lista detalhada.</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               <p className="text-2xl font-bold">{operacao.tratativasResolvidasCount}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">Decisão Final = sucesso/retomada</p>
@@ -251,6 +263,18 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               <div className="flex items-center gap-2 mb-1">
                 <Wallet className="h-4 w-4 text-amber-600" />
                 <span className="text-xs text-muted-foreground">Valor isentado (Atendimento O2)</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 ml-auto opacity-60 cursor-help" onClick={(e) => e.stopPropagation()} />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm text-xs">
+                    <p className="font-semibold mb-1">De onde vem:</p>
+                    <p>Pipefy → pipe <strong>Tratativas</strong> → campo <code>Valor Isentado finalizacao</code> (fallbacks: <code>Valor Isentado</code>, <code>Valor isentado</code>).</p>
+                    <p className="mt-2 font-semibold">Como soma:</p>
+                    <p>Soma do valor isentado em todas as tratativas finalizadas com valor &gt; 0. Não filtra por motivo — mostra o total isentado em qualquer tratativa.</p>
+                    <p className="mt-2 text-muted-foreground">Clique para ver isenções por cliente (e ver quais foram por motivo Atendimento O2).</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               <p className="text-2xl font-bold">{formatCurrency(operacao.valorIsentadoTotal)}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">{operacao.isentamentos.length} tratativas com isenção</p>
@@ -261,6 +285,18 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               <div className="flex items-center gap-2 mb-1">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 <span className="text-xs text-muted-foreground">Churns com problema na Oxy</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 ml-auto opacity-60 cursor-help" onClick={(e) => e.stopPropagation()} />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm text-xs">
+                    <p className="font-semibold mb-1">De onde vem:</p>
+                    <p>Pipefy → pipe <strong>Central de Projetos</strong> → campo <code>Problemas com a Oxy</code>.</p>
+                    <p className="mt-2 font-semibold">Como conta:</p>
+                    <p>Clientes em fase Churn / Desistência / Arquivado cujo card tem <code>Problemas com a Oxy</code> preenchido, OU cujo motivo principal/cancelamento contém a palavra "oxy".</p>
+                    <p className="mt-2 text-muted-foreground">MRR perdido = soma do MRR desses clientes. Clique para ver a lista.</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
               <p className="text-2xl font-bold">{operacao.churnsOxyCount}</p>
               <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido: {formatCurrency(operacao.churnsOxy.reduce((s, c) => s + c.mrr, 0))}</p>

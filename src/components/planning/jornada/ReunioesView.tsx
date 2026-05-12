@@ -350,7 +350,14 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>R1-R3 = reuniões semanais (dias 7, 14, 21). Comitê = reunião mensal estratégica (dia 28). Taxa = reuniões feitas / 4 × 100. Reunião no prazo = preenchida antes do deadline. Atrasada = preenchida após. Fonte: Pipefy — Rotinas (pipe 306755752)</p>
+              <p className="font-semibold mb-1">Status por reunião (novo):</p>
+              <p>🟢 <strong>Feita</strong> = data preenchida + cliente confirmou participação (campo <code>Cliente Participou</code> = Sim)</p>
+              <p>🔵 <strong>Preenchida</strong> = data preenchida mas sem confirmação de participação do cliente</p>
+              <p>🔴 <strong>Não feita</strong> = cliente marcou que não participou (<code>Cliente Participou</code> = Não)</p>
+              <p>🟠 <strong>Atrasada</strong> = passou do deadline sem preencher</p>
+              <p>⚪ <strong>Pendente</strong> = deadline futuro</p>
+              <p className="mt-2"><strong>Deadlines:</strong> R1 dia 7, R2 dia 14, R3 dia 21, Comitê dia 28.</p>
+              <p className="mt-2"><strong>Fonte:</strong> Pipefy → pipe Rotinas (306755752) → tabela <code>pipefy_moviment_rotinas</code> → campos <code>Data Reuniao 1/2/3</code>, <code>Data Mensal</code>, <code>Cliente Participou</code> (e variantes <code>participou2/3/m</code>).</p>
             </TooltipContent>
           </Tooltip>
         </h4>
@@ -431,7 +438,8 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                     <Info className="h-3 w-3 text-muted-foreground cursor-help inline ml-0.5" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs">
-                    <p>R1 (dia 7), R2 (dia 14), R3 (dia 21) = reuniões semanais. Comitê (dia 28) = reunião mensal estratégica. Verde = no prazo. Vermelho = preenchido após prazo. Laranja = prazo expirado sem preenchimento. Cinza = prazo futuro. Fonte: Pipefy — Rotinas</p>
+                    <p>🟢 Feita = data + cliente confirmou. 🔵 Preenchida = data sem confirmação. 🔴 Não feita = cliente marcou Não. 🟠 Atrasada = passou do prazo. ⚪ Pendente = prazo futuro.</p>
+                    <p className="mt-1"><strong>Fonte:</strong> Pipefy Rotinas (306755752) — campos <code>Data Reuniao X</code> + <code>Cliente Participou</code> (e variantes).</p>
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
