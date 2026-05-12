@@ -432,15 +432,16 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     //   c) "Finalizacao contrato ultimo dia" da Tratativa (se preenchido)
     // Isso evita que casos como Rampanelli (movido para Churn em Mar/26 mas com contrato
     // administrativamente encerrado em Abr/26) caiam no mês errado.
-    const finalizacaoContrato = (trat as any)?.['Finalizacao contrato ultimo dia']
+    const finalizacaoContratoRaw = (trat as any)?.['Finalizacao contrato ultimo dia']
       ?? (trat as any)?.['Finalização contrato último dia']
       ?? (trat as any)?.['Finalizacao do contrato ultimo dia']
       ?? null;
+    const finalizacaoContrato = correctChurnDate(finalizacaoContratoRaw, key);
     const churnPhaseEntry = parsePipefyDate(card['Entrada']);
     const candidateDates = [
       toLocalDateBR((card as any)['Data do churn']),
       churnPhaseEntry ? toLocalDateBR(churnPhaseEntry) : '',
-      toLocalDateBR(finalizacaoContrato),
+      finalizacaoContrato,
     ].filter(Boolean) as string[];
     let dataEncerramento = candidateDates.length > 0
       ? candidateDates.reduce((min, d) => (d < min ? d : min))
