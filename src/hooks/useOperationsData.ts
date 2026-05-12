@@ -366,20 +366,30 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     const dataAssinatura = assinaturaMap.get(card.ID) || card['Data de assinatura do contrato'] || '';
     const saidaDate = parsePipefyDate(trat?.['Saída']);
     const tratEntradaDate = parsePipefyDate(trat?.['Entrada']);
-    // Hierarquia da data de encerramento (prioriza fonte oficial):
-    // 1) Central de Projetos — "Data do churn" (campo manual preenchido pelo CFO)
-    // 2) Central de Projetos — "Data encerramento" (legado)
-    // 3) Tratativa — "Finalizacao contrato ultimo dia"
-    // 4) Tratativa — "Saída" (data em que saiu da fase ativa)
+    // Hierarquia da data de encerramento — fonte oficial = relatório do CRM (Pipefy):
+    // 1) Tratativa — "Finalizacao contrato ultimo dia" (PRIMÁRIA, alinhada ao CRM)
+    // 2) Central de Projetos — "Data do churn" (backup, caso passe a existir no card)
+    // 3) Central de Projetos — "Data encerramento" (legado)
+    // 4) Tratativa — "Saída" (fallback: data em que saiu da fase ativa)
     // 5) Tratativa — "Entrada" (último recurso: entrada na fase finalizada)
     // Normaliza tudo para YYYY-MM-DD no fuso America/Sao_Paulo para evitar shift de timezone.
+    const finalizacaoContrato = (trat as any)?.['Finalizacao contrato ultimo dia']
+      ?? (trat as any)?.['Finalização contrato último dia']
+      ?? (trat as any)?.['Finalizacao do contrato ultimo dia']
+      ?? null;
     const dataEncerramento =
-      toLocalDateBR(card['Data do churn']) ||
+      toLocalDateBR(finalizacaoContrato) ||
+      toLocalDateBR((card as any)['Data do churn']) ||
       toLocalDateBR(card['Data encerramento']) ||
-      toLocalDateBR(trat?.['Finalizacao contrato ultimo dia']) ||
       (saidaDate ? toLocalDateBR(saidaDate) : '') ||
       (tratEntradaDate ? toLocalDateBR(tratEntradaDate) : '') ||
       '';
+    // Logging defensivo: alerta quando cair no fallback de Saída/Entrada
+    if (!finalizacaoContrato && !(card as any)['Data do churn'] && !card['Data encerramento'] && (saidaDate || tratEntradaDate)) {
+      console.warn(
+        `[ChurnDossier] "${card['Título']}" sem "Finalizacao contrato ultimo dia" — usando fallback Saída/Entrada → ${dataEncerramento}`
+      );
+    }
     // mesChurn segue a mesma hierarquia de dataEncerramento (deriva direto dela quando possível).
     // Parse local de YYYY-MM-DD para evitar shift de timezone no início/fim de mês.
     let mesChurn = '';
