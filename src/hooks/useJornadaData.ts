@@ -809,7 +809,7 @@ export function useJornadaData() {
       if (normMotivo(c.motivoChurn) !== 'atendimento o2') continue;
       const churnDate = churnDateByTitulo.get(c.titulo.toLowerCase()) || null;
       if (!churnDate) continue;
-      const valor = valorIsentadoByTitulo.get(c.titulo.toLowerCase()) || 0;
+      const valor = valorIsentadoByTitulo.get(normTitulo(c.titulo)) || 0;
       isentamentos.push({
         titulo: c.titulo,
         cfo: c.cfo,
