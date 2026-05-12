@@ -2957,6 +2957,7 @@ export function MediaInvestmentTab() {
             dreByMonth={dreByBU.modelo_atual || {}}
             isLoadingRealized={isLoadingRealized}
             pendingMonths={getPendingMonths('modelo_atual')}
+            metaAnualFixa={22_250_000}
           />
 
           <BUInvestmentTable
