@@ -443,9 +443,12 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       churnPhaseEntry ? toLocalDateBR(churnPhaseEntry) : '',
       finalizacaoContrato,
     ].filter(Boolean) as string[];
-    let dataEncerramento = candidateDates.length > 0
-      ? candidateDates.reduce((min, d) => (d < min ? d : min))
-      : '';
+    // Hierarquia: data oficial de fim do contrato (corrigida) > Data do churn manual >
+    // entrada na fase de churn. Isso garante que o filtro mensal use o mês oficial
+    // de finalização do contrato (fonte de verdade do XLSX/financeiro).
+    const dataChurnManual = toLocalDateBR((card as any)['Data do churn']);
+    const dataPhaseEntry = churnPhaseEntry ? toLocalDateBR(churnPhaseEntry) : '';
+    let dataEncerramento = finalizacaoContrato || dataChurnManual || dataPhaseEntry || '';
     // Fallbacks legados quando nenhuma das 3 fontes oficiais existe
     if (!dataEncerramento) {
       dataEncerramento =
