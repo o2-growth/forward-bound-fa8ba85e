@@ -111,14 +111,22 @@ export function OperacaoKpisStrip({ operacao }: Props) {
                 <TooltipContent className="max-w-sm text-xs">
                   <p className="font-semibold mb-1">De onde vem:</p>
                   <p>Pipefy → <strong>Tratativas</strong> (campo <code>Entrada</code> da 1ª tratativa do cliente) cruzado com <strong>Central de Projetos</strong> (<code>Data encerramento</code> / <code>Saída</code> do churn).</p>
-                  <p className="mt-2 font-semibold">Como calcula:</p>
-                  <p>Para cada cliente em Churn/Desistência/Arquivado: <code>dias = data_encerramento − entrada_primeira_tratativa</code>. Média e mediana sobre todos os churns com tratativa registrada (descarta &lt;0 ou &gt;730 dias).</p>
-                  <p className="mt-2 text-muted-foreground">Clique para ver a lista por cliente.</p>
+                  <p className="mt-2 font-semibold">Universo:</p>
+                  <p>Todas as tratativas com 1ª entrada registrada. Se o cliente já virou churn → conta na média/mediana. Se ainda não virou → aparece como "em andamento" (não entra na média).</p>
+                  <p className="mt-2 text-muted-foreground">Clique para ver a lista completa.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
             <p className="text-2xl font-bold">{operacao.tempoMedioTratativaChurn} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">média · mediana {operacao.tempoMedianoTratativaChurn}d · {operacao.tempoTratativaChurn.length} clientes</p>
+            {(() => {
+              const churnCount = operacao.tempoTratativaChurn.filter(t => t.status === 'churn').length;
+              const ongoingCount = operacao.tempoTratativaChurn.filter(t => t.status === 'ongoing').length;
+              return (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  mediana {operacao.tempoMedianoTratativaChurn}d · {churnCount} churns · {ongoingCount} em andamento
+                </p>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
