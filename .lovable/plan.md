@@ -1,35 +1,44 @@
 ## Diagnóstico
 
-No card "Valor isentado por tratativa", o Grupo Imagem aparece como **R$ 3.429.316** mas o valor real é **R$ 34.293,16** — diferença de fator 100. Isso indica que o campo `Valor Isentado finalizacao` (e fallbacks) vem do Pipefy em **centavos**, não em reais. O `formatCurrency` está correto; o problema está no parsing.
+Na tabela "Dossiê de Churn", a Rampanelli Redemac aparece como **Mar/2026**, mas a data real do churn é outra. As outras linhas (Amora, Fiagro, Alufacil) estão corretas em Abr/2026.
 
-Local: `src/hooks/useJornadaData.ts` linhas 209-211 (`readNum(...)` retornando o número bruto).
+**Causa raiz** (`src/hooks/useOperationsData.ts:383`):
 
-Esse valor é usado em dois lugares (ambos afetados):
-- `isentamentos[].valor` → tabela "Valor isentado por tratativa" + KPI `valorIsentadoTotal`
-- `tratativasResolvidas[].valorIsentado` → tabela de tratativas resolvidas
+```ts
+const mesChurn = trat ? formatMonthYear(trat['Entrada']) : (card['Mes do Churn'] || '');
+```
+
+`mesChurn` usa **`trat['Entrada']`** — a data em que o card da tratativa **entrou na fase finalizada** no Pipefy — em vez da data canônica do churn (`Data do churn` em Central de Projetos). É o mesmo padrão de bug que já corrigimos em `dataEncerramento` na rodada anterior, mas o `mesChurn` ficou de fora.
+
+No caso da Rampanelli, a tratativa foi finalizada em Mar/2026, mas o churn em si aconteceu em outro mês (registrado em `Data do churn`). Por isso o "Mês do Churn" diverge do `dataEncerramento` (que já está correto).
 
 ---
 
 ## Plano
 
-### `src/hooks/useJornadaData.ts` (~linha 209)
+### `src/hooks/useOperationsData.ts` (linha 383)
 
-Normalizar a leitura dividindo por 100:
+Derivar `mesChurn` da **mesma hierarquia** de `dataEncerramento`, garantindo coerência entre as duas colunas:
 
 ```text
-const valorIsentado = readNum(
-  row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
-) / 100;
+mesChurn =
+  formatMonthYear(card['Data do churn'])                       // ← primária (Central de Projetos)
+  ?? formatMonthYear(card['Data encerramento'])                // legado
+  ?? formatMonthYear(trat?.['Finalizacao contrato ultimo dia'])// fallback tratativa
+  ?? formatMonthYear(saidaDate ISO)                            // saída da fase
+  ?? formatMonthYear(trat?.['Entrada'])                        // último recurso (comportamento antigo)
+  ?? card['Mes do Churn']                                      // fallback final do próprio card
 ```
 
-Como ambos os arrays (`isentamentos` e `tratativasResolvidas`) consomem a mesma variável, e o total `valorIsentadoTotal` é derivado de `isentamentos`, a correção em um único ponto resolve KPI + ambas as tabelas.
+Implementação: criar uma const local `churnRefDate` que retorna a primeira string não-vazia da hierarquia acima, e passar para `formatMonthYear`. Reaproveita o helper já existente (`parsePipefyDate` aceita ISO `YYYY-MM-DD` e formato Pipefy).
 
 ### Validação
 
-- Grupo Imagem deve passar de R$ 3.429.316 → **R$ 34.293,16**.
-- KPI "Valor isentado (Atendimento O2)" no card de Operação deve cair proporcionalmente (todas as linhas /100).
-- Conferir 1-2 outras linhas da tabela "Tratativas resolvidas" para garantir que os valores agora batem com o Pipefy.
+- **Rampanelli Redemac** → `Mês do Churn` deve passar de Mar/2026 para o mês correspondente a `Data do churn` da Central de Projetos.
+- **Amora, Fiagro, Alufacil** → devem continuar em Abr/2026 (cai no mesmo campo, sem regressão).
+- Conferir que `mesChurn` e `dataEncerramento` ficam **sempre coerentes** (mesmo mês/ano).
+- Filtros do dossiê (período, ordenação por mês) continuam funcionando — o tipo do retorno é o mesmo.
 
 ### Fora do escopo
 
-Não mexer em outros campos monetários da Jornada (MRR, churn) — esses já estão sendo tratados em outras leituras com normalizações próprias.
+Outras tabelas/visões da Jornada que usam `trat['Entrada']` para fins distintos (ex.: cálculo de SLA de tratativa) não devem ser alteradas — apenas o "Mês do Churn" exibido no dossiê.
