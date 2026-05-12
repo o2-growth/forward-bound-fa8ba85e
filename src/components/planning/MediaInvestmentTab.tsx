@@ -16,6 +16,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useMediaMetas } from "@/contexts/MediaMetasContext";
 import { useMonetaryMetas, BuType, isPontualOnlyBU } from "@/hooks/useMonetaryMetas";
 import { useIndicatorsRealized, FunnelRealized } from "@/hooks/useIndicatorsRealized";
@@ -779,23 +780,85 @@ function BUInvestmentTable({
                 // Gap = soma de (MRR Base projetado − MRR Base realizado/Oxy) dos meses
                 // que já têm Oxy real disponível. Esse é o valor que precisa ser
                 // realocado manualmente para "A Vender" dos meses futuros.
-                const gap = funnelData.reduce((sum, d: any) => {
-                  const g = Number(d.mrrBaseGap) || 0;
-                  return g > 0 ? sum + g : sum;
-                }, 0);
+                const breakdown = funnelData
+                  .map((d: any) => ({
+                    month: d.month,
+                    projetado: Number(d.mrrBaseProjetado) || 0,
+                    real: Number(d.mrrBase) || 0,
+                    gap: Number(d.mrrBaseGap) || 0,
+                  }))
+                  .filter(b => Math.abs(b.gap) > 1);
+                const gap = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
                 const isResolved = gap < 1;
                 return (
                   <TableRow className={isResolved ? 'bg-emerald-500/10' : 'bg-destructive/10'}>
                     <TableCell></TableCell>
                     <TableCell className="font-semibold" colSpan={showMrrBase ? 3 : 2}>
-                      <span className="inline-flex items-center gap-2" title={`Soma de (MRR Base projetado − MRR Base realizado/Oxy) dos meses fechados. Realoque editando "A Vender" de qualquer mês futuro até zerar.`}>
-                        {isResolved ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        ) : (
-                          <AlertCircle className="h-4 w-4 text-destructive" />
-                        )}
-                        Gap a Realocar
-                      </span>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-2 hover:underline cursor-pointer"
+                          >
+                            {isResolved ? (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <AlertCircle className="h-4 w-4 text-destructive" />
+                            )}
+                            Gap a Realocar
+                            <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[420px] p-0" align="start">
+                          <div className="p-3 border-b">
+                            <p className="font-semibold text-sm">Detalhamento do Gap</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Diferença entre MRR Base projetado e o realizado (Oxy) por mês.
+                            </p>
+                          </div>
+                          {breakdown.length === 0 ? (
+                            <div className="p-4 text-sm text-muted-foreground text-center">
+                              Nenhum mês com gap. Tudo alinhado com a projeção.
+                            </div>
+                          ) : (
+                            <div className="max-h-[320px] overflow-auto">
+                              <table className="w-full text-xs">
+                                <thead className="bg-muted/50 sticky top-0">
+                                  <tr>
+                                    <th className="text-left px-3 py-2 font-medium">Mês</th>
+                                    <th className="text-right px-3 py-2 font-medium">Projetado</th>
+                                    <th className="text-right px-3 py-2 font-medium">Real (Oxy)</th>
+                                    <th className="text-right px-3 py-2 font-medium">Δ</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {breakdown.map(b => (
+                                    <tr key={b.month} className="border-t">
+                                      <td className="px-3 py-2">{b.month}</td>
+                                      <td className="text-right px-3 py-2 text-muted-foreground">{formatCurrency(b.projetado)}</td>
+                                      <td className="text-right px-3 py-2">{formatCurrency(b.real)}</td>
+                                      <td className={`text-right px-3 py-2 font-semibold ${b.gap > 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                                        {b.gap > 0 ? '−' : '+'}{formatCurrency(Math.abs(b.gap))}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot className="bg-muted/30 sticky bottom-0">
+                                  <tr className="border-t">
+                                    <td className="px-3 py-2 font-semibold" colSpan={3}>Total a realocar</td>
+                                    <td className={`text-right px-3 py-2 font-bold ${isResolved ? 'text-emerald-600' : 'text-destructive'}`}>
+                                      {isResolved ? 'R$ 0' : formatCurrency(gap)}
+                                    </td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          )}
+                          <div className="p-3 border-t bg-muted/20 text-xs text-muted-foreground">
+                            Realoque editando "A Vender" de qualquer mês futuro até zerar o saldo.
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </TableCell>
                     {showMrrBase && (
                       <TableCell className={`text-right font-bold ${isResolved ? 'text-emerald-600' : 'text-destructive'}`}>
