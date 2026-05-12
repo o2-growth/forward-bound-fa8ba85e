@@ -25,7 +25,7 @@ Resuma em 2-3 frases narrativas o que ocorreu na tratativa, baseando-se nos camp
 **💸 Impacto**
 - MRR perdido: <valor>; Setup: <valor>; LT realizado: <X meses> (entre <data assinatura> e <data encerramento>).
 - Satisfação final na tratativa: <valor do campo "Satisfacao do Cliente">, se houver.
-- Tempo total da tratativa: <tempo_total_tratativa_dias> dias (de <data_abertura_tratativa> até <data_finalizacao_tratativa>). Use APENAS o campo `tempo_total_tratativa_dias` do `tratativa_resumo` — não recalcule por fase.
+- Tempo total da tratativa: <tempo_total_tratativa_dias> dias (de <data_abertura_tratativa> até <data_finalizacao_tratativa>). Use APENAS o campo \`tempo_total_tratativa_dias\` do \`tratativa_resumo\` — não recalcule por fase.
 
 **🛡️ Lições para retenção**
 - 1 a 3 bullets, no formato: \`<Verbo no infinitivo> <ação preventiva concreta> — dono: <CS|CFO|Operação|Head CS|Produto>; quando aplicar: <gatilho mensurável que indica risco semelhante>\`.
