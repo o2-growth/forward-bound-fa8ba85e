@@ -27,6 +27,7 @@ import { ChurnDossierSection } from './nps/ChurnDossierSection';
 import { QuarterlyComparison } from './nps/QuarterlyComparison';
 import { OkrProximity } from './nps/OkrProximity';
 import { VisaoGeralCS } from './cs/VisaoGeralCS';
+import { OperacaoKpisStrip } from './cs/OperacaoKpisStrip';
 import type { JornadaCliente, JornadaCfo, PipelineFase } from './jornada/types';
 import { DateRange } from 'react-day-picker';
 import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -454,6 +455,7 @@ function CustomerSuccessTabInner() {
 
           <TabsContent value="churn" className="mt-4">
             <div className="space-y-8">
+              <OperacaoKpisStrip operacao={operacao} />
               <ChurnDossierSection
                 data={opsData?.churnDossier || []}
                 selectedProdutos={filters.produtos}
