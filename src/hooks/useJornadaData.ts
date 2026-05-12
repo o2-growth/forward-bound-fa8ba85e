@@ -210,11 +210,12 @@ export function useJornadaData() {
       const valorIsentado = readNum(
         row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
       ) / 100;
+      const finalizacaoDate = parseDate(row['Saída'] || row['Saida'] || row['Data encerramento'] || row['Data de encerramento']) || entrada;
       if (decisao && (isSucessoDecisao(decisao) || /sim/i.test(solucaoSucesso))) {
-        tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado });
+        tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado, data: finalizacaoDate });
       }
       if (valorIsentado > 0) {
-        isentamentos.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivoChurn: motivoChurnTrat, valor: valorIsentado });
+        isentamentos.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivoChurn: motivoChurnTrat, valor: valorIsentado, data: finalizacaoDate });
       }
 
       // Store in all-tratativas map (latest wins)
