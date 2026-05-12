@@ -52,7 +52,7 @@ type KpiDialogType = 'clientes' | 'mrr' | 'health' | 'nps' | 'churn' | null;
 
 export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNavigateToAlertas, operacao }: VisaoGeralCSProps) {
   const [openDialog, setOpenDialog] = useState<KpiDialogType>(null);
-  const [opDialog, setOpDialog] = useState<'resolvidas' | 'isentado' | 'oxy' | 'tempo' | null>(null);
+  
 
   const activeClientes = useMemo(() => {
     return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
