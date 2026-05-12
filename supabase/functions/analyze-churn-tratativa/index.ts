@@ -96,10 +96,9 @@ interface NpsRow {
   "Título": string | null;
   "Entrada": string | null;
   "Fase Atual": string | null;
-  "NPS": string | number | null;
-  "CSAT": string | number | null;
-  "Sean Ellis": string | null;
-  "Comentario NPS": string | null;
+  "Nota NPS": string | number | null;
+  "Motivo da Nota": string | null;
+  "Sentimento Oxy": string | null;
   "CFO Responsavel": string | null;
 }
 
@@ -203,18 +202,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 3) Fetch last NPS responses for the same client
+    // 3) Fetch last NPS responses for the same client (best-effort, never derruba o post-mortem)
     let npsRows: NpsRow[] = [];
     if (resolvedTitulo) {
-      const r = await pgClient.query(
-        `SELECT "ID", "Título", "Entrada", "Fase Atual", "NPS", "CSAT", "Sean Ellis", "Comentario NPS", "CFO Responsavel"
-         FROM pipefy_moviment_nps
-         WHERE "Título" ILIKE $1
-         ORDER BY "Entrada" DESC
-         LIMIT 8`,
-        [`%${resolvedTitulo.trim()}%`],
-      );
-      npsRows = r.rows as NpsRow[];
+      try {
+        const r = await pgClient.query(
+          `SELECT "ID", "Título", "Entrada", "Fase Atual", "Nota NPS", "Motivo da Nota", "Sentimento Oxy", "CFO Responsavel"
+           FROM pipefy_moviment_nps
+           WHERE "Título" ILIKE $1
+           ORDER BY "Entrada" DESC
+           LIMIT 8`,
+          [`%${resolvedTitulo.trim()}%`],
+        );
+        npsRows = r.rows as NpsRow[];
+      } catch (npsErr) {
+        console.error("NPS fetch failed (continuando sem NPS):", npsErr);
+      }
     }
 
     await pgClient.end();
@@ -281,10 +284,9 @@ Deno.serve(async (req) => {
         id: String(n.ID),
         data: n["Entrada"],
         fase: n["Fase Atual"],
-        nps: n["NPS"],
-        csat: n["CSAT"],
-        sean_ellis: n["Sean Ellis"],
-        comentario: n["Comentario NPS"],
+        nota: n["Nota NPS"],
+        motivo_nota: n["Motivo da Nota"],
+        sentimento_oxy: n["Sentimento Oxy"],
         cfo_responsavel: n["CFO Responsavel"],
       })),
     };
