@@ -680,6 +680,8 @@ export function useJornadaData() {
       dataPrevista: Date | null; overdue: boolean;
       r1: Date | null; r2: Date | null; r3: Date | null; r4: Date | null;
       t1: string | null; t2: string | null; t3: string | null; t4: string | null;
+      p1: string | null; p2: string | null; p3: string | null; p4: string | null;
+      ata1: string | null; ata2: string | null; ata3: string | null; ata4: string | null;
     }> = [];
 
     const seenReunionIds = new Set<string>();
@@ -751,6 +753,14 @@ export function useJornadaData() {
         t2: row['Temperatura 2'] || null,
         t3: row['Temperatura 3'] || null,
         t4: row['Temperatura Mensal'] || null,
+        p1: row['Cliente Participou'] || row['Cliente Participou 1'] || row['participou'] || row['participou1'] || null,
+        p2: row['Cliente Participou 2'] || row['participou2'] || row['Participou 2'] || null,
+        p3: row['Cliente Participou 3'] || row['participou3'] || row['Participou 3'] || null,
+        p4: row['Cliente Participou Mensal'] || row['participoum'] || row['Participou Mensal'] || null,
+        ata1: row['Ata 1'] || row['Ata Reuniao 1'] || row['ata1'] || null,
+        ata2: row['Ata 2'] || row['Ata Reuniao 2'] || row['ata2'] || null,
+        ata3: row['Ata 3'] || row['Ata Reuniao 3'] || row['ata3'] || null,
+        ata4: row['Ata Mensal'] || row['Ata Comite'] || row['ata_mensal'] || null,
       });
     }
 
