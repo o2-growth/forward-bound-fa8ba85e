@@ -345,6 +345,7 @@ interface BUInvestmentTableProps {
   dreByMonth?: Record<string, number>;
   isLoadingRealized?: boolean;
   pendingMonths?: Set<string>;
+  metaAnualFixa?: number;
 }
 
 function BUInvestmentTable({
@@ -355,7 +356,7 @@ function BUInvestmentTable({
   metrics,
   showMrrBase = false,
   mrrBase = 0,
-  churnMensal = 0.06,
+  churnMensal = 0.05,
   retencaoVendas = 0.25,
   mrrFinal = 0,
   buKey,
@@ -365,7 +366,8 @@ function BUInvestmentTable({
   realizedFunnelByMonth = {},
   dreByMonth = {},
   isLoadingRealized = false,
-  pendingMonths = new Set()
+  pendingMonths = new Set(),
+  metaAnualFixa,
 }: BUInvestmentTableProps) {
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -772,12 +774,48 @@ function BUInvestmentTable({
                   </>
                 );
               })}
+              {(() => {
+                if (typeof metaAnualFixa !== 'number') return null;
+                const gap = metaAnualFixa - totalFaturamentoVender;
+                const isResolved = Math.abs(gap) < 1;
+                return (
+                  <TableRow className={isResolved ? 'bg-emerald-500/10' : 'bg-destructive/10'}>
+                    <TableCell></TableCell>
+                    <TableCell className="font-semibold" colSpan={showMrrBase ? 3 : 2}>
+                      <span className="inline-flex items-center gap-2" title={`Diferença entre meta anual (${formatCurrency(metaAnualFixa)}) e a soma de A Vender dos meses. Realoque editando A Vender em qualquer mês futuro.`}>
+                        {isResolved ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        Gap a Realocar
+                      </span>
+                    </TableCell>
+                    {showMrrBase && (
+                      <TableCell className={`text-right font-bold ${isResolved ? 'text-emerald-600' : 'text-destructive'}`}>
+                        {isResolved ? '✓ Tudo realocado' : formatCurrency(gap)}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                  </TableRow>
+                );
+              })()}
               <TableRow className="bg-muted/50 font-bold">
                 <TableCell></TableCell>
                 <TableCell>Total</TableCell>
                 <TableCell className="text-right">{formatCurrency(totalFaturamentoMeta)}</TableCell>
                 {showMrrBase && <TableCell className="text-right text-muted-foreground">—</TableCell>}
-                {showMrrBase && <TableCell className="text-right text-amber-600">{formatCurrency(totalFaturamentoVender)}</TableCell>}
+                {showMrrBase && (
+                  <TableCell className="text-right text-amber-600">
+                    {formatCurrency(typeof metaAnualFixa === 'number' ? metaAnualFixa : totalFaturamentoVender)}
+                  </TableCell>
+                )}
                 <TableCell className="text-right">{totalVendas}</TableCell>
                 <TableCell className="text-right">{funnelData.reduce((s, d) => s + d.propostas, 0)}</TableCell>
                 <TableCell className="text-right">{funnelData.reduce((s, d) => s + d.rrs, 0)}</TableCell>
@@ -1066,7 +1104,7 @@ export function MediaInvestmentTab() {
   // Estados editáveis - Taxas gerais (Modelo Atual)
   const [mrrInicial, setMrrInicial] = useState(700000);
   const [valorVenderInicial, setValorVenderInicial] = useState(400000);
-  const [churnMensal, setChurnMensal] = useState(0.06);
+  const [churnMensal, setChurnMensal] = useState(0.05);
   const [retencaoVendas, setRetencaoVendas] = useState(0.25);
   
   // Estados editáveis - O2 TAX
@@ -2640,11 +2678,14 @@ export function MediaInvestmentTab() {
       </div>
 
       {/* Funil de Vendas Projetado 2026 */}
-      <div>
-        <h3 className="font-display text-2xl font-bold mb-6 flex items-center gap-2">
-          <Filter className="h-6 w-6 text-primary" />
-          Funil de Vendas Projetado 2026
-        </h3>
+      <Collapsible defaultOpen={false}>
+        <div>
+          <CollapsibleTrigger className="flex items-center gap-2 mb-6 group hover:opacity-80 transition-opacity w-full">
+            <Filter className="h-6 w-6 text-primary" />
+            <h3 className="font-display text-2xl font-bold">Funil de Vendas Projetado 2026</h3>
+            <ChevronDown className="h-5 w-5 ml-auto transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
 
         {/* Consolidated Funnel */}
         <div className="mb-8">
@@ -2700,7 +2741,9 @@ export function MediaInvestmentTab() {
             color="hsl(var(--secondary))"
           />
         </div>
-      </div>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
 
       {/* KPI Resumo Realizado */}
       <Card className="glass-card border-emerald-500/30">
@@ -2759,7 +2802,7 @@ export function MediaInvestmentTab() {
                           <TableHead className="text-xs text-right">Oxy Hacker</TableHead>
                           <TableHead className="text-xs text-right">Franquia</TableHead>
                           <TableHead className="text-xs text-right font-bold">Meta Total</TableHead>
-                          <TableHead className="text-xs text-right font-bold">DRE Total</TableHead>
+                          <TableHead className="text-xs text-right font-bold">Faturamento Oxy</TableHead>
                           <TableHead className="text-xs text-right font-bold">Ating. %</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -2919,6 +2962,7 @@ export function MediaInvestmentTab() {
             dreByMonth={dreByBU.modelo_atual || {}}
             isLoadingRealized={isLoadingRealized}
             pendingMonths={getPendingMonths('modelo_atual')}
+            metaAnualFixa={22_250_000}
           />
 
           <BUInvestmentTable
@@ -2968,9 +3012,9 @@ export function MediaInvestmentTab() {
             isLoadingRealized={isLoadingRealized}
             pendingMonths={getPendingMonths('franquia')}
           />
+          </div>
         </div>
       </div>
-    </div>
     {hasPendingChanges && (
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-4xl w-[calc(100%-2rem)] bg-background/95 backdrop-blur border border-border rounded-xl p-4 shadow-2xl">
         <div className="flex items-center justify-between flex-wrap gap-3">

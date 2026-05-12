@@ -1,67 +1,61 @@
-## Objetivo
 
-Atualizar configurações de Modelo Atual em **Jan, Fev, Mar/2026** com os novos valores e **recalcular o funil** (MQL → RM → RR → Proposta → Venda) com as novas conversões. **A Vender, MRR Base e metas monetárias ficam intocados.** Antes de qualquer alteração, criar backups completos para rollback.
+## Ajustes em Plan Growth (MediaInvestmentTab)
 
-## Etapa 1 — Backups (migração: cria duas tabelas espelho)
-
-- `bu_indicators_config_backup_20260512_modelo_atual` — snapshot das 3 linhas Jan/Fev/Mar de `modelo_atual`
-- `funnel_metas_backup_20260512_modelo_atual_v2` — snapshot das 3 linhas Jan/Fev/Mar de `modelo_atual` em `funnel_metas` (inclui `is_locked`, `faturamento_meta`, `faturamento_vender`, `mrr_base_planejamento`, `investimento`, e quantidades)
-
-Ambas com RLS restrita a admin (SELECT only). Rollback = `UPDATE ... FROM backup`.
-
-## Etapa 2 — Update das configurações (`bu_indicators_config`)
-
-| Campo | Atual (Jan/Fev/Mar) | Novo |
-|---|---|---|
-| ticket_medio | R$ 22.672,13 | R$ 17.000 |
-| cpmql | R$ 461,27 | R$ 473 |
-| cpv | 6.389 / 7.986 / 7.667 | R$ 9.052 |
-| mql_to_rm | 49,1% | 54% |
-| rm_to_rr | 72,2% | 75% |
-| rr_to_prop | 88,4% | 88% |
-| prop_to_venda | 24,3% | 25% |
-
-`investimento_planejado` preservado em cada mês.
-
-## Etapa 3 — Recálculo do funil (`funnel_metas`)
-
-Como **A Vender é mantido** (Jan 400k, Fev 400k, Mar 500k) e o novo ticket é R$ 17k:
-
-- **Vendas** = `ceil(faturamento_vender / 17000)` → Jan **24**, Fev **24**, Mar **30** (iguais às atuais por coincidência de arredondamento)
-- **Propostas** = `ceil(vendas / 0.25)` → Jan/Fev **96**, Mar **120**
-- **RR** = `ceil(propostas / 0.88)` → Jan/Fev **110**, Mar **137**
-- **RM** = `ceil(rrs / 0.75)` → Jan/Fev **147**, Mar **183**
-- **MQL** = `ceil(rms / 0.54)` → Jan/Fev **273**, Mar **339**
-- **Leads**: a conversão Lead→MQL não está em `bu_indicators_config`. Hoje a razão real é Jan 735/316 ≈ 43%, Mar 914/393 ≈ 43%. **Proposta**: manter a mesma razão atual de Lead/MQL por mês → Jan/Fev **635**, Mar **789**.
-
-Como as 3 linhas estão `is_locked=true`, o update precisa **respeitar o lock** (SQL direto ignora a checagem do hook React, mas o snapshot anterior fica preservado no backup). Mantemos `is_locked=true` para que dashboards continuem usando a meta congelada — apenas com os novos números.
-
-`faturamento_meta`, `faturamento_vender`, `mrr_base_planejamento`, `investimento` **não mudam**.
-
-## Etapa 4 — Verificação
-
-Após o update, leio as 3 linhas de cada tabela e confirmo no chat os valores aplicados.
-
-## Rollback (se necessário)
+### 0. Backup antes de qualquer alteração
+Antes de implementar, criar snapshots das tabelas que podem ser afetadas indiretamente pela mudança de churn (recálculo de MRR/A Vender exibido) e de qualquer dado que o usuário possa querer restaurar:
 
 ```sql
-UPDATE bu_indicators_config c
-SET cpmql=b.cpmql, cpv=b.cpv, ticket_medio=b.ticket_medio,
-    mql_to_rm=b.mql_to_rm, rm_to_rr=b.rm_to_rr,
-    rr_to_prop=b.rr_to_prop, prop_to_venda=b.prop_to_venda
-FROM bu_indicators_config_backup_20260512_modelo_atual b
-WHERE c.bu=b.bu AND c.month=b.month;
+CREATE TABLE funnel_metas_backup_20260512_v3_pre_churn AS
+  SELECT * FROM funnel_metas;
 
-UPDATE funnel_metas f
-SET leads=b.leads, mqls=b.mqls, rms=b.rms, rrs=b.rrs,
-    propostas=b.propostas, vendas=b.vendas
-FROM funnel_metas_backup_20260512_modelo_atual_v2 b
-WHERE f.bu=b.bu AND f.month=b.month AND f.year=b.year;
+CREATE TABLE bu_indicators_config_backup_20260512_v2_pre_churn AS
+  SELECT * FROM bu_indicators_config;
+
+CREATE TABLE mrr_base_monthly_backup_20260512_pre_churn AS
+  SELECT * FROM mrr_base_monthly;
 ```
 
-## Confirmação antes de executar
+Aplicar via migration com RLS de leitura apenas para admins (mesmo padrão dos backups anteriores).
+Também serão mantidos os arquivos `.bak` dos componentes alterados (`MediaInvestmentTab.tsx.bak-2026-05-12`, `usePlanGrowthData.ts.bak-2026-05-12`) para reverter o frontend rapidamente caso necessário.
 
-OK proceder com:
-1. Criar as 2 tabelas de backup
-2. Atualizar `bu_indicators_config`
-3. Recalcular `funnel_metas` com os números acima (Leads usando a razão Lead/MQL atual de cada mês)?
+### 1. Renomear coluna "DRE Total" → "Faturamento Oxy"
+No bloco **Consolidado Anual** (`MediaInvestmentTab.tsx:2762`):
+- Alterar header `DRE Total` para `Faturamento Oxy`.
+- Mantém toda a lógica (continua somando `dreByBU` das 4 BUs) — apenas o rótulo muda.
+
+### 2. Funil de Vendas Projetado 2026 — minimizável e fechado por padrão
+Seção a partir de `MediaInvestmentTab.tsx:2642`:
+- Envolver o bloco inteiro (`Consolidado 2026` + grid das 4 BUs) em um `Collapsible` shadcn.
+- `defaultOpen={false}` (entra minimizado ao abrir a página).
+- Header com chevron, padrão visual igual ao do "Consolidado Anual" (`consolidadoOpen` em 1023).
+
+### 3. Churn Modelo Atual: 6% → 5%
+Três ocorrências:
+- `usePlanGrowthData.ts:362` → `0.06` ⇒ `0.05`.
+- `MediaInvestmentTab.tsx:358` (default param `churnMensal = 0.06`) ⇒ `0.05`.
+- `MediaInvestmentTab.tsx:1069` (`useState(0.06)`) ⇒ `useState(0.05)`.
+- Input/slider de churn permanece editável; só muda o default.
+
+### 4. Linha de **Gap** no Modelo Atual (entre Dez e Total)
+No `BUInvestmentTable` da Modelo Atual (renderizado em 2903), adicionar nova `TableRow` posicionada **depois de Dezembro e antes de Total**.
+
+**Comportamento:**
+- A linha "Gap" aparece **apenas** quando `buKey === 'modelo_atual'` (nova prop `metaAnualFixa?: number` no componente; quando definida, renderiza a linha de Gap).
+- Constante: `const META_ANUAL_MODELO_ATUAL = 22_250_000;`
+- Cálculo:
+  - `somaAVender = sum(faturamentoVender de Jan..Dez após edições)`.
+  - `gap = META_ANUAL_MODELO_ATUAL - somaAVender`.
+- Exibição:
+  - Label: **"Gap a Realocar"** + tooltip "Diferença entre meta anual (R$ 22,25M) e a soma realocada nos meses".
+  - Apenas a coluna `A Vender` preenchida (vermelho se `gap > 0`, verde se `gap = 0`); demais colunas `—`.
+  - Fundo `bg-destructive/10` quando `gap > 0`, `bg-emerald-50` quando `gap = 0`.
+- Linha **Total** continua somando todos os meses + a linha de Gap → sempre fecha em **R$ 22.250.000**.
+
+**Realocação dentro da mesma BU:**
+- Sem nova UI de drag/realocar — usa o fluxo já existente: usuário edita "A Vender" de qualquer mês futuro e o Gap diminui em tempo real.
+- Quando `gap === 0`, a linha mostra ✓ "Tudo realocado" em verde.
+
+### Validações finais
+- MRR Base inicial Mar/Abr 2026 segue R$ 667.987 (memória do projeto).
+- Total Modelo Atual no rodapé exibe R$ 22.250.000 mesmo com gap > 0.
+- Ajustes de churn (5%) e do gap row são apenas projeção/UI — não alteram dados persistidos em `funnel_metas`.
