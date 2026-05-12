@@ -477,14 +477,13 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                                   className="h-6 w-6 shrink-0"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const c = findCliente(row);
-                                    if (c) setDrawerCliente(c);
+                                    setAnalysisChurn(row);
                                   }}
                                 >
                                   <Sparkles className="h-3.5 w-3.5 text-primary" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Análise IA do cliente</TooltipContent>
+                              <TooltipContent>Análise IA do churn</TooltipContent>
                             </Tooltip>
                           </div>
                         </TableCell>
