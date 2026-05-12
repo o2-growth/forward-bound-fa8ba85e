@@ -3011,9 +3011,8 @@ export function MediaInvestmentTab() {
             pendingMonths={getPendingMonths('franquia')}
           />
           </div>
-          </CollapsibleContent>
         </div>
-      </Collapsible>
+      </div>
     {hasPendingChanges && (
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 max-w-4xl w-[calc(100%-2rem)] bg-background/95 backdrop-blur border border-border rounded-xl p-4 shadow-2xl">
         <div className="flex items-center justify-between flex-wrap gap-3">
