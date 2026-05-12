@@ -774,12 +774,48 @@ function BUInvestmentTable({
                   </>
                 );
               })}
+              {(() => {
+                if (typeof metaAnualFixa !== 'number') return null;
+                const gap = metaAnualFixa - totalFaturamentoVender;
+                const isResolved = Math.abs(gap) < 1;
+                return (
+                  <TableRow className={isResolved ? 'bg-emerald-500/10' : 'bg-destructive/10'}>
+                    <TableCell></TableCell>
+                    <TableCell className="font-semibold" colSpan={showMrrBase ? 3 : 2}>
+                      <span className="inline-flex items-center gap-2" title={`Diferença entre meta anual (${formatCurrency(metaAnualFixa)}) e a soma de A Vender dos meses. Realoque editando A Vender em qualquer mês futuro.`}>
+                        {isResolved ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        Gap a Realocar
+                      </span>
+                    </TableCell>
+                    {showMrrBase && (
+                      <TableCell className={`text-right font-bold ${isResolved ? 'text-emerald-600' : 'text-destructive'}`}>
+                        {isResolved ? '✓ Tudo realocado' : formatCurrency(gap)}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                    <TableCell className="text-right text-muted-foreground">—</TableCell>
+                  </TableRow>
+                );
+              })()}
               <TableRow className="bg-muted/50 font-bold">
                 <TableCell></TableCell>
                 <TableCell>Total</TableCell>
                 <TableCell className="text-right">{formatCurrency(totalFaturamentoMeta)}</TableCell>
                 {showMrrBase && <TableCell className="text-right text-muted-foreground">—</TableCell>}
-                {showMrrBase && <TableCell className="text-right text-amber-600">{formatCurrency(totalFaturamentoVender)}</TableCell>}
+                {showMrrBase && (
+                  <TableCell className="text-right text-amber-600">
+                    {formatCurrency(typeof metaAnualFixa === 'number' ? metaAnualFixa : totalFaturamentoVender)}
+                  </TableCell>
+                )}
                 <TableCell className="text-right">{totalVendas}</TableCell>
                 <TableCell className="text-right">{funnelData.reduce((s, d) => s + d.propostas, 0)}</TableCell>
                 <TableCell className="text-right">{funnelData.reduce((s, d) => s + d.rrs, 0)}</TableCell>
