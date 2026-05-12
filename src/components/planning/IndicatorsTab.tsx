@@ -476,18 +476,19 @@ export function IndicatorsTab() {
   const { metas: sdrMetasList } = useSdrMetas(currentYear);
   const { funnelMetas: dbFunnelMetas } = useFunnelMetas(currentYear);
 
-  // Look up the LOCKED funnel meta value (mqls/rms/rrs/propostas/vendas/leads) for a BU+month
-  // from funnel_metas DB. Returns null when the row doesn't exist OR is not locked.
-  // Regra de negócio: meses fechados (is_locked=true) → DB é a verdade (congelado).
-  // Meses abertos → o caller deve usar funnelData (Plan Growth ao vivo) como verdade.
-  const getLockedDbFunnelValue = (
+  // Look up the funnel meta value (mqls/rms/rrs/propostas/vendas/leads) for a BU+month
+  // from funnel_metas DB. Returns null when the row doesn't exist.
+  // Regra de negócio: DB é fonte da verdade quando há linha persistida (locked OU sincronizada
+  // via Plan Growth → Sync). Caller usa funnelData (Plan Growth ao vivo) só como fallback
+  // quando a linha ainda não existe no DB.
+  const getDbFunnelValue = (
     bu: string | undefined,
     monthName: string,
     indicatorKey: IndicatorType
   ): number | null => {
     if (!bu) return null;
     const row = dbFunnelMetas.find(m => m.bu === bu && m.month === monthName);
-    if (!row || row.is_locked !== true) return null;
+    if (!row) return null;
     switch (indicatorKey) {
       case 'leads': return row.leads ?? null;
       case 'mql': return row.mqls ?? null;
@@ -726,9 +727,9 @@ export function IndicatorsTab() {
       const monthName = monthNames[getMonth(monthDate)];
 
       // 🎯 Fonte da verdade:
-      //   - mês LOCKED → DB (congelado, snapshot oficial)
-      //   - mês aberto → Plan Growth ao vivo (funnelItems)
-      const dbVal = getLockedDbFunnelValue(bu, monthName, indicatorKey);
+      //   - linha existe em funnel_metas (locked OU sincronizada via Plan Growth) → DB
+      //   - sem linha no DB → Plan Growth ao vivo (funnelItems) como fallback
+      const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
       const item = funnelItems?.find(f => f.month === monthName);
       if (dbVal === null && !item) continue;
 
@@ -779,8 +780,8 @@ export function IndicatorsTab() {
         if (hasData) return Math.round(value);
       }
 
-      // 🎯 Fonte da verdade: DB para mês LOCKED, Plan Growth ao vivo para mês aberto.
-      const dbVal = getLockedDbFunnelValue(bu, monthName, indicatorKey);
+      // 🎯 Fonte da verdade: DB quando há linha persistida (locked ou sync), Plan Growth ao vivo como fallback.
+      const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
       let value = 0;
       if (dbVal !== null) {
         value = dbVal;

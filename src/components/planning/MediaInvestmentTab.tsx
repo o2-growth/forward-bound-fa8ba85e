@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -1042,6 +1042,7 @@ export function MediaInvestmentTab() {
   // MRR Base real (Oxy truth) e funnel_metas snapshot (lock)
   const { mrrBaseData } = useMrrBase();
   const { hasFunnelForBU, getFunnelForBU, bulkUpsert: bulkUpsertFunnelMetas, funnelMetas: allFunnelMetas } = useFunnelMetas();
+  const queryClient = useQueryClient();
 
   // MRR Base de cada mês = MRR realizado do mês ANTERIOR (Oxy truth).
   // Ex.: MRR Base de Fev/26 = MRR de Jan/26; MRR Base de Jan/26 = MRR de Dez/25.
@@ -1946,6 +1947,8 @@ export function MediaInvestmentTab() {
       }
 
       await bulkUpsertFunnelMetas.mutateAsync(funnelSyncItems);
+      // Force refetch para Indicadores refletirem o novo snapshot imediatamente
+      await queryClient.refetchQueries({ queryKey: ['funnel-metas', 2026] });
       await logAction('monetary_meta', `Sincronização manual Plan Growth → funnel_metas: ${funnelSyncItems.length} registros`, {
         source: 'manual_sync_button',
         count: funnelSyncItems.length,
@@ -1955,7 +1958,7 @@ export function MediaInvestmentTab() {
       console.error('Erro na sincronização manual:', err);
       toast.error('Falha ao sincronizar com Indicadores Comercial');
     }
-  }, [allFunnelMetas, modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel, bulkUpsertFunnelMetas, logAction]);
+  }, [allFunnelMetas, modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel, bulkUpsertFunnelMetas, logAction, queryClient]);
 
   // Get pending months for a BU (for visual indicators)
   const getPendingMonths = (bu: string): Set<string> => {
