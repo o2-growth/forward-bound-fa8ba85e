@@ -12,7 +12,7 @@ export interface OperacaoKpisData {
   valorIsentadoTotal: number;
   churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }>;
   churnsOxyCount: number;
-  tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string }>;
+  tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string; status?: 'churn' | 'ongoing' }>;
   tempoMedioTratativaChurn: number;
   tempoMedianoTratativaChurn: number;
 }
