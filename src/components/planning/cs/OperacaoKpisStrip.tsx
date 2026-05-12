@@ -192,15 +192,14 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
           <DialogHeader><DialogTitle>Tempo entre levantar a mão e churn</DialogTitle></DialogHeader>
           <div className="text-xs text-muted-foreground mb-3">
-            Média: <strong className="text-foreground">{operacao.tempoMedioTratativaChurn} dias</strong> · Mediana: <strong className="text-foreground">{operacao.tempoMedianoTratativaChurn} dias</strong> · {operacao.tempoTratativaChurn.filter(t => t.status === 'churn').length} churns · {operacao.tempoTratativaChurn.filter(t => t.status === 'ongoing').length} em andamento
-            <p className="mt-1 text-[10px]">Médias calculadas apenas sobre clientes que já viraram churn.</p>
+            Média: <strong className="text-foreground">{tempoMedio} dias</strong> · Mediana: <strong className="text-foreground">{tempoMediano} dias</strong> · {tempoChurnList.length} churns · {tempoOngoingCount} em andamento
+            <p className="mt-1 text-[10px]">Universo: tratativas iniciadas no período selecionado. Médias calculadas apenas sobre clientes que já viraram churn.</p>
           </div>
           <Table>
             <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Status</TableHead><TableHead>Motivo</TableHead><TableHead className="text-right">Dias</TableHead></TableRow></TableHeader>
             <TableBody>
-              {[...operacao.tempoTratativaChurn]
+              {[...tempoFiltered]
                 .sort((a, b) => {
-                  // churns primeiro, depois ongoing; dentro de cada grupo desc por dias
                   if (a.status !== b.status) return a.status === 'churn' ? -1 : 1;
                   return b.diasAteChurn - a.diasAteChurn;
                 })
@@ -219,8 +218,8 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
                     <TableCell className="text-right">{t.diasAteChurn}d</TableCell>
                   </TableRow>
                 ))}
-              {operacao.tempoTratativaChurn.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa registrada.</TableCell></TableRow>
+              {tempoFiltered.length === 0 && (
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa iniciada no período.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
