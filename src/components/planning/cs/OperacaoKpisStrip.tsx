@@ -107,8 +107,8 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-2xl font-bold">{operacao.churnsOxyCount}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido: {formatCurrency(operacao.churnsOxy.reduce((s, c) => s + c.mrr, 0))}</p>
+            <p className="text-2xl font-bold">{churnsOxyFiltered.length}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido: {formatCurrency(mrrOxyFiltered)} · {periodLabel}</p>
           </CardContent>
         </Card>
 
