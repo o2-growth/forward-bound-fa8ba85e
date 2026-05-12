@@ -776,13 +776,19 @@ function BUInvestmentTable({
               })}
               {(() => {
                 if (typeof metaAnualFixa !== 'number') return null;
-                const gap = metaAnualFixa - totalFaturamentoVender;
+                // Realizado para meses passados (fechados), A Vender para meses atuais/futuros
+                const somaConsiderada = funnelData.reduce((sum, d, idx) => {
+                  const isClosed = idx < currentMonthIndex;
+                  const realizado = realizedByMonth?.[d.month] ?? 0;
+                  return sum + (isClosed ? realizado : d.faturamentoVender);
+                }, 0);
+                const gap = metaAnualFixa - somaConsiderada;
                 const isResolved = Math.abs(gap) < 1;
                 return (
                   <TableRow className={isResolved ? 'bg-emerald-500/10' : 'bg-destructive/10'}>
                     <TableCell></TableCell>
                     <TableCell className="font-semibold" colSpan={showMrrBase ? 3 : 2}>
-                      <span className="inline-flex items-center gap-2" title={`Diferença entre meta anual (${formatCurrency(metaAnualFixa)}) e a soma de A Vender dos meses. Realoque editando A Vender em qualquer mês futuro.`}>
+                      <span className="inline-flex items-center gap-2" title={`Meta anual ${formatCurrency(metaAnualFixa)} − (Realizado dos meses fechados + A Vender dos meses futuros = ${formatCurrency(somaConsiderada)}). Realoque editando A Vender em qualquer mês futuro.`}>
                         {isResolved ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         ) : (
