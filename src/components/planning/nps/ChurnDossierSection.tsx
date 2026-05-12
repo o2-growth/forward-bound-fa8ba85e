@@ -534,7 +534,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                                 <p className="text-foreground">{row.motivosCancelamento || 'Não informado'}</p>
                               </div>
                               <div>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Problemas com a Oxy</p>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase mb-1">Feedback NPS</p>
                                 <p className="text-foreground">{row.problemasOxy || 'Não informado'}</p>
                               </div>
                             </div>
