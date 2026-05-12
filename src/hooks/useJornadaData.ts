@@ -685,41 +685,6 @@ export function useJornadaData() {
     }> = [];
 
     const seenReunionIds = new Set<string>();
-    // DEBUG: card específico para investigar (R1-R4 preenchidos no Pipefy mas dashboard não reflete)
-    const DEBUG_CARD_ID = '1329376764';
-    const debugRowsForCard = data.rotinas.filter(r => String(r.ID || '') === DEBUG_CARD_ID);
-    if (debugRowsForCard.length > 0) {
-      console.log(`[REUNIAO DEBUG] Card ${DEBUG_CARD_ID} — encontrado ${debugRowsForCard.length} registro(s) em rotinas:`);
-      debugRowsForCard.forEach((r, i) => {
-        console.log(`[REUNIAO DEBUG] Registro ${i + 1}:`, {
-          'Título': r['Título'],
-          'Fase': r['Fase'],
-          'Fase Atual': r['Fase Atual'],
-          'Tipo de Entrega': r['Tipo de Entrega'],
-          'Mes Referencia': r['Mes Referencia'],
-          'CFO Responsavel': r['CFO Responsavel'],
-          'Data Reuniao 1': r['Data Reuniao 1'],
-          'Data Reuniao 2': r['Data Reuniao 2'],
-          'Data Reuniao 3': r['Data Reuniao 3'],
-          'Data Mensal': r['Data Mensal'],
-          'Temperatura 1': r['Temperatura 1'],
-          'Temperatura 2': r['Temperatura 2'],
-          'Temperatura 3': r['Temperatura 3'],
-          'Temperatura Mensal': r['Temperatura Mensal'],
-          'Cliente Participou': r['Cliente Participou'],
-          'Selecao Reuniao': r['Selecao Reuniao'],
-          'Overdue': r['Overdue'],
-        });
-        // Diagnóstico dos filtros que rodam abaixo
-        const passFaseAtual = r['Fase'] === r['Fase Atual'];
-        const passTipo = (r['Tipo de Entrega'] || '') === 'Reuniões com Cliente';
-        const fase = r['Fase Atual'] || '';
-        const passExclude = !['Cancelado', 'Cancelada', 'Arquivado', 'Arquivo'].some(t => fase.includes(t));
-        console.log(`[REUNIAO DEBUG] Filtros: Fase===FaseAtual=${passFaseAtual} | Tipo='Reuniões com Cliente'=${passTipo} | Não excluído=${passExclude} → ${passFaseAtual && passTipo && passExclude ? 'INCLUI' : 'EXCLUI'}`);
-      });
-    } else {
-      console.log(`[REUNIAO DEBUG] Card ${DEBUG_CARD_ID} NÃO encontrado em pipefy_moviment_rotinas (limit ${2000} rows). Possível causa: limite de fetchTable, ou ID não existe na tabela.`);
-    }
 
     for (const row of data.rotinas) {
       if (row['Fase'] !== row['Fase Atual']) continue;
