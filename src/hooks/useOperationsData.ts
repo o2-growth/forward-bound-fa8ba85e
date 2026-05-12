@@ -438,11 +438,6 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       ?? null;
     const finalizacaoContrato = correctChurnDate(finalizacaoContratoRaw, key);
     const churnPhaseEntry = parsePipefyDate(card['Entrada']);
-    const candidateDates = [
-      toLocalDateBR((card as any)['Data do churn']),
-      churnPhaseEntry ? toLocalDateBR(churnPhaseEntry) : '',
-      finalizacaoContrato,
-    ].filter(Boolean) as string[];
     // Hierarquia: data oficial de fim do contrato (corrigida) > Data do churn manual >
     // entrada na fase de churn. Isso garante que o filtro mensal use o mês oficial
     // de finalização do contrato (fonte de verdade do XLSX/financeiro).
