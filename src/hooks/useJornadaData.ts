@@ -216,7 +216,8 @@ export function useJornadaData() {
         tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado, data: finalizacaoDate });
       }
       if (valorIsentado > 0) {
-        isentamentos.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivoChurn: motivoChurnTrat, valor: valorIsentado, data: finalizacaoDate });
+        const t = (row['Título'] || '').trim().toLowerCase();
+        valorIsentadoByTitulo.set(t, (valorIsentadoByTitulo.get(t) || 0) + valorIsentado);
       }
 
       // Store in all-tratativas map (latest wins)
