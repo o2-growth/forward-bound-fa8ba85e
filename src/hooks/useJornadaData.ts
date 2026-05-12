@@ -819,6 +819,18 @@ export function useJornadaData() {
       });
     }
 
+    // Diagnóstico temporário — valores isentados capturados
+    if (typeof window !== 'undefined') {
+      const all = Array.from(valorIsentadoByTitulo.entries()).filter(([, v]) => v > 0);
+      console.log('[isentado/diag]', {
+        totalComValor: all.length,
+        amostra: all.slice(0, 20),
+        amora: valorIsentadoByTitulo.get(normTitulo('Amora Distribuidora')) || 0,
+        grupoImagem: valorIsentadoByTitulo.get(normTitulo('Grupo imagem')) || 0,
+        fiagro: valorIsentadoByTitulo.get(normTitulo('Fiagro')) || 0,
+      });
+    }
+
     // Tempo entre levantar a mão (1ª tratativa) e churn
     // Universo: TODAS as tratativas com 1ª entrada registrada.
     // Se cliente já virou churn → entra na média/mediana.
