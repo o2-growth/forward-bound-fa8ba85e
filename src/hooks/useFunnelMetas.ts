@@ -132,9 +132,20 @@ export function useFunnelMetas(year = 2026) {
   });
 
   // Bulk upsert funnel metas
+  // Defense-in-depth: filters out months that are is_locked=true so callers
+  // cannot accidentally overwrite frozen accelerator metas.
   const bulkUpsert = useMutation({
     mutationFn: async (items: FunnelMetaUpsert[]) => {
-      const upsertData = items.map(item => ({
+      const lockedSet = new Set(
+        funnelMetas
+          .filter(m => m.is_locked === true)
+          .map(m => `${m.bu}__${m.month}__${m.year}`)
+      );
+      const filtered = items.filter(
+        i => !lockedSet.has(`${i.bu}__${i.month}__${i.year ?? year}`)
+      );
+      if (filtered.length === 0) return;
+      const upsertData = filtered.map(item => ({
         bu: item.bu,
         month: item.month,
         year: item.year || year,
