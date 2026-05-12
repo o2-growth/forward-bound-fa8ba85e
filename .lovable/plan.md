@@ -1,44 +1,54 @@
-## Contexto
+## Pontos a resolver
 
-Hoje, no card "Valor isentado (Atendimento O2)", somamos **toda** tratativa finalizada com `Valor Isentado > 0`, sem exigir que o cliente tenha virado churn nem que o motivo seja "Atendimento O2". Já o card "Churns com problemas na Oxy" lista qualquer cliente em fase inativa com referência a Oxy, mesmo sem `data de encerramento` válida (ficando fora do filtro por período).
-
-A jornada/dossiê de Abril mostra **8 churns**. Os dois cards precisam ser estritamente subconjuntos desses 8:
-
-- **Valor isentado (Atendimento O2)** = só os churns do período cujo `motivoChurn` = "Atendimento O2", somando o `Valor Isentado` da tratativa correspondente.
-- **Churns com problemas na Oxy** = só os churns do período cujo motivo principal/cancelamento/problemasOxy menciona Oxy.
+1. **Redundância "Tratativas Salvas" / "Taxa de Salvamento"** no `ChurnDossierSection` vs "Tratativas resolvidas com sucesso" no `OperacaoKpisStrip`, com **valores diferentes** (4 vs 2) — o dossiê usa `tratativasResolvidasCount` cru (todo o histórico) e o strip usa filtrado por período.
+2. **"Tempo levantar a mão → churn" mostra 61 em andamento** porque hoje o universo é "todas as tratativas com 1ª entrada", sem recorte temporal. Conforme decidido antes, o universo deve ser **só tratativas iniciadas no período do filtro**.
+3. **Valor isentado dos 3 churns Atendimento O2 = R$ 0** (Amora Distribuidora, Grupo Imagem, Fiagro). Hoje o `valorIsentadoByTitulo` só lê linhas de tratativa com `Fase === Fase Atual`, e cobre apenas 4 variações exatas de nome do campo. É provável que a linha de finalização tenha sido descartada.
 
 ## Mudanças
 
-### `src/hooks/useJornadaData.ts`
+### 1) `src/hooks/useJornadaData.ts`
 
-1. **Construir lista canônica de churns** (`churnsList`) iterando `allClientes` filtrando por `INACTIVE_PHASES`, anexando `churnDate = churnDateByTitulo.get(titulo.toLowerCase())` e `motivoChurn` já consolidado (com `CHURN_OVERRIDES`). Isso garante que os dois cards partam exatamente do mesmo universo do dossiê.
+**a. Captura tolerante do valor isentado** (resolve ponto 3):
+- Mover a leitura de `valorIsentado` para fora do `continue` que descarta linhas com `Fase !== Fase Atual` — capturamos em **qualquer** linha de movimento da tratativa.
+- Função tolerante de match de campo:
+  ```ts
+  const normKey = (k: string) => k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+  const readValorIsentado = (row) => {
+    for (const k of Object.keys(row)) {
+      const nk = normKey(k);
+      if (nk.startsWith('valorisentado')) return readNum(row[k]) / 100;
+    }
+    return 0;
+  };
+  ```
+- Acumular o **máximo** por título (não soma) — evita duplicar quando o histórico tem várias movimentações.
+- Normalizar título com NFD (`normTitulo`) ao indexar e ao consultar do lado dos churns.
+- Diagnóstico temporário: `console.log('[isentado/diag]', { Amora, GrupoImagem, Fiagro, totalComValor })`.
 
-2. **Mapa `valorIsentadoByTitulo`**: a partir do loop atual de `tratativas`, guardar `Map<tituloLower, { valor, data }>` (somando se houver mais de uma tratativa).
+**b. Adicionar `data` em `tempoTratativaChurn`** (suporte ao recorte do ponto 2):
+- Em cada item, incluir `data: tratativaDate` (a 1ª entrada na tratativa). Atualizar a tipagem em `OperacaoKpisStrip`.
 
-3. **Refazer `isentamentos`** para conter **apenas churns** com `motivoChurn === 'Atendimento O2'`:
-   ```ts
-   isentamentos = churnsList
-     .filter(c => normalize(c.motivoChurn) === 'atendimento o2')
-     .map(c => ({
-       titulo: c.titulo,
-       cfo: c.cfo,
-       motivoChurn: c.motivoChurn,
-       valor: valorIsentadoByTitulo.get(c.titulo.toLowerCase())?.valor ?? 0,
-       data: c.churnDate,   // usa data do churn (não da tratativa) para casar com o filtro do dossiê
-     }));
-   ```
-   (mantemos itens com `valor = 0` para que a contagem do card bata com a do dossiê; a soma usa só os > 0.)
+### 2) `src/components/planning/cs/OperacaoKpisStrip.tsx`
 
-4. **Refazer `churnsOxy`** para garantir que a `data` é a do churn e que entram apenas itens com `churnDate` no período (o front já filtra por `inRange(data)`, então basta sempre setar `data: churnDate`). Manter o critério `hasOxy` atual.
+- Adicionar `data?: Date | null` no tipo de `tempoTratativaChurn`.
+- No card "Tempo levantar a mão", filtrar `tempoTratativaChurn` por `inRange(item.data)` (1ª entrada da tratativa dentro do período). Recalcular mediana/média e contagens (churns / em andamento) **a partir desse subconjunto**.
+- Atualizar tooltip: "Universo: tratativas iniciadas no período selecionado."
 
-### `src/components/planning/cs/OperacaoKpisStrip.tsx`
+### 3) `src/components/planning/nps/ChurnDossierSection.tsx`
 
-- Atualizar tooltip do card "Valor isentado (Atendimento O2)": deixar claro que conta **apenas churns** do período cujo motivo é "Atendimento O2".
-- No diálogo de isentados, esconder linhas com `valor === 0` (ou marcar como "—") para não confundir.
-- Sem mudanças no card "Churns com problemas na Oxy" — o `inRange(data)` já cuida do recorte agora que `data` será sempre o `churnDate`.
+Resolve ponto 1, removendo a duplicidade:
+- **Remover** o card "Tratativas Salvas" do dossiê (já existe no strip acima como "Tratativas resolvidas com sucesso").
+- **Manter** o card "Taxa de Salvamento" (métrica única do dossiê), mas:
+  - Receber `tratativasResolvidasCount` já **filtrado pelo período** — alterar `CustomerSuccessTab.tsx` para passar `resolvidasFiltered.length` em vez de `operacao.tratativasResolvidasCount`.
+  - Ajustar grid de `grid-cols-3` para `grid-cols-2` na linha onde o card removido estava (ou recompor com Logo Churn% + Taxa de Salvamento).
+
+### 4) `src/components/planning/CustomerSuccessTab.tsx`
+
+- Calcular `resolvidasNoPeriodo` aplicando `inRange` (mesma regra do strip) e passar para o dossiê.
+- Alternativa mais limpa: expor a contagem filtrada diretamente do `OperacaoKpisStrip` via callback **ou** mover o filtro para um util compartilhado. Vou usar um util inline (`filterByDateRange`) no `CustomerSuccessTab` para manter consistência.
 
 ## Resultado esperado
 
-Em Abril, com 8 churns no dossiê:
-- Card "Valor isentado (Atendimento O2)" mostra apenas os churns desse mês com motivo "Atendimento O2" e soma o valor isentado das tratativas ligadas a eles.
-- Card "Churns com problemas na Oxy" mostra apenas os churns desse mês cujo motivo cita Oxy.
+- "Tratativas Salvas" deixa de existir no dossiê; "Taxa de Salvamento" passa a usar a mesma contagem do strip (2 em Abr/26, batendo).
+- "Tempo levantar a mão" mostra apenas tratativas que **começaram** entre 01/04 e 30/04 — os 61 em andamento caem para um número condizente (provavelmente <10).
+- Os 3 churns Atendimento O2 passam a aparecer com seus valores reais de Pipefy no card "Valor isentado", validados via console.log diagnóstico.
