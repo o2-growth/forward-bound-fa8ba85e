@@ -176,6 +176,20 @@ export function useJornadaData() {
     const tratativaMap = new Map<string, { motivo: string; motivoChurn: string | null; dias: number; fase: string }>();
     // All tratativas map: captures motivo from ANY tratativa (for churned clients)
     const allTratativaMap = new Map<string, { motivo: string; motivoChurn: string | null; fase: string }>();
+    // Tratativas resolvidas com sucesso (decisão final = retomada / sucesso)
+    const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number }> = [];
+    // Valor isentado por tratativa (campo 'Valor Isentado finalizacao')
+    const isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number }> = [];
+    const readNum = (v: unknown): number => {
+      if (v == null) return 0;
+      const s = String(v).replace(/[^0-9.,-]/g, '').replace(/\./g, '').replace(',', '.');
+      const n = parseFloat(s);
+      return isNaN(n) ? 0 : n;
+    };
+    const isSucessoDecisao = (d: string): boolean => {
+      const s = d.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+      return s.includes('sucesso') || s.includes('retomada') || s.includes('retornou') || s.includes('resolvido') || s.includes('implementada com sucesso');
+    };
     for (const row of tratativas) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const titulo = (row['Título'] || '').trim().toLowerCase();
@@ -185,6 +199,20 @@ export function useJornadaData() {
       const motivo = (row['Motivo'] || '').trim() || 'Não informado';
       const entrada = parseDate(row['Entrada'] || row['Data de Inicio da Tratativa']);
       const dias = entrada ? daysBetween(entrada, now) : 0;
+      const cfoT = normalizeCfoName((row['CFO Responsavel'] || row['Responsavel pela Tratativa'] || '').trim());
+
+      // Tratativas finalizadas: checar decisão e valor isentado
+      const decisao = (row['Decisao Final'] || '').trim();
+      const solucaoSucesso = (row['Solucao Implementada com Sucesso'] || row['Solução Implementada com Sucesso'] || '').trim();
+      const valorIsentado = readNum(
+        row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
+      );
+      if (decisao && (isSucessoDecisao(decisao) || /sim/i.test(solucaoSucesso))) {
+        tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado });
+      }
+      if (valorIsentado > 0) {
+        isentamentos.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivoChurn: motivoChurnTrat, valor: valorIsentado });
+      }
 
       // Store in all-tratativas map (latest wins)
       allTratativaMap.set(titulo, { motivo, motivoChurn: motivoChurnTrat, fase });
@@ -313,9 +341,19 @@ export function useJornadaData() {
       let pontual = valorDiagnostico + valorTurnaround + valorValuation + valorEducacao + (isPontualOnly ? valorCfoaas : 0);
 
       // Override específico (Dago): valor lançado como pontual é, na verdade, recorrente (MRR)
-      const PONTUAL_TO_MRR_OVERRIDES = ['libracom', 'rgo', 'guará', 'guara'];
+      const PONTUAL_TO_MRR_OVERRIDES = ['libracom', 'rgo'];
       if (PONTUAL_TO_MRR_OVERRIDES.some(k => tituloLower.includes(k))) {
         mrr = mrr + pontual;
+        pontual = 0;
+      }
+      // Override de MRR fixo (Dago): Guará entrou como 30k mas o real é 15k recorrente
+      const MRR_FIXED_OVERRIDES: Record<string, number> = {
+        'guará': 15000,
+        'guara': 15000,
+      };
+      const guaraKey = Object.keys(MRR_FIXED_OVERRIDES).find(k => tituloLower.includes(k));
+      if (guaraKey) {
+        mrr = MRR_FIXED_OVERRIDES[guaraKey];
         pontual = 0;
       }
       const entrada = parseDate(row['Entrada']) || new Date();
@@ -724,7 +762,33 @@ export function useJornadaData() {
         }, '')
       : '';
 
-    return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync };
+    // === 7. Operação: agregados especiais ===
+    // Churns com Problemas com a Oxy (vindos do central_projetos)
+    const churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }> = [];
+    for (const c of allClientes) {
+      if (c.id.endsWith('__pedrolo')) continue;
+      if (!INACTIVE_PHASES.includes(c.faseAtual)) continue;
+      const proj = projetoMotivoChurnMap.get(c.titulo.toLowerCase());
+      const motivo = c.motivoChurn || '';
+      const hasOxy = !!proj?.problemasOxy
+        || /oxy/i.test(motivo)
+        || /oxy/i.test(proj?.principal || '')
+        || /oxy/i.test(proj?.cancelamento || '');
+      if (hasOxy) {
+        churnsOxy.push({ titulo: c.titulo, cfo: c.cfo, motivo: proj?.problemasOxy || motivo || 'Problema na Oxy', mrr: c.mrr });
+      }
+    }
+
+    const operacao = {
+      tratativasResolvidas,
+      tratativasResolvidasCount: tratativasResolvidas.length,
+      isentamentos,
+      valorIsentadoTotal: isentamentos.reduce((s, i) => s + i.valor, 0),
+      churnsOxy,
+      churnsOxyCount: churnsOxy.length,
+    };
+
+    return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, operacao };
   }, [data, oxyProductsByMonth]);
 
   return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };
