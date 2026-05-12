@@ -832,6 +832,7 @@ export function useJornadaData() {
       diasAteChurn: number;
       motivo: string;
       status: 'churn' | 'ongoing';
+      data: Date | null;
     }> = [];
 
     for (const [tituloLower, tratativaDate] of firstTratativaByTitulo) {
@@ -851,6 +852,7 @@ export function useJornadaData() {
           diasAteChurn: dias,
           motivo: cliente.motivoChurn || '—',
           status: 'churn',
+          data: tratativaDate,
         });
       } else {
         const dias = daysBetween(tratativaDate, now);
@@ -861,6 +863,7 @@ export function useJornadaData() {
           diasAteChurn: dias,
           motivo: 'Em andamento',
           status: 'ongoing',
+          data: tratativaDate,
         });
       }
     }
