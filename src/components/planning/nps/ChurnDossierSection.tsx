@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
-import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus } from 'lucide-react';
+import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus, Sparkles } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
+import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawer';
 
 /* ─── helpers ─── */
 function formatDate(dateStr: string | null | undefined): string {
@@ -68,6 +69,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
   const [excludeMotivos, setExcludeMotivos] = useState<string[]>([]);
+  const [analysisChurn, setAnalysisChurn] = useState<ChurnDossierCard | null>(null);
 
   /* ─── derived data ─── */
   const motivos = useMemo(() => [...new Set(data.map(d => d.motivoPrincipal).filter(Boolean))], [data]);
@@ -502,7 +504,24 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                           ) : '—'}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          <PipefyCardLink pipeId={PIPEFY_PIPES.CENTRAL_PROJETOS} cardId={row.id} label="Ver card" variant="button" />
+                          <div className="flex items-center gap-1">
+                            <PipefyCardLink pipeId={PIPEFY_PIPES.CENTRAL_PROJETOS} cardId={row.id} label="Ver card" variant="button" />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => setAnalysisChurn(row)}
+                                >
+                                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" className="text-xs">
+                                Análise IA do churn
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
                         </TableCell>
                       </TableRow>
                       {isExpanded && (
@@ -529,6 +548,12 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
           </div>
         </CardContent>
       </Card>
+
+      <ChurnAnalysisDrawer
+        churn={analysisChurn}
+        open={!!analysisChurn}
+        onClose={() => setAnalysisChurn(null)}
+      />
     </div>
     </TooltipProvider>
   );
