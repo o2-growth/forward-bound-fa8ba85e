@@ -776,22 +776,19 @@ function BUInvestmentTable({
               })}
               {(() => {
                 if (typeof metaAnualFixa !== 'number') return null;
-                // Faturamento de meses fechados (realizado, se disponível) + faturamentoMeta (MRR Base + A Vender) dos meses futuros
-                const somaConsiderada = funnelData.reduce((sum, d, idx) => {
-                  const isClosed = idx < currentMonthIndex;
-                  const realizado = realizedByMonth?.[d.month];
-                  if (isClosed && typeof realizado === 'number' && realizado > 0) {
-                    return sum + realizado;
-                  }
-                  return sum + d.faturamentoMeta;
+                // Gap = soma de (MRR Base projetado − MRR Base realizado/Oxy) dos meses
+                // que já têm Oxy real disponível. Esse é o valor que precisa ser
+                // realocado manualmente para "A Vender" dos meses futuros.
+                const gap = funnelData.reduce((sum, d: any) => {
+                  const g = Number(d.mrrBaseGap) || 0;
+                  return g > 0 ? sum + g : sum;
                 }, 0);
-                const gap = metaAnualFixa - somaConsiderada;
-                const isResolved = Math.abs(gap) < 1;
+                const isResolved = gap < 1;
                 return (
                   <TableRow className={isResolved ? 'bg-emerald-500/10' : 'bg-destructive/10'}>
                     <TableCell></TableCell>
                     <TableCell className="font-semibold" colSpan={showMrrBase ? 3 : 2}>
-                      <span className="inline-flex items-center gap-2" title={`Meta anual ${formatCurrency(metaAnualFixa)} − (Realizado dos meses fechados + Faturamento projetado [MRR Base + A Vender] dos meses futuros = ${formatCurrency(somaConsiderada)}). Realoque editando A Vender em qualquer mês futuro.`}>
+                      <span className="inline-flex items-center gap-2" title={`Soma de (MRR Base projetado − MRR Base realizado/Oxy) dos meses fechados. Realoque editando "A Vender" de qualquer mês futuro até zerar.`}>
                         {isResolved ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         ) : (
