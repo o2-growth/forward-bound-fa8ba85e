@@ -341,6 +341,66 @@ export type Database = {
         }
         Relationships: []
       }
+      funnel_metas_backup_20260512: {
+        Row: {
+          bu: string | null
+          created_at: string | null
+          faturamento_meta: number | null
+          faturamento_vender: number | null
+          id: string | null
+          investimento: number | null
+          is_locked: boolean | null
+          leads: number | null
+          month: string | null
+          mqls: number | null
+          mrr_base_planejamento: number | null
+          propostas: number | null
+          rms: number | null
+          rrs: number | null
+          updated_at: string | null
+          vendas: number | null
+          year: number | null
+        }
+        Insert: {
+          bu?: string | null
+          created_at?: string | null
+          faturamento_meta?: number | null
+          faturamento_vender?: number | null
+          id?: string | null
+          investimento?: number | null
+          is_locked?: boolean | null
+          leads?: number | null
+          month?: string | null
+          mqls?: number | null
+          mrr_base_planejamento?: number | null
+          propostas?: number | null
+          rms?: number | null
+          rrs?: number | null
+          updated_at?: string | null
+          vendas?: number | null
+          year?: number | null
+        }
+        Update: {
+          bu?: string | null
+          created_at?: string | null
+          faturamento_meta?: number | null
+          faturamento_vender?: number | null
+          id?: string | null
+          investimento?: number | null
+          is_locked?: boolean | null
+          leads?: number | null
+          month?: string | null
+          mqls?: number | null
+          mrr_base_planejamento?: number | null
+          propostas?: number | null
+          rms?: number | null
+          rrs?: number | null
+          updated_at?: string | null
+          vendas?: number | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       funnel_realized: {
         Row: {
           bu: string
