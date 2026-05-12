@@ -96,10 +96,9 @@ interface NpsRow {
   "Título": string | null;
   "Entrada": string | null;
   "Fase Atual": string | null;
-  "NPS": string | number | null;
-  "CSAT": string | number | null;
-  "Sean Ellis": string | null;
-  "Comentario NPS": string | null;
+  "Nota NPS": string | number | null;
+  "Motivo da Nota": string | null;
+  "Sentimento Oxy": string | null;
   "CFO Responsavel": string | null;
 }
 
