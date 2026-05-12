@@ -181,7 +181,8 @@ export function useJornadaData() {
     // Tratativas resolvidas com sucesso (decisão final = retomada / sucesso)
     const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number; data: Date | null }> = [];
     // Valor isentado por tratativa (campo 'Valor Isentado finalizacao')
-    const isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number; data: Date | null }> = [];
+    // Acumulamos por título para depois cruzar somente com churns do período
+    const valorIsentadoByTitulo = new Map<string, number>();
     const readNum = (v: unknown): number => {
       if (v == null) return 0;
       const s = String(v).replace(/[^0-9.,-]/g, '').replace(/\./g, '').replace(',', '.');
@@ -215,7 +216,8 @@ export function useJornadaData() {
         tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado, data: finalizacaoDate });
       }
       if (valorIsentado > 0) {
-        isentamentos.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivoChurn: motivoChurnTrat, valor: valorIsentado, data: finalizacaoDate });
+        const t = (row['Título'] || '').trim().toLowerCase();
+        valorIsentadoByTitulo.set(t, (valorIsentadoByTitulo.get(t) || 0) + valorIsentado);
       }
 
       // Store in all-tratativas map (latest wins)
@@ -758,11 +760,17 @@ export function useJornadaData() {
       : '';
 
     // === 7. Operação: agregados especiais ===
+    const normMotivo = (s: string | null | undefined) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
     // Churns com Problemas com a Oxy (vindos do central_projetos)
+    // Restrito a churns com data de encerramento (para casar com filtro do dossiê)
     const churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number; data: Date | null }> = [];
     for (const c of allClientes) {
       if (c.id.endsWith('__pedrolo')) continue;
       if (!INACTIVE_PHASES.includes(c.faseAtual)) continue;
+      const churnDate = churnDateByTitulo.get(c.titulo.toLowerCase()) || null;
+      if (!churnDate) continue;
       const proj = projetoMotivoChurnMap.get(c.titulo.toLowerCase());
       const motivo = c.motivoChurn || '';
       const hasOxy = !!proj?.problemasOxy
@@ -770,9 +778,26 @@ export function useJornadaData() {
         || /oxy/i.test(proj?.principal || '')
         || /oxy/i.test(proj?.cancelamento || '');
       if (hasOxy) {
-        const churnDate = churnDateByTitulo.get(c.titulo.toLowerCase()) || null;
         churnsOxy.push({ titulo: c.titulo, cfo: c.cfo, motivo: proj?.problemasOxy || motivo || 'Problema na Oxy', mrr: c.mrr, data: churnDate });
       }
+    }
+
+    // Valor isentado (Atendimento O2): apenas churns do período cujo motivo é "Atendimento O2"
+    const isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number; data: Date | null }> = [];
+    for (const c of allClientes) {
+      if (c.id.endsWith('__pedrolo')) continue;
+      if (!INACTIVE_PHASES.includes(c.faseAtual)) continue;
+      if (normMotivo(c.motivoChurn) !== 'atendimento o2') continue;
+      const churnDate = churnDateByTitulo.get(c.titulo.toLowerCase()) || null;
+      if (!churnDate) continue;
+      const valor = valorIsentadoByTitulo.get(c.titulo.toLowerCase()) || 0;
+      isentamentos.push({
+        titulo: c.titulo,
+        cfo: c.cfo,
+        motivoChurn: c.motivoChurn,
+        valor,
+        data: churnDate,
+      });
     }
 
     // Tempo entre levantar a mão (1ª tratativa) e churn

@@ -79,13 +79,12 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
                   <p className="font-semibold mb-1">De onde vem:</p>
                   <p>Pipefy → pipe <strong>Tratativas</strong> → campo <code>Valor Isentado finalizacao</code> (fallbacks: <code>Valor Isentado</code>, <code>Valor isentado</code>).</p>
                   <p className="mt-2 font-semibold">Como soma:</p>
-                  <p>Soma do valor isentado em todas as tratativas finalizadas com valor &gt; 0. Não filtra por motivo — mostra o total isentado em qualquer tratativa.</p>
-                  <p className="mt-2 text-muted-foreground">Clique para ver isenções por cliente (e ver quais foram por motivo Atendimento O2).</p>
+                  <p>Considera <strong>apenas churns do período</strong> cujo motivo é "Atendimento O2" e soma o <code>Valor Isentado</code> da tratativa associada. Subconjunto dos churns do dossiê.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
             <p className="text-2xl font-bold">{formatCurrency(valorIsentadoFiltered)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{isentamentosFiltered.length} tratativas com isenção · {periodLabel}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{isentamentosFiltered.length} churns Atendimento O2 · {periodLabel}</p>
           </CardContent>
         </Card>
 

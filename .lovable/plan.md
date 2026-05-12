@@ -1,39 +1,44 @@
-## Aplicar filtro de data global aos KPIs de Operação
+## Contexto
 
-Hoje os 3 cards seguintes mostram totais acumulados (sem respeitar o filtro de período do CS):
-- Tratativas resolvidas com sucesso
-- Valor isentado (Atendimento O2)
-- Churns com problema na Oxy
+Hoje, no card "Valor isentado (Atendimento O2)", somamos **toda** tratativa finalizada com `Valor Isentado > 0`, sem exigir que o cliente tenha virado churn nem que o motivo seja "Atendimento O2". Já o card "Churns com problemas na Oxy" lista qualquer cliente em fase inativa com referência a Oxy, mesmo sem `data de encerramento` válida (ficando fora do filtro por período).
 
-O CS Tab já tem `csStartDate`/`csEndDate` (passado como `globalDateRange` p/ ChurnDossier). Vamos reusar esse mesmo filtro.
+A jornada/dossiê de Abril mostra **8 churns**. Os dois cards precisam ser estritamente subconjuntos desses 8:
+
+- **Valor isentado (Atendimento O2)** = só os churns do período cujo `motivoChurn` = "Atendimento O2", somando o `Valor Isentado` da tratativa correspondente.
+- **Churns com problemas na Oxy** = só os churns do período cujo motivo principal/cancelamento/problemasOxy menciona Oxy.
 
 ## Mudanças
 
 ### `src/hooks/useJornadaData.ts`
 
-Anexar a **data de referência** em cada item dos arrays:
+1. **Construir lista canônica de churns** (`churnsList`) iterando `allClientes` filtrando por `INACTIVE_PHASES`, anexando `churnDate = churnDateByTitulo.get(titulo.toLowerCase())` e `motivoChurn` já consolidado (com `CHURN_OVERRIDES`). Isso garante que os dois cards partam exatamente do mesmo universo do dossiê.
 
-- `tratativasResolvidas`: adicionar `data: Date | null` = `parseDate(row['Saída'] || row['Saida'] || row['Data encerramento'] || row['Entrada'])` (data em que a tratativa foi finalizada).
-- `isentamentos`: adicionar `data: Date | null` = mesma regra acima (quando o valor isentado foi registrado/finalizado).
-- `churnsOxy`: adicionar `data: Date | null` = `churnDateByTitulo.get(tituloLower)` (data de encerramento do projeto).
+2. **Mapa `valorIsentadoByTitulo`**: a partir do loop atual de `tratativas`, guardar `Map<tituloLower, { valor, data }>` (somando se houver mais de uma tratativa).
+
+3. **Refazer `isentamentos`** para conter **apenas churns** com `motivoChurn === 'Atendimento O2'`:
+   ```ts
+   isentamentos = churnsList
+     .filter(c => normalize(c.motivoChurn) === 'atendimento o2')
+     .map(c => ({
+       titulo: c.titulo,
+       cfo: c.cfo,
+       motivoChurn: c.motivoChurn,
+       valor: valorIsentadoByTitulo.get(c.titulo.toLowerCase())?.valor ?? 0,
+       data: c.churnDate,   // usa data do churn (não da tratativa) para casar com o filtro do dossiê
+     }));
+   ```
+   (mantemos itens com `valor = 0` para que a contagem do card bata com a do dossiê; a soma usa só os > 0.)
+
+4. **Refazer `churnsOxy`** para garantir que a `data` é a do churn e que entram apenas itens com `churnDate` no período (o front já filtra por `inRange(data)`, então basta sempre setar `data: churnDate`). Manter o critério `hasOxy` atual.
 
 ### `src/components/planning/cs/OperacaoKpisStrip.tsx`
 
-- Adicionar prop opcional `dateRange?: { from: Date; to: Date }`.
-- Atualizar interface `OperacaoKpisData` para incluir o novo `data` em cada item.
-- Criar `inRange(d)` helper: `!dateRange || (d && d >= dateRange.from && d <= dateRange.to)` — itens sem data caem fora quando há filtro ativo.
-- Filtrar **antes** de calcular contagens/somas:
-  - `resolvidasFiltered = operacao.tratativasResolvidas.filter(t => inRange(t.data))` → usar `.length` no card e na tabela.
-  - `isentamentosFiltered = operacao.isentamentos.filter(i => inRange(i.data))` → soma e contagem.
-  - `churnsOxyFiltered = operacao.churnsOxy.filter(c => inRange(c.data))` → contagem, soma MRR e tabela.
-- Mostrar pequena legenda no rodapé de cada card quando o filtro estiver ativo: `"no período selecionado"`.
-- Manter o card de "Tempo levantar a mão → churn" inalterado (já tratado anteriormente).
+- Atualizar tooltip do card "Valor isentado (Atendimento O2)": deixar claro que conta **apenas churns** do período cujo motivo é "Atendimento O2".
+- No diálogo de isentados, esconder linhas com `valor === 0` (ou marcar como "—") para não confundir.
+- Sem mudanças no card "Churns com problemas na Oxy" — o `inRange(data)` já cuida do recorte agora que `data` será sempre o `churnDate`.
 
-### `src/components/planning/CustomerSuccessTab.tsx`
+## Resultado esperado
 
-- Passar `dateRange={{ from: csStartDate, to: csEndDate }}` para `<OperacaoKpisStrip>` (linha ~458).
-
-## Sem mudança
-
-- Lógica de derivação dos itens no hook permanece a mesma; apenas anexamos a data.
-- Outros cards/seções do CS Tab seguem como estão.
+Em Abril, com 8 churns no dossiê:
+- Card "Valor isentado (Atendimento O2)" mostra apenas os churns desse mês com motivo "Atendimento O2" e soma o valor isentado das tratativas ligadas a eles.
+- Card "Churns com problemas na Oxy" mostra apenas os churns desse mês cujo motivo cita Oxy.
