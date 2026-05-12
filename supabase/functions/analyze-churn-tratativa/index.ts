@@ -20,7 +20,8 @@ Listar SOMENTE as fases efetivamente percorridas, em ordem cronológica. Citar a
 
 **🎯 Causa raiz**
 - **Motivo declarado:** <campo "Motivo Principal do Churn" ou "Motivo Churn" da tratativa, se houver>.
-- **Motivos detalhados:** <campo "Motivos cancelamento" ou "Problemas com a Oxy", se preenchido>.
+- **Motivos detalhados:** <campo "Motivos cancelamento", "Motivo da perda" ou "Problemas com a Oxy", se preenchido>.
+- **Comentários do CFO/CS na tratativa:** cite TRECHOS LITERAIS (entre aspas, máx 25 palavras cada) dos campos textuais quando preenchidos: "Descricao da Situacao", "Detalhes da Tratativa", "Plano de Acao definido", "Feedback Final", "Observacoes finalizacao", "Negociacao paralela rescisao". Mostre que leu o que o time escreveu — não parafraseie. Se um cliente teve "Plano de Acao definido" mas churnou mesmo assim, cite o plano e aponte que ele falhou.
 - **Sinais nos dados:** 1-3 bullets factuais conectando os campos do JSON (ex.: NPS caindo de 9→6 em 90d, satisfação na tratativa = "Insatisfeito", >X dias parado em "Plano de Ação", problema operacional explícito). Cada sinal deve citar evidência (campo + valor + data).
 
 **💸 Impacto**
@@ -70,6 +71,41 @@ interface TratativaRow {
   "Motivo Churn": string | null;
   "Satisfacao do Cliente": string | null;
   "Responsavel pela Tratativa": string | null;
+  "Destino": string | null;
+  "Descricao da Situacao": string | null;
+  "Problemas com a Oxy cliente": string | null;
+  "Problemas com a Oxy": string | null;
+  "Detalhes da Tratativa": string | null;
+  "Plano de Acao definido": string | null;
+  "Solucao Implementada com Sucesso": string | null;
+  "Negociacao paralela rescisao": string | null;
+  "Feedback Final": string | null;
+  "Observacoes finalizacao": string | null;
+  "Motivo da perda": string | null;
+  "Termo de Rescisao Enviado": string | null;
+  "Data de Solicitacao": string | null;
+  "Data de Inicio da Tratativa": string | null;
+  "Data prevista finalizacao tratativa": string | null;
+  "Data finalizacao plano de acao": string | null;
+  "Finalizacao contrato ultimo dia": string | null;
+}
+
+function compactObj<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === "string" && v.trim() === "") continue;
+    out[k] = v;
+  }
+  return out as Partial<T>;
+}
+
+function lastNonEmpty(rows: TratativaRow[], field: keyof TratativaRow): string | null {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const v = rows[i]?.[field];
+    if (typeof v === "string" && v.trim() !== "") return v;
+  }
+  return null;
 }
 
 interface ProjectRow {
@@ -257,19 +293,37 @@ Deno.serve(async (req) => {
           valor_diagnostico: diagnostico,
         },
       } : null,
-      tratativa_historico: tratativaRows.map(t => ({
+      tratativa_historico: tratativaRows.map(t => compactObj({
         id: String(t.ID),
         fase: t["Fase"],
         fase_atual: t["Fase Atual"],
+        destino: t["Destino"],
         entrada: t["Entrada"],
         saida: t["Saída"],
         dias_na_fase: diffDays(t["Entrada"], t["Saída"]),
         cfo_responsavel: t["CFO Responsavel"],
         responsavel_tratativa: t["Responsavel pela Tratativa"],
         motivo: t["Motivo"],
+        motivo_da_perda: t["Motivo da perda"],
         decisao_final: t["Decisao Final"],
         motivo_churn: t["Motivo Churn"],
         satisfacao_cliente: t["Satisfacao do Cliente"],
+        // Campos de texto livre (comentários/observações da tratativa)
+        descricao_situacao: t["Descricao da Situacao"],
+        detalhes_tratativa: t["Detalhes da Tratativa"],
+        plano_de_acao: t["Plano de Acao definido"],
+        solucao_implementada: t["Solucao Implementada com Sucesso"],
+        feedback_final: t["Feedback Final"],
+        observacoes_finalizacao: t["Observacoes finalizacao"],
+        negociacao_paralela_rescisao: t["Negociacao paralela rescisao"],
+        problemas_com_oxy_cliente: t["Problemas com a Oxy cliente"],
+        problemas_com_oxy: t["Problemas com a Oxy"],
+        termo_rescisao_enviado: t["Termo de Rescisao Enviado"],
+        data_solicitacao: t["Data de Solicitacao"],
+        data_inicio_tratativa: t["Data de Inicio da Tratativa"],
+        data_prevista_finalizacao: t["Data prevista finalizacao tratativa"],
+        data_finalizacao_plano_acao: t["Data finalizacao plano de acao"],
+        data_finalizacao_contrato: t["Finalizacao contrato ultimo dia"],
       })),
       tratativa_resumo: tratativaRows.length > 0 ? {
         total_fases_percorridas: tratativaRows.length,
@@ -279,6 +333,13 @@ Deno.serve(async (req) => {
         decisao_final: tratativaRows.find(t => t["Decisao Final"])?.["Decisao Final"] ?? null,
         motivo_churn_final: tratativaRows.find(t => t["Motivo Churn"])?.["Motivo Churn"] ?? null,
         satisfacao_final: tratativaRows.find(t => t["Satisfacao do Cliente"])?.["Satisfacao do Cliente"] ?? null,
+        // Comentários consolidados — última entrada não-vazia de cada campo qualitativo
+        ultimo_feedback_final: lastNonEmpty(tratativaRows, "Feedback Final"),
+        ultimo_plano_de_acao: lastNonEmpty(tratativaRows, "Plano de Acao definido"),
+        ultima_descricao_situacao: lastNonEmpty(tratativaRows, "Descricao da Situacao"),
+        ultimas_observacoes_finalizacao: lastNonEmpty(tratativaRows, "Observacoes finalizacao"),
+        ultimos_detalhes_tratativa: lastNonEmpty(tratativaRows, "Detalhes da Tratativa"),
+        ultimos_problemas_com_oxy: lastNonEmpty(tratativaRows, "Problemas com a Oxy"),
       } : null,
       nps_recente: npsRows.map(n => ({
         id: String(n.ID),
