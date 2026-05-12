@@ -776,11 +776,14 @@ function BUInvestmentTable({
               })}
               {(() => {
                 if (typeof metaAnualFixa !== 'number') return null;
-                // Realizado para meses passados (fechados), A Vender para meses atuais/futuros
+                // Faturamento de meses fechados (realizado, se disponível) + faturamentoMeta (MRR Base + A Vender) dos meses futuros
                 const somaConsiderada = funnelData.reduce((sum, d, idx) => {
                   const isClosed = idx < currentMonthIndex;
-                  const realizado = realizedByMonth?.[d.month] ?? 0;
-                  return sum + (isClosed ? realizado : d.faturamentoVender);
+                  const realizado = realizedByMonth?.[d.month];
+                  if (isClosed && typeof realizado === 'number' && realizado > 0) {
+                    return sum + realizado;
+                  }
+                  return sum + d.faturamentoMeta;
                 }, 0);
                 const gap = metaAnualFixa - somaConsiderada;
                 const isResolved = Math.abs(gap) < 1;
@@ -788,7 +791,7 @@ function BUInvestmentTable({
                   <TableRow className={isResolved ? 'bg-emerald-500/10' : 'bg-destructive/10'}>
                     <TableCell></TableCell>
                     <TableCell className="font-semibold" colSpan={showMrrBase ? 3 : 2}>
-                      <span className="inline-flex items-center gap-2" title={`Meta anual ${formatCurrency(metaAnualFixa)} − (Realizado dos meses fechados + A Vender dos meses futuros = ${formatCurrency(somaConsiderada)}). Realoque editando A Vender em qualquer mês futuro.`}>
+                      <span className="inline-flex items-center gap-2" title={`Meta anual ${formatCurrency(metaAnualFixa)} − (Realizado dos meses fechados + Faturamento projetado [MRR Base + A Vender] dos meses futuros = ${formatCurrency(somaConsiderada)}). Realoque editando A Vender em qualquer mês futuro.`}>
                         {isResolved ? (
                           <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         ) : (
