@@ -3010,6 +3010,21 @@ export function MediaInvestmentTab() {
         </div>
       </div>
     )}
+    {showSyncBtn && !hasPendingChanges && (
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleManualSyncFunnel}
+          disabled={bulkUpsertFunnelMetas.isPending}
+          className="shadow-lg bg-background/95 backdrop-blur"
+          title="Sincronizar metas de funil com Indicadores Comercial (?syncFunnel=1)"
+        >
+          <ArrowRightLeft className="h-4 w-4 mr-1" />
+          {bulkUpsertFunnelMetas.isPending ? 'Sincronizando...' : 'Sync → Indicadores'}
+        </Button>
+      </div>
+    )}
     {isAdmin && (
       <MetaRedistributionPanel
         open={redistOpen}
