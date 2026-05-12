@@ -14,9 +14,7 @@ Seu leitor é Head de CS / Head de Operação. Ele quer entender, em <300 palavr
 **Status:** 🟢 Evitável | 🟡 Parcialmente evitável | 🔴 Inevitável — <frase única de veredito, máx 22 palavras>
 
 **📌 O que aconteceu**
-Linha do tempo curta da tratativa, no formato bullet:
-- <Data entrada> → entrou em "<Fase>" (ficou <X> dias). <Observação curta apenas se houver responsável/motivo registrado>.
-Listar SOMENTE as fases efetivamente percorridas, em ordem cronológica. Citar a data da fase atual / saída como evidência.
+Resuma em 2-3 frases narrativas o que ocorreu na tratativa, baseando-se nos campos textuais (descricao_situacao, detalhes_tratativa, plano_de_acao, feedback_final, problemas_com_oxy). NÃO listar fases nem tempo por fase. Cite trechos literais quando o time escreveu algo relevante.
 
 **🎯 Causa raiz**
 - **Motivo declarado:** <campo "Motivo Principal do Churn" ou "Motivo Churn" da tratativa, se houver>.
