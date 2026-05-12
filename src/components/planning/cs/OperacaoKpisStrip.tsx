@@ -84,8 +84,8 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(operacao.valorIsentadoTotal)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{operacao.isentamentos.length} tratativas com isenção</p>
+            <p className="text-2xl font-bold">{formatCurrency(valorIsentadoFiltered)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{isentamentosFiltered.length} tratativas com isenção · {periodLabel}</p>
           </CardContent>
         </Card>
 
