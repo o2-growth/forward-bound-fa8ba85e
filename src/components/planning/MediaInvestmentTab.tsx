@@ -2741,7 +2741,9 @@ export function MediaInvestmentTab() {
             color="hsl(var(--secondary))"
           />
         </div>
-      </div>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
 
       {/* KPI Resumo Realizado */}
       <Card className="glass-card border-emerald-500/30">
