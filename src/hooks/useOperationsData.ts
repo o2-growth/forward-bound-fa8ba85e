@@ -380,7 +380,11 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       (saidaDate ? toLocalDateBR(saidaDate) : '') ||
       (tratEntradaDate ? toLocalDateBR(tratEntradaDate) : '') ||
       '';
-    const mesChurn = trat ? formatMonthYear(trat['Entrada']) : (card['Mes do Churn'] || '');
+    // mesChurn segue a mesma hierarquia de dataEncerramento (deriva direto dela quando possível)
+    const mesChurn =
+      formatMonthYear(dataEncerramento) ||
+      (trat ? formatMonthYear(trat['Entrada']) : '') ||
+      (card['Mes do Churn'] || '');
     const ltMeses = diffInMonths(dataAssinatura, dataEncerramento) || (card['LT (meses)'] || '');
 
     const problemasOxy = nps?.['Comentarios'] || nps?.['Motivo da Nota'] || card['Problemas com a Oxy'] || '';
