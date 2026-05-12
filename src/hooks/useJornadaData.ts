@@ -759,7 +759,7 @@ export function useJornadaData() {
 
     // === 7. Operação: agregados especiais ===
     // Churns com Problemas com a Oxy (vindos do central_projetos)
-    const churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }> = [];
+    const churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number; data: Date | null }> = [];
     for (const c of allClientes) {
       if (c.id.endsWith('__pedrolo')) continue;
       if (!INACTIVE_PHASES.includes(c.faseAtual)) continue;
@@ -770,7 +770,8 @@ export function useJornadaData() {
         || /oxy/i.test(proj?.principal || '')
         || /oxy/i.test(proj?.cancelamento || '');
       if (hasOxy) {
-        churnsOxy.push({ titulo: c.titulo, cfo: c.cfo, motivo: proj?.problemasOxy || motivo || 'Problema na Oxy', mrr: c.mrr });
+        const churnDate = churnDateByTitulo.get(c.titulo.toLowerCase()) || null;
+        churnsOxy.push({ titulo: c.titulo, cfo: c.cfo, motivo: proj?.problemasOxy || motivo || 'Problema na Oxy', mrr: c.mrr, data: churnDate });
       }
     }
 
