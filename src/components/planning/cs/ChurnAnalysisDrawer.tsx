@@ -136,9 +136,24 @@ export function ChurnAnalysisDrawer({ churn, open, onClose }: Props) {
                 )}
 
                 {data?.dossie && (
-                  <details className="rounded-lg border p-3 bg-muted/30 min-w-0 overflow-hidden">
-                    <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-                      Ver JSON cru (debug)
+                  <details open className="rounded-lg border p-3 bg-muted/30 min-w-0 overflow-hidden">
+                    <summary className="cursor-pointer text-xs font-medium text-muted-foreground flex items-center justify-between gap-2">
+                      <span>
+                        JSON do dossiê •{" "}
+                        {(data.dossie as any)?.tratativa_historico?.length ?? 0} fases tratativa •{" "}
+                        {(data.dossie as any)?.nps_recente?.length ?? 0} NPS •{" "}
+                        Central de Projetos: {(data.dossie as any)?.central_projetos ? "sim" : "não"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigator.clipboard.writeText(JSON.stringify(data.dossie, null, 2));
+                        }}
+                        className="text-[10px] px-2 py-0.5 rounded border bg-background hover:bg-muted"
+                      >
+                        Copiar JSON
+                      </button>
                     </summary>
                     <pre className="text-[10px] mt-3 overflow-x-auto max-h-96 max-w-full whitespace-pre bg-background p-3 rounded">
                       {JSON.stringify(data.dossie, null, 2)}
