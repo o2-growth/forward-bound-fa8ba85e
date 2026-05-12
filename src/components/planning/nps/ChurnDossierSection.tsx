@@ -88,7 +88,13 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
       if (globalCfos.length > 0 && !globalCfos.includes(d.cfo)) return false;
       if (selectedProdutos.length > 0 && !selectedProdutos.some(p => (d.produto || '').includes(p))) return false;
       if (globalDateRange?.from) {
-        let churnDate = d.dataEncerramento ? new Date(d.dataEncerramento) : null;
+        let churnDate: Date | null = null;
+        if (d.dataEncerramento) {
+          const ymdLocal = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.dataEncerramento);
+          churnDate = ymdLocal
+            ? new Date(Number(ymdLocal[1]), Number(ymdLocal[2]) - 1, Number(ymdLocal[3]))
+            : new Date(d.dataEncerramento);
+        }
         if (churnDate && isNaN(churnDate.getTime())) churnDate = null;
         // Fallback: parse mesChurn (e.g. "Jan/2026") to get an approximate date
         if (!churnDate && d.mesChurn) {
