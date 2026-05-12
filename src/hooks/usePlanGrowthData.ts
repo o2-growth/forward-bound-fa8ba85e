@@ -450,16 +450,13 @@ export function usePlanGrowthData() {
       gapPorMes[m] = gap;
       if (gap > 0) gapTotal += gap;
     });
-    if (gapTotal > 0) {
-      const ticket = indicadoresPorBU.modeloAtual.ticketMedio || 17000;
-      adjusted.revenueToSell['Dez'] = (adjusted.revenueToSell['Dez'] || 0) + gapTotal;
-      adjusted.vendasPorMes['Dez'] = Math.round(adjusted.revenueToSell['Dez'] / ticket);
-    }
+    // Auto-realocação para Dez removida: o gap agora é exibido na linha
+    // "Gap a Realocar" da tabela Modelo Atual e deve ser realocado manualmente
+    // pelo usuário editando "A Vender" dos meses futuros.
     console.log('[GapMRR ModeloAtual]', {
       gapPorMes,
       gapTotal,
-      dezAVenderOriginal: mrrDynamicRaw.revenueToSell['Dez'],
-      dezAVenderAjustado: adjusted.revenueToSell['Dez'],
+      note: 'Auto-realocação para Dez desativada — gap visível na linha Gap a Realocar',
     });
     return adjusted;
   }, [mrrDynamicRaw, mrrBaseRealPorMes]);
