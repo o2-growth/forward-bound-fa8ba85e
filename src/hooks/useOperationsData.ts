@@ -2,6 +2,26 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { parsePipefyDate, parsePipefyDateOnly } from './dateUtils';
 
+/**
+ * Converte qualquer entrada (Date | string ISO | 'YYYY-MM-DD' | null) em
+ * 'YYYY-MM-DD' representando o dia no fuso America/Sao_Paulo.
+ * Evita o shift de timezone ao usar `toISOString().split('T')[0]`.
+ */
+function toLocalDateBR(input: string | Date | null | undefined): string {
+  if (!input) return '';
+  // Se já vier no formato YYYY-MM-DD, retorna direto.
+  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+  const d = input instanceof Date ? input : new Date(input);
+  if (isNaN(d.getTime())) return '';
+  // Formata via Intl no fuso BR — pt-CA produz YYYY-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
 export interface ProjectCard {
   ID: string;
   'Título': string;
