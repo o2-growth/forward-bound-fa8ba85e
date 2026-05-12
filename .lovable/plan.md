@@ -1,19 +1,38 @@
-Vou ajustar o Dossiê de Churn para parar de manter esses 4 clientes em abril quando a data oficial indicar outro mês.
+# Correção de datas invertidas no Dossiê de Churn
 
-Plano:
-1. Corrigir o vínculo com Tratativas
-   - Hoje o mapa `título → tratativa` pega apenas registros em que `Fase === Fase Atual` e pode escolher uma tratativa que não contém a data oficial correta.
-   - Vou passar a escolher, por cliente, a tratativa com a melhor data oficial de encerramento disponível, priorizando `Finalização do contrato (último dia trabalhado)`.
+## Problema
+O sync escreve `Finalização do contrato (último dia trabalhado)` em `pipefy_moviment_tratativas` invertendo dia/mês quando o dia ≤ 12. Isso faz clientes sumirem do filtro do mês correto (ex: 5 clientes que deveriam aparecer em Abril/2026 não aparecem).
 
-2. Usar o campo oficial com mais variações de nome
-   - Expandir a leitura para contemplar nomes com/sem acento e a forma do relatório oficial: `Finalização do contrato (último dia trabalhado)`.
-   - A hierarquia continuará sendo: data oficial da tratativa → backups do card → saída/entrada apenas como último recurso.
+## Solução
+Heurística de correção aplicada **somente** no hook do dossiê de churn, usando como âncora a entrada na fase "Tratativa finalizada" do mesmo card (gerada pelo Pipefy, não afetada pelo bug).
 
-3. Filtrar pelo mesmo mês exibido
-   - O filtro global da tela deve usar `dataEncerramento` calculada pelo hook, sem cair em uma data de fase antiga.
-   - Vou garantir parse local de `YYYY-MM-DD`, evitando diferenças de fuso e garantindo que o mês filtrado seja o mesmo mostrado na coluna “Mês do Churn”.
+## Mudanças
 
-Resultado esperado:
-- Abril/2026 deixa de mostrar Rampanelli Redemac se a data oficial dele for março.
-- A lista de abril passa a se alinhar ao relatório oficial do CRM.
-- Os clientes realmente oficiais de abril continuam aparecendo quando estiverem na base carregada pelo app.
+### `src/hooks/useOperationsData.ts`
+1. Para cada tratativa com `Decisão Final = Churn Cliente`:
+   - Ler `Finalização do contrato (último dia trabalhado)` como `YYYY-MM-DD` → componentes Y/M/D.
+   - Buscar `phaseFinalizadaEntry` (data de entrada na fase "Tratativa finalizada" do mesmo título).
+2. Aplicar correção apenas se **todas** as condições forem verdadeiras:
+   - `M ≤ 12` **e** `D ≤ 12` (data ambígua).
+   - Existe `phaseFinalizadaEntry`.
+   - `|original − âncora| > 60 dias` **e** `|swap − âncora| < 60 dias`.
+   - O swap é estritamente mais próximo da âncora.
+3. Caso contrário, manter a data original.
+4. Logar todas as inversões aplicadas com `[CHURN_DATE_FIX]` (título, original, corrigido, diff em dias).
+5. Construir lista de churn a partir de `Decisão Final = Churn Cliente` (fonte canônica), enriquecendo com Central de Projetos para MRR, Setup, CFO, produto, link Pipefy.
+6. `mesChurn` e `dataEncerramento` usam o valor corrigido. Filtros de período continuam usando `dataEncerramento`.
+7. Manter dados históricos da Central de Projetos (Churn/Atividades/Desistência) sem tratativa registrada via hierarquia já existente.
+
+### `src/components/planning/nps/ChurnDossierSection.tsx`
+- Parsear `YYYY-MM-DD` como data local (evitar shift de timezone).
+
+## Garantias
+- **Escopo isolado:** apenas o dossiê de churn lê esse campo. Zero impacto em funil, vendas, MRR, etc.
+- **Margem de segurança:** só inverte quando o ganho é claro (> 60 dias de diferença vs. âncora).
+- **Fallback seguro:** sem fase "Tratativa finalizada", mantém original.
+- **Genérico:** funciona para qualquer cliente/mês, sem hardcode.
+
+## Validação pós-implementação
+- Conferir Abril/2026: deve mostrar exatamente os 8 clientes do XLSX.
+- Conferir Março e Maio/2026: nenhum cliente deve ter migrado para mês errado.
+- Revisar logs `[CHURN_DATE_FIX]` no console.
