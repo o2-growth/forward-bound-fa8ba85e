@@ -1,61 +1,52 @@
 
-## Ajustes em Plan Growth (MediaInvestmentTab)
+## Objetivo
+Usar a tabela `mrr_base_monthly` como **fonte única de verdade** do MRR Base na tabela do Modelo Atual (Plan Growth), em vez de derivar de seed projetado com churn.
 
-### 0. Backup antes de qualquer alteração
-Antes de implementar, criar snapshots das tabelas que podem ser afetadas indiretamente pela mudança de churn (recálculo de MRR/A Vender exibido) e de qualquer dado que o usuário possa querer restaurar:
+## Valores reais já no banco (2026)
+- Jan: R$ 705.268,07
+- Fev: R$ 746.847,17
+- Mar: R$ 733.281,13
+- Abr: R$ 700.152,57
+- Mai a Dez: ainda não existem na tabela
 
-```sql
-CREATE TABLE funnel_metas_backup_20260512_v3_pre_churn AS
-  SELECT * FROM funnel_metas;
+## Comportamento
 
-CREATE TABLE bu_indicators_config_backup_20260512_v2_pre_churn AS
-  SELECT * FROM bu_indicators_config;
+**Coluna "MRR Base" do Modelo Atual:**
+1. Para cada mês, ler diretamente de `mrr_base_monthly` (via hook `useMrrBase` já existente).
+2. Se o mês existe na tabela → usar o valor exato (real Oxy).
+3. Se não existe (meses futuros, hoje Mai–Dez/26) → projetar a partir do **último mês disponível** aplicando **5% de churn ao mês**:
+   - Mai/26 = Abr × 0,95 = R$ 665.145
+   - Jun/26 = Mai × 0,95
+   - … e assim por diante até Dez/26.
 
-CREATE TABLE mrr_base_monthly_backup_20260512_pre_churn AS
-  SELECT * FROM mrr_base_monthly;
-```
+**Coluna "Gap"** (badge ⚠️ por mês):
+- Continua mostrando diferença entre o MRR Base atual e o que seria a projeção pura desde Jan (mês × 0,95). Serve só para sinalizar variações vs. modelo teórico.
 
-Aplicar via migration com RLS de leitura apenas para admins (mesmo padrão dos backups anteriores).
-Também serão mantidos os arquivos `.bak` dos componentes alterados (`MediaInvestmentTab.tsx.bak-2026-05-12`, `usePlanGrowthData.ts.bak-2026-05-12`) para reverter o frontend rapidamente caso necessário.
+**Linha "Gap a Realocar" (abaixo de Dezembro):**
+- Mantém comportamento atual: soma os gaps dos meses fechados, mostrando saldo a realocar manualmente em "A Vender".
 
-### 1. Renomear coluna "DRE Total" → "Faturamento Oxy"
-No bloco **Consolidado Anual** (`MediaInvestmentTab.tsx:2762`):
-- Alterar header `DRE Total` para `Faturamento Oxy`.
-- Mantém toda a lógica (continua somando `dreByBU` das 4 BUs) — apenas o rótulo muda.
+## Reversibilidade
+- Os arquivos `.bak-2026-05-12` de `MediaInvestmentTab.tsx` e `usePlanGrowthData.ts` permanecem. Backup do `mrr_base_monthly_backup_20260512_pre_churn` está intacto.
+- Nenhuma escrita em banco — só mudança de leitura no frontend.
 
-### 2. Funil de Vendas Projetado 2026 — minimizável e fechado por padrão
-Seção a partir de `MediaInvestmentTab.tsx:2642`:
-- Envolver o bloco inteiro (`Consolidado 2026` + grid das 4 BUs) em um `Collapsible` shadcn.
-- `defaultOpen={false}` (entra minimizado ao abrir a página).
-- Header com chevron, padrão visual igual ao do "Consolidado Anual" (`consolidadoOpen` em 1023).
+## Arquivos a alterar (frontend apenas)
 
-### 3. Churn Modelo Atual: 6% → 5%
-Três ocorrências:
-- `usePlanGrowthData.ts:362` → `0.06` ⇒ `0.05`.
-- `MediaInvestmentTab.tsx:358` (default param `churnMensal = 0.06`) ⇒ `0.05`.
-- `MediaInvestmentTab.tsx:1069` (`useState(0.06)`) ⇒ `useState(0.05)`.
-- Input/slider de churn permanece editável; só muda o default.
+### `src/hooks/usePlanGrowthData.ts`
+- Importar `useMrrBase` (já existe).
+- Substituir o atual cálculo de `mrrBaseRealPorMes` (que faz `seed × 0,95` e depois aplica churn) por:
+  - Para Jan–Dez/2026: `getMrrBaseForMonth(month, 2026)`.
+  - Se `0` (não existe): pegar o último mês com valor e aplicar `× 0,95^n`.
+- Remover a constante local `CHURN_OXY = 0.05` da derivação inicial (ainda usada para projetar futuro).
 
-### 4. Linha de **Gap** no Modelo Atual (entre Dez e Total)
-No `BUInvestmentTable` da Modelo Atual (renderizado em 2903), adicionar nova `TableRow` posicionada **depois de Dezembro e antes de Total**.
+### `src/components/planning/MediaInvestmentTab.tsx`
+- Mesma mudança no cálculo de `mrrBaseRealPorMes` (linhas ~1091–1108).
+- A coluna "MRR Base" continua exibindo o valor real (já implementado nas linhas ~1418–1473).
+- A linha "Gap a Realocar" e gauges não mudam.
 
-**Comportamento:**
-- A linha "Gap" aparece **apenas** quando `buKey === 'modelo_atual'` (nova prop `metaAnualFixa?: number` no componente; quando definida, renderiza a linha de Gap).
-- Constante: `const META_ANUAL_MODELO_ATUAL = 22_250_000;`
-- Cálculo:
-  - `somaAVender = sum(faturamentoVender de Jan..Dez após edições)`.
-  - `gap = META_ANUAL_MODELO_ATUAL - somaAVender`.
-- Exibição:
-  - Label: **"Gap a Realocar"** + tooltip "Diferença entre meta anual (R$ 22,25M) e a soma realocada nos meses".
-  - Apenas a coluna `A Vender` preenchida (vermelho se `gap > 0`, verde se `gap = 0`); demais colunas `—`.
-  - Fundo `bg-destructive/10` quando `gap > 0`, `bg-emerald-50` quando `gap = 0`.
-- Linha **Total** continua somando todos os meses + a linha de Gap → sempre fecha em **R$ 22.250.000**.
+## Validações
+- Mar/26 deve mostrar **R$ 733.281** (não R$ 709.504).
+- Abr/26 deve mostrar **R$ 700.153** (não R$ 696.617).
+- Mai/26 (futuro) projeta = R$ 700.153 × 0,95 = **R$ 665.145**.
+- Total anual e Gap Row recalculam automaticamente.
 
-**Realocação dentro da mesma BU:**
-- Sem nova UI de drag/realocar — usa o fluxo já existente: usuário edita "A Vender" de qualquer mês futuro e o Gap diminui em tempo real.
-- Quando `gap === 0`, a linha mostra ✓ "Tudo realocado" em verde.
-
-### Validações finais
-- MRR Base inicial Mar/Abr 2026 segue R$ 667.987 (memória do projeto).
-- Total Modelo Atual no rodapé exibe R$ 22.250.000 mesmo com gap > 0.
-- Ajustes de churn (5%) e do gap row são apenas projeção/UI — não alteram dados persistidos em `funnel_metas`.
+Sem alterações em banco, edge functions ou outros componentes.
