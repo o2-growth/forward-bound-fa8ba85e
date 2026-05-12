@@ -243,7 +243,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
             )}
           </h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <Card className="border-destructive/30 bg-destructive/5">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
@@ -288,6 +288,38 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
               <p className="text-[10px] text-muted-foreground mt-0.5">sobre base de clientes</p>
             </CardContent>
           </Card>
+          {(() => {
+            const totalDeals = tratativasResolvidasCount + filtered.length;
+            const saveRate = totalDeals > 0 ? (tratativasResolvidasCount / totalDeals) * 100 : 0;
+            const saveColor = saveRate >= 50 ? 'text-emerald-600 dark:text-emerald-400' : saveRate >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-destructive';
+            const saveBorder = saveRate >= 50 ? 'border-emerald-500/30 bg-emerald-500/5' : saveRate >= 30 ? 'border-amber-500/30 bg-amber-500/5' : 'border-destructive/30 bg-destructive/5';
+            return (
+              <>
+                <Card className="border-emerald-500/30 bg-emerald-500/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
+                      <LifeBuoy className="h-4 w-4" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">Tratativas Salvas</span>
+                      <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tratativas resolvidas no período (cliente foi recuperado e não virou churn).</p></TooltipContent></Tooltip>
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{tratativasResolvidasCount}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">resolvidas no período</p>
+                  </CardContent>
+                </Card>
+                <Card className={saveBorder}>
+                  <CardContent className="p-4">
+                    <div className={`flex items-center gap-2 mb-1 ${saveColor}`}>
+                      <ShieldCheck className="h-4 w-4" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">Taxa de Salvamento</span>
+                      <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tratativas salvas / (Tratativas salvas + Churns) × 100. Mede a eficácia em recuperar clientes em tratativa antes que virem churn.</p></TooltipContent></Tooltip>
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{saveRate.toFixed(1)}%</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{tratativasResolvidasCount} salvas / {filtered.length} churns</p>
+                  </CardContent>
+                </Card>
+              </>
+            );
+          })()}
         </div>
       </div>
 
