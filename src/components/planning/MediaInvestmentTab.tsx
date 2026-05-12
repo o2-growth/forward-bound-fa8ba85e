@@ -1041,7 +1041,7 @@ export function MediaInvestmentTab() {
 
   // MRR Base real (Oxy truth) e funnel_metas snapshot (lock)
   const { mrrBaseData } = useMrrBase();
-  const { hasFunnelForBU, getFunnelForBU } = useFunnelMetas();
+  const { hasFunnelForBU, getFunnelForBU, bulkUpsert: bulkUpsertFunnelMetas, funnelMetas: allFunnelMetas } = useFunnelMetas();
 
   // MRR Base de cada mês = MRR realizado do mês ANTERIOR (Oxy truth).
   // Ex.: MRR Base de Fev/26 = MRR de Jan/26; MRR Base de Jan/26 = MRR de Dez/25.
