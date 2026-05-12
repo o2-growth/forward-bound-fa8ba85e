@@ -70,6 +70,41 @@ interface TratativaRow {
   "Motivo Churn": string | null;
   "Satisfacao do Cliente": string | null;
   "Responsavel pela Tratativa": string | null;
+  "Destino": string | null;
+  "Descricao da Situacao": string | null;
+  "Problemas com a Oxy cliente": string | null;
+  "Problemas com a Oxy": string | null;
+  "Detalhes da Tratativa": string | null;
+  "Plano de Acao definido": string | null;
+  "Solucao Implementada com Sucesso": string | null;
+  "Negociacao paralela rescisao": string | null;
+  "Feedback Final": string | null;
+  "Observacoes finalizacao": string | null;
+  "Motivo da perda": string | null;
+  "Termo de Rescisao Enviado": string | null;
+  "Data de Solicitacao": string | null;
+  "Data de Inicio da Tratativa": string | null;
+  "Data prevista finalizacao tratativa": string | null;
+  "Data finalizacao plano de acao": string | null;
+  "Finalizacao contrato ultimo dia": string | null;
+}
+
+function compactObj<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v === null || v === undefined) continue;
+    if (typeof v === "string" && v.trim() === "") continue;
+    out[k] = v;
+  }
+  return out as Partial<T>;
+}
+
+function lastNonEmpty(rows: TratativaRow[], field: keyof TratativaRow): string | null {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const v = rows[i]?.[field];
+    if (typeof v === "string" && v.trim() !== "") return v;
+  }
+  return null;
 }
 
 interface ProjectRow {
