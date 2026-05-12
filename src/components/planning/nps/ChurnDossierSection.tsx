@@ -14,6 +14,13 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 /* ─── helpers ─── */
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '—';
+  // Strings YYYY-MM-DD precisam ser construídas como local para não
+  // sofrer shift de timezone (UTC midnight - 3h = dia anterior em BRT).
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (ymd) {
+    const d = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]));
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
