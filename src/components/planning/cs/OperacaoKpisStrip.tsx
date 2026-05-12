@@ -40,6 +40,23 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
   const valorIsentadoFiltered = isentamentosFiltered.reduce((s, i) => s + i.valor, 0);
   const mrrOxyFiltered = churnsOxyFiltered.reduce((s, c) => s + c.mrr, 0);
 
+  // Tempo levantar a mão: universo restrito a tratativas iniciadas no período
+  const tempoFiltered = operacao.tempoTratativaChurn.filter(t => inRange(t.data));
+  const tempoChurnList = tempoFiltered.filter(t => t.status === 'churn');
+  const tempoOngoingCount = tempoFiltered.filter(t => t.status === 'ongoing').length;
+  const tempoMedio = tempoChurnList.length
+    ? Math.round(tempoChurnList.reduce((s, t) => s + t.diasAteChurn, 0) / tempoChurnList.length)
+    : 0;
+  const tempoMediano = tempoChurnList.length
+    ? (() => {
+        const sorted = [...tempoChurnList].sort((a, b) => a.diasAteChurn - b.diasAteChurn);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0
+          ? Math.round((sorted[mid - 1].diasAteChurn + sorted[mid].diasAteChurn) / 2)
+          : sorted[mid].diasAteChurn;
+      })()
+    : 0;
+
   return (
     <TooltipProvider>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
