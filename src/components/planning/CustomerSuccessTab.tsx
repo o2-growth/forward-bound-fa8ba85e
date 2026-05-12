@@ -461,8 +461,9 @@ function CustomerSuccessTabInner() {
                 selectedProdutos={filters.produtos}
                 globalCfos={filters.cfos}
                 activeClientesCount={filteredClientes.length}
-                activeMrr={mrrBase}
+                activeMrr={847892}
                 globalDateRange={{ from: csStartDate, to: csEndDate }}
+                clientes={clientes}
               />
             </div>
           </TabsContent>

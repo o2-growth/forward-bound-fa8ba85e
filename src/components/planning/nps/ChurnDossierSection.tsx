@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MultiSelect } from '@/components/ui/multi-select';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
 import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus, Sparkles } from 'lucide-react';
+import { Cliente360Drawer } from '@/components/planning/jornada/Cliente360Drawer';
+import type { JornadaCliente } from '@/components/planning/jornada/types';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawer';
@@ -62,10 +64,29 @@ interface Props {
   globalCfos?: string[];
   activeClientesCount?: number;
   activeMrr?: number;
+  clientes?: JornadaCliente[];
 }
 
-export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0 }: Props) {
+export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0, clientes = [] }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [drawerCliente, setDrawerCliente] = useState<JornadaCliente | null>(null);
+
+  // Build lookup: by id and by title (lowercase) for matching ChurnDossierCard ↔ JornadaCliente
+  const clienteLookup = useMemo(() => {
+    const byId = new Map<string, JornadaCliente>();
+    const byTitle = new Map<string, JornadaCliente>();
+    for (const c of clientes) {
+      byId.set(c.id, c);
+      byTitle.set((c.titulo || '').trim().toLowerCase(), c);
+    }
+    return { byId, byTitle };
+  }, [clientes]);
+
+  const findCliente = (row: ChurnDossierCard): JornadaCliente | null => {
+    return clienteLookup.byId.get(row.id)
+      || clienteLookup.byTitle.get((row.cliente || '').trim().toLowerCase())
+      || null;
+  };
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
   const [excludeMotivos, setExcludeMotivos] = useState<string[]>([]);
@@ -458,16 +479,35 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-xs">{formatDate(row.mesChurn) !== '—' ? row.mesChurn : '—'}</TableCell>
                         <TableCell className="font-medium whitespace-nowrap">
-                          <a
-                            href={`https://app.pipefy.com/pipes/${PIPEFY_PIPES.CENTRAL_PROJETOS}#cards/${row.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline flex items-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {row.cliente}
-                            <ExternalLink className="h-3 w-3 opacity-50" />
-                          </a>
+                          <div className="flex items-center gap-1.5">
+                            <a
+                              href={`https://app.pipefy.com/pipes/${PIPEFY_PIPES.CENTRAL_PROJETOS}#cards/${row.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline flex items-center gap-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {row.cliente}
+                              <ExternalLink className="h-3 w-3 opacity-50" />
+                            </a>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 shrink-0"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const c = findCliente(row);
+                                    if (c) setDrawerCliente(c);
+                                  }}
+                                >
+                                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Análise IA do cliente</TooltipContent>
+                            </Tooltip>
+                          </div>
                         </TableCell>
                         <TableCell className="text-right whitespace-nowrap font-mono text-xs">{formatCurrency(row.setup)}</TableCell>
                         <TableCell className="text-right whitespace-nowrap font-mono text-xs">{formatCurrency(row.diagnostico)}</TableCell>
@@ -555,6 +595,11 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         onClose={() => setAnalysisChurn(null)}
       />
     </div>
+    <Cliente360Drawer
+      cliente={drawerCliente}
+      open={!!drawerCliente}
+      onClose={() => setDrawerCliente(null)}
+    />
     </TooltipProvider>
   );
 }
