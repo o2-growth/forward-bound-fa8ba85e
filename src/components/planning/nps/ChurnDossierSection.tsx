@@ -243,7 +243,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
             )}
           </h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <Card className="border-destructive/30 bg-destructive/5">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
