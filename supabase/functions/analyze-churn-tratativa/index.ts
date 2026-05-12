@@ -14,9 +14,7 @@ Seu leitor é Head de CS / Head de Operação. Ele quer entender, em <300 palavr
 **Status:** 🟢 Evitável | 🟡 Parcialmente evitável | 🔴 Inevitável — <frase única de veredito, máx 22 palavras>
 
 **📌 O que aconteceu**
-Linha do tempo curta da tratativa, no formato bullet:
-- <Data entrada> → entrou em "<Fase>" (ficou <X> dias). <Observação curta apenas se houver responsável/motivo registrado>.
-Listar SOMENTE as fases efetivamente percorridas, em ordem cronológica. Citar a data da fase atual / saída como evidência.
+Resuma em 2-3 frases narrativas o que ocorreu na tratativa, baseando-se nos campos textuais (descricao_situacao, detalhes_tratativa, plano_de_acao, feedback_final, problemas_com_oxy). NÃO listar fases nem tempo por fase. Cite trechos literais quando o time escreveu algo relevante.
 
 **🎯 Causa raiz**
 - **Motivo declarado:** <campo "Motivo Principal do Churn" ou "Motivo Churn" da tratativa, se houver>.
@@ -27,7 +25,7 @@ Listar SOMENTE as fases efetivamente percorridas, em ordem cronológica. Citar a
 **💸 Impacto**
 - MRR perdido: <valor>; Setup: <valor>; LT realizado: <X meses> (entre <data assinatura> e <data encerramento>).
 - Satisfação final na tratativa: <valor do campo "Satisfacao do Cliente">, se houver.
-- Tempo total da tratativa: <X dias> (da primeira entrada até a fase final).
+- Tempo total da tratativa: <tempo_total_tratativa_dias> dias (de <data_abertura_tratativa> até <data_finalizacao_tratativa>). Use APENAS o campo \`tempo_total_tratativa_dias\` do \`tratativa_resumo\` — não recalcule por fase.
 
 **🛡️ Lições para retenção**
 - 1 a 3 bullets, no formato: \`<Verbo no infinitivo> <ação preventiva concreta> — dono: <CS|CFO|Operação|Head CS|Produto>; quando aplicar: <gatilho mensurável que indica risco semelhante>\`.
@@ -295,12 +293,6 @@ Deno.serve(async (req) => {
       } : null,
       tratativa_historico: tratativaRows.map(t => compactObj({
         id: String(t.ID),
-        fase: t["Fase"],
-        fase_atual: t["Fase Atual"],
-        destino: t["Destino"],
-        entrada: t["Entrada"],
-        saida: t["Saída"],
-        dias_na_fase: diffDays(t["Entrada"], t["Saída"]),
         cfo_responsavel: t["CFO Responsavel"],
         responsavel_tratativa: t["Responsavel pela Tratativa"],
         motivo: t["Motivo"],
@@ -308,6 +300,7 @@ Deno.serve(async (req) => {
         decisao_final: t["Decisao Final"],
         motivo_churn: t["Motivo Churn"],
         satisfacao_cliente: t["Satisfacao do Cliente"],
+        destino: t["Destino"],
         // Campos de texto livre (comentários/observações da tratativa)
         descricao_situacao: t["Descricao da Situacao"],
         detalhes_tratativa: t["Detalhes da Tratativa"],
@@ -319,28 +312,38 @@ Deno.serve(async (req) => {
         problemas_com_oxy_cliente: t["Problemas com a Oxy cliente"],
         problemas_com_oxy: t["Problemas com a Oxy"],
         termo_rescisao_enviado: t["Termo de Rescisao Enviado"],
-        data_solicitacao: t["Data de Solicitacao"],
-        data_inicio_tratativa: t["Data de Inicio da Tratativa"],
-        data_prevista_finalizacao: t["Data prevista finalizacao tratativa"],
-        data_finalizacao_plano_acao: t["Data finalizacao plano de acao"],
-        data_finalizacao_contrato: t["Finalizacao contrato ultimo dia"],
       })),
-      tratativa_resumo: tratativaRows.length > 0 ? {
-        total_fases_percorridas: tratativaRows.length,
-        primeira_entrada: tratativaRows[0]?.["Entrada"] ?? null,
-        ultima_movimentacao: tratativaRows[tratativaRows.length - 1]?.["Saída"] ?? tratativaRows[tratativaRows.length - 1]?.["Entrada"] ?? null,
-        fase_final: tratativaRows[tratativaRows.length - 1]?.["Fase"] ?? null,
-        decisao_final: tratativaRows.find(t => t["Decisao Final"])?.["Decisao Final"] ?? null,
-        motivo_churn_final: tratativaRows.find(t => t["Motivo Churn"])?.["Motivo Churn"] ?? null,
-        satisfacao_final: tratativaRows.find(t => t["Satisfacao do Cliente"])?.["Satisfacao do Cliente"] ?? null,
-        // Comentários consolidados — última entrada não-vazia de cada campo qualitativo
-        ultimo_feedback_final: lastNonEmpty(tratativaRows, "Feedback Final"),
-        ultimo_plano_de_acao: lastNonEmpty(tratativaRows, "Plano de Acao definido"),
-        ultima_descricao_situacao: lastNonEmpty(tratativaRows, "Descricao da Situacao"),
-        ultimas_observacoes_finalizacao: lastNonEmpty(tratativaRows, "Observacoes finalizacao"),
-        ultimos_detalhes_tratativa: lastNonEmpty(tratativaRows, "Detalhes da Tratativa"),
-        ultimos_problemas_com_oxy: lastNonEmpty(tratativaRows, "Problemas com a Oxy"),
-      } : null,
+      tratativa_resumo: tratativaRows.length > 0 ? (() => {
+        const dataAbertura = tratativaRows[0]?.["Entrada"] ?? null;
+        // Última saída não-nula, fallback para última entrada ou finalização de contrato
+        let dataFinalizacao: string | null = null;
+        for (let i = tratativaRows.length - 1; i >= 0; i--) {
+          const s = tratativaRows[i]?.["Saída"];
+          if (s) { dataFinalizacao = s; break; }
+        }
+        if (!dataFinalizacao) {
+          dataFinalizacao = lastNonEmpty(tratativaRows, "Finalizacao contrato ultimo dia")
+            ?? tratativaRows[tratativaRows.length - 1]?.["Entrada"]
+            ?? null;
+        }
+        const tempoTotal = diffDays(dataAbertura, dataFinalizacao);
+        return {
+          total_movimentacoes: tratativaRows.length,
+          data_abertura_tratativa: dataAbertura,
+          data_finalizacao_tratativa: dataFinalizacao,
+          tempo_total_tratativa_dias: (tempoTotal != null && tempoTotal >= 0 && tempoTotal <= 730) ? tempoTotal : null,
+          decisao_final: tratativaRows.find(t => t["Decisao Final"])?.["Decisao Final"] ?? null,
+          motivo_churn_final: tratativaRows.find(t => t["Motivo Churn"])?.["Motivo Churn"] ?? null,
+          satisfacao_final: tratativaRows.find(t => t["Satisfacao do Cliente"])?.["Satisfacao do Cliente"] ?? null,
+          // Comentários consolidados — última entrada não-vazia de cada campo qualitativo
+          ultimo_feedback_final: lastNonEmpty(tratativaRows, "Feedback Final"),
+          ultimo_plano_de_acao: lastNonEmpty(tratativaRows, "Plano de Acao definido"),
+          ultima_descricao_situacao: lastNonEmpty(tratativaRows, "Descricao da Situacao"),
+          ultimas_observacoes_finalizacao: lastNonEmpty(tratativaRows, "Observacoes finalizacao"),
+          ultimos_detalhes_tratativa: lastNonEmpty(tratativaRows, "Detalhes da Tratativa"),
+          ultimos_problemas_com_oxy: lastNonEmpty(tratativaRows, "Problemas com a Oxy"),
+        };
+      })() : null,
       nps_recente: npsRows.map(n => ({
         id: String(n.ID),
         data: n["Entrada"],

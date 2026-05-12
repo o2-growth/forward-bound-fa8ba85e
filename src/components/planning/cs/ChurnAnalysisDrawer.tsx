@@ -56,7 +56,7 @@ export function ChurnAnalysisDrawer({ churn, open, onClose }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-full sm:w-[640px] sm:max-w-[90vw] overflow-hidden flex flex-col p-0">
+      <SheetContent side="right" className="w-full sm:w-[760px] lg:w-[880px] sm:max-w-[95vw] overflow-hidden flex flex-col p-0">
         {churn && (
           <>
             <SheetHeader className="p-6 pb-4 border-b">
@@ -155,7 +155,7 @@ export function ChurnAnalysisDrawer({ churn, open, onClose }: Props) {
                         Copiar JSON
                       </button>
                     </summary>
-                    <pre className="text-[10px] mt-3 overflow-x-auto max-h-96 max-w-full whitespace-pre bg-background p-3 rounded">
+                    <pre className="text-[10px] mt-3 overflow-x-auto max-h-96 max-w-full whitespace-pre-wrap break-all bg-background p-3 rounded">
                       {JSON.stringify(data.dossie, null, 2)}
                     </pre>
                   </details>
