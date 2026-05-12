@@ -169,16 +169,35 @@ export function OperacaoKpisStrip({ operacao }: Props) {
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
           <DialogHeader><DialogTitle>Tempo entre levantar a mão e churn</DialogTitle></DialogHeader>
           <div className="text-xs text-muted-foreground mb-3">
-            Média: <strong className="text-foreground">{operacao.tempoMedioTratativaChurn} dias</strong> · Mediana: <strong className="text-foreground">{operacao.tempoMedianoTratativaChurn} dias</strong> · {operacao.tempoTratativaChurn.length} clientes
+            Média: <strong className="text-foreground">{operacao.tempoMedioTratativaChurn} dias</strong> · Mediana: <strong className="text-foreground">{operacao.tempoMedianoTratativaChurn} dias</strong> · {operacao.tempoTratativaChurn.filter(t => t.status === 'churn').length} churns · {operacao.tempoTratativaChurn.filter(t => t.status === 'ongoing').length} em andamento
+            <p className="mt-1 text-[10px]">Médias calculadas apenas sobre clientes que já viraram churn.</p>
           </div>
           <Table>
-            <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo Churn</TableHead><TableHead className="text-right">Dias até churn</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Status</TableHead><TableHead>Motivo</TableHead><TableHead className="text-right">Dias</TableHead></TableRow></TableHeader>
             <TableBody>
-              {[...operacao.tempoTratativaChurn].sort((a, b) => b.diasAteChurn - a.diasAteChurn).map((t, i) => (
-                <TableRow key={i}><TableCell>{t.titulo}</TableCell><TableCell>{t.cfo}</TableCell><TableCell>{t.motivo}</TableCell><TableCell className="text-right">{t.diasAteChurn}d</TableCell></TableRow>
-              ))}
+              {[...operacao.tempoTratativaChurn]
+                .sort((a, b) => {
+                  // churns primeiro, depois ongoing; dentro de cada grupo desc por dias
+                  if (a.status !== b.status) return a.status === 'churn' ? -1 : 1;
+                  return b.diasAteChurn - a.diasAteChurn;
+                })
+                .map((t, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{t.titulo}</TableCell>
+                    <TableCell>{t.cfo}</TableCell>
+                    <TableCell>
+                      {t.status === 'churn' ? (
+                        <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 px-2 py-0.5 text-[10px] font-medium">Churn</span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] font-medium">Em andamento</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{t.motivo}</TableCell>
+                    <TableCell className="text-right">{t.diasAteChurn}d</TableCell>
+                  </TableRow>
+                ))}
               {operacao.tempoTratativaChurn.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum cliente com tratativa registrada e data de encerramento.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa registrada.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
