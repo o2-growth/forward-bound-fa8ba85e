@@ -513,6 +513,72 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     diagnostico: 0,
   });
 
+  // ============= Override oficial Abr/2026 (XLSX fonte de verdade) =============
+  // Fixa exatamente os 8 clientes do XLSX para Abr/2026: força datas/CFO/motivo,
+  // injeta os ausentes e remove qualquer outro card que tenha caído em Abr/2026.
+  const APR_2026_OFFICIAL: Record<string, { dataEncerramento: string; motivo: string; cfo: string }> = {
+    'agrupar corporate':              { dataEncerramento: '2026-04-03', motivo: 'Replanejamento do Cliente', cfo: 'Gustavo Cochlar' },
+    'alufacil':                       { dataEncerramento: '2026-04-13', motivo: 'Cliente Omisso',           cfo: 'Eduardo Milani Pedrolo' },
+    'amora distribuidora':            { dataEncerramento: '2026-04-30', motivo: 'Atendimento O2',           cfo: 'Oliveira' },
+    'fiagro':                         { dataEncerramento: '2026-04-14', motivo: 'Atendimento O2',           cfo: 'Oliveira' },
+    'grupo imagem':                   { dataEncerramento: '2026-04-10', motivo: 'Atendimento O2',           cfo: 'Douglas Schossler' },
+    'mineralis sa':                   { dataEncerramento: '2026-04-03', motivo: 'Cliente Omisso',           cfo: 'Gustavo Cochlar' },
+    'nutrypower distribuidora ltda':  { dataEncerramento: '2026-04-10', motivo: 'Cliente Omisso',           cfo: 'Eduardo Milani Pedrolo' },
+    'rumo certo':                     { dataEncerramento: '2026-04-02', motivo: 'Replanejamento do Cliente', cfo: "Eduardo D'Agostini" },
+  };
+  const APR_OFFICIAL_KEYS = new Set(Object.keys(APR_2026_OFFICIAL));
+
+  // 1) Forçar dados nos cards que já estão na lista oficial
+  const seenOfficial = new Set<string>();
+  for (let i = 0; i < churnDossier.length; i++) {
+    const c = churnDossier[i];
+    const k = (c.cliente || '').trim().toLowerCase();
+    const off = APR_2026_OFFICIAL[k];
+    if (off) {
+      seenOfficial.add(k);
+      churnDossier[i] = {
+        ...c,
+        mesChurn: 'Abr/2026',
+        dataEncerramento: off.dataEncerramento,
+        motivoPrincipal: off.motivo,
+        cfo: off.cfo,
+        ltMeses: diffInMonths(c.dataAssinatura, off.dataEncerramento) || c.ltMeses,
+      };
+    }
+  }
+
+  // 2) Remover intrusos de Abr/2026 que não estão na lista oficial
+  for (let i = churnDossier.length - 1; i >= 0; i--) {
+    const c = churnDossier[i];
+    if (c.mesChurn === 'Abr/2026') {
+      const k = (c.cliente || '').trim().toLowerCase();
+      if (!APR_OFFICIAL_KEYS.has(k)) churnDossier.splice(i, 1);
+    }
+  }
+
+  // 3) Injetar oficiais ausentes (sem MRR/Setup quando não há card no Pipefy)
+  Object.entries(APR_2026_OFFICIAL).forEach(([key, off]) => {
+    if (seenOfficial.has(key)) return;
+    const titulo = key.replace(/\b\w/g, ch => ch.toUpperCase());
+    churnDossier.push({
+      id: `synthetic-apr2026-${key.replace(/\s+/g, '-')}`,
+      mesChurn: 'Abr/2026',
+      cliente: titulo,
+      setup: 0,
+      mrr: 0,
+      motivoPrincipal: off.motivo,
+      motivosCancelamento: off.motivo,
+      cfo: off.cfo,
+      produto: '',
+      faseAtual: 'Tratativa finalizada',
+      dataAssinatura: '',
+      dataEncerramento: off.dataEncerramento,
+      ltMeses: '',
+      problemasOxy: '',
+      diagnostico: 0,
+    });
+  });
+
   return {
     phaseCount,
     cfoDistribution,

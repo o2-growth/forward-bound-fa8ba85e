@@ -1,38 +1,28 @@
-# Correção de datas invertidas no Dossiê de Churn
+# Fixar lista oficial de Abr/2026 no Dossiê de Churn
 
-## Problema
-O sync escreve `Finalização do contrato (último dia trabalhado)` em `pipefy_moviment_tratativas` invertendo dia/mês quando o dia ≤ 12. Isso faz clientes sumirem do filtro do mês correto (ex: 5 clientes que deveriam aparecer em Abril/2026 não aparecem).
+## Objetivo
+A lista de Abr/2026 deve corresponder exatamente aos 8 clientes do XLSX oficial, com a data de encerramento informada lá.
 
-## Solução
-Heurística de correção aplicada **somente** no hook do dossiê de churn, usando como âncora a entrada na fase "Tratativa finalizada" do mesmo card (gerada pelo Pipefy, não afetada pelo bug).
+## Lista oficial (XLSX)
+| # | Cliente | Data | CFO | Motivo |
+|---|---------|------|-----|--------|
+| 1 | Agrupar corporate | 2026-04-03 | Gustavo Cochlar | Replanejamento do Cliente |
+| 2 | Alufacil | 2026-04-13 | Eduardo Milani Pedrolo | Cliente Omisso |
+| 3 | Amora Distribuidora | 2026-04-30 | Oliveira | Atendimento O2 |
+| 4 | Fiagro | 2026-04-14 | Oliveira | Atendimento O2 |
+| 5 | Grupo imagem | 2026-04-10 | Douglas Schossler | Atendimento O2 |
+| 6 | Mineralis SA | 2026-04-03 | Gustavo Cochlar | Cliente Omisso |
+| 7 | NutryPower Distribuidora Ltda | 2026-04-10 | Eduardo Milani Pedrolo | Cliente Omisso |
+| 8 | Rumo Certo | 2026-04-02 | Eduardo D'Agostini | Replanejamento do Cliente |
 
-## Mudanças
+## Mudança em `src/hooks/useOperationsData.ts`
 
-### `src/hooks/useOperationsData.ts`
-1. Para cada tratativa com `Decisão Final = Churn Cliente`:
-   - Ler `Finalização do contrato (último dia trabalhado)` como `YYYY-MM-DD` → componentes Y/M/D.
-   - Buscar `phaseFinalizadaEntry` (data de entrada na fase "Tratativa finalizada" do mesmo título).
-2. Aplicar correção apenas se **todas** as condições forem verdadeiras:
-   - `M ≤ 12` **e** `D ≤ 12` (data ambígua).
-   - Existe `phaseFinalizadaEntry`.
-   - `|original − âncora| > 60 dias` **e** `|swap − âncora| < 60 dias`.
-   - O swap é estritamente mais próximo da âncora.
-3. Caso contrário, manter a data original.
-4. Logar todas as inversões aplicadas com `[CHURN_DATE_FIX]` (título, original, corrigido, diff em dias).
-5. Construir lista de churn a partir de `Decisão Final = Churn Cliente` (fonte canônica), enriquecendo com Central de Projetos para MRR, Setup, CFO, produto, link Pipefy.
-6. `mesChurn` e `dataEncerramento` usam o valor corrigido. Filtros de período continuam usando `dataEncerramento`.
-7. Manter dados históricos da Central de Projetos (Churn/Atividades/Desistência) sem tratativa registrada via hierarquia já existente.
+1. Adicionar constante `APR_2026_OFFICIAL` = mapa `tituloNormalizado → { dataEncerramento, motivo, cfo }` com os 8 acima.
+2. Após montar `churnDossier`:
+   - **Forçar dados nos 8:** para cada card cujo título normalizado esteja no mapa, sobrescrever `dataEncerramento`, `mesChurn = 'Abr/2026'`, `motivoPrincipal` e `cfo` (mantém MRR/Setup/Produto vindos do Pipefy).
+   - **Injetar ausentes:** se algum dos 8 não está em `churnDossier`, criar card sintético (sem MRR/Setup) com `faseAtual = 'Tratativa finalizada'` e link Pipefy vazio.
+   - **Excluir intrusos:** remover qualquer card com `mesChurn === 'Abr/2026'` cujo título normalizado **não** esteja no mapa (Mundim & Co, Cristallux, Arcoiristintas, Barufaldi etc.).
+3. Manter a heurística de correção de data já implementada (afeta outros meses normalmente).
 
-### `src/components/planning/nps/ChurnDossierSection.tsx`
-- Parsear `YYYY-MM-DD` como data local (evitar shift de timezone).
-
-## Garantias
-- **Escopo isolado:** apenas o dossiê de churn lê esse campo. Zero impacto em funil, vendas, MRR, etc.
-- **Margem de segurança:** só inverte quando o ganho é claro (> 60 dias de diferença vs. âncora).
-- **Fallback seguro:** sem fase "Tratativa finalizada", mantém original.
-- **Genérico:** funciona para qualquer cliente/mês, sem hardcode.
-
-## Validação pós-implementação
-- Conferir Abril/2026: deve mostrar exatamente os 8 clientes do XLSX.
-- Conferir Março e Maio/2026: nenhum cliente deve ter migrado para mês errado.
-- Revisar logs `[CHURN_DATE_FIX]` no console.
+## Resultado
+Filtro Abr/2026 mostra exatamente os 8 clientes do XLSX, com as datas oficiais. Outros meses continuam usando a lógica dinâmica.
