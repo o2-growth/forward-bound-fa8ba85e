@@ -366,29 +366,33 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     const dataAssinatura = assinaturaMap.get(card.ID) || card['Data de assinatura do contrato'] || '';
     const saidaDate = parsePipefyDate(trat?.['Saída']);
     const tratEntradaDate = parsePipefyDate(trat?.['Entrada']);
-    // Hierarquia da data de encerramento — fonte oficial = relatório do CRM (Pipefy):
-    // 1) Tratativa — "Finalizacao contrato ultimo dia" (PRIMÁRIA, alinhada ao CRM)
-    // 2) Central de Projetos — "Data do churn" (backup, caso passe a existir no card)
-    // 3) Central de Projetos — "Data encerramento" (legado)
-    // 4) Tratativa — "Saída" (fallback: data em que saiu da fase ativa)
-    // 5) Tratativa — "Entrada" (último recurso: entrada na fase finalizada)
-    // Normaliza tudo para YYYY-MM-DD no fuso America/Sao_Paulo para evitar shift de timezone.
+    // Mês do Churn — regra alinhada ao relatório oficial do CRM:
+    // O churn "acontece" no MENOR entre:
+    //   a) "Data do churn" preenchida no card da Central de Projetos
+    //   b) Data de entrada do card na fase terminal (Churn / Atividades finalizadas / Desistência)
+    //   c) "Finalizacao contrato ultimo dia" da Tratativa (se preenchido)
+    // Isso evita que casos como Rampanelli (movido para Churn em Mar/26 mas com contrato
+    // administrativamente encerrado em Abr/26) caiam no mês errado.
     const finalizacaoContrato = (trat as any)?.['Finalizacao contrato ultimo dia']
       ?? (trat as any)?.['Finalização contrato último dia']
       ?? (trat as any)?.['Finalizacao do contrato ultimo dia']
       ?? null;
-    const dataEncerramento =
-      toLocalDateBR(finalizacaoContrato) ||
-      toLocalDateBR((card as any)['Data do churn']) ||
-      toLocalDateBR(card['Data encerramento']) ||
-      (saidaDate ? toLocalDateBR(saidaDate) : '') ||
-      (tratEntradaDate ? toLocalDateBR(tratEntradaDate) : '') ||
-      '';
-    // Logging defensivo: alerta quando cair no fallback de Saída/Entrada
-    if (!finalizacaoContrato && !(card as any)['Data do churn'] && !card['Data encerramento'] && (saidaDate || tratEntradaDate)) {
-      console.warn(
-        `[ChurnDossier] "${card['Título']}" sem "Finalizacao contrato ultimo dia" — usando fallback Saída/Entrada → ${dataEncerramento}`
-      );
+    const churnPhaseEntry = parsePipefyDate(card['Entrada']);
+    const candidateDates = [
+      toLocalDateBR((card as any)['Data do churn']),
+      churnPhaseEntry ? toLocalDateBR(churnPhaseEntry) : '',
+      toLocalDateBR(finalizacaoContrato),
+    ].filter(Boolean) as string[];
+    let dataEncerramento = candidateDates.length > 0
+      ? candidateDates.reduce((min, d) => (d < min ? d : min))
+      : '';
+    // Fallbacks legados quando nenhuma das 3 fontes oficiais existe
+    if (!dataEncerramento) {
+      dataEncerramento =
+        toLocalDateBR(card['Data encerramento']) ||
+        (saidaDate ? toLocalDateBR(saidaDate) : '') ||
+        (tratEntradaDate ? toLocalDateBR(tratEntradaDate) : '') ||
+        '';
     }
     // mesChurn segue a mesma hierarquia de dataEncerramento (deriva direto dela quando possível).
     // Parse local de YYYY-MM-DD para evitar shift de timezone no início/fim de mês.
