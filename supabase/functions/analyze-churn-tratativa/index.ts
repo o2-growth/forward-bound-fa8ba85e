@@ -20,7 +20,8 @@ Listar SOMENTE as fases efetivamente percorridas, em ordem cronológica. Citar a
 
 **🎯 Causa raiz**
 - **Motivo declarado:** <campo "Motivo Principal do Churn" ou "Motivo Churn" da tratativa, se houver>.
-- **Motivos detalhados:** <campo "Motivos cancelamento" ou "Problemas com a Oxy", se preenchido>.
+- **Motivos detalhados:** <campo "Motivos cancelamento", "Motivo da perda" ou "Problemas com a Oxy", se preenchido>.
+- **Comentários do CFO/CS na tratativa:** cite TRECHOS LITERAIS (entre aspas, máx 25 palavras cada) dos campos textuais quando preenchidos: "Descricao da Situacao", "Detalhes da Tratativa", "Plano de Acao definido", "Feedback Final", "Observacoes finalizacao", "Negociacao paralela rescisao". Mostre que leu o que o time escreveu — não parafraseie. Se um cliente teve "Plano de Acao definido" mas churnou mesmo assim, cite o plano e aponte que ele falhou.
 - **Sinais nos dados:** 1-3 bullets factuais conectando os campos do JSON (ex.: NPS caindo de 9→6 em 90d, satisfação na tratativa = "Insatisfeito", >X dias parado em "Plano de Ação", problema operacional explícito). Cada sinal deve citar evidência (campo + valor + data).
 
 **💸 Impacto**
