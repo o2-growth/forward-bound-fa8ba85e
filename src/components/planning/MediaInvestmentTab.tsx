@@ -1958,7 +1958,7 @@ export function MediaInvestmentTab() {
       console.error('Erro na sincronização manual:', err);
       toast.error('Falha ao sincronizar com Indicadores Comercial');
     }
-  }, [allFunnelMetas, modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel, bulkUpsertFunnelMetas, logAction]);
+  }, [allFunnelMetas, modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel, bulkUpsertFunnelMetas, logAction, queryClient]);
 
   // Get pending months for a BU (for visual indicators)
   const getPendingMonths = (bu: string): Set<string> => {
