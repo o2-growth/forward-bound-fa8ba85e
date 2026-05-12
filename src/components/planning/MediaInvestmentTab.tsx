@@ -2797,7 +2797,7 @@ export function MediaInvestmentTab() {
                           <TableHead className="text-xs text-right">Oxy Hacker</TableHead>
                           <TableHead className="text-xs text-right">Franquia</TableHead>
                           <TableHead className="text-xs text-right font-bold">Meta Total</TableHead>
-                          <TableHead className="text-xs text-right font-bold">DRE Total</TableHead>
+                          <TableHead className="text-xs text-right font-bold">Faturamento Oxy</TableHead>
                           <TableHead className="text-xs text-right font-bold">Ating. %</TableHead>
                         </TableRow>
                       </TableHeader>
