@@ -727,8 +727,8 @@ export function IndicatorsTab() {
       const monthName = monthNames[getMonth(monthDate)];
 
       // 🎯 Fonte da verdade:
-      //   - mês LOCKED → DB (congelado, snapshot oficial)
-      //   - mês aberto → Plan Growth ao vivo (funnelItems)
+      //   - linha existe em funnel_metas (locked OU sincronizada via Plan Growth) → DB
+      //   - sem linha no DB → Plan Growth ao vivo (funnelItems) como fallback
       const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
       const item = funnelItems?.find(f => f.month === monthName);
       if (dbVal === null && !item) continue;
