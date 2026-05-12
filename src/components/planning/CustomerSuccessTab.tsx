@@ -455,7 +455,7 @@ function CustomerSuccessTabInner() {
 
           <TabsContent value="churn" className="mt-4">
             <div className="space-y-8">
-              <OperacaoKpisStrip operacao={operacao} />
+              <OperacaoKpisStrip operacao={operacao} dateRange={{ from: csStartDate, to: csEndDate }} />
               <ChurnDossierSection
                 data={opsData?.churnDossier || []}
                 selectedProdutos={filters.produtos}

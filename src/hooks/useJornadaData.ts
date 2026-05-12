@@ -179,9 +179,9 @@ export function useJornadaData() {
     // Primeira tratativa por título — para medir "tempo entre levantar a mão e churn"
     const firstTratativaByTitulo = new Map<string, Date>();
     // Tratativas resolvidas com sucesso (decisão final = retomada / sucesso)
-    const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number }> = [];
+    const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number; data: Date | null }> = [];
     // Valor isentado por tratativa (campo 'Valor Isentado finalizacao')
-    const isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number }> = [];
+    const isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number; data: Date | null }> = [];
     const readNum = (v: unknown): number => {
       if (v == null) return 0;
       const s = String(v).replace(/[^0-9.,-]/g, '').replace(/\./g, '').replace(',', '.');
@@ -210,11 +210,12 @@ export function useJornadaData() {
       const valorIsentado = readNum(
         row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
       ) / 100;
+      const finalizacaoDate = parseDate(row['Saída'] || row['Saida'] || row['Data encerramento'] || row['Data de encerramento']) || entrada;
       if (decisao && (isSucessoDecisao(decisao) || /sim/i.test(solucaoSucesso))) {
-        tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado });
+        tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado, data: finalizacaoDate });
       }
       if (valorIsentado > 0) {
-        isentamentos.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivoChurn: motivoChurnTrat, valor: valorIsentado });
+        isentamentos.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivoChurn: motivoChurnTrat, valor: valorIsentado, data: finalizacaoDate });
       }
 
       // Store in all-tratativas map (latest wins)
@@ -758,7 +759,7 @@ export function useJornadaData() {
 
     // === 7. Operação: agregados especiais ===
     // Churns com Problemas com a Oxy (vindos do central_projetos)
-    const churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }> = [];
+    const churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number; data: Date | null }> = [];
     for (const c of allClientes) {
       if (c.id.endsWith('__pedrolo')) continue;
       if (!INACTIVE_PHASES.includes(c.faseAtual)) continue;
@@ -769,7 +770,8 @@ export function useJornadaData() {
         || /oxy/i.test(proj?.principal || '')
         || /oxy/i.test(proj?.cancelamento || '');
       if (hasOxy) {
-        churnsOxy.push({ titulo: c.titulo, cfo: c.cfo, motivo: proj?.problemasOxy || motivo || 'Problema na Oxy', mrr: c.mrr });
+        const churnDate = churnDateByTitulo.get(c.titulo.toLowerCase()) || null;
+        churnsOxy.push({ titulo: c.titulo, cfo: c.cfo, motivo: proj?.problemasOxy || motivo || 'Problema na Oxy', mrr: c.mrr, data: churnDate });
       }
     }
 

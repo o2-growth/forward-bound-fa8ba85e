@@ -6,11 +6,11 @@ import { TrendingDown, Info, CheckCircle2, Wallet, AlertCircle } from 'lucide-re
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 
 export interface OperacaoKpisData {
-  tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number }>;
+  tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number; data?: Date | null }>;
   tratativasResolvidasCount: number;
-  isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number }>;
+  isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number; data?: Date | null }>;
   valorIsentadoTotal: number;
-  churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }>;
+  churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number; data?: Date | null }>;
   churnsOxyCount: number;
   tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string; status?: 'churn' | 'ongoing' }>;
   tempoMedioTratativaChurn: number;
@@ -21,11 +21,24 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
 }
 
-interface Props { operacao?: OperacaoKpisData }
+interface Props { operacao?: OperacaoKpisData; dateRange?: { from: Date; to: Date } }
 
-export function OperacaoKpisStrip({ operacao }: Props) {
+export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
   const [opDialog, setOpDialog] = useState<'resolvidas' | 'isentado' | 'oxy' | 'tempo' | null>(null);
   if (!operacao) return null;
+
+  const inRange = (d?: Date | null): boolean => {
+    if (!dateRange) return true;
+    if (!d) return false;
+    return d >= dateRange.from && d <= dateRange.to;
+  };
+  const periodLabel = dateRange ? 'no período selecionado' : 'total';
+
+  const resolvidasFiltered = operacao.tratativasResolvidas.filter(t => inRange(t.data));
+  const isentamentosFiltered = operacao.isentamentos.filter(i => inRange(i.data));
+  const churnsOxyFiltered = operacao.churnsOxy.filter(c => inRange(c.data));
+  const valorIsentadoFiltered = isentamentosFiltered.reduce((s, i) => s + i.valor, 0);
+  const mrrOxyFiltered = churnsOxyFiltered.reduce((s, c) => s + c.mrr, 0);
 
   return (
     <TooltipProvider>
@@ -48,8 +61,8 @@ export function OperacaoKpisStrip({ operacao }: Props) {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-2xl font-bold">{operacao.tratativasResolvidasCount}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Decisão Final = sucesso/retomada</p>
+            <p className="text-2xl font-bold">{resolvidasFiltered.length}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Decisão Final = sucesso/retomada · {periodLabel}</p>
           </CardContent>
         </Card>
 
@@ -71,8 +84,8 @@ export function OperacaoKpisStrip({ operacao }: Props) {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(operacao.valorIsentadoTotal)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{operacao.isentamentos.length} tratativas com isenção</p>
+            <p className="text-2xl font-bold">{formatCurrency(valorIsentadoFiltered)}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{isentamentosFiltered.length} tratativas com isenção · {periodLabel}</p>
           </CardContent>
         </Card>
 
@@ -94,8 +107,8 @@ export function OperacaoKpisStrip({ operacao }: Props) {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-2xl font-bold">{operacao.churnsOxyCount}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido: {formatCurrency(operacao.churnsOxy.reduce((s, c) => s + c.mrr, 0))}</p>
+            <p className="text-2xl font-bold">{churnsOxyFiltered.length}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido: {formatCurrency(mrrOxyFiltered)} · {periodLabel}</p>
           </CardContent>
         </Card>
 
@@ -137,10 +150,10 @@ export function OperacaoKpisStrip({ operacao }: Props) {
           <Table>
             <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo</TableHead><TableHead>Decisão</TableHead><TableHead className="text-right">Isentado</TableHead></TableRow></TableHeader>
             <TableBody>
-              {operacao.tratativasResolvidas.map((t, i) => (
+              {resolvidasFiltered.map((t, i) => (
                 <TableRow key={i}><TableCell>{t.titulo}</TableCell><TableCell>{t.cfo}</TableCell><TableCell>{t.motivo}</TableCell><TableCell>{t.decisao}</TableCell><TableCell className="text-right">{t.valorIsentado > 0 ? formatCurrency(t.valorIsentado) : '—'}</TableCell></TableRow>
               ))}
-              {operacao.tratativasResolvidas.length === 0 && (
+              {resolvidasFiltered.length === 0 && (
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa resolvida com sucesso encontrada.</TableCell></TableRow>
               )}
             </TableBody>
@@ -154,10 +167,10 @@ export function OperacaoKpisStrip({ operacao }: Props) {
           <Table>
             <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo Churn</TableHead><TableHead className="text-right">Valor isentado</TableHead></TableRow></TableHeader>
             <TableBody>
-              {[...operacao.isentamentos].sort((a, b) => b.valor - a.valor).map((i, idx) => (
+              {[...isentamentosFiltered].sort((a, b) => b.valor - a.valor).map((i, idx) => (
                 <TableRow key={idx}><TableCell>{i.titulo}</TableCell><TableCell>{i.cfo}</TableCell><TableCell>{i.motivoChurn || '—'}</TableCell><TableCell className="text-right">{formatCurrency(i.valor)}</TableCell></TableRow>
               ))}
-              {operacao.isentamentos.length === 0 && (
+              {isentamentosFiltered.length === 0 && (
                 <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhuma tratativa com valor isentado registrado no Pipefy.</TableCell></TableRow>
               )}
             </TableBody>
@@ -210,10 +223,10 @@ export function OperacaoKpisStrip({ operacao }: Props) {
           <Table>
             <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo</TableHead><TableHead className="text-right">MRR</TableHead></TableRow></TableHeader>
             <TableBody>
-              {[...operacao.churnsOxy].sort((a, b) => b.mrr - a.mrr).map((c, i) => (
+              {[...churnsOxyFiltered].sort((a, b) => b.mrr - a.mrr).map((c, i) => (
                 <TableRow key={i}><TableCell>{c.titulo}</TableCell><TableCell>{c.cfo}</TableCell><TableCell>{c.motivo}</TableCell><TableCell className="text-right">{formatCurrency(c.mrr)}</TableCell></TableRow>
               ))}
-              {operacao.churnsOxy.length === 0 && (
+              {churnsOxyFiltered.length === 0 && (
                 <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum churn por problema na Oxy.</TableCell></TableRow>
               )}
             </TableBody>
