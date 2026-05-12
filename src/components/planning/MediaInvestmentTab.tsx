@@ -1904,6 +1904,59 @@ export function MediaInvestmentTab() {
     toast.info('Alterações descartadas');
   }, []);
 
+  // Hidden button (?syncFunnel=1): force-sync Plan Growth funnel quantities
+  // into funnel_metas without requiring A Vender edits. Same logic used inside
+  // handleSaveAll, but callable independently.
+  const showSyncBtn = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('syncFunnel') === '1';
+
+  const handleManualSyncFunnel = useCallback(async () => {
+    try {
+      const lockedKey = (bu: string, m: string) =>
+        allFunnelMetas.some(x => x.bu === bu && x.month === m && x.year === 2026 && x.is_locked === true);
+
+      const buildItems = (
+        bu: string,
+        funnel: Array<{ month: string; leads?: number; mqls?: number; rms?: number; rrs?: number; propostas?: number; vendas?: number }>
+      ) =>
+        funnel
+          .filter(d => !lockedKey(bu, d.month))
+          .map(d => ({
+            bu,
+            month: d.month,
+            year: 2026,
+            leads: Math.round(d.leads || 0),
+            mqls: Math.round(d.mqls || 0),
+            rms: Math.round(d.rms || 0),
+            rrs: Math.round(d.rrs || 0),
+            propostas: Math.round(d.propostas || 0),
+            vendas: Math.round(d.vendas || 0),
+          }));
+
+      const funnelSyncItems = [
+        ...buildItems('modelo_atual', modeloAtualFunnel),
+        ...buildItems('o2_tax', o2TaxFunnel),
+        ...buildItems('oxy_hacker', oxyHackerFunnel),
+        ...buildItems('franquia', franquiaFunnel),
+      ];
+
+      if (funnelSyncItems.length === 0) {
+        toast.info('Nenhum mês para sincronizar (todos lockados).');
+        return;
+      }
+
+      await bulkUpsertFunnelMetas.mutateAsync(funnelSyncItems);
+      await logAction('monetary_meta', `Sincronização manual Plan Growth → funnel_metas: ${funnelSyncItems.length} registros`, {
+        source: 'manual_sync_button',
+        count: funnelSyncItems.length,
+      });
+      toast.success(`${funnelSyncItems.length} metas de funil sincronizadas com Indicadores Comercial`);
+    } catch (err) {
+      console.error('Erro na sincronização manual:', err);
+      toast.error('Falha ao sincronizar com Indicadores Comercial');
+    }
+  }, [allFunnelMetas, modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel, bulkUpsertFunnelMetas, logAction]);
+
   // Get pending months for a BU (for visual indicators)
   const getPendingMonths = (bu: string): Set<string> => {
     const changes = pendingChanges[bu];
