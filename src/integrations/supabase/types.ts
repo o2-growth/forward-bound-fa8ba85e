@@ -176,6 +176,54 @@ export type Database = {
         }
         Relationships: []
       }
+      bu_indicators_config_backup_20260512_v2_pre_churn: {
+        Row: {
+          bu: string | null
+          cpmql: number | null
+          cpv: number | null
+          created_at: string | null
+          id: string | null
+          investimento_planejado: number | null
+          month: string | null
+          mql_to_rm: number | null
+          prop_to_venda: number | null
+          rm_to_rr: number | null
+          rr_to_prop: number | null
+          ticket_medio: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          bu?: string | null
+          cpmql?: number | null
+          cpv?: number | null
+          created_at?: string | null
+          id?: string | null
+          investimento_planejado?: number | null
+          month?: string | null
+          mql_to_rm?: number | null
+          prop_to_venda?: number | null
+          rm_to_rr?: number | null
+          rr_to_prop?: number | null
+          ticket_medio?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          bu?: string | null
+          cpmql?: number | null
+          cpv?: number | null
+          created_at?: string | null
+          id?: string | null
+          investimento_planejado?: number | null
+          month?: string | null
+          mql_to_rm?: number | null
+          prop_to_venda?: number | null
+          rm_to_rr?: number | null
+          rr_to_prop?: number | null
+          ticket_medio?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       bu_investment_snapshots: {
         Row: {
           bu: string
@@ -509,6 +557,66 @@ export type Database = {
         }
         Relationships: []
       }
+      funnel_metas_backup_20260512_v3_pre_churn: {
+        Row: {
+          bu: string | null
+          created_at: string | null
+          faturamento_meta: number | null
+          faturamento_vender: number | null
+          id: string | null
+          investimento: number | null
+          is_locked: boolean | null
+          leads: number | null
+          month: string | null
+          mqls: number | null
+          mrr_base_planejamento: number | null
+          propostas: number | null
+          rms: number | null
+          rrs: number | null
+          updated_at: string | null
+          vendas: number | null
+          year: number | null
+        }
+        Insert: {
+          bu?: string | null
+          created_at?: string | null
+          faturamento_meta?: number | null
+          faturamento_vender?: number | null
+          id?: string | null
+          investimento?: number | null
+          is_locked?: boolean | null
+          leads?: number | null
+          month?: string | null
+          mqls?: number | null
+          mrr_base_planejamento?: number | null
+          propostas?: number | null
+          rms?: number | null
+          rrs?: number | null
+          updated_at?: string | null
+          vendas?: number | null
+          year?: number | null
+        }
+        Update: {
+          bu?: string | null
+          created_at?: string | null
+          faturamento_meta?: number | null
+          faturamento_vender?: number | null
+          id?: string | null
+          investimento?: number | null
+          is_locked?: boolean | null
+          leads?: number | null
+          month?: string | null
+          mqls?: number | null
+          mrr_base_planejamento?: number | null
+          propostas?: number | null
+          rms?: number | null
+          rrs?: number | null
+          updated_at?: string | null
+          vendas?: number | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       funnel_realized: {
         Row: {
           bu: string
@@ -721,6 +829,36 @@ export type Database = {
           updated_at?: string
           value?: number
           year?: number
+        }
+        Relationships: []
+      }
+      mrr_base_monthly_backup_20260512_pre_churn: {
+        Row: {
+          created_at: string | null
+          id: string | null
+          is_total_override: boolean | null
+          month: string | null
+          updated_at: string | null
+          value: number | null
+          year: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string | null
+          is_total_override?: boolean | null
+          month?: string | null
+          updated_at?: string | null
+          value?: number | null
+          year?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string | null
+          is_total_override?: boolean | null
+          month?: string | null
+          updated_at?: string | null
+          value?: number | null
+          year?: number | null
         }
         Relationships: []
       }
