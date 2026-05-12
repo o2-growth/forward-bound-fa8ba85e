@@ -1847,7 +1847,45 @@ export function MediaInvestmentTab() {
         await bulkUpdateMetas.mutateAsync(updates);
         toast.success(`${updates.length} meta${updates.length > 1 ? 's' : ''} atualizada${updates.length > 1 ? 's' : ''} com sucesso`);
       }
-      
+
+      // Sync recalculated funnel quantities (leads/mqls/rms/rrs/propostas/vendas)
+      // from Plan Growth into funnel_metas, so Indicadores Comercial reflects
+      // the same numbers shown here. Locked months are filtered inside the hook.
+      try {
+        const lockedKey = (bu: string, m: string) =>
+          allFunnelMetas.some(x => x.bu === bu && x.month === m && x.year === 2026 && x.is_locked === true);
+
+        const buildItems = (bu: string, funnel: typeof modeloAtualFunnel) =>
+          funnel
+            .filter(d => !lockedKey(bu, d.month))
+            .map(d => ({
+              bu,
+              month: d.month,
+              year: 2026,
+              leads: Math.round(d.leads || 0),
+              mqls: Math.round(d.mqls || 0),
+              rms: Math.round(d.rms || 0),
+              rrs: Math.round(d.rrs || 0),
+              propostas: Math.round(d.propostas || 0),
+              vendas: Math.round(d.vendas || 0),
+            }));
+
+        const funnelSyncItems = [
+          ...buildItems('modelo_atual', modeloAtualFunnel),
+          ...buildItems('o2_tax', o2TaxFunnel),
+          ...buildItems('oxy_hacker', oxyHackerFunnel),
+          ...buildItems('franquia', franquiaFunnel),
+        ];
+
+        if (funnelSyncItems.length > 0) {
+          await bulkUpsertFunnelMetas.mutateAsync(funnelSyncItems);
+          toast.success('Metas do funil sincronizadas com Indicadores Comercial');
+        }
+      } catch (syncErr) {
+        console.error('Erro ao sincronizar funnel_metas:', syncErr);
+        toast.error('Metas monetárias salvas, mas falhou sincronizar Indicadores Comercial');
+      }
+
       // Clear pending
       setPendingChanges({});
       originalValuesRef.current = {};
@@ -1855,7 +1893,7 @@ export function MediaInvestmentTab() {
       console.error('Error saving changes:', error);
       toast.error('Erro ao salvar alterações');
     }
-  }, [pendingChanges, isAllBalanced, metas, bulkUpdateMetas, indicadoresPorBU, modeloAtualFunnel, logAction]);
+  }, [pendingChanges, isAllBalanced, metas, bulkUpdateMetas, indicadoresPorBU, modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel, allFunnelMetas, bulkUpsertFunnelMetas, logAction]);
 
   const handleDiscardAll = useCallback(() => {
     setPendingChanges({});
