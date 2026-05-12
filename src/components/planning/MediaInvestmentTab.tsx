@@ -1947,6 +1947,8 @@ export function MediaInvestmentTab() {
       }
 
       await bulkUpsertFunnelMetas.mutateAsync(funnelSyncItems);
+      // Force refetch para Indicadores refletirem o novo snapshot imediatamente
+      await queryClient.refetchQueries({ queryKey: ['funnel-metas', 2026] });
       await logAction('monetary_meta', `Sincronização manual Plan Growth → funnel_metas: ${funnelSyncItems.length} registros`, {
         source: 'manual_sync_button',
         count: funnelSyncItems.length,
