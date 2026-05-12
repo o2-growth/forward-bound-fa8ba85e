@@ -380,11 +380,16 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       (saidaDate ? toLocalDateBR(saidaDate) : '') ||
       (tratEntradaDate ? toLocalDateBR(tratEntradaDate) : '') ||
       '';
-    // mesChurn segue a mesma hierarquia de dataEncerramento (deriva direto dela quando possível)
-    const mesChurn =
-      formatMonthYear(dataEncerramento) ||
-      (trat ? formatMonthYear(trat['Entrada']) : '') ||
-      (card['Mes do Churn'] || '');
+    // mesChurn segue a mesma hierarquia de dataEncerramento (deriva direto dela quando possível).
+    // Parse local de YYYY-MM-DD para evitar shift de timezone no início/fim de mês.
+    let mesChurn = '';
+    const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dataEncerramento);
+    if (ymdMatch) {
+      const monthsBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+      mesChurn = `${monthsBR[Number(ymdMatch[2]) - 1]}/${ymdMatch[1]}`;
+    } else {
+      mesChurn = (trat ? formatMonthYear(trat['Entrada']) : '') || (card['Mes do Churn'] || '');
+    }
     const ltMeses = diffInMonths(dataAssinatura, dataEncerramento) || (card['LT (meses)'] || '');
 
     const problemasOxy = nps?.['Comentarios'] || nps?.['Motivo da Nota'] || card['Problemas com a Oxy'] || '';
