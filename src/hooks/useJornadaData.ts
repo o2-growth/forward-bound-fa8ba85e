@@ -179,9 +179,9 @@ export function useJornadaData() {
     // Primeira tratativa por título — para medir "tempo entre levantar a mão e churn"
     const firstTratativaByTitulo = new Map<string, Date>();
     // Tratativas resolvidas com sucesso (decisão final = retomada / sucesso)
-    const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number }> = [];
+    const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number; data: Date | null }> = [];
     // Valor isentado por tratativa (campo 'Valor Isentado finalizacao')
-    const isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number }> = [];
+    const isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number; data: Date | null }> = [];
     const readNum = (v: unknown): number => {
       if (v == null) return 0;
       const s = String(v).replace(/[^0-9.,-]/g, '').replace(/\./g, '').replace(',', '.');
