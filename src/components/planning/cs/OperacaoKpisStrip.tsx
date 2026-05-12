@@ -61,8 +61,8 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-2xl font-bold">{operacao.tratativasResolvidasCount}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Decisão Final = sucesso/retomada</p>
+            <p className="text-2xl font-bold">{resolvidasFiltered.length}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">Decisão Final = sucesso/retomada · {periodLabel}</p>
           </CardContent>
         </Card>
 
