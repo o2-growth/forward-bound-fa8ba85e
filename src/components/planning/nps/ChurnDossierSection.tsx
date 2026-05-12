@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
-import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus, Sparkles, ShieldCheck, LifeBuoy } from 'lucide-react';
+import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus, Sparkles, ShieldCheck } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LabelList } from 'recharts';
 import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawer';
