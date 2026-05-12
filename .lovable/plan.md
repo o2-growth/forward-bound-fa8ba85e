@@ -1,47 +1,35 @@
 ## Diagnóstico
 
-A linha "Protecface Respiradores" mostra **09/04/2026** (não 2025) como Encerramento porque:
+No card "Valor isentado por tratativa", o Grupo Imagem aparece como **R$ 3.429.316** mas o valor real é **R$ 34.293,16** — diferença de fator 100. Isso indica que o campo `Valor Isentado finalizacao` (e fallbacks) vem do Pipefy em **centavos**, não em reais. O `formatCurrency` está correto; o problema está no parsing.
 
-1. Em `src/hooks/useOperationsData.ts:349`, `dataEncerramento` cai no fallback `tratEntradaDate` (a data em que a tratativa entrou na fase finalizada, `2026-04-10T20:11Z`) — **não** no campo correto `Data do churn` da Central de Projetos, que está preenchido como **18/03/2026**.
-2. `toISOString().split('T')[0]` produz `"2026-04-10"` (UTC). Em `ChurnDossierSection.formatDate` (linha 17), `new Date("2026-04-10")` é interpretado como meia-noite UTC e renderizado em BRT (UTC-3), virando **09/04/2026**.
+Local: `src/hooks/useJornadaData.ts` linhas 209-211 (`readNum(...)` retornando o número bruto).
 
-Resultado: data errada (entrada da tratativa em vez da data real do churn) **e** com shift de timezone.
+Esse valor é usado em dois lugares (ambos afetados):
+- `isentamentos[].valor` → tabela "Valor isentado por tratativa" + KPI `valorIsentadoTotal`
+- `tratativasResolvidas[].valorIsentado` → tabela de tratativas resolvidas
 
 ---
 
 ## Plano
 
-### 1. `src/hooks/useOperationsData.ts` (linhas ~340-350)
+### `src/hooks/useJornadaData.ts` (~linha 209)
 
-Mudar a hierarquia de `dataEncerramento` para usar **`Data do churn` da Central de Projetos como fonte primária**:
-
-```text
-dataEncerramento =
-  card['Data do churn']                          // ← NOVA fonte primária (Central de Projetos)
-  ?? card['Data encerramento']                   // fallback legado
-  ?? trat?.['Finalizacao contrato ultimo dia']   // fallback tratativa
-  ?? (saidaDate    ? toLocalDateBR(saidaDate)    : null)
-  ?? (tratEntradaDate ? toLocalDateBR(tratEntradaDate) : null)  // último recurso
-```
-
-Normalizar tudo para `YYYY-MM-DD` no fuso `America/Sao_Paulo` via helper local (não usar `toISOString` cru), para evitar shift quando a fonte vier com timestamp.
-
-### 2. `src/components/planning/nps/ChurnDossierSection.tsx` (`formatDate`, linhas 15-20)
-
-Quando a string já vier no formato `YYYY-MM-DD` (sem hora), construir a `Date` como **local** para não voltar um dia em BRT:
+Normalizar a leitura dividindo por 100:
 
 ```text
-if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('pt-BR', { ... });
-}
+const valorIsentado = readNum(
+  row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
+) / 100;
 ```
 
-### 3. Validação
+Como ambos os arrays (`isentamentos` e `tratativasResolvidas`) consomem a mesma variável, e o total `valorIsentadoTotal` é derivado de `isentamentos`, a correção em um único ponto resolve KPI + ambas as tabelas.
 
-- Protecface Respiradores → Encerramento deve mostrar **18/03/2026** e Mês Mar/2026.
-- Conferir 2-3 outros churns recentes (Zebl, Aled, Cymaco) — devem continuar batendo com o que estava antes (eles caem no override do dossiê Q1 e não dependem desta data).
-- Conferir que `ltMeses` (calculado via `diffInMonths(dataAssinatura, dataEncerramento)`) continua coerente com a nova data.
+### Validação
+
+- Grupo Imagem deve passar de R$ 3.429.316 → **R$ 34.293,16**.
+- KPI "Valor isentado (Atendimento O2)" no card de Operação deve cair proporcionalmente (todas as linhas /100).
+- Conferir 1-2 outras linhas da tabela "Tratativas resolvidas" para garantir que os valores agora batem com o Pipefy.
 
 ### Fora do escopo
-- Não mexer em filtros (`CHURN_CUTOFF`, overrides de motivo) nem no stub sintético `synthetic-protectface` — depois que o card real ficar correto, avaliamos remover o stub.
+
+Não mexer em outros campos monetários da Jornada (MRR, churn) — esses já estão sendo tratados em outras leituras com normalizações próprias.
