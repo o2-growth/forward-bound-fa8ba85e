@@ -206,9 +206,10 @@ export function useJornadaData() {
       // Tratativas finalizadas: checar decisão e valor isentado
       const decisao = (row['Decisao Final'] || '').trim();
       const solucaoSucesso = (row['Solucao Implementada com Sucesso'] || row['Solução Implementada com Sucesso'] || '').trim();
+      // Pipefy retorna campos de moeda em centavos — dividir por 100 para reais
       const valorIsentado = readNum(
         row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
-      );
+      ) / 100;
       if (decisao && (isSucessoDecisao(decisao) || /sim/i.test(solucaoSucesso))) {
         tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado });
       }
