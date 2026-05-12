@@ -12,7 +12,7 @@ export interface OperacaoKpisData {
   valorIsentadoTotal: number;
   churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }>;
   churnsOxyCount: number;
-  tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string }>;
+  tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string; status?: 'churn' | 'ongoing' }>;
   tempoMedioTratativaChurn: number;
   tempoMedianoTratativaChurn: number;
 }
@@ -111,14 +111,22 @@ export function OperacaoKpisStrip({ operacao }: Props) {
                 <TooltipContent className="max-w-sm text-xs">
                   <p className="font-semibold mb-1">De onde vem:</p>
                   <p>Pipefy → <strong>Tratativas</strong> (campo <code>Entrada</code> da 1ª tratativa do cliente) cruzado com <strong>Central de Projetos</strong> (<code>Data encerramento</code> / <code>Saída</code> do churn).</p>
-                  <p className="mt-2 font-semibold">Como calcula:</p>
-                  <p>Para cada cliente em Churn/Desistência/Arquivado: <code>dias = data_encerramento − entrada_primeira_tratativa</code>. Média e mediana sobre todos os churns com tratativa registrada (descarta &lt;0 ou &gt;730 dias).</p>
-                  <p className="mt-2 text-muted-foreground">Clique para ver a lista por cliente.</p>
+                  <p className="mt-2 font-semibold">Universo:</p>
+                  <p>Todas as tratativas com 1ª entrada registrada. Se o cliente já virou churn → conta na média/mediana. Se ainda não virou → aparece como "em andamento" (não entra na média).</p>
+                  <p className="mt-2 text-muted-foreground">Clique para ver a lista completa.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
             <p className="text-2xl font-bold">{operacao.tempoMedioTratativaChurn} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">média · mediana {operacao.tempoMedianoTratativaChurn}d · {operacao.tempoTratativaChurn.length} clientes</p>
+            {(() => {
+              const churnCount = operacao.tempoTratativaChurn.filter(t => t.status === 'churn').length;
+              const ongoingCount = operacao.tempoTratativaChurn.filter(t => t.status === 'ongoing').length;
+              return (
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  mediana {operacao.tempoMedianoTratativaChurn}d · {churnCount} churns · {ongoingCount} em andamento
+                </p>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>
@@ -161,16 +169,35 @@ export function OperacaoKpisStrip({ operacao }: Props) {
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
           <DialogHeader><DialogTitle>Tempo entre levantar a mão e churn</DialogTitle></DialogHeader>
           <div className="text-xs text-muted-foreground mb-3">
-            Média: <strong className="text-foreground">{operacao.tempoMedioTratativaChurn} dias</strong> · Mediana: <strong className="text-foreground">{operacao.tempoMedianoTratativaChurn} dias</strong> · {operacao.tempoTratativaChurn.length} clientes
+            Média: <strong className="text-foreground">{operacao.tempoMedioTratativaChurn} dias</strong> · Mediana: <strong className="text-foreground">{operacao.tempoMedianoTratativaChurn} dias</strong> · {operacao.tempoTratativaChurn.filter(t => t.status === 'churn').length} churns · {operacao.tempoTratativaChurn.filter(t => t.status === 'ongoing').length} em andamento
+            <p className="mt-1 text-[10px]">Médias calculadas apenas sobre clientes que já viraram churn.</p>
           </div>
           <Table>
-            <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo Churn</TableHead><TableHead className="text-right">Dias até churn</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Status</TableHead><TableHead>Motivo</TableHead><TableHead className="text-right">Dias</TableHead></TableRow></TableHeader>
             <TableBody>
-              {[...operacao.tempoTratativaChurn].sort((a, b) => b.diasAteChurn - a.diasAteChurn).map((t, i) => (
-                <TableRow key={i}><TableCell>{t.titulo}</TableCell><TableCell>{t.cfo}</TableCell><TableCell>{t.motivo}</TableCell><TableCell className="text-right">{t.diasAteChurn}d</TableCell></TableRow>
-              ))}
+              {[...operacao.tempoTratativaChurn]
+                .sort((a, b) => {
+                  // churns primeiro, depois ongoing; dentro de cada grupo desc por dias
+                  if (a.status !== b.status) return a.status === 'churn' ? -1 : 1;
+                  return b.diasAteChurn - a.diasAteChurn;
+                })
+                .map((t, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{t.titulo}</TableCell>
+                    <TableCell>{t.cfo}</TableCell>
+                    <TableCell>
+                      {t.status === 'churn' ? (
+                        <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 px-2 py-0.5 text-[10px] font-medium">Churn</span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[10px] font-medium">Em andamento</span>
+                      )}
+                    </TableCell>
+                    <TableCell>{t.motivo}</TableCell>
+                    <TableCell className="text-right">{t.diasAteChurn}d</TableCell>
+                  </TableRow>
+                ))}
               {operacao.tempoTratativaChurn.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum cliente com tratativa registrada e data de encerramento.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa registrada.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

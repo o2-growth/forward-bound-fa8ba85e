@@ -1,35 +1,34 @@
-## Mudanças no Customer Success / Dossiê de Churn
+## Problema
 
-### 1. Gráfico "MRR Perdido por CFO" — adicionar quantidade de clientes
-Arquivo: `src/components/planning/nps/ChurnDossierSection.tsx`
+O KPI "Tempo levantar a mão → churn" mostra hoje **44 dias / 1 cliente** porque exige (1) 1ª tratativa registrada E (2) data de churn — só 1 cliente bate as duas no recorte atual. A regra também não respeita o filtro de período do dashboard.
 
-- Renomear título para **"Churn por CFO — MRR e Clientes"**.
-- O `cfoChartData` já contém `churns` e `mrr`. Manter a barra horizontal de MRR e:
-  - Exibir um label à direita de cada barra mostrando `Nº clientes` (ex.: `12 cl. · R$ 45k`), OU
-  - Adicionar uma segunda barra fina (combo) com `churns` em outro eixo X.
-- Implementação preferida: usar `<LabelList>` do recharts na barra MRR no formato `"{churns} cl. · {mrrCompact}"` para manter o card compacto sem segundo eixo.
+## Nova regra
 
-### 2. Novo KPI "Taxa de Salvamento" (tratativas resolvidas vs churns)
-Arquivo: `src/components/planning/nps/ChurnDossierSection.tsx` + `CustomerSuccessTab.tsx`
+Universo = **todas as tratativas cuja 1ª entrada caiu dentro do período filtrado** (mesmo que o cliente ainda não tenha virado churn).
 
-- Adicionar nova prop opcional `tratativasResolvidasCount?: number` em `Props`.
-- `CustomerSuccessTab.tsx` (linha ~459) passar `tratativasResolvidasCount={operacao.tratativasResolvidasCount}`.
-- Na linha "Churn no período" (grid de KPIs), expandir de 4 para 5 cards (`md:grid-cols-5`) adicionando:
-  - **Tratativas Resolvidas (Salvas)** — valor `tratativasResolvidasCount`, com sublabel "salvas no período".
-  - **Taxa de Salvamento** — `resolvidas / (resolvidas + churns) × 100`, com tooltip explicando a fórmula. Cor verde se ≥ 50%, amarelo entre 30-50%, vermelho < 30%.
-- Como serão 6 cards na linha 2, usar `md:grid-cols-3 lg:grid-cols-6` para acomodar bem em 1008px.
+Para cada uma:
+- Se o cliente **já virou churn** (fase Churn/Desistência/Arquivado e tem `churnDate`): `dias = churnDate − entradaTratativa` → entra na **média/mediana**.
+- Se **ainda não virou churn**: aparece na lista do dialog como **"em andamento"** (`dias = hoje − entradaTratativa`, marcado como ongoing) e **NÃO** entra na média/mediana.
 
-### 3. Alinhar MRR da "Visão Geral CS" com o do Dossiê
-Arquivo: `src/components/planning/CustomerSuccessTab.tsx` + `src/components/planning/cs/VisaoGeralCS.tsx`
+## Mudanças
 
-- Hoje `VisaoGeralCS` recebe `mrrBase={mrrBase}` (vem do hook). O Dossiê usa `activeMrr={847892}` (hardcoded em CustomerSuccessTab linha 464).
-- Trocar a prop passada: `mrrBase={847892}` no `<VisaoGeralCS>` (mesmo valor literal usado no Dossiê), para garantir consistência exibida.
-- Atualizar tooltip do card "MRR Base" em `VisaoGeralCS.tsx` (linha 195) para refletir que é "soma de Valor CFOaaS + Valor OXY dos clientes ativos" — texto já descreve isso corretamente; nenhuma outra mudança no componente.
+**`src/hooks/useJornadaData.ts`** (bloco em ~L776-800)
+- Substituir o loop atual (que itera `allClientes` em fase inativa) por um loop sobre `firstTratativaByTitulo`.
+- Filtrar entradas pela janela do período já existente no hook (mesmo `dateInRange` usado em outros KPIs de Operação — verificar se há `periodStart/periodEnd` no escopo; se não, ler dos parâmetros `selectedPeriod`).
+- Para cada título com 1ª tratativa no período:
+  - Buscar `churnDate = churnDateByTitulo.get(titulo)` e fase atual em `allClientes`.
+  - Se em fase inativa + churnDate válido → push `{ ..., diasAteChurn, status: 'churn' }`.
+  - Senão → push `{ ..., diasAteChurn: hoje−entrada, status: 'ongoing', motivo: 'Em andamento' }`.
+- Manter sanidade: descarta `dias < 0` ou `> 730`.
+- `tempoMedioTratativaChurn` e `tempoMedianoTratativaChurn` calculados **só sobre `status === 'churn'`**.
 
-Observação: o ideal arquitetural seria centralizar `activeMrr` num hook único, mas como o valor já é compartilhado via prop hardcoded no parent, basta reutilizá-lo. Se preferir, podemos extrair para uma constante `ACTIVE_MRR_SNAPSHOT` no topo de `CustomerSuccessTab.tsx` para usar nos dois lugares — me avise se quiser.
+**`src/components/planning/cs/OperacaoKpisStrip.tsx`**
+- Atualizar interface `tempoTratativaChurn` para incluir `status: 'churn' | 'ongoing'`.
+- Card: legenda mostra `"X churns / Y em andamento"` em vez de `"N clientes"`.
+- Dialog: nova coluna **Status** (badge "Churn" vermelho / "Em andamento" cinza). Ordenar churns primeiro, depois em andamento. Texto explicativo do header atualizado.
+- Atualizar tooltip do `Info` no card refletindo a nova regra.
 
-### Arquivos editados
-- `src/components/planning/nps/ChurnDossierSection.tsx` — gráfico CFO + 2 novos KPIs + nova prop
-- `src/components/planning/CustomerSuccessTab.tsx` — passar `tratativasResolvidasCount` e alinhar `mrrBase`
+## Sem mudança
 
-Sem alterações em hooks, edge functions ou banco.
+- Outras métricas do strip de Operação (resolvidas, isentado, churns Oxy) seguem inalteradas.
+- Dossiê de Churn segue inalterado.

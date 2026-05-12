@@ -774,24 +774,58 @@ export function useJornadaData() {
     }
 
     // Tempo entre levantar a mão (1ª tratativa) e churn
-    const tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string }> = [];
-    for (const c of allClientes) {
-      if (c.id.endsWith('__pedrolo')) continue;
-      if (!INACTIVE_PHASES.includes(c.faseAtual)) continue;
-      const tituloLower = c.titulo.toLowerCase();
-      const tratativaDate = firstTratativaByTitulo.get(tituloLower);
+    // Universo: TODAS as tratativas com 1ª entrada registrada.
+    // Se cliente já virou churn → entra na média/mediana.
+    // Se ainda não virou → aparece como "em andamento" (não conta na média).
+    const clienteByTituloLower = new Map<string, typeof allClientes[number]>();
+    for (const c of allClientes) clienteByTituloLower.set(c.titulo.toLowerCase(), c);
+
+    const tempoTratativaChurn: Array<{
+      titulo: string;
+      cfo: string;
+      diasAteChurn: number;
+      motivo: string;
+      status: 'churn' | 'ongoing';
+    }> = [];
+
+    for (const [tituloLower, tratativaDate] of firstTratativaByTitulo) {
+      const cliente = clienteByTituloLower.get(tituloLower);
+      if (!cliente) continue;
+      if (cliente.id.endsWith('__pedrolo')) continue;
+
+      const isChurn = INACTIVE_PHASES.includes(cliente.faseAtual);
       const churnDate = churnDateByTitulo.get(tituloLower);
-      if (!tratativaDate || !churnDate) continue;
-      const dias = daysBetween(tratativaDate, churnDate);
-      if (dias < 0 || dias > 730) continue; // sanity (negativo ou >2 anos = dado ruim)
-      tempoTratativaChurn.push({ titulo: c.titulo, cfo: c.cfo, diasAteChurn: dias, motivo: c.motivoChurn || '—' });
+
+      if (isChurn && churnDate) {
+        const dias = daysBetween(tratativaDate, churnDate);
+        if (dias < 0 || dias > 730) continue;
+        tempoTratativaChurn.push({
+          titulo: cliente.titulo,
+          cfo: cliente.cfo,
+          diasAteChurn: dias,
+          motivo: cliente.motivoChurn || '—',
+          status: 'churn',
+        });
+      } else {
+        const dias = daysBetween(tratativaDate, now);
+        if (dias < 0 || dias > 730) continue;
+        tempoTratativaChurn.push({
+          titulo: cliente.titulo,
+          cfo: cliente.cfo,
+          diasAteChurn: dias,
+          motivo: 'Em andamento',
+          status: 'ongoing',
+        });
+      }
     }
-    const tempoMedioTratativaChurn = tempoTratativaChurn.length > 0
-      ? Math.round(tempoTratativaChurn.reduce((s, t) => s + t.diasAteChurn, 0) / tempoTratativaChurn.length)
+
+    const churnsList = tempoTratativaChurn.filter(t => t.status === 'churn');
+    const tempoMedioTratativaChurn = churnsList.length > 0
+      ? Math.round(churnsList.reduce((s, t) => s + t.diasAteChurn, 0) / churnsList.length)
       : 0;
-    const tempoMedianoTratativaChurn = tempoTratativaChurn.length > 0
+    const tempoMedianoTratativaChurn = churnsList.length > 0
       ? (() => {
-          const sorted = [...tempoTratativaChurn].sort((a, b) => a.diasAteChurn - b.diasAteChurn);
+          const sorted = [...churnsList].sort((a, b) => a.diasAteChurn - b.diasAteChurn);
           const mid = Math.floor(sorted.length / 2);
           return sorted.length % 2 === 0
             ? Math.round((sorted[mid - 1].diasAteChurn + sorted[mid].diasAteChurn) / 2)
