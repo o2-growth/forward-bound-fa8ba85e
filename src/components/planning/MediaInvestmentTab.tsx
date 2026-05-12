@@ -1421,9 +1421,11 @@ export function MediaInvestmentTab() {
         const fatMeta = Number(fixed.faturamento_meta) || d.faturamentoMeta;
         const fatVender = Number(fixed.faturamento_vender) || d.faturamentoVender;
         const invest = Number(fixed.investimento) || d.investimento;
+        // Coluna MRR Base exibe o REAL (Oxy − churn) quando disponível, senão o projetado.
+        const mrrBaseExibido = realMrr > 0 ? realMrr : projetado;
         return {
           ...d,
-          mrrBase: projetado,
+          mrrBase: mrrBaseExibido,
           faturamentoMeta: fatMeta,
           faturamentoVender: fatVender,
           investimento: invest,
@@ -1445,7 +1447,7 @@ export function MediaInvestmentTab() {
       }
 
       // Mês não locked com Oxy real: recalcula A Vender + funil baseado no REAL,
-      // mas a coluna mrrBase exibe o PROJETADO (gap aparece no badge).
+      // e a coluna mrrBase passa a exibir o REAL (Oxy − churn). Gap fica no badge.
       const mm = metricsByMonthPorBU.modeloAtual[d.month] ?? m;
       const tm = mm.ticketMedio || ticketMedio;
       const novoVender = Math.max(0, d.faturamentoMeta - realMrr);
@@ -1459,7 +1461,7 @@ export function MediaInvestmentTab() {
 
       return {
         ...d,
-        mrrBase: projetado,
+        mrrBase: realMrr,
         faturamentoVender: novoVender,
         vendas: Math.ceil(vendas),
         propostas: Math.ceil(propostas),
