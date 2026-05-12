@@ -27,10 +27,7 @@ Seu leitor é Head de CS / Head de Operação. O cliente JÁ CHURNOU — este é
 - Verbos permitidos: Acionar, Escalar, Revisar, Documentar, Validar, Reunir, Renegociar, Antecipar, Monitorar, Encerrar.
 - O gatilho precisa ser observável em outros clientes (ex.: "NPS ≤7 por 2 ciclos", ">15d em Plano de Ação", "Satisfação 'Insatisfeito' em qualquer tratativa", "Atraso recorrente Oxy em 2 meses").
 
-CRITÉRIOS DE STATUS (objetivos):
-- 🟢 Evitável: causa raiz operacional/relacional sob controle da O2 (atendimento, atrasos Oxy, falta de cadência, NPS caindo sem ação registrada). Tinha sinal antecipado nos dados.
-- 🟡 Parcialmente evitável: causa mista — fator externo (mudança de gestão, troca de ERP, redução de operação no cliente) + sinal de oportunidade que poderia ter sido trabalhado.
-- 🔴 Inevitável: fator 100% externo sem sinal acionável (encerramento da empresa, fusão/aquisição, mudança estratégica do cliente totalmente externa, decisão tomada antes de qualquer interação).
+PROIBIDO incluir blocos como "Status", "O que aconteceu", "Próximos passos", "Plano de retenção", "Recomendações para o cliente" ou qualquer ação direcionada a este cliente. Saída começa direto em **🎯 Causa raiz** e termina em **🛡️ Lições para retenção**.
 
 REGRAS GERAIS (não negociáveis):
 - Use SOMENTE dados do JSON. NUNCA invente datas, nomes, valores, motivos.
