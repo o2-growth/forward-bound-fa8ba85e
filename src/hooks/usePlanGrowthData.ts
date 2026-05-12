@@ -326,10 +326,8 @@ export function usePlanGrowthData() {
   const hasSeeded = useRef(false);
   const hasAutoLocked = useRef(false);
 
-  // Build a map of MRR Base real (Oxy truth) by month for the current planning year (2026)
-  // MRR Base de cada mês = MRR realizado do mês ANTERIOR × (1 - churn 5%) — Oxy truth.
-  // Ex.: MRR Base de Mar/26 = MRR de Fev/26 × 0,95.
-  // Ex.: MRR Base de Jan/26 = MRR de Dez/25 × 0,95.
+  // MRR Base por mês — fonte da verdade: tabela mrr_base_monthly.
+  // Para meses sem valor (futuros), projeta a partir do último mês conhecido com churn 5% a.m.
   const CHURN_OXY = 0.05;
   const mrrBaseRealPorMes = useMemo(() => {
     const PLAN_YEAR = 2026;
@@ -338,11 +336,18 @@ export function usePlanGrowthData() {
       lookup.set(`${r.year}-${r.month}`, Number(r.value) || 0);
     });
     const map: Record<string, number> = {};
-    months.forEach((m, idx) => {
-      const prevMonth = idx === 0 ? 'Dez' : months[idx - 1];
-      const prevYear = idx === 0 ? PLAN_YEAR - 1 : PLAN_YEAR;
-      const v = lookup.get(`${prevYear}-${prevMonth}`);
-      if (v && v > 0) map[m] = v * (1 - CHURN_OXY);
+    let lastKnown = 0;
+    let monthsSinceKnown = 0;
+    months.forEach((m) => {
+      const real = lookup.get(`${PLAN_YEAR}-${m}`) || 0;
+      if (real > 0) {
+        map[m] = real;
+        lastKnown = real;
+        monthsSinceKnown = 0;
+      } else if (lastKnown > 0) {
+        monthsSinceKnown += 1;
+        map[m] = lastKnown * Math.pow(1 - CHURN_OXY, monthsSinceKnown);
+      }
     });
     return map;
   }, [mrrBaseData]);

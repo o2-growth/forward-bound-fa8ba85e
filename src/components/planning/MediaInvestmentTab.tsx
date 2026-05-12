@@ -1088,9 +1088,8 @@ export function MediaInvestmentTab() {
   const { hasFunnelForBU, getFunnelForBU, bulkUpsert: bulkUpsertFunnelMetas, funnelMetas: allFunnelMetas } = useFunnelMetas();
   const queryClient = useQueryClient();
 
-  // MRR Base de cada mês = MRR realizado do mês ANTERIOR × (1 - churn 5%) — Oxy truth.
-  // Ex.: MRR Base de Mar/26 = MRR de Fev/26 × 0,95.
-  // Ex.: MRR Base de Jan/26 = MRR de Dez/25 × 0,95.
+  // MRR Base por mês — fonte da verdade: tabela mrr_base_monthly.
+  // Meses futuros sem valor: projeta do último conhecido com churn 5% a.m.
   const CHURN_OXY = 0.05;
   const mrrBaseRealPorMes = useMemo(() => {
     const MONTHS_ORDER = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -1100,11 +1099,18 @@ export function MediaInvestmentTab() {
       lookup.set(`${r.year}-${r.month}`, Number(r.value) || 0);
     });
     const map: Record<string, number> = {};
-    MONTHS_ORDER.forEach((m, idx) => {
-      const prevMonth = idx === 0 ? 'Dez' : MONTHS_ORDER[idx - 1];
-      const prevYear = idx === 0 ? PLAN_YEAR - 1 : PLAN_YEAR;
-      const v = lookup.get(`${prevYear}-${prevMonth}`);
-      if (v && v > 0) map[m] = v * (1 - CHURN_OXY);
+    let lastKnown = 0;
+    let monthsSinceKnown = 0;
+    MONTHS_ORDER.forEach((m) => {
+      const real = lookup.get(`${PLAN_YEAR}-${m}`) || 0;
+      if (real > 0) {
+        map[m] = real;
+        lastKnown = real;
+        monthsSinceKnown = 0;
+      } else if (lastKnown > 0) {
+        monthsSinceKnown += 1;
+        map[m] = lastKnown * Math.pow(1 - CHURN_OXY, monthsSinceKnown);
+      }
     });
     return map;
   }, [mrrBaseData]);
