@@ -56,7 +56,7 @@ export function ChurnAnalysisDrawer({ churn, open, onClose }: Props) {
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-full sm:w-[640px] sm:max-w-[90vw] overflow-hidden flex flex-col p-0">
+      <SheetContent side="right" className="w-full sm:w-[760px] lg:w-[880px] sm:max-w-[95vw] overflow-hidden flex flex-col p-0">
         {churn && (
           <>
             <SheetHeader className="p-6 pb-4 border-b">
