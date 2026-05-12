@@ -368,16 +368,24 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         {/* CFO Bar */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">MRR Perdido por CFO</CardTitle>
+            <CardTitle className="text-sm">Churn por CFO — MRR e Clientes</CardTitle>
           </CardHeader>
           <CardContent className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cfoChartData} layout="vertical" margin={{ left: 60, right: 10 }}>
+              <BarChart data={cfoChartData} layout="vertical" margin={{ left: 60, right: 60 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} fontSize={10} />
                 <YAxis type="category" dataKey="name" fontSize={10} width={55} />
-                <RechartsTooltip formatter={(val: number) => [formatCurrency(val), 'MRR Perdido']} />
-                <Bar dataKey="mrr" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
+                <RechartsTooltip formatter={(val: number, _name, item: any) => [`${formatCurrency(val)} · ${item?.payload?.churns ?? 0} cliente(s)`, 'MRR Perdido']} />
+                <Bar dataKey="mrr" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]}>
+                  <LabelList
+                    dataKey="churns"
+                    position="right"
+                    fontSize={10}
+                    fill="hsl(var(--foreground))"
+                    formatter={(v: number) => `${v} cl.`}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
