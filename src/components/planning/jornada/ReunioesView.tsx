@@ -30,6 +30,14 @@ interface ReuniaoData {
   t2: string | null;
   t3: string | null;
   t4: string | null; // Temperatura Mensal
+  p1?: string | null;
+  p2?: string | null;
+  p3?: string | null;
+  p4?: string | null; // Cliente Participou Mensal
+  ata1?: string | null;
+  ata2?: string | null;
+  ata3?: string | null;
+  ata4?: string | null;
 }
 
 interface ReunioesViewProps {
@@ -42,21 +50,35 @@ interface ReunioesViewProps {
 const DEADLINES = [7, 14, 21, 28];
 const REUNION_LABELS = ['R1', 'R2', 'R3', 'R4'];
 
-function getReunionStatus(data: Date | null, deadlineDay: number, now: Date): 'done' | 'late' | 'pending' | 'overdue' {
+type ReunionStatus = 'feita' | 'preenchida' | 'nao_feita' | 'pending' | 'overdue';
+
+function getReunionStatus(data: Date | null, deadlineDay: number, now: Date, participou?: string | null): ReunionStatus {
   if (!data) {
-    // Não preencheu: verificar se já passou do prazo
     return now.getDate() > deadlineDay ? 'overdue' : 'pending';
   }
-  // Preencheu: verificar se foi dentro do prazo
-  return data.getDate() <= deadlineDay ? 'done' : 'late';
+  const part = (participou || '').trim().toLowerCase();
+  if (part === 'sim' || part === 'yes') return 'feita';
+  if (part === 'não' || part === 'nao' || part === 'no') return 'nao_feita';
+  return 'preenchida';
 }
 
-function statusIcon(status: 'done' | 'late' | 'pending' | 'overdue') {
+function statusIcon(status: ReunionStatus) {
   switch (status) {
-    case 'done': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    case 'late': return <XCircle className="h-4 w-4 text-red-500" />;
+    case 'feita': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+    case 'preenchida': return <Circle className="h-4 w-4 text-blue-400" />;
+    case 'nao_feita': return <XCircle className="h-4 w-4 text-red-500" />;
     case 'overdue': return <XCircle className="h-4 w-4 text-orange-500" />;
     case 'pending': return <Circle className="h-4 w-4 text-gray-400" />;
+  }
+}
+
+function statusLabel(status: ReunionStatus): string {
+  switch (status) {
+    case 'feita': return 'Feita';
+    case 'preenchida': return 'Preenchida (sem confirmação)';
+    case 'nao_feita': return 'Não feita';
+    case 'overdue': return 'Atrasada';
+    case 'pending': return 'Pendente';
   }
 }
 
@@ -217,11 +239,13 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
   const enriched = useMemo(() => {
     return monthFiltered.map(r => {
       const dates = [r.r1, r.r2, r.r3, r.r4];
-      const statuses = dates.map((d, i) => getReunionStatus(d, DEADLINES[i], now));
-      const done = statuses.filter(s => s === 'done' || s === 'late').length;
-      const late = statuses.filter(s => s === 'late').length;
+      const parts = [r.p1, r.p2, r.p3, r.p4];
+      const statuses = dates.map((d, i) => getReunionStatus(d, DEADLINES[i], now, parts[i]));
+      const done = statuses.filter(s => s === 'feita').length;
+      const filled = statuses.filter(s => s === 'preenchida').length;
+      const naoFeitas = statuses.filter(s => s === 'nao_feita').length;
       const progress = done;
-      return { ...r, statuses, done, late, progress };
+      return { ...r, statuses, done, filled, naoFeitas, late: naoFeitas, progress };
     });
   }, [monthFiltered, now]);
 
@@ -473,20 +497,42 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                       const isComite = i === 3;
                       return (
                         <TableCell key={i} className={`text-center ${isComite ? 'bg-indigo-500/5 border-l-2 border-indigo-500/30' : ''}`}>
-                          {status === 'done' ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/20">
-                                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                              </div>
-                              <span className="text-[9px] text-muted-foreground">{dateLabel}</span>
-                            </div>
-                          ) : status === 'late' ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15">
-                                <XCircle className="h-4 w-4 text-red-500" />
-                              </div>
-                              <span className="text-[9px] text-red-400">{dateLabel || 'atraso'}</span>
-                            </div>
+                          {status === 'feita' ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex flex-col items-center gap-0.5 cursor-help">
+                                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-green-500/20">
+                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                  </div>
+                                  <span className="text-[9px] text-muted-foreground">{dateLabel}</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>Feita (cliente confirmou participação)</TooltipContent>
+                            </Tooltip>
+                          ) : status === 'preenchida' ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex flex-col items-center gap-0.5 cursor-help">
+                                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-blue-500/15">
+                                    <Circle className="h-4 w-4 text-blue-400" />
+                                  </div>
+                                  <span className="text-[9px] text-blue-400">{dateLabel} • só preench.</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>Data preenchida, mas sem confirmação de participação do cliente</TooltipContent>
+                            </Tooltip>
+                          ) : status === 'nao_feita' ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex flex-col items-center gap-0.5 cursor-help">
+                                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15">
+                                    <XCircle className="h-4 w-4 text-red-500" />
+                                  </div>
+                                  <span className="text-[9px] text-red-400">{dateLabel} • não feita</span>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>Reunião não ocorreu (cliente marcou "Não")</TooltipContent>
+                            </Tooltip>
                           ) : status === 'overdue' ? (
                             <div className="flex flex-col items-center gap-0.5">
                               <div className="flex items-center justify-center w-7 h-7 rounded-full bg-orange-500/15">
