@@ -455,6 +455,7 @@ function CustomerSuccessTabInner() {
 
           <TabsContent value="churn" className="mt-4">
             <div className="space-y-8">
+              <OperacaoKpisStrip operacao={operacao} />
               <ChurnDossierSection
                 data={opsData?.churnDossier || []}
                 selectedProdutos={filters.produtos}
