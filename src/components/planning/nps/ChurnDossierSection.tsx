@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MultiSelect } from '@/components/ui/multi-select';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
 import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus, Sparkles } from 'lucide-react';
-import { Cliente360Drawer } from '@/components/planning/jornada/Cliente360Drawer';
-import type { JornadaCliente } from '@/components/planning/jornada/types';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
 import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawer';
