@@ -176,6 +176,8 @@ export function useJornadaData() {
     const tratativaMap = new Map<string, { motivo: string; motivoChurn: string | null; dias: number; fase: string }>();
     // All tratativas map: captures motivo from ANY tratativa (for churned clients)
     const allTratativaMap = new Map<string, { motivo: string; motivoChurn: string | null; fase: string }>();
+    // Primeira tratativa por título — para medir "tempo entre levantar a mão e churn"
+    const firstTratativaByTitulo = new Map<string, Date>();
     // Tratativas resolvidas com sucesso (decisão final = retomada / sucesso)
     const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number }> = [];
     // Valor isentado por tratativa (campo 'Valor Isentado finalizacao')
@@ -217,9 +219,25 @@ export function useJornadaData() {
       // Store in all-tratativas map (latest wins)
       allTratativaMap.set(titulo, { motivo, motivoChurn: motivoChurnTrat, fase });
 
+      // First tratativa entrada (earliest wins)
+      if (entrada) {
+        const prev = firstTratativaByTitulo.get(titulo);
+        if (!prev || entrada < prev) firstTratativaByTitulo.set(titulo, entrada);
+      }
+
       // Only active tratativas go into the active map
       if (!TRATATIVA_ACTIVE.includes(fase)) continue;
       tratativaMap.set(titulo, { motivo, motivoChurn: motivoChurnTrat, dias, fase });
+    }
+
+    // Data de encerramento (churn date) por título
+    const churnDateByTitulo = new Map<string, Date>();
+    for (const row of projetos) {
+      if (row['Fase'] !== row['Fase Atual']) continue;
+      const titulo = (row['Título'] || '').trim().toLowerCase();
+      if (!titulo) continue;
+      const enc = parseDate(row['Data encerramento'] || row['Data de encerramento'] || row['Saída'] || row['Saida']);
+      if (enc) churnDateByTitulo.set(titulo, enc);
     }
 
     // Motivo de churn vindo direto do card central de projetos
@@ -754,11 +772,40 @@ export function useJornadaData() {
       }
     }
 
+    // Tempo entre levantar a mão (1ª tratativa) e churn
+    const tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string }> = [];
+    for (const c of allClientes) {
+      if (c.id.endsWith('__pedrolo')) continue;
+      if (!INACTIVE_PHASES.includes(c.faseAtual)) continue;
+      const tituloLower = c.titulo.toLowerCase();
+      const tratativaDate = firstTratativaByTitulo.get(tituloLower);
+      const churnDate = churnDateByTitulo.get(tituloLower);
+      if (!tratativaDate || !churnDate) continue;
+      const dias = daysBetween(tratativaDate, churnDate);
+      if (dias < 0 || dias > 730) continue; // sanity (negativo ou >2 anos = dado ruim)
+      tempoTratativaChurn.push({ titulo: c.titulo, cfo: c.cfo, diasAteChurn: dias, motivo: c.motivoChurn || '—' });
+    }
+    const tempoMedioTratativaChurn = tempoTratativaChurn.length > 0
+      ? Math.round(tempoTratativaChurn.reduce((s, t) => s + t.diasAteChurn, 0) / tempoTratativaChurn.length)
+      : 0;
+    const tempoMedianoTratativaChurn = tempoTratativaChurn.length > 0
+      ? (() => {
+          const sorted = [...tempoTratativaChurn].sort((a, b) => a.diasAteChurn - b.diasAteChurn);
+          const mid = Math.floor(sorted.length / 2);
+          return sorted.length % 2 === 0
+            ? Math.round((sorted[mid - 1].diasAteChurn + sorted[mid].diasAteChurn) / 2)
+            : sorted[mid].diasAteChurn;
+        })()
+      : 0;
+
     const operacao = {
       tratativasResolvidas,
       tratativasResolvidasCount: tratativasResolvidas.length,
       isentamentos,
       valorIsentadoTotal: isentamentos.reduce((s, i) => s + i.valor, 0),
+      tempoTratativaChurn,
+      tempoMedioTratativaChurn,
+      tempoMedianoTratativaChurn,
       churnsOxy,
       churnsOxyCount: churnsOxy.length,
     };

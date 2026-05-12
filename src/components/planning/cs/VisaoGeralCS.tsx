@@ -22,6 +22,9 @@ interface VisaoGeralCSProps {
     valorIsentadoTotal: number;
     churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }>;
     churnsOxyCount: number;
+    tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string }>;
+    tempoMedioTratativaChurn: number;
+    tempoMedianoTratativaChurn: number;
   };
 }
 
@@ -49,7 +52,7 @@ type KpiDialogType = 'clientes' | 'mrr' | 'health' | 'nps' | 'churn' | null;
 
 export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNavigateToAlertas, operacao }: VisaoGeralCSProps) {
   const [openDialog, setOpenDialog] = useState<KpiDialogType>(null);
-  const [opDialog, setOpDialog] = useState<'resolvidas' | 'isentado' | 'oxy' | null>(null);
+  const [opDialog, setOpDialog] = useState<'resolvidas' | 'isentado' | 'oxy' | 'tempo' | null>(null);
 
   const activeClientes = useMemo(() => {
     return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
@@ -233,9 +236,9 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
         })}
       </div>
 
-      {/* Operação — agregados (tratativas resolvidas, valor isentado, churns por Oxy) */}
+      {/* Operação — agregados (tratativas resolvidas, valor isentado, churns por Oxy, tempo até churn) */}
       {operacao && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="cursor-pointer hover:border-primary/50 transition" onClick={() => setOpDialog('resolvidas')}>
             <CardContent className="pt-4 pb-3 px-4">
               <div className="flex items-center gap-2 mb-1">
@@ -302,6 +305,28 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido: {formatCurrency(operacao.churnsOxy.reduce((s, c) => s + c.mrr, 0))}</p>
             </CardContent>
           </Card>
+          <Card className="cursor-pointer hover:border-primary/50 transition" onClick={() => setOpDialog('tempo')}>
+            <CardContent className="pt-4 pb-3 px-4">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingDown className="h-4 w-4 text-orange-600" />
+                <span className="text-xs text-muted-foreground">Tempo levantar a mão → churn</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3 w-3 ml-auto opacity-60 cursor-help" onClick={(e) => e.stopPropagation()} />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-sm text-xs">
+                    <p className="font-semibold mb-1">De onde vem:</p>
+                    <p>Pipefy → <strong>Tratativas</strong> (campo <code>Entrada</code> da 1ª tratativa do cliente) cruzado com <strong>Central de Projetos</strong> (<code>Data encerramento</code> / <code>Saída</code> do churn).</p>
+                    <p className="mt-2 font-semibold">Como calcula:</p>
+                    <p>Para cada cliente em Churn/Desistência/Arquivado: <code>dias = data_encerramento − entrada_primeira_tratativa</code>. Média e mediana sobre todos os churns com tratativa registrada (descarta &lt;0 ou &gt;730 dias).</p>
+                    <p className="mt-2 text-muted-foreground">Clique para ver a lista por cliente.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+              <p className="text-2xl font-bold">{operacao.tempoMedioTratativaChurn} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">média · mediana {operacao.tempoMedianoTratativaChurn}d · {operacao.tempoTratativaChurn.length} clientes</p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -333,6 +358,25 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               ))}
               {(operacao?.isentamentos || []).length === 0 && (
                 <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhuma tratativa com valor isentado registrado no Pipefy.</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={opDialog === 'tempo'} onOpenChange={(o) => !o && setOpDialog(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+          <DialogHeader><DialogTitle>Tempo entre levantar a mão e churn</DialogTitle></DialogHeader>
+          <div className="text-xs text-muted-foreground mb-3">
+            Média: <strong className="text-foreground">{operacao?.tempoMedioTratativaChurn ?? 0} dias</strong> · Mediana: <strong className="text-foreground">{operacao?.tempoMedianoTratativaChurn ?? 0} dias</strong> · {operacao?.tempoTratativaChurn.length ?? 0} clientes
+          </div>
+          <Table>
+            <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo Churn</TableHead><TableHead className="text-right">Dias até churn</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {(operacao?.tempoTratativaChurn || []).sort((a, b) => b.diasAteChurn - a.diasAteChurn).map((t, i) => (
+                <TableRow key={i}><TableCell>{t.titulo}</TableCell><TableCell>{t.cfo}</TableCell><TableCell>{t.motivo}</TableCell><TableCell className="text-right">{t.diasAteChurn}d</TableCell></TableRow>
+              ))}
+              {(operacao?.tempoTratativaChurn || []).length === 0 && (
+                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum cliente com tratativa registrada e data de encerramento.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
