@@ -176,20 +176,6 @@ export function useJornadaData() {
     const tratativaMap = new Map<string, { motivo: string; motivoChurn: string | null; dias: number; fase: string }>();
     // All tratativas map: captures motivo from ANY tratativa (for churned clients)
     const allTratativaMap = new Map<string, { motivo: string; motivoChurn: string | null; fase: string }>();
-    // Tratativas resolvidas com sucesso (decisão final = retomada / sucesso)
-    const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number }> = [];
-    // Valor isentado por tratativa (campo 'Valor Isentado finalizacao')
-    const isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number }> = [];
-    const readNum = (v: unknown): number => {
-      if (v == null) return 0;
-      const s = String(v).replace(/[^0-9.,-]/g, '').replace(/\./g, '').replace(',', '.');
-      const n = parseFloat(s);
-      return isNaN(n) ? 0 : n;
-    };
-    const isSucessoDecisao = (d: string): boolean => {
-      const s = d.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-      return s.includes('sucesso') || s.includes('retomada') || s.includes('retornou') || s.includes('resolvido') || s.includes('implementada com sucesso');
-    };
     for (const row of tratativas) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const titulo = (row['Título'] || '').trim().toLowerCase();
@@ -199,20 +185,6 @@ export function useJornadaData() {
       const motivo = (row['Motivo'] || '').trim() || 'Não informado';
       const entrada = parseDate(row['Entrada'] || row['Data de Inicio da Tratativa']);
       const dias = entrada ? daysBetween(entrada, now) : 0;
-      const cfoT = normalizeCfoName((row['CFO Responsavel'] || row['Responsavel pela Tratativa'] || '').trim());
-
-      // Tratativas finalizadas: checar decisão e valor isentado
-      const decisao = (row['Decisao Final'] || '').trim();
-      const solucaoSucesso = (row['Solucao Implementada com Sucesso'] || row['Solução Implementada com Sucesso'] || '').trim();
-      const valorIsentado = readNum(
-        row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
-      );
-      if (decisao && (isSucessoDecisao(decisao) || /sim/i.test(solucaoSucesso))) {
-        tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado });
-      }
-      if (valorIsentado > 0) {
-        isentamentos.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivoChurn: motivoChurnTrat, valor: valorIsentado });
-      }
 
       // Store in all-tratativas map (latest wins)
       allTratativaMap.set(titulo, { motivo, motivoChurn: motivoChurnTrat, fase });
@@ -341,19 +313,9 @@ export function useJornadaData() {
       let pontual = valorDiagnostico + valorTurnaround + valorValuation + valorEducacao + (isPontualOnly ? valorCfoaas : 0);
 
       // Override específico (Dago): valor lançado como pontual é, na verdade, recorrente (MRR)
-      const PONTUAL_TO_MRR_OVERRIDES = ['libracom', 'rgo'];
+      const PONTUAL_TO_MRR_OVERRIDES = ['libracom', 'rgo', 'guará', 'guara'];
       if (PONTUAL_TO_MRR_OVERRIDES.some(k => tituloLower.includes(k))) {
         mrr = mrr + pontual;
-        pontual = 0;
-      }
-      // Override de MRR fixo (Dago): Guará entrou como 30k mas o real é 15k recorrente
-      const MRR_FIXED_OVERRIDES: Record<string, number> = {
-        'guará': 15000,
-        'guara': 15000,
-      };
-      const guaraKey = Object.keys(MRR_FIXED_OVERRIDES).find(k => tituloLower.includes(k));
-      if (guaraKey) {
-        mrr = MRR_FIXED_OVERRIDES[guaraKey];
         pontual = 0;
       }
       const entrada = parseDate(row['Entrada']) || new Date();
@@ -680,11 +642,44 @@ export function useJornadaData() {
       dataPrevista: Date | null; overdue: boolean;
       r1: Date | null; r2: Date | null; r3: Date | null; r4: Date | null;
       t1: string | null; t2: string | null; t3: string | null; t4: string | null;
-      p1: string | null; p2: string | null; p3: string | null; p4: string | null;
-      ata1: string | null; ata2: string | null; ata3: string | null; ata4: string | null;
     }> = [];
 
     const seenReunionIds = new Set<string>();
+    // DEBUG: card específico para investigar (R1-R4 preenchidos no Pipefy mas dashboard não reflete)
+    const DEBUG_CARD_ID = '1329376764';
+    const debugRowsForCard = data.rotinas.filter(r => String(r.ID || '') === DEBUG_CARD_ID);
+    if (debugRowsForCard.length > 0) {
+      console.log(`[REUNIAO DEBUG] Card ${DEBUG_CARD_ID} — encontrado ${debugRowsForCard.length} registro(s) em rotinas:`);
+      debugRowsForCard.forEach((r, i) => {
+        console.log(`[REUNIAO DEBUG] Registro ${i + 1}:`, {
+          'Título': r['Título'],
+          'Fase': r['Fase'],
+          'Fase Atual': r['Fase Atual'],
+          'Tipo de Entrega': r['Tipo de Entrega'],
+          'Mes Referencia': r['Mes Referencia'],
+          'CFO Responsavel': r['CFO Responsavel'],
+          'Data Reuniao 1': r['Data Reuniao 1'],
+          'Data Reuniao 2': r['Data Reuniao 2'],
+          'Data Reuniao 3': r['Data Reuniao 3'],
+          'Data Mensal': r['Data Mensal'],
+          'Temperatura 1': r['Temperatura 1'],
+          'Temperatura 2': r['Temperatura 2'],
+          'Temperatura 3': r['Temperatura 3'],
+          'Temperatura Mensal': r['Temperatura Mensal'],
+          'Cliente Participou': r['Cliente Participou'],
+          'Selecao Reuniao': r['Selecao Reuniao'],
+          'Overdue': r['Overdue'],
+        });
+        // Diagnóstico dos filtros que rodam abaixo
+        const passFaseAtual = r['Fase'] === r['Fase Atual'];
+        const passTipo = (r['Tipo de Entrega'] || '') === 'Reuniões com Cliente';
+        const fase = r['Fase Atual'] || '';
+        const passExclude = !['Cancelado', 'Cancelada', 'Arquivado', 'Arquivo'].some(t => fase.includes(t));
+        console.log(`[REUNIAO DEBUG] Filtros: Fase===FaseAtual=${passFaseAtual} | Tipo='Reuniões com Cliente'=${passTipo} | Não excluído=${passExclude} → ${passFaseAtual && passTipo && passExclude ? 'INCLUI' : 'EXCLUI'}`);
+      });
+    } else {
+      console.log(`[REUNIAO DEBUG] Card ${DEBUG_CARD_ID} NÃO encontrado em pipefy_moviment_rotinas (limit ${2000} rows). Possível causa: limite de fetchTable, ou ID não existe na tabela.`);
+    }
 
     for (const row of data.rotinas) {
       if (row['Fase'] !== row['Fase Atual']) continue;
@@ -718,14 +713,6 @@ export function useJornadaData() {
         t2: row['Temperatura 2'] || null,
         t3: row['Temperatura 3'] || null,
         t4: row['Temperatura Mensal'] || null,
-        p1: row['Cliente Participou'] || row['Cliente Participou 1'] || row['participou'] || row['participou1'] || null,
-        p2: row['Cliente Participou 2'] || row['participou2'] || row['Participou 2'] || null,
-        p3: row['Cliente Participou 3'] || row['participou3'] || row['Participou 3'] || null,
-        p4: row['Cliente Participou Mensal'] || row['participoum'] || row['Participou Mensal'] || null,
-        ata1: row['Ata 1'] || row['Ata Reuniao 1'] || row['ata1'] || null,
-        ata2: row['Ata 2'] || row['Ata Reuniao 2'] || row['ata2'] || null,
-        ata3: row['Ata 3'] || row['Ata Reuniao 3'] || row['ata3'] || null,
-        ata4: row['Ata Mensal'] || row['Ata Comite'] || row['ata_mensal'] || null,
       });
     }
 
@@ -737,33 +724,7 @@ export function useJornadaData() {
         }, '')
       : '';
 
-    // === 7. Operação: agregados especiais ===
-    // Churns com Problemas com a Oxy (vindos do central_projetos)
-    const churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }> = [];
-    for (const c of allClientes) {
-      if (c.id.endsWith('__pedrolo')) continue;
-      if (!INACTIVE_PHASES.includes(c.faseAtual)) continue;
-      const proj = projetoMotivoChurnMap.get(c.titulo.toLowerCase());
-      const motivo = c.motivoChurn || '';
-      const hasOxy = !!proj?.problemasOxy
-        || /oxy/i.test(motivo)
-        || /oxy/i.test(proj?.principal || '')
-        || /oxy/i.test(proj?.cancelamento || '');
-      if (hasOxy) {
-        churnsOxy.push({ titulo: c.titulo, cfo: c.cfo, motivo: proj?.problemasOxy || motivo || 'Problema na Oxy', mrr: c.mrr });
-      }
-    }
-
-    const operacao = {
-      tratativasResolvidas,
-      tratativasResolvidasCount: tratativasResolvidas.length,
-      isentamentos,
-      valorIsentadoTotal: isentamentos.reduce((s, i) => s + i.valor, 0),
-      churnsOxy,
-      churnsOxyCount: churnsOxy.length,
-    };
-
-    return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, operacao };
+    return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync };
   }, [data, oxyProductsByMonth]);
 
   return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };

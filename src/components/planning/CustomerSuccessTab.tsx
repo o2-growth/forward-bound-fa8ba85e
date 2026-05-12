@@ -47,7 +47,7 @@ function CustomerSuccessTabInner() {
   };
 
   // Data hooks
-  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, operacao, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
+  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
   const { data: npsData, isLoading: npsLoading, error: npsError } = useNpsData();
   const { data: opsData } = useOperationsData();
 
@@ -228,7 +228,7 @@ function CustomerSuccessTabInner() {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-3 text-muted-foreground">Carregando dados de Operação...</span>
+        <span className="ml-3 text-muted-foreground">Carregando dados de Customer Success...</span>
       </div>
     );
   }
@@ -254,7 +254,7 @@ function CustomerSuccessTabInner() {
               <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
-              <p>Operação — visão unificada de clientes, NPS, churn, reuniões e alertas.</p>
+              <p>Customer Success — visão unificada de clientes, NPS, churn, reuniões e alertas.</p>
             </TooltipContent>
           </Tooltip>
 
@@ -373,7 +373,6 @@ function CustomerSuccessTabInner() {
               npsScore={displayNpsData?.metrics?.nps?.score ?? null}
               mrrBase={mrrBase}
               onNavigateToAlertas={() => setActiveTab('alertas')}
-              operacao={operacao}
             />
           </TabsContent>
 

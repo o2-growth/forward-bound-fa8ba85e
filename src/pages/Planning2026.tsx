@@ -30,7 +30,7 @@ const TAB_CONFIG: { key: TabKey; label: string; icon: React.ComponentType<{ clas
   
   { key: 'media', label: 'Plan Growth', icon: Megaphone },
   { key: 'indicators', label: 'Indicadores', icon: Activity },
-  { key: 'cs', label: 'Operação', icon: HeartHandshake },
+  { key: 'cs', label: 'Customer Success', icon: HeartHandshake },
   { key: 'financial', label: 'Financeiro', icon: DollarSign },
   { key: 'marketing', label: 'Marketing', icon: Lightbulb },
   { key: 'structure', label: 'Estrutura', icon: Users },

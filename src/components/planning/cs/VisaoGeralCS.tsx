@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Users, DollarSign, Heart, SmilePlus, TrendingDown, AlertTriangle, Info, CheckCircle2, Wallet, AlertCircle } from 'lucide-react';
+import { Users, DollarSign, Heart, SmilePlus, TrendingDown, AlertTriangle, Info } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import type { JornadaCliente, JornadaCfo, JornadaAlerta } from '@/components/planning/jornada/types';
@@ -15,14 +15,6 @@ interface VisaoGeralCSProps {
   npsScore: number | null;
   mrrBase: number;
   onNavigateToAlertas?: () => void;
-  operacao?: {
-    tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number }>;
-    tratativasResolvidasCount: number;
-    isentamentos: Array<{ titulo: string; cfo: string; motivoChurn: string | null; valor: number }>;
-    valorIsentadoTotal: number;
-    churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number }>;
-    churnsOxyCount: number;
-  };
 }
 
 function formatCurrency(value: number) {
@@ -47,9 +39,8 @@ const PONTUAL_PRODUCTS = ['Diagnostico', 'Turnaround', 'Valuation', 'Educacao'];
 
 type KpiDialogType = 'clientes' | 'mrr' | 'health' | 'nps' | 'churn' | null;
 
-export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNavigateToAlertas, operacao }: VisaoGeralCSProps) {
+export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNavigateToAlertas }: VisaoGeralCSProps) {
   const [openDialog, setOpenDialog] = useState<KpiDialogType>(null);
-  const [opDialog, setOpDialog] = useState<'resolvidas' | 'isentado' | 'oxy' | null>(null);
 
   const activeClientes = useMemo(() => {
     return clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
@@ -232,92 +223,6 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
           );
         })}
       </div>
-
-      {/* Operação — agregados (tratativas resolvidas, valor isentado, churns por Oxy) */}
-      {operacao && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="cursor-pointer hover:border-primary/50 transition" onClick={() => setOpDialog('resolvidas')}>
-            <CardContent className="pt-4 pb-3 px-4">
-              <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span className="text-xs text-muted-foreground">Tratativas resolvidas com sucesso</span>
-              </div>
-              <p className="text-2xl font-bold">{operacao.tratativasResolvidasCount}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Decisão Final = sucesso/retomada</p>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:border-primary/50 transition" onClick={() => setOpDialog('isentado')}>
-            <CardContent className="pt-4 pb-3 px-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Wallet className="h-4 w-4 text-amber-600" />
-                <span className="text-xs text-muted-foreground">Valor isentado (Atendimento O2)</span>
-              </div>
-              <p className="text-2xl font-bold">{formatCurrency(operacao.valorIsentadoTotal)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{operacao.isentamentos.length} tratativas com isenção</p>
-            </CardContent>
-          </Card>
-          <Card className="cursor-pointer hover:border-primary/50 transition" onClick={() => setOpDialog('oxy')}>
-            <CardContent className="pt-4 pb-3 px-4">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <span className="text-xs text-muted-foreground">Churns com problema na Oxy</span>
-              </div>
-              <p className="text-2xl font-bold">{operacao.churnsOxyCount}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido: {formatCurrency(operacao.churnsOxy.reduce((s, c) => s + c.mrr, 0))}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Operação dialogs */}
-      <Dialog open={opDialog === 'resolvidas'} onOpenChange={(o) => !o && setOpDialog(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
-          <DialogHeader><DialogTitle>Tratativas resolvidas com sucesso</DialogTitle></DialogHeader>
-          <Table>
-            <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo</TableHead><TableHead>Decisão</TableHead><TableHead className="text-right">Isentado</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {(operacao?.tratativasResolvidas || []).map((t, i) => (
-                <TableRow key={i}><TableCell>{t.titulo}</TableCell><TableCell>{t.cfo}</TableCell><TableCell>{t.motivo}</TableCell><TableCell>{t.decisao}</TableCell><TableCell className="text-right">{t.valorIsentado > 0 ? formatCurrency(t.valorIsentado) : '—'}</TableCell></TableRow>
-              ))}
-              {(operacao?.tratativasResolvidas || []).length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa resolvida com sucesso encontrada.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={opDialog === 'isentado'} onOpenChange={(o) => !o && setOpDialog(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
-          <DialogHeader><DialogTitle>Valor isentado por tratativa</DialogTitle></DialogHeader>
-          <Table>
-            <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo Churn</TableHead><TableHead className="text-right">Valor isentado</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {(operacao?.isentamentos || []).sort((a, b) => b.valor - a.valor).map((i, idx) => (
-                <TableRow key={idx}><TableCell>{i.titulo}</TableCell><TableCell>{i.cfo}</TableCell><TableCell>{i.motivoChurn || '—'}</TableCell><TableCell className="text-right">{formatCurrency(i.valor)}</TableCell></TableRow>
-              ))}
-              {(operacao?.isentamentos || []).length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhuma tratativa com valor isentado registrado no Pipefy.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={opDialog === 'oxy'} onOpenChange={(o) => !o && setOpDialog(null)}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
-          <DialogHeader><DialogTitle>Churns com problema na Oxy</DialogTitle></DialogHeader>
-          <Table>
-            <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo</TableHead><TableHead className="text-right">MRR</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {(operacao?.churnsOxy || []).sort((a, b) => b.mrr - a.mrr).map((c, i) => (
-                <TableRow key={i}><TableCell>{c.titulo}</TableCell><TableCell>{c.cfo}</TableCell><TableCell>{c.motivo}</TableCell><TableCell className="text-right">{formatCurrency(c.mrr)}</TableCell></TableRow>
-              ))}
-              {(operacao?.churnsOxy || []).length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum churn por problema na Oxy.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </DialogContent>
-      </Dialog>
 
       {/* Alert Summary Strip */}
       {(alertSummary.criticos > 0 || alertSummary.altos > 0) && (
