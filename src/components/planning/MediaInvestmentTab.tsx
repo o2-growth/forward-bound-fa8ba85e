@@ -1855,7 +1855,10 @@ export function MediaInvestmentTab() {
         const lockedKey = (bu: string, m: string) =>
           allFunnelMetas.some(x => x.bu === bu && x.month === m && x.year === 2026 && x.is_locked === true);
 
-        const buildItems = (bu: string, funnel: typeof modeloAtualFunnel) =>
+        const buildItems = (
+          bu: string,
+          funnel: Array<{ month: string; leads?: number; mqls?: number; rms?: number; rrs?: number; propostas?: number; vendas?: number }>
+        ) =>
           funnel
             .filter(d => !lockedKey(bu, d.month))
             .map(d => ({
