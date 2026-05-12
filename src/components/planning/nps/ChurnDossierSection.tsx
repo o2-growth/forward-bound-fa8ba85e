@@ -522,24 +522,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                           ) : '—'}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-1">
-                            <PipefyCardLink pipeId={PIPEFY_PIPES.CENTRAL_PROJETOS} cardId={row.id} label="Ver card" variant="button" />
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => setAnalysisChurn(row)}
-                                >
-                                  <Sparkles className="h-3.5 w-3.5 text-primary" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent side="top" className="text-xs">
-                                Análise IA do churn
-                              </TooltipContent>
-                            </Tooltip>
-                          </div>
+                          <PipefyCardLink pipeId={PIPEFY_PIPES.CENTRAL_PROJETOS} cardId={row.id} label="Ver card" variant="button" />
                         </TableCell>
                       </TableRow>
                       {isExpanded && (
