@@ -345,6 +345,7 @@ interface BUInvestmentTableProps {
   dreByMonth?: Record<string, number>;
   isLoadingRealized?: boolean;
   pendingMonths?: Set<string>;
+  metaAnualFixa?: number;
 }
 
 function BUInvestmentTable({
@@ -355,7 +356,7 @@ function BUInvestmentTable({
   metrics,
   showMrrBase = false,
   mrrBase = 0,
-  churnMensal = 0.06,
+  churnMensal = 0.05,
   retencaoVendas = 0.25,
   mrrFinal = 0,
   buKey,
@@ -365,7 +366,8 @@ function BUInvestmentTable({
   realizedFunnelByMonth = {},
   dreByMonth = {},
   isLoadingRealized = false,
-  pendingMonths = new Set()
+  pendingMonths = new Set(),
+  metaAnualFixa,
 }: BUInvestmentTableProps) {
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
