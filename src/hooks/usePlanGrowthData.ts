@@ -327,8 +327,10 @@ export function usePlanGrowthData() {
   const hasAutoLocked = useRef(false);
 
   // Build a map of MRR Base real (Oxy truth) by month for the current planning year (2026)
-  // MRR Base de cada mês = MRR realizado do mês ANTERIOR (Oxy truth).
-  // Ex.: MRR Base de Fev/26 = MRR de Jan/26; MRR Base de Jan/26 = MRR de Dez/25.
+  // MRR Base de cada mês = MRR realizado do mês ANTERIOR × (1 - churn 5%) — Oxy truth.
+  // Ex.: MRR Base de Mar/26 = MRR de Fev/26 × 0,95.
+  // Ex.: MRR Base de Jan/26 = MRR de Dez/25 × 0,95.
+  const CHURN_OXY = 0.05;
   const mrrBaseRealPorMes = useMemo(() => {
     const PLAN_YEAR = 2026;
     const lookup = new Map<string, number>();
@@ -340,7 +342,7 @@ export function usePlanGrowthData() {
       const prevMonth = idx === 0 ? 'Dez' : months[idx - 1];
       const prevYear = idx === 0 ? PLAN_YEAR - 1 : PLAN_YEAR;
       const v = lookup.get(`${prevYear}-${prevMonth}`);
-      if (v && v > 0) map[m] = v;
+      if (v && v > 0) map[m] = v * (1 - CHURN_OXY);
     });
     return map;
   }, [mrrBaseData]);

@@ -1088,8 +1088,10 @@ export function MediaInvestmentTab() {
   const { hasFunnelForBU, getFunnelForBU, bulkUpsert: bulkUpsertFunnelMetas, funnelMetas: allFunnelMetas } = useFunnelMetas();
   const queryClient = useQueryClient();
 
-  // MRR Base de cada mês = MRR realizado do mês ANTERIOR (Oxy truth).
-  // Ex.: MRR Base de Fev/26 = MRR de Jan/26; MRR Base de Jan/26 = MRR de Dez/25.
+  // MRR Base de cada mês = MRR realizado do mês ANTERIOR × (1 - churn 5%) — Oxy truth.
+  // Ex.: MRR Base de Mar/26 = MRR de Fev/26 × 0,95.
+  // Ex.: MRR Base de Jan/26 = MRR de Dez/25 × 0,95.
+  const CHURN_OXY = 0.05;
   const mrrBaseRealPorMes = useMemo(() => {
     const MONTHS_ORDER = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     const PLAN_YEAR = 2026;
@@ -1102,7 +1104,7 @@ export function MediaInvestmentTab() {
       const prevMonth = idx === 0 ? 'Dez' : MONTHS_ORDER[idx - 1];
       const prevYear = idx === 0 ? PLAN_YEAR - 1 : PLAN_YEAR;
       const v = lookup.get(`${prevYear}-${prevMonth}`);
-      if (v && v > 0) map[m] = v;
+      if (v && v > 0) map[m] = v * (1 - CHURN_OXY);
     });
     return map;
   }, [mrrBaseData]);
@@ -1419,9 +1421,11 @@ export function MediaInvestmentTab() {
         const fatMeta = Number(fixed.faturamento_meta) || d.faturamentoMeta;
         const fatVender = Number(fixed.faturamento_vender) || d.faturamentoVender;
         const invest = Number(fixed.investimento) || d.investimento;
+        // Coluna MRR Base exibe o REAL (Oxy − churn) quando disponível, senão o projetado.
+        const mrrBaseExibido = realMrr > 0 ? realMrr : projetado;
         return {
           ...d,
-          mrrBase: projetado,
+          mrrBase: mrrBaseExibido,
           faturamentoMeta: fatMeta,
           faturamentoVender: fatVender,
           investimento: invest,
@@ -1443,7 +1447,7 @@ export function MediaInvestmentTab() {
       }
 
       // Mês não locked com Oxy real: recalcula A Vender + funil baseado no REAL,
-      // mas a coluna mrrBase exibe o PROJETADO (gap aparece no badge).
+      // e a coluna mrrBase passa a exibir o REAL (Oxy − churn). Gap fica no badge.
       const mm = metricsByMonthPorBU.modeloAtual[d.month] ?? m;
       const tm = mm.ticketMedio || ticketMedio;
       const novoVender = Math.max(0, d.faturamentoMeta - realMrr);
@@ -1457,7 +1461,7 @@ export function MediaInvestmentTab() {
 
       return {
         ...d,
-        mrrBase: projetado,
+        mrrBase: realMrr,
         faturamentoVender: novoVender,
         vendas: Math.ceil(vendas),
         propostas: Math.ceil(propostas),
