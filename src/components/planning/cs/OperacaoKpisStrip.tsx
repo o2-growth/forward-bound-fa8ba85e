@@ -141,21 +141,15 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
                   <p className="font-semibold mb-1">De onde vem:</p>
                   <p>Pipefy → <strong>Tratativas</strong> (campo <code>Entrada</code> da 1ª tratativa do cliente) cruzado com <strong>Central de Projetos</strong> (<code>Data encerramento</code> / <code>Saída</code> do churn).</p>
                   <p className="mt-2 font-semibold">Universo:</p>
-                  <p>Todas as tratativas com 1ª entrada registrada. Se o cliente já virou churn → conta na média/mediana. Se ainda não virou → aparece como "em andamento" (não entra na média).</p>
+                  <p>Apenas tratativas <strong>iniciadas no período selecionado</strong>. Se o cliente já virou churn → conta na média/mediana. Se ainda não virou → aparece como "em andamento" (não entra na média).</p>
                   <p className="mt-2 text-muted-foreground">Clique para ver a lista completa.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-2xl font-bold">{operacao.tempoMedioTratativaChurn} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
-            {(() => {
-              const churnCount = operacao.tempoTratativaChurn.filter(t => t.status === 'churn').length;
-              const ongoingCount = operacao.tempoTratativaChurn.filter(t => t.status === 'ongoing').length;
-              return (
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  mediana {operacao.tempoMedianoTratativaChurn}d · {churnCount} churns · {ongoingCount} em andamento
-                </p>
-              );
-            })()}
+            <p className="text-2xl font-bold">{tempoMedio} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              mediana {tempoMediano}d · {tempoChurnList.length} churns · {tempoOngoingCount} em andamento · {periodLabel}
+            </p>
           </CardContent>
         </Card>
       </div>
