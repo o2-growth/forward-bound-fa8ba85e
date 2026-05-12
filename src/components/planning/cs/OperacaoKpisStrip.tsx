@@ -150,10 +150,10 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
           <Table>
             <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo</TableHead><TableHead>Decisão</TableHead><TableHead className="text-right">Isentado</TableHead></TableRow></TableHeader>
             <TableBody>
-              {operacao.tratativasResolvidas.map((t, i) => (
+              {resolvidasFiltered.map((t, i) => (
                 <TableRow key={i}><TableCell>{t.titulo}</TableCell><TableCell>{t.cfo}</TableCell><TableCell>{t.motivo}</TableCell><TableCell>{t.decisao}</TableCell><TableCell className="text-right">{t.valorIsentado > 0 ? formatCurrency(t.valorIsentado) : '—'}</TableCell></TableRow>
               ))}
-              {operacao.tratativasResolvidas.length === 0 && (
+              {resolvidasFiltered.length === 0 && (
                 <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa resolvida com sucesso encontrada.</TableCell></TableRow>
               )}
             </TableBody>
@@ -167,10 +167,10 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
           <Table>
             <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo Churn</TableHead><TableHead className="text-right">Valor isentado</TableHead></TableRow></TableHeader>
             <TableBody>
-              {[...operacao.isentamentos].sort((a, b) => b.valor - a.valor).map((i, idx) => (
+              {[...isentamentosFiltered].sort((a, b) => b.valor - a.valor).map((i, idx) => (
                 <TableRow key={idx}><TableCell>{i.titulo}</TableCell><TableCell>{i.cfo}</TableCell><TableCell>{i.motivoChurn || '—'}</TableCell><TableCell className="text-right">{formatCurrency(i.valor)}</TableCell></TableRow>
               ))}
-              {operacao.isentamentos.length === 0 && (
+              {isentamentosFiltered.length === 0 && (
                 <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhuma tratativa com valor isentado registrado no Pipefy.</TableCell></TableRow>
               )}
             </TableBody>
@@ -223,10 +223,10 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
           <Table>
             <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Motivo</TableHead><TableHead className="text-right">MRR</TableHead></TableRow></TableHeader>
             <TableBody>
-              {[...operacao.churnsOxy].sort((a, b) => b.mrr - a.mrr).map((c, i) => (
+              {[...churnsOxyFiltered].sort((a, b) => b.mrr - a.mrr).map((c, i) => (
                 <TableRow key={i}><TableCell>{c.titulo}</TableCell><TableCell>{c.cfo}</TableCell><TableCell>{c.motivo}</TableCell><TableCell className="text-right">{formatCurrency(c.mrr)}</TableCell></TableRow>
               ))}
-              {operacao.churnsOxy.length === 0 && (
+              {churnsOxyFiltered.length === 0 && (
                 <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Nenhum churn por problema na Oxy.</TableCell></TableRow>
               )}
             </TableBody>
