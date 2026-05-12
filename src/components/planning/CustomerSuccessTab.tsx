@@ -469,7 +469,7 @@ function CustomerSuccessTabInner() {
                     selectedProdutos={filters.produtos}
                     globalCfos={filters.cfos}
                     activeClientesCount={filteredClientes.length}
-                    activeMrr={847892}
+                    activeMrr={724400}
                     tratativasResolvidasCount={resolvidasNoPeriodo}
                     globalDateRange={{ from: csStartDate, to: csEndDate }}
                   />
