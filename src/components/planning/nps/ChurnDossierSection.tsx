@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
-import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus, Sparkles } from 'lucide-react';
+import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Clock, AlertTriangle, Filter, Info, Users, Percent, Wallet, UserMinus, Sparkles, ShieldCheck, LifeBuoy } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LabelList } from 'recharts';
 import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawer';
 
 /* ─── helpers ─── */
@@ -62,9 +62,10 @@ interface Props {
   globalCfos?: string[];
   activeClientesCount?: number;
   activeMrr?: number;
+  tratativasResolvidasCount?: number;
 }
 
-export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0 }: Props) {
+export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0, tratativasResolvidasCount = 0 }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
@@ -242,7 +243,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
             )}
           </h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <Card className="border-destructive/30 bg-destructive/5">
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
@@ -287,6 +288,38 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
               <p className="text-[10px] text-muted-foreground mt-0.5">sobre base de clientes</p>
             </CardContent>
           </Card>
+          {(() => {
+            const totalDeals = tratativasResolvidasCount + filtered.length;
+            const saveRate = totalDeals > 0 ? (tratativasResolvidasCount / totalDeals) * 100 : 0;
+            const saveColor = saveRate >= 50 ? 'text-emerald-600 dark:text-emerald-400' : saveRate >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-destructive';
+            const saveBorder = saveRate >= 50 ? 'border-emerald-500/30 bg-emerald-500/5' : saveRate >= 30 ? 'border-amber-500/30 bg-amber-500/5' : 'border-destructive/30 bg-destructive/5';
+            return (
+              <>
+                <Card className="border-emerald-500/30 bg-emerald-500/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
+                      <LifeBuoy className="h-4 w-4" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">Tratativas Salvas</span>
+                      <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tratativas resolvidas no período (cliente foi recuperado e não virou churn).</p></TooltipContent></Tooltip>
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{tratativasResolvidasCount}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">resolvidas no período</p>
+                  </CardContent>
+                </Card>
+                <Card className={saveBorder}>
+                  <CardContent className="p-4">
+                    <div className={`flex items-center gap-2 mb-1 ${saveColor}`}>
+                      <ShieldCheck className="h-4 w-4" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">Taxa de Salvamento</span>
+                      <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tratativas salvas / (Tratativas salvas + Churns) × 100. Mede a eficácia em recuperar clientes em tratativa antes que virem churn.</p></TooltipContent></Tooltip>
+                    </div>
+                    <p className="text-2xl font-bold text-foreground">{saveRate.toFixed(1)}%</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{tratativasResolvidasCount} salvas / {filtered.length} churns</p>
+                  </CardContent>
+                </Card>
+              </>
+            );
+          })()}
         </div>
       </div>
 
@@ -335,16 +368,24 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         {/* CFO Bar */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">MRR Perdido por CFO</CardTitle>
+            <CardTitle className="text-sm">Churn por CFO — MRR e Clientes</CardTitle>
           </CardHeader>
           <CardContent className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={cfoChartData} layout="vertical" margin={{ left: 60, right: 10 }}>
+              <BarChart data={cfoChartData} layout="vertical" margin={{ left: 60, right: 60 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} fontSize={10} />
                 <YAxis type="category" dataKey="name" fontSize={10} width={55} />
-                <RechartsTooltip formatter={(val: number) => [formatCurrency(val), 'MRR Perdido']} />
-                <Bar dataKey="mrr" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
+                <RechartsTooltip formatter={(val: number, _name, item: any) => [`${formatCurrency(val)} · ${item?.payload?.churns ?? 0} cliente(s)`, 'MRR Perdido']} />
+                <Bar dataKey="mrr" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]}>
+                  <LabelList
+                    dataKey="churns"
+                    position="right"
+                    fontSize={10}
+                    fill="hsl(var(--foreground))"
+                    formatter={(v: number) => `${v} cl.`}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
