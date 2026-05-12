@@ -314,6 +314,65 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     if (key) tratativaMap.set(key, t);
   });
 
+  // Âncora para correção de data: entrada na fase "Tratativa finalizada" por título.
+  // Esse timestamp é gerado pelo Pipefy (movimentação real) e não é afetado pelo
+  // bug de sync que inverte dia/mês em "Finalizacao contrato ultimo dia".
+  const tratativaFinalizadaAnchor = new Map<string, Date>();
+  tratativas.forEach(t => {
+    if ((t['Fase'] || '').trim().toLowerCase() !== 'tratativa finalizada') return;
+    const key = (t['Título'] || '').trim().toLowerCase();
+    if (!key) return;
+    const entrada = parsePipefyDate(t['Entrada']);
+    if (!entrada) return;
+    const existing = tratativaFinalizadaAnchor.get(key);
+    if (!existing || entrada.getTime() > existing.getTime()) {
+      tratativaFinalizadaAnchor.set(key, entrada);
+    }
+  });
+
+  /**
+   * Corrige datas de "Finalizacao contrato ultimo dia" que vieram com dia/mês
+   * invertidos pelo sync. Só inverte quando todas as condições abaixo são
+   * verdadeiras (margem de segurança ampla):
+   *  - data no formato YYYY-MM-DD com mês ≤ 12 e dia ≤ 12 (ambígua)
+   *  - existe uma âncora "Tratativa finalizada" para o mesmo título
+   *  - a versão original está a > 60 dias da âncora
+   *  - a versão invertida está a < 60 dias da âncora
+   *  - a versão invertida é estritamente mais próxima da âncora
+   * Em qualquer outro caso retorna a data original. Loga toda inversão.
+   */
+  function correctChurnDate(raw: unknown, titleKey: string): string {
+    const dateStr = toLocalDateBR(raw as any);
+    if (!dateStr) return dateStr;
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    if (!m) return dateStr;
+    const Y = Number(m[1]);
+    const M = Number(m[2]);
+    const D = Number(m[3]);
+    if (M > 12 || D > 12 || M === D) return dateStr;
+    const anchor = tratativaFinalizadaAnchor.get(titleKey);
+    if (!anchor) return dateStr;
+    const orig = new Date(Y, M - 1, D);
+    const swap = new Date(Y, D - 1, M);
+    const anchorMs = anchor.getTime();
+    const dayMs = 86400000;
+    const origDiff = Math.abs(orig.getTime() - anchorMs) / dayMs;
+    const swapDiff = Math.abs(swap.getTime() - anchorMs) / dayMs;
+    if (origDiff > 60 && swapDiff < 60 && swapDiff < origDiff) {
+      const swapStr = `${Y}-${String(D).padStart(2, '0')}-${String(M).padStart(2, '0')}`;
+      console.log('[CHURN_DATE_FIX]', {
+        title: titleKey,
+        original: dateStr,
+        corrected: swapStr,
+        anchor: toLocalDateBR(anchor),
+        origDiffDays: Math.round(origDiff),
+        swapDiffDays: Math.round(swapDiff),
+      });
+      return swapStr;
+    }
+    return dateStr;
+  }
+
   // Mapa título → NPS (buscar detratores ou último feedback com comentário)
   const npsCurrentPhase = npsRows.filter(r => r['Fase'] === r['Fase Atual']);
   const npsMap = new Map<string, NpsCard>();
@@ -373,19 +432,18 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     //   c) "Finalizacao contrato ultimo dia" da Tratativa (se preenchido)
     // Isso evita que casos como Rampanelli (movido para Churn em Mar/26 mas com contrato
     // administrativamente encerrado em Abr/26) caiam no mês errado.
-    const finalizacaoContrato = (trat as any)?.['Finalizacao contrato ultimo dia']
+    const finalizacaoContratoRaw = (trat as any)?.['Finalizacao contrato ultimo dia']
       ?? (trat as any)?.['Finalização contrato último dia']
       ?? (trat as any)?.['Finalizacao do contrato ultimo dia']
       ?? null;
+    const finalizacaoContrato = correctChurnDate(finalizacaoContratoRaw, key);
     const churnPhaseEntry = parsePipefyDate(card['Entrada']);
-    const candidateDates = [
-      toLocalDateBR((card as any)['Data do churn']),
-      churnPhaseEntry ? toLocalDateBR(churnPhaseEntry) : '',
-      toLocalDateBR(finalizacaoContrato),
-    ].filter(Boolean) as string[];
-    let dataEncerramento = candidateDates.length > 0
-      ? candidateDates.reduce((min, d) => (d < min ? d : min))
-      : '';
+    // Hierarquia: data oficial de fim do contrato (corrigida) > Data do churn manual >
+    // entrada na fase de churn. Isso garante que o filtro mensal use o mês oficial
+    // de finalização do contrato (fonte de verdade do XLSX/financeiro).
+    const dataChurnManual = toLocalDateBR((card as any)['Data do churn']);
+    const dataPhaseEntry = churnPhaseEntry ? toLocalDateBR(churnPhaseEntry) : '';
+    let dataEncerramento = finalizacaoContrato || dataChurnManual || dataPhaseEntry || '';
     // Fallbacks legados quando nenhuma das 3 fontes oficiais existe
     if (!dataEncerramento) {
       dataEncerramento =
