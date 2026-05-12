@@ -780,7 +780,7 @@ export function IndicatorsTab() {
         if (hasData) return Math.round(value);
       }
 
-      // 🎯 Fonte da verdade: DB para mês LOCKED, Plan Growth ao vivo para mês aberto.
+      // 🎯 Fonte da verdade: DB quando há linha persistida (locked ou sync), Plan Growth ao vivo como fallback.
       const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
       let value = 0;
       if (dbVal !== null) {
