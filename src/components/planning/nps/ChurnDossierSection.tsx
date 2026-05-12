@@ -66,6 +66,7 @@ interface Props {
 
 export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0 }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
   const [excludeMotivos, setExcludeMotivos] = useState<string[]>([]);
   const [analysisChurn, setAnalysisChurn] = useState<ChurnDossierCard | null>(null);
