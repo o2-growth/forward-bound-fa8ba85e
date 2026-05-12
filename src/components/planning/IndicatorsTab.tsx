@@ -729,7 +729,7 @@ export function IndicatorsTab() {
       // 🎯 Fonte da verdade:
       //   - mês LOCKED → DB (congelado, snapshot oficial)
       //   - mês aberto → Plan Growth ao vivo (funnelItems)
-      const dbVal = getLockedDbFunnelValue(bu, monthName, indicatorKey);
+      const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
       const item = funnelItems?.find(f => f.month === monthName);
       if (dbVal === null && !item) continue;
 
@@ -781,7 +781,7 @@ export function IndicatorsTab() {
       }
 
       // 🎯 Fonte da verdade: DB para mês LOCKED, Plan Growth ao vivo para mês aberto.
-      const dbVal = getLockedDbFunnelValue(bu, monthName, indicatorKey);
+      const dbVal = getDbFunnelValue(bu, monthName, indicatorKey);
       let value = 0;
       if (dbVal !== null) {
         value = dbVal;
