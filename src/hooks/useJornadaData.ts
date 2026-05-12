@@ -180,8 +180,10 @@ export function useJornadaData() {
     const firstTratativaByTitulo = new Map<string, Date>();
     // Tratativas resolvidas com sucesso (decisão final = retomada / sucesso)
     const tratativasResolvidas: Array<{ titulo: string; cfo: string; motivo: string; decisao: string; valorIsentado: number; data: Date | null }> = [];
-    // Valor isentado por tratativa (campo 'Valor Isentado finalizacao')
-    // Acumulamos por título para depois cruzar somente com churns do período
+    // Valor isentado por tratativa (campo 'Valor Isentado finalizacao' / variantes)
+    // Acumulamos por título normalizado (NFD) — pegamos o MAIOR valor encontrado em
+    // qualquer linha de movimento da tratativa (o histórico costuma repetir o mesmo
+    // valor em várias fases; somar duplicaria). Captura tolerante a variações de nome.
     const valorIsentadoByTitulo = new Map<string, number>();
     const readNum = (v: unknown): number => {
       if (v == null) return 0;
@@ -189,6 +191,29 @@ export function useJornadaData() {
       const n = parseFloat(s);
       return isNaN(n) ? 0 : n;
     };
+    const normKey = (k: string) =>
+      k.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    const normTitulo = (t: string) =>
+      (t || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const readValorIsentadoFromRow = (row: Record<string, unknown>): number => {
+      for (const k of Object.keys(row)) {
+        const nk = normKey(k);
+        if (nk.startsWith('valorisentado')) {
+          const n = readNum(row[k]);
+          if (n > 0) return n / 100; // Pipefy retorna em centavos
+        }
+      }
+      return 0;
+    };
+    // Pré-passagem: captura valor isentado em QUALQUER linha de movimento (não só Fase Atual)
+    for (const row of tratativas) {
+      const v = readValorIsentadoFromRow(row);
+      if (v <= 0) continue;
+      const t = normTitulo(String(row['Título'] || ''));
+      if (!t) continue;
+      const prev = valorIsentadoByTitulo.get(t) || 0;
+      if (v > prev) valorIsentadoByTitulo.set(t, v);
+    }
     const isSucessoDecisao = (d: string): boolean => {
       const s = d.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
       return s.includes('sucesso') || s.includes('retomada') || s.includes('retornou') || s.includes('resolvido') || s.includes('implementada com sucesso');
@@ -207,17 +232,11 @@ export function useJornadaData() {
       // Tratativas finalizadas: checar decisão e valor isentado
       const decisao = (row['Decisao Final'] || '').trim();
       const solucaoSucesso = (row['Solucao Implementada com Sucesso'] || row['Solução Implementada com Sucesso'] || '').trim();
-      // Pipefy retorna campos de moeda em centavos — dividir por 100 para reais
-      const valorIsentado = readNum(
-        row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
-      ) / 100;
+      // Valor isentado já capturado na pré-passagem (qualquer linha de movimento)
+      const valorIsentado = valorIsentadoByTitulo.get(normTitulo(String(row['Título'] || ''))) || 0;
       const finalizacaoDate = parseDate(row['Saída'] || row['Saida'] || row['Data encerramento'] || row['Data de encerramento']) || entrada;
       if (decisao && (isSucessoDecisao(decisao) || /sim/i.test(solucaoSucesso))) {
         tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado, data: finalizacaoDate });
-      }
-      if (valorIsentado > 0) {
-        const t = (row['Título'] || '').trim().toLowerCase();
-        valorIsentadoByTitulo.set(t, (valorIsentadoByTitulo.get(t) || 0) + valorIsentado);
       }
 
       // Store in all-tratativas map (latest wins)
@@ -790,13 +809,25 @@ export function useJornadaData() {
       if (normMotivo(c.motivoChurn) !== 'atendimento o2') continue;
       const churnDate = churnDateByTitulo.get(c.titulo.toLowerCase()) || null;
       if (!churnDate) continue;
-      const valor = valorIsentadoByTitulo.get(c.titulo.toLowerCase()) || 0;
+      const valor = valorIsentadoByTitulo.get(normTitulo(c.titulo)) || 0;
       isentamentos.push({
         titulo: c.titulo,
         cfo: c.cfo,
         motivoChurn: c.motivoChurn,
         valor,
         data: churnDate,
+      });
+    }
+
+    // Diagnóstico temporário — valores isentados capturados
+    if (typeof window !== 'undefined') {
+      const all = Array.from(valorIsentadoByTitulo.entries()).filter(([, v]) => v > 0);
+      console.log('[isentado/diag]', {
+        totalComValor: all.length,
+        amostra: all.slice(0, 20),
+        amora: valorIsentadoByTitulo.get(normTitulo('Amora Distribuidora')) || 0,
+        grupoImagem: valorIsentadoByTitulo.get(normTitulo('Grupo imagem')) || 0,
+        fiagro: valorIsentadoByTitulo.get(normTitulo('Fiagro')) || 0,
       });
     }
 
@@ -813,6 +844,7 @@ export function useJornadaData() {
       diasAteChurn: number;
       motivo: string;
       status: 'churn' | 'ongoing';
+      data: Date | null;
     }> = [];
 
     for (const [tituloLower, tratativaDate] of firstTratativaByTitulo) {
@@ -832,6 +864,7 @@ export function useJornadaData() {
           diasAteChurn: dias,
           motivo: cliente.motivoChurn || '—',
           status: 'churn',
+          data: tratativaDate,
         });
       } else {
         const dias = daysBetween(tratativaDate, now);
@@ -842,6 +875,7 @@ export function useJornadaData() {
           diasAteChurn: dias,
           motivo: 'Em andamento',
           status: 'ongoing',
+          data: tratativaDate,
         });
       }
     }

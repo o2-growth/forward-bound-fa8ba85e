@@ -12,7 +12,7 @@ export interface OperacaoKpisData {
   valorIsentadoTotal: number;
   churnsOxy: Array<{ titulo: string; cfo: string; motivo: string; mrr: number; data?: Date | null }>;
   churnsOxyCount: number;
-  tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string; status?: 'churn' | 'ongoing' }>;
+  tempoTratativaChurn: Array<{ titulo: string; cfo: string; diasAteChurn: number; motivo: string; status?: 'churn' | 'ongoing'; data?: Date | null }>;
   tempoMedioTratativaChurn: number;
   tempoMedianoTratativaChurn: number;
 }
@@ -39,6 +39,23 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
   const churnsOxyFiltered = operacao.churnsOxy.filter(c => inRange(c.data));
   const valorIsentadoFiltered = isentamentosFiltered.reduce((s, i) => s + i.valor, 0);
   const mrrOxyFiltered = churnsOxyFiltered.reduce((s, c) => s + c.mrr, 0);
+
+  // Tempo levantar a mão: universo restrito a tratativas iniciadas no período
+  const tempoFiltered = operacao.tempoTratativaChurn.filter(t => inRange(t.data));
+  const tempoChurnList = tempoFiltered.filter(t => t.status === 'churn');
+  const tempoOngoingCount = tempoFiltered.filter(t => t.status === 'ongoing').length;
+  const tempoMedio = tempoChurnList.length
+    ? Math.round(tempoChurnList.reduce((s, t) => s + t.diasAteChurn, 0) / tempoChurnList.length)
+    : 0;
+  const tempoMediano = tempoChurnList.length
+    ? (() => {
+        const sorted = [...tempoChurnList].sort((a, b) => a.diasAteChurn - b.diasAteChurn);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 === 0
+          ? Math.round((sorted[mid - 1].diasAteChurn + sorted[mid].diasAteChurn) / 2)
+          : sorted[mid].diasAteChurn;
+      })()
+    : 0;
 
   return (
     <TooltipProvider>
@@ -124,21 +141,15 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
                   <p className="font-semibold mb-1">De onde vem:</p>
                   <p>Pipefy → <strong>Tratativas</strong> (campo <code>Entrada</code> da 1ª tratativa do cliente) cruzado com <strong>Central de Projetos</strong> (<code>Data encerramento</code> / <code>Saída</code> do churn).</p>
                   <p className="mt-2 font-semibold">Universo:</p>
-                  <p>Todas as tratativas com 1ª entrada registrada. Se o cliente já virou churn → conta na média/mediana. Se ainda não virou → aparece como "em andamento" (não entra na média).</p>
+                  <p>Apenas tratativas <strong>iniciadas no período selecionado</strong>. Se o cliente já virou churn → conta na média/mediana. Se ainda não virou → aparece como "em andamento" (não entra na média).</p>
                   <p className="mt-2 text-muted-foreground">Clique para ver a lista completa.</p>
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-2xl font-bold">{operacao.tempoMedioTratativaChurn} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
-            {(() => {
-              const churnCount = operacao.tempoTratativaChurn.filter(t => t.status === 'churn').length;
-              const ongoingCount = operacao.tempoTratativaChurn.filter(t => t.status === 'ongoing').length;
-              return (
-                <p className="text-[10px] text-muted-foreground mt-0.5">
-                  mediana {operacao.tempoMedianoTratativaChurn}d · {churnCount} churns · {ongoingCount} em andamento
-                </p>
-              );
-            })()}
+            <p className="text-2xl font-bold">{tempoMedio} <span className="text-sm font-normal text-muted-foreground">dias</span></p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              mediana {tempoMediano}d · {tempoChurnList.length} churns · {tempoOngoingCount} em andamento · {periodLabel}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -181,15 +192,14 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
           <DialogHeader><DialogTitle>Tempo entre levantar a mão e churn</DialogTitle></DialogHeader>
           <div className="text-xs text-muted-foreground mb-3">
-            Média: <strong className="text-foreground">{operacao.tempoMedioTratativaChurn} dias</strong> · Mediana: <strong className="text-foreground">{operacao.tempoMedianoTratativaChurn} dias</strong> · {operacao.tempoTratativaChurn.filter(t => t.status === 'churn').length} churns · {operacao.tempoTratativaChurn.filter(t => t.status === 'ongoing').length} em andamento
-            <p className="mt-1 text-[10px]">Médias calculadas apenas sobre clientes que já viraram churn.</p>
+            Média: <strong className="text-foreground">{tempoMedio} dias</strong> · Mediana: <strong className="text-foreground">{tempoMediano} dias</strong> · {tempoChurnList.length} churns · {tempoOngoingCount} em andamento
+            <p className="mt-1 text-[10px]">Universo: tratativas iniciadas no período selecionado. Médias calculadas apenas sobre clientes que já viraram churn.</p>
           </div>
           <Table>
             <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>CFO</TableHead><TableHead>Status</TableHead><TableHead>Motivo</TableHead><TableHead className="text-right">Dias</TableHead></TableRow></TableHeader>
             <TableBody>
-              {[...operacao.tempoTratativaChurn]
+              {[...tempoFiltered]
                 .sort((a, b) => {
-                  // churns primeiro, depois ongoing; dentro de cada grupo desc por dias
                   if (a.status !== b.status) return a.status === 'churn' ? -1 : 1;
                   return b.diasAteChurn - a.diasAteChurn;
                 })
@@ -208,8 +218,8 @@ export function OperacaoKpisStrip({ operacao, dateRange }: Props) {
                     <TableCell className="text-right">{t.diasAteChurn}d</TableCell>
                   </TableRow>
                 ))}
-              {operacao.tempoTratativaChurn.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa registrada.</TableCell></TableRow>
+              {tempoFiltered.length === 0 && (
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma tratativa iniciada no período.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

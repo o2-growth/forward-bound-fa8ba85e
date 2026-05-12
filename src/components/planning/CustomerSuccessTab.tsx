@@ -456,15 +456,25 @@ function CustomerSuccessTabInner() {
           <TabsContent value="churn" className="mt-4">
             <div className="space-y-8">
               <OperacaoKpisStrip operacao={operacao} dateRange={{ from: csStartDate, to: csEndDate }} />
-              <ChurnDossierSection
-                data={opsData?.churnDossier || []}
-                selectedProdutos={filters.produtos}
-                globalCfos={filters.cfos}
-                activeClientesCount={filteredClientes.length}
-                activeMrr={847892}
-                tratativasResolvidasCount={operacao.tratativasResolvidasCount}
-                globalDateRange={{ from: csStartDate, to: csEndDate }}
-              />
+              {(() => {
+                // Mesma regra do strip: contar resolvidas dentro do período
+                const resolvidasNoPeriodo = (operacao?.tratativasResolvidas || []).filter((t: any) => {
+                  const d = t?.data;
+                  if (!d) return false;
+                  return d >= csStartDate && d <= csEndDate;
+                }).length;
+                return (
+                  <ChurnDossierSection
+                    data={opsData?.churnDossier || []}
+                    selectedProdutos={filters.produtos}
+                    globalCfos={filters.cfos}
+                    activeClientesCount={filteredClientes.length}
+                    activeMrr={847892}
+                    tratativasResolvidasCount={resolvidasNoPeriodo}
+                    globalDateRange={{ from: csStartDate, to: csEndDate }}
+                  />
+                );
+              })()}
             </div>
           </TabsContent>
 
