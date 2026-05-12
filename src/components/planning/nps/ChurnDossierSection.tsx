@@ -556,11 +556,6 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         onClose={() => setAnalysisChurn(null)}
       />
     </div>
-    <Cliente360Drawer
-      cliente={drawerCliente}
-      open={!!drawerCliente}
-      onClose={() => setDrawerCliente(null)}
-    />
     </TooltipProvider>
   );
 }
