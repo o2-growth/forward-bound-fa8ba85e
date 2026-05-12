@@ -232,17 +232,11 @@ export function useJornadaData() {
       // Tratativas finalizadas: checar decisão e valor isentado
       const decisao = (row['Decisao Final'] || '').trim();
       const solucaoSucesso = (row['Solucao Implementada com Sucesso'] || row['Solução Implementada com Sucesso'] || '').trim();
-      // Pipefy retorna campos de moeda em centavos — dividir por 100 para reais
-      const valorIsentado = readNum(
-        row['Valor Isentado finalizacao'] ?? row['Valor Isentado'] ?? row['Valor isentado'] ?? row['Valor Isentado Finalizacao']
-      ) / 100;
+      // Valor isentado já capturado na pré-passagem (qualquer linha de movimento)
+      const valorIsentado = valorIsentadoByTitulo.get(normTitulo(String(row['Título'] || ''))) || 0;
       const finalizacaoDate = parseDate(row['Saída'] || row['Saida'] || row['Data encerramento'] || row['Data de encerramento']) || entrada;
       if (decisao && (isSucessoDecisao(decisao) || /sim/i.test(solucaoSucesso))) {
         tratativasResolvidas.push({ titulo: (row['Título'] || '').trim(), cfo: cfoT, motivo, decisao, valorIsentado, data: finalizacaoDate });
-      }
-      if (valorIsentado > 0) {
-        const t = (row['Título'] || '').trim().toLowerCase();
-        valorIsentadoByTitulo.set(t, (valorIsentadoByTitulo.get(t) || 0) + valorIsentado);
       }
 
       // Store in all-tratativas map (latest wins)
