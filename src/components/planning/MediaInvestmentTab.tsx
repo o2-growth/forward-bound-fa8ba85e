@@ -2678,11 +2678,14 @@ export function MediaInvestmentTab() {
       </div>
 
       {/* Funil de Vendas Projetado 2026 */}
-      <div>
-        <h3 className="font-display text-2xl font-bold mb-6 flex items-center gap-2">
-          <Filter className="h-6 w-6 text-primary" />
-          Funil de Vendas Projetado 2026
-        </h3>
+      <Collapsible defaultOpen={false}>
+        <div>
+          <CollapsibleTrigger className="flex items-center gap-2 mb-6 group hover:opacity-80 transition-opacity w-full">
+            <Filter className="h-6 w-6 text-primary" />
+            <h3 className="font-display text-2xl font-bold">Funil de Vendas Projetado 2026</h3>
+            <ChevronDown className="h-5 w-5 ml-auto transition-transform group-data-[state=open]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
 
         {/* Consolidated Funnel */}
         <div className="mb-8">
