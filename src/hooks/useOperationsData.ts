@@ -346,7 +346,20 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     const dataAssinatura = assinaturaMap.get(card.ID) || card['Data de assinatura do contrato'] || '';
     const saidaDate = parsePipefyDate(trat?.['Saída']);
     const tratEntradaDate = parsePipefyDate(trat?.['Entrada']);
-    const dataEncerramento = saidaDate ? saidaDate.toISOString().split('T')[0] : tratEntradaDate ? tratEntradaDate.toISOString().split('T')[0] : (card['Data encerramento'] || '');
+    // Hierarquia da data de encerramento (prioriza fonte oficial):
+    // 1) Central de Projetos — "Data do churn" (campo manual preenchido pelo CFO)
+    // 2) Central de Projetos — "Data encerramento" (legado)
+    // 3) Tratativa — "Finalizacao contrato ultimo dia"
+    // 4) Tratativa — "Saída" (data em que saiu da fase ativa)
+    // 5) Tratativa — "Entrada" (último recurso: entrada na fase finalizada)
+    // Normaliza tudo para YYYY-MM-DD no fuso America/Sao_Paulo para evitar shift de timezone.
+    const dataEncerramento =
+      toLocalDateBR(card['Data do churn']) ||
+      toLocalDateBR(card['Data encerramento']) ||
+      toLocalDateBR(trat?.['Finalizacao contrato ultimo dia']) ||
+      (saidaDate ? toLocalDateBR(saidaDate) : '') ||
+      (tratEntradaDate ? toLocalDateBR(tratEntradaDate) : '') ||
+      '';
     const mesChurn = trat ? formatMonthYear(trat['Entrada']) : (card['Mes do Churn'] || '');
     const ltMeses = diffInMonths(dataAssinatura, dataEncerramento) || (card['LT (meses)'] || '');
 
