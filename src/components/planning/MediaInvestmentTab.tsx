@@ -780,15 +780,22 @@ function BUInvestmentTable({
                 // Gap = soma de (MRR Base projetado − MRR Base realizado/Oxy) dos meses
                 // que já têm Oxy real disponível. Esse é o valor que precisa ser
                 // realocado manualmente para "A Vender" dos meses futuros.
-                const breakdown = funnelData
-                  .map((d: any) => ({
-                    month: d.month,
-                    projetado: Number(d.mrrBaseProjetado) || 0,
-                    real: Number(d.mrrBase) || 0,
-                    gap: Number(d.mrrBaseGap) || 0,
-                  }))
-                  .filter(b => Math.abs(b.gap) > 1);
-                const gap = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
+                 const breakdown = funnelData.map((d: any) => {
+                   const projetado = Number(d.mrrBaseProjetado) || 0;
+                   const gapMes = Number(d.mrrBaseGap) || 0;
+                   // Tem Oxy real quando gap !== 0 OU quando mrrBase difere do projetado.
+                   // Para meses futuros, mrrBase === projetado e gap === 0 → fonte = Projeção.
+                   const mrrBaseAtual = Number(d.mrrBase) || 0;
+                   const temOxy = Math.abs(gapMes) > 0.5 || (mrrBaseAtual > 0 && Math.abs(mrrBaseAtual - projetado) > 0.5);
+                   return {
+                     month: d.month,
+                     projetado,
+                     real: temOxy ? mrrBaseAtual : projetado,
+                     gap: gapMes,
+                     fonte: temOxy ? 'Oxy' : 'Projeção' as 'Oxy' | 'Projeção',
+                   };
+                 });
+                 const gap = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
                 const isResolved = gap < 1;
                 return (
                   <TableRow className={isResolved ? 'bg-emerald-500/10' : 'bg-destructive/10'}>

@@ -1,52 +1,32 @@
-
 ## Objetivo
-Usar a tabela `mrr_base_monthly` como **fonte única de verdade** do MRR Base na tabela do Modelo Atual (Plan Growth), em vez de derivar de seed projetado com churn.
+Expandir o popover do "Gap a Realocar" para listar todos os 12 meses do ano, mostrando MRR projetado, MRR real (Oxy quando fechado, projeção quando futuro) e Δ.
 
-## Valores reais já no banco (2026)
-- Jan: R$ 705.268,07
-- Fev: R$ 746.847,17
-- Mar: R$ 733.281,13
-- Abr: R$ 700.152,57
-- Mai a Dez: ainda não existem na tabela
+## Mudança única
+Arquivo: `src/components/planning/MediaInvestmentTab.tsx` (bloco do popover, ~linhas 778–861).
 
-## Comportamento
+### Comportamento novo do `breakdown`
+- Em vez de filtrar `Math.abs(gap) > 1`, mapear **todos os 12 meses** do `funnelData`.
+- Para cada mês, definir `tipoFonte`:
+  - **"Oxy"** quando o mês tem `mrrBase` real (`mrrBaseGap !== 0` ou flag de fechado): coluna "Real" = `mrrBase`.
+  - **"Projeção"** quando não tem Oxy: coluna "Real" = `mrrBaseProjetado` (a chain já calculada com 0,95 + 25% das vendas anteriores).
+- `gap` continua sendo `mrrBaseGap` (0 para meses futuros).
 
-**Coluna "MRR Base" do Modelo Atual:**
-1. Para cada mês, ler diretamente de `mrr_base_monthly` (via hook `useMrrBase` já existente).
-2. Se o mês existe na tabela → usar o valor exato (real Oxy).
-3. Se não existe (meses futuros, hoje Mai–Dez/26) → projetar a partir do **último mês disponível** aplicando **5% de churn ao mês**:
-   - Mai/26 = Abr × 0,95 = R$ 665.145
-   - Jun/26 = Mai × 0,95
-   - … e assim por diante até Dez/26.
+### UI do popover
+- Adicionar nova coluna "Fonte" (badge pequeno: `Oxy` cinza / `Projeção` outline).
+- Linhas com Δ=0 ficam em cinza claro (sem destaque vermelho/verde).
+- Total a realocar continua somando só gaps positivos dos meses Oxy.
+- Rodapé atualizado: *"Meses fechados usam Oxy. Meses futuros usam projeção (MRR anterior × 0,95 + 25% das vendas anteriores)."*
+- Aumentar largura do popover de `w-[420px]` para `w-[480px]` para caber a coluna extra.
+- Adicionar `max-h-[420px]` para suportar 12 linhas.
 
-**Coluna "Gap"** (badge ⚠️ por mês):
-- Continua mostrando diferença entre o MRR Base atual e o que seria a projeção pura desde Jan (mês × 0,95). Serve só para sinalizar variações vs. modelo teórico.
+### Sem mudanças em
+- Cálculo de `mrrBaseGap` no useMemo (linhas ~1480–1546).
+- Hook `usePlanGrowthData`.
+- Banco de dados, Edge Functions, outros componentes.
 
-**Linha "Gap a Realocar" (abaixo de Dezembro):**
-- Mantém comportamento atual: soma os gaps dos meses fechados, mostrando saldo a realocar manualmente em "A Vender".
-
-## Reversibilidade
-- Os arquivos `.bak-2026-05-12` de `MediaInvestmentTab.tsx` e `usePlanGrowthData.ts` permanecem. Backup do `mrr_base_monthly_backup_20260512_pre_churn` está intacto.
-- Nenhuma escrita em banco — só mudança de leitura no frontend.
-
-## Arquivos a alterar (frontend apenas)
-
-### `src/hooks/usePlanGrowthData.ts`
-- Importar `useMrrBase` (já existe).
-- Substituir o atual cálculo de `mrrBaseRealPorMes` (que faz `seed × 0,95` e depois aplica churn) por:
-  - Para Jan–Dez/2026: `getMrrBaseForMonth(month, 2026)`.
-  - Se `0` (não existe): pegar o último mês com valor e aplicar `× 0,95^n`.
-- Remover a constante local `CHURN_OXY = 0.05` da derivação inicial (ainda usada para projetar futuro).
-
-### `src/components/planning/MediaInvestmentTab.tsx`
-- Mesma mudança no cálculo de `mrrBaseRealPorMes` (linhas ~1091–1108).
-- A coluna "MRR Base" continua exibindo o valor real (já implementado nas linhas ~1418–1473).
-- A linha "Gap a Realocar" e gauges não mudam.
-
-## Validações
-- Mar/26 deve mostrar **R$ 733.281** (não R$ 709.504).
-- Abr/26 deve mostrar **R$ 700.153** (não R$ 696.617).
-- Mai/26 (futuro) projeta = R$ 700.153 × 0,95 = **R$ 665.145**.
-- Total anual e Gap Row recalculam automaticamente.
-
-Sem alterações em banco, edge functions ou outros componentes.
+## Validação
+- Jan/Fev → Real = Oxy, Δ pequeno (sincronizado).
+- Mar/26 → Real = R$ 733.281 (Oxy), Δ destacado se ≠ projetado.
+- Abr/26 → Real = R$ 700.153 (Oxy), Δ destacado.
+- Mai–Dez/26 → Real = projeção (Abr × 0,95^n + acumulado das vendas), Δ = R$ 0, fonte "Projeção".
+- Total a realocar inalterado (só conta gaps Oxy positivos).
