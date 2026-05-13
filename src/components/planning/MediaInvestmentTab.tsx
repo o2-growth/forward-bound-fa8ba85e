@@ -1517,13 +1517,14 @@ export function MediaInvestmentTab() {
           vendas: fixed.vendas ?? d.vendas,
           mrrBaseProjetado: projetado,
           mrrBaseGap: realMrr > 0 ? projetado - realMrr : 0,
+          hasOxyReal: realMrr > 0,
           aVenderOriginal,
         };
       }
 
       // Mês não locked sem Oxy real: usa só projetado
       if (!(realMrr > 0)) {
-        return { ...d, mrrBaseProjetado: projetado, mrrBaseGap: 0, aVenderOriginal };
+        return { ...d, mrrBaseProjetado: projetado, mrrBaseGap: 0, hasOxyReal: false, aVenderOriginal };
       }
 
       // Mês não locked com Oxy real: recalcula A Vender + funil baseado no REAL,
