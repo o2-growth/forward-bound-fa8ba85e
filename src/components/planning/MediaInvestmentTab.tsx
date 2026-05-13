@@ -1434,6 +1434,33 @@ export function MediaInvestmentTab() {
     [mrrInicial, churnMensal, retencaoVendas, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.ticketMedio, valorVenderInicial]
   );
 
+  // MRR Base real por mês:
+  // - Meses com valor real em mrr_base_monthly: usa o valor real (Oxy).
+  // - Meses sem valor real: cascata = anterior × (1 − churn) + retenção × A Vender (do plano) do mês anterior.
+  const mrrBaseRealPorMes = useMemo(() => {
+    const MONTHS_ORDER = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const PLAN_YEAR = 2026;
+    const lookup = new Map<string, number>();
+    (mrrBaseData || []).forEach((r: any) => {
+      lookup.set(`${r.year}-${r.month}`, Number(r.value) || 0);
+    });
+    const map: Record<string, number> = {};
+    let lastKnown = 0;
+    MONTHS_ORDER.forEach((m, idx) => {
+      const real = lookup.get(`${PLAN_YEAR}-${m}`) || 0;
+      if (real > 0) {
+        map[m] = real;
+        lastKnown = real;
+      } else if (lastKnown > 0) {
+        const mesAnterior = idx > 0 ? MONTHS_ORDER[idx - 1] : null;
+        const aVenderAnterior = mesAnterior ? (mrrDynamic.revenueToSell[mesAnterior] || 0) : 0;
+        map[m] = lastKnown * (1 - CHURN_OXY) + RETENCAO_OXY * aVenderAnterior;
+        lastKnown = map[m];
+      }
+    });
+    return map;
+  }, [mrrBaseData, mrrDynamic]);
+
   // Receitas outras BUs - prioritize DB, fallback to calculated values
   const o2TaxMonthly = useMemo(() => {
     const dbMetas = getDbMetasForBU('o2_tax');
