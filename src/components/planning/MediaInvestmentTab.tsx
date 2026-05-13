@@ -1177,29 +1177,7 @@ export function MediaInvestmentTab() {
     return set;
   }, [mrrBaseData]);
 
-  const mrrBaseRealPorMes = useMemo(() => {
-    const MONTHS_ORDER = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const PLAN_YEAR = 2026;
-    const lookup = new Map<string, number>();
-    (mrrBaseData || []).forEach((r: any) => {
-      lookup.set(`${r.year}-${r.month}`, Number(r.value) || 0);
-    });
-    const map: Record<string, number> = {};
-    let lastKnown = 0;
-    let monthsSinceKnown = 0;
-    MONTHS_ORDER.forEach((m) => {
-      const real = lookup.get(`${PLAN_YEAR}-${m}`) || 0;
-      if (real > 0) {
-        map[m] = real;
-        lastKnown = real;
-        monthsSinceKnown = 0;
-      } else if (lastKnown > 0) {
-        monthsSinceKnown += 1;
-        map[m] = lastKnown * Math.pow(1 - CHURN_OXY, monthsSinceKnown);
-      }
-    });
-    return map;
-  }, [mrrBaseData]);
+  // mrrBaseRealPorMes é definido depois de mrrDynamic (precisa do A Vender do plano)
 
   // Estados editáveis - Taxas gerais (Modelo Atual)
   const [mrrInicial, setMrrInicial] = useState(700000);
