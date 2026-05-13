@@ -1161,8 +1161,9 @@ export function MediaInvestmentTab() {
   const queryClient = useQueryClient();
 
   // MRR Base por mês — fonte da verdade: tabela mrr_base_monthly.
-  // Meses futuros sem valor: projeta do último conhecido com churn 5% a.m.
+  // Meses futuros sem valor: projeta em cascata = anterior × (1 − churn) + retenção × A Vender do mês anterior.
   const CHURN_OXY = 0.05;
+  const RETENCAO_OXY = 0.25;
   // Set de meses com Oxy REAL (presente em mrr_base_monthly), separado dos
   // meses projetados por churn. Usado para o badge "Oxy" vs "Projeção".
   const mrrBaseRealMonthsSet = useMemo(() => {
