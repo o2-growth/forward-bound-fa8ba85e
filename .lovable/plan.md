@@ -1,19 +1,60 @@
-Plano para corrigir o popover de “Gap a Realocar”:
+## Objetivo
 
-1. Separar “valor real vindo da Oxy” de “valor projetado por churn”
-   - Hoje `mrrBaseRealPorMes` mistura os dois: quando não existe valor real no banco, ele preenche o mês futuro com projeção.
-   - Isso faz `hasOxyReal` ficar verdadeiro em Mai–Dez, porque `realMrr > 0` também vale para projeções.
+Corrigir o cálculo de `mrrBaseRealPorMes` para que os meses sem dado real da Oxy (Mai/2026 em diante) usem a fórmula:
 
-2. Criar um mapa explícito de presença real
-   - Manter o valor projetado para os cálculos que dependem dele.
-   - Adicionar um mapa/flag separado, por mês, indicando se existe registro real em `mrr_base_monthly`.
-   - O badge “Oxy” usará somente essa flag real, não o valor projetado.
+```
+projetado[m] = projetado[m-1] × (1 − 5%) + 25% × aVender[m-1]
+```
 
-3. Ajustar o Modelo Atual no `MediaInvestmentTab.tsx`
-   - Para meses com registro real: mostrar “Oxy” e calcular Δ = projetado − real.
-   - Para meses sem registro real: mostrar “Projeção”, Δ = R$ 0, e usar a chain corrigida como exibido.
+usando como `aVender[m-1]` o valor de **"A Vender" do plano** (mesma fonte exibida na tabela do Modelo Atual).
 
-4. Validar o resultado esperado
-   - Jan–Abr: “Oxy” se houver registro real.
-   - Mai–Dez: “Projeção”, sem Δ a realocar.
-   - O total a realocar considera apenas meses realmente fechados com dado da Oxy.
+## Resultado esperado para Mai/2026
+
+- Real Abr (Oxy) = R$ 700.153
+- A Vender Abr (do plano) = X
+- Mai = 700.153 × 0,95 + 0,25 × X = 665.145 + 0,25 × X
+
+E a mesma regra propaga em cascata para Jun → Dez, cada mês adicionando 25% do A Vender do mês anterior.
+
+## Mudanças
+
+### Arquivo único: `src/components/planning/MediaInvestmentTab.tsx`
+
+**1. Ajustar `mrrBaseRealPorMes` (linhas 1180–1202)**
+
+Trocar a projeção churn-only (`lastKnown × (1-churn)^n`) por uma cascata mês a mês que aplica retenção de vendas:
+
+```ts
+const RETENCAO_OXY = 0.25;
+let lastKnown = 0;
+MONTHS_ORDER.forEach((m, idx) => {
+  const real = lookup.get(`${PLAN_YEAR}-${m}`) || 0;
+  if (real > 0) {
+    map[m] = real;
+    lastKnown = real;
+  } else if (lastKnown > 0) {
+    const mesAnterior = MONTHS_ORDER[idx - 1];
+    const aVenderAnterior = mrrDynamic.revenueToSell[mesAnterior] || 0;
+    map[m] = lastKnown * (1 - CHURN_OXY) + RETENCAO_OXY * aVenderAnterior;
+    lastKnown = map[m];
+  }
+});
+```
+
+**2. Adicionar `mrrDynamic` como dependência do `useMemo`**
+
+A fonte `mrrDynamic.revenueToSell` já existe (linha 1446/1486) e representa o "A Vender do plano" antes do recálculo com Oxy real — exatamente o valor pedido. Adicionar `mrrDynamic` ao array de dependências.
+
+**3. Não mexer em**:
+- `mrrBaseRealMonthsSet` (badge "Oxy" continua só para meses com dado real).
+- `applyPendingToFunnel` (continua sem sobrescrever `mrrBase`).
+- `Δ Gap a Realocar` permanece R$ 0 em Mai+ (não há real para comparar).
+
+## Validação
+
+Após a mudança, abrir o popover em Mai/2026 e conferir:
+- Badge "Projeção" (não "Oxy").
+- Valor projetado ≈ 665.145 + 25% × A Vender de Abr.
+- Cascata para Jun usa o novo Mai como base + 25% × A Vender de Mai.
+
+Sem mudanças de UI, sem mudanças de schema, sem novos hooks.

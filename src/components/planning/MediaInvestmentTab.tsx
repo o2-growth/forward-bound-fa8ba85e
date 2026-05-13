@@ -1161,8 +1161,9 @@ export function MediaInvestmentTab() {
   const queryClient = useQueryClient();
 
   // MRR Base por mês — fonte da verdade: tabela mrr_base_monthly.
-  // Meses futuros sem valor: projeta do último conhecido com churn 5% a.m.
+  // Meses futuros sem valor: projeta em cascata = anterior × (1 − churn) + retenção × A Vender do mês anterior.
   const CHURN_OXY = 0.05;
+  const RETENCAO_OXY = 0.25;
   // Set de meses com Oxy REAL (presente em mrr_base_monthly), separado dos
   // meses projetados por churn. Usado para o badge "Oxy" vs "Projeção".
   const mrrBaseRealMonthsSet = useMemo(() => {
@@ -1176,29 +1177,7 @@ export function MediaInvestmentTab() {
     return set;
   }, [mrrBaseData]);
 
-  const mrrBaseRealPorMes = useMemo(() => {
-    const MONTHS_ORDER = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-    const PLAN_YEAR = 2026;
-    const lookup = new Map<string, number>();
-    (mrrBaseData || []).forEach((r: any) => {
-      lookup.set(`${r.year}-${r.month}`, Number(r.value) || 0);
-    });
-    const map: Record<string, number> = {};
-    let lastKnown = 0;
-    let monthsSinceKnown = 0;
-    MONTHS_ORDER.forEach((m) => {
-      const real = lookup.get(`${PLAN_YEAR}-${m}`) || 0;
-      if (real > 0) {
-        map[m] = real;
-        lastKnown = real;
-        monthsSinceKnown = 0;
-      } else if (lastKnown > 0) {
-        monthsSinceKnown += 1;
-        map[m] = lastKnown * Math.pow(1 - CHURN_OXY, monthsSinceKnown);
-      }
-    });
-    return map;
-  }, [mrrBaseData]);
+  // mrrBaseRealPorMes é definido depois de mrrDynamic (precisa do A Vender do plano)
 
   // Estados editáveis - Taxas gerais (Modelo Atual)
   const [mrrInicial, setMrrInicial] = useState(700000);
@@ -1454,6 +1433,33 @@ export function MediaInvestmentTab() {
     ),
     [mrrInicial, churnMensal, retencaoVendas, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.ticketMedio, valorVenderInicial]
   );
+
+  // MRR Base real por mês:
+  // - Meses com valor real em mrr_base_monthly: usa o valor real (Oxy).
+  // - Meses sem valor real: cascata = anterior × (1 − churn) + retenção × A Vender (do plano) do mês anterior.
+  const mrrBaseRealPorMes = useMemo(() => {
+    const MONTHS_ORDER = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    const PLAN_YEAR = 2026;
+    const lookup = new Map<string, number>();
+    (mrrBaseData || []).forEach((r: any) => {
+      lookup.set(`${r.year}-${r.month}`, Number(r.value) || 0);
+    });
+    const map: Record<string, number> = {};
+    let lastKnown = 0;
+    MONTHS_ORDER.forEach((m, idx) => {
+      const real = lookup.get(`${PLAN_YEAR}-${m}`) || 0;
+      if (real > 0) {
+        map[m] = real;
+        lastKnown = real;
+      } else if (lastKnown > 0) {
+        const mesAnterior = idx > 0 ? MONTHS_ORDER[idx - 1] : null;
+        const aVenderAnterior = mesAnterior ? (mrrDynamic.revenueToSell[mesAnterior] || 0) : 0;
+        map[m] = lastKnown * (1 - CHURN_OXY) + RETENCAO_OXY * aVenderAnterior;
+        lastKnown = map[m];
+      }
+    });
+    return map;
+  }, [mrrBaseData, mrrDynamic]);
 
   // Receitas outras BUs - prioritize DB, fallback to calculated values
   const o2TaxMonthly = useMemo(() => {
