@@ -1501,6 +1501,7 @@ export function MediaInvestmentTab() {
 
     return calculated.map(d => {
       const realMrr = mrrBaseRealPorMes[d.month];
+      const isRealOxy = mrrBaseRealMonthsSet.has(d.month);
       const fixed = fixedRows.find(f => f.month === d.month);
       const isLocked = fixed?.is_locked === true;
       const projetado = d.mrrBase; // chain projetada (vinda do hook)
@@ -1527,19 +1528,19 @@ export function MediaInvestmentTab() {
           propostas: fixed.propostas ?? d.propostas,
           vendas: fixed.vendas ?? d.vendas,
           mrrBaseProjetado: projetado,
-          mrrBaseGap: realMrr > 0 ? projetado - realMrr : 0,
-          hasOxyReal: realMrr > 0,
+          mrrBaseGap: isRealOxy && realMrr > 0 ? projetado - realMrr : 0,
+          hasOxyReal: isRealOxy,
           aVenderOriginal,
         };
       }
 
       // Mês não locked sem Oxy real: usa só projetado
-      if (!(realMrr > 0)) {
+      if (!isRealOxy || !(realMrr > 0)) {
         return { ...d, mrrBaseProjetado: projetado, mrrBaseGap: 0, hasOxyReal: false, aVenderOriginal };
       }
 
       // Mês não locked com Oxy real: recalcula A Vender + funil baseado no REAL,
-      // e a coluna mrrBase passa a exibir o REAL (Oxy − churn). Gap fica no badge.
+      // e a coluna mrrBase passa a exibir o REAL. Gap fica no badge.
       const mm = metricsByMonthPorBU.modeloAtual[d.month] ?? m;
       const tm = mm.ticketMedio || ticketMedio;
       const novoVender = Math.max(0, d.faturamentoMeta - realMrr);
@@ -1568,7 +1569,7 @@ export function MediaInvestmentTab() {
         aVenderOriginal,
       };
     });
-  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, hasFunnelForBU, getFunnelForBU, metricsByMonthPorBU]);
+  }, [mrrDynamic, funnelMetrics.modeloAtual, metasMensaisModeloAtual, indicadoresPorBU.modeloAtual.cpv, indicadoresPorBU.modeloAtual.ticketMedio, mrrBaseRealPorMes, mrrBaseRealMonthsSet, hasFunnelForBU, getFunnelForBU, metricsByMonthPorBU]);
   
   // Override: se funnel_metas tem investimento=0 e is_locked=false para a BU/mês,
   // força investimento=0 no display (decisão estratégica de zerar Oxy Hacker e O2 TAX).
