@@ -782,17 +782,15 @@ function BUInvestmentTable({
                 // realocado manualmente para "A Vender" dos meses futuros.
                  const breakdown = funnelData.map((d: any) => {
                    const projetado = Number(d.mrrBaseProjetado) || 0;
-                   const gapMes = Number(d.mrrBaseGap) || 0;
-                   // Tem Oxy real quando gap !== 0 OU quando mrrBase difere do projetado.
-                   // Para meses futuros, mrrBase === projetado e gap === 0 → fonte = Projeção.
                    const mrrBaseAtual = Number(d.mrrBase) || 0;
-                   const temOxy = Math.abs(gapMes) > 0.5 || (mrrBaseAtual > 0 && Math.abs(mrrBaseAtual - projetado) > 0.5);
+                   const temOxy = !!d.hasOxyReal;
+                   // Para meses de Projeção, "projetado" e "real" são a mesma chain → Δ = 0
                    return {
                      month: d.month,
-                     projetado,
-                     real: temOxy ? mrrBaseAtual : projetado,
-                     gap: gapMes,
-                     fonte: temOxy ? 'Oxy' : 'Projeção' as 'Oxy' | 'Projeção',
+                     projetado: temOxy ? projetado : mrrBaseAtual,
+                     real: mrrBaseAtual,
+                     gap: temOxy ? Number(d.mrrBaseGap) || 0 : 0,
+                     fonte: (temOxy ? 'Oxy' : 'Projeção') as 'Oxy' | 'Projeção',
                    };
                  });
                  const gap = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
