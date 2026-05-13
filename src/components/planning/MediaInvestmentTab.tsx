@@ -1553,6 +1553,7 @@ export function MediaInvestmentTab() {
         investimento,
         mrrBaseProjetado: projetado,
         mrrBaseGap: projetado - realMrr,
+        hasOxyReal: true,
         aVenderOriginal,
       };
     });
