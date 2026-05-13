@@ -1163,6 +1163,19 @@ export function MediaInvestmentTab() {
   // MRR Base por mês — fonte da verdade: tabela mrr_base_monthly.
   // Meses futuros sem valor: projeta do último conhecido com churn 5% a.m.
   const CHURN_OXY = 0.05;
+  // Set de meses com Oxy REAL (presente em mrr_base_monthly), separado dos
+  // meses projetados por churn. Usado para o badge "Oxy" vs "Projeção".
+  const mrrBaseRealMonthsSet = useMemo(() => {
+    const PLAN_YEAR = 2026;
+    const set = new Set<string>();
+    (mrrBaseData || []).forEach((r: any) => {
+      if (Number(r?.year) === PLAN_YEAR && Number(r?.value) > 0) {
+        set.add(String(r.month));
+      }
+    });
+    return set;
+  }, [mrrBaseData]);
+
   const mrrBaseRealPorMes = useMemo(() => {
     const MONTHS_ORDER = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
     const PLAN_YEAR = 2026;
