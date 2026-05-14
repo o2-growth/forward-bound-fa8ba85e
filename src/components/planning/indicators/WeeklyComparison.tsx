@@ -101,11 +101,23 @@ function getSdrName(item: DetailItem): { display: string; group: string } {
   return { display: raw, group: raw.toLowerCase() };
 }
 
+function getCloserName(item: DetailItem): { display: string; group: string } {
+  const raw = (item.closer || "").trim();
+  if (!raw) return { display: "Sem Closer", group: "__none__" };
+  return { display: raw, group: raw.toLowerCase() };
+}
+
+type PersonRole = 'sdr' | 'closer';
+function getPersonName(item: DetailItem, role: PersonRole) {
+  return role === 'sdr' ? getSdrName(item) : getCloserName(item);
+}
+
 interface SdrBreakdownProps {
   itemsByIndicator: Record<string, DetailItem[]>;
   startDate: Date;
   endDate: Date;
   indicatorConfigs: IndicatorConfig[];
+  role?: PersonRole; // default 'sdr'
 }
 
 function aggregateSdrCounts(
@@ -113,6 +125,7 @@ function aggregateSdrCounts(
   columns: { key: IndicatorType; label: string }[],
   startTime: number,
   endTime: number,
+  role: PersonRole = 'sdr',
 ): Map<string, { display: string; counts: Record<string, number> }> {
   const groups = new Map<string, { display: string; counts: Record<string, number> }>();
   for (const col of columns) {
@@ -121,7 +134,7 @@ function aggregateSdrCounts(
       if (!item.date) continue;
       const t = new Date(item.date).getTime();
       if (t < startTime || t > endTime) continue;
-      const { display, group } = getSdrName(item);
+      const { display, group } = getPersonName(item, role);
       const existing = groups.get(group);
       if (existing) {
         existing.counts[col.key] = (existing.counts[col.key] || 0) + 1;
@@ -136,7 +149,8 @@ function aggregateSdrCounts(
   return groups;
 }
 
-function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }: SdrBreakdownProps) {
+function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs, role = 'sdr' }: SdrBreakdownProps) {
+  const roleLabel = role === 'sdr' ? 'SDR' : 'Closer';
   const startTime = startDate.getTime();
   const endTime = new Date(
     endDate.getFullYear(),
@@ -150,14 +164,14 @@ function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }
   const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
   if (columns.length === 0) return null;
 
-  const groups = aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime);
+  const groups = aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime, role);
 
   if (groups.size === 0) {
     return (
       <div className="border rounded-lg p-3">
-        <div className="text-sm font-semibold mb-1">Por SDR</div>
+        <div className="text-sm font-semibold mb-1">Por {roleLabel}</div>
         <div className="text-xs text-muted-foreground">
-          Sem dados de SDR no período selecionado.
+          Sem dados de {roleLabel} no período selecionado.
         </div>
       </div>
     );
@@ -178,16 +192,16 @@ function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs }
   return (
     <div className="border rounded-lg overflow-hidden">
       <div className="px-3 py-2 border-b bg-muted/40">
-        <div className="text-sm font-semibold">Por SDR (período completo)</div>
+        <div className="text-sm font-semibold">Por {roleLabel} (período completo)</div>
         <div className="text-xs text-muted-foreground">
-          Quantidade de cards por SDR responsável no intervalo selecionado.
+          Quantidade de cards por {roleLabel} responsável no intervalo selecionado.
         </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/20">
-              <th className="text-left px-3 py-2 font-medium text-muted-foreground">SDR</th>
+              <th className="text-left px-3 py-2 font-medium text-muted-foreground">{roleLabel}</th>
               {columns.map(col => (
                 <th
                   key={col.key}
@@ -229,11 +243,13 @@ interface SdrBreakdownWeeklyProps {
   weeks: WeekRange[];
   itemsByIndicator: Record<string, DetailItem[]>;
   indicatorConfigs: IndicatorConfig[];
+  role?: PersonRole; // default 'sdr'
 }
 
-function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs }: SdrBreakdownWeeklyProps) {
+function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs, role = 'sdr' }: SdrBreakdownWeeklyProps) {
   const presentKeys = new Set(indicatorConfigs.map(c => c.key));
   const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
+  const roleLabel = role === 'sdr' ? 'SDR' : 'Closer';
 
   const [activeIndicator, setActiveIndicator] = useState<IndicatorType | null>(
     columns[0]?.key ?? null
@@ -244,7 +260,7 @@ function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs }: SdrBr
   const weeklyAggregates = weeks.map(week => {
     const startTime = week.start.getTime();
     const endTime = week.end.getTime();
-    return aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime);
+    return aggregateSdrCounts(itemsByIndicator, columns, startTime, endTime, role);
   });
 
   // sdrGroup -> { display, perWeek: number[] }
@@ -279,9 +295,9 @@ function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs }: SdrBr
     <div className="border rounded-lg overflow-hidden">
       <div className="px-3 py-2 border-b bg-muted/40 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-sm font-semibold">Por SDR — comparativo semanal</div>
+          <div className="text-sm font-semibold">Por {roleLabel} — comparativo semanal</div>
           <div className="text-xs text-muted-foreground">
-            {activeLabel} por SDR em cada semana, com variação vs. semana anterior.
+            {activeLabel} por {roleLabel} em cada semana, com variação vs. semana anterior.
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -312,7 +328,7 @@ function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs }: SdrBr
 
       {!hasAnyData ? (
         <div className="px-3 py-4 text-xs text-muted-foreground text-center">
-          Sem dados de SDR no período selecionado.
+          Sem dados de {roleLabel} no período selecionado.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -320,7 +336,7 @@ function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs }: SdrBr
             <thead>
               <tr className="border-b bg-muted/20">
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground sticky left-0 bg-muted/20 z-10 min-w-[140px]">
-                  SDR
+                  {roleLabel}
                 </th>
                 {weeks.map(week => (
                   <th
@@ -518,6 +534,7 @@ export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicat
               startDate={startDate}
               endDate={endDate}
               indicatorConfigs={indicatorConfigs}
+              role="sdr"
             />
 
             {/* Breakdown por SDR semana a semana */}
@@ -525,6 +542,24 @@ export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicat
               weeks={weeks}
               itemsByIndicator={allItemsByIndicator}
               indicatorConfigs={indicatorConfigs}
+              role="sdr"
+            />
+
+            {/* Breakdown por Closer (RM, RR, Proposta, Venda) — período completo */}
+            <SdrBreakdown
+              itemsByIndicator={allItemsByIndicator}
+              startDate={startDate}
+              endDate={endDate}
+              indicatorConfigs={indicatorConfigs}
+              role="closer"
+            />
+
+            {/* Breakdown por Closer semana a semana */}
+            <SdrBreakdownWeekly
+              weeks={weeks}
+              itemsByIndicator={allItemsByIndicator}
+              indicatorConfigs={indicatorConfigs}
+              role="closer"
             />
 
             {/* Grouped bar chart */}
