@@ -23,7 +23,7 @@ export const BU_CLOSERS: Record<BuType, readonly CloserType[]> = {
   modelo_atual: ['Pedro Albite', 'Daniel Trindade', 'Thiago', 'Amanda Serafim', 'Bruna'],
   o2_tax: ['Lucas Ilha'],
   oxy_hacker: ['Pedro Albite', 'Daniel Trindade'],
-  franquia: ['Pedro Albite', 'Daniel Trindade'],
+  franquia: ['Pedro Albite', 'Daniel Trindade', 'Bruna'],
 } as const;
 
 // Helper function to get closers for a specific BU

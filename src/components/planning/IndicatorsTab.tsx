@@ -85,11 +85,12 @@ const buOptions: MultiSelectOption[] = [
 ];
 
 // SDR mapping by BU
+// Bruna atua tanto como SDR quanto como Closer no time de Franquia.
 const BU_SDRS: Record<BuType, string[]> = {
   modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Matheus', 'Ana'],
   o2_tax: ['Carlos'],
   oxy_hacker: ['Carlos'],
-  franquia: ['Carlos'],
+  franquia: ['Carlos', 'Bruna'],
 };
 
 // SDR options for MultiSelect
@@ -99,6 +100,7 @@ const sdrOptions: MultiSelectOption[] = [
   { value: 'Amanda', label: 'Amanda' },
   { value: 'Matheus', label: 'Matheus' },
   { value: 'Ana', label: 'Ana' },
+  { value: 'Bruna', label: 'Bruna (Franquia)' },
 ];
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -1013,6 +1015,55 @@ export function IndicatorsTab() {
   };
 
   const buildChartData = (indicator: IndicatorConfig) => {
+    // Helper: agrupa cards (com filtro de closer/SDR aplicado) na mesma granularidade
+    // do gráfico. Usado quando há filtro de closer/SDR ativo — caso contrário, o
+    // gráfico cai no caminho original (getXxxGroupedData) que é mais barato.
+    const hasPeopleFilter = effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0;
+    const buildQtyArrayFromFilteredCards = (
+      cards: Array<{ dataEntrada: Date; closer?: string | null; responsavel?: string | null; sdr?: string | null; responsible?: string | null }>,
+      personRole: 'closer' | 'sdr' | 'both' = 'both'
+    ): number[] => {
+      const filtered = cards.filter((card: any) => {
+        const cardCloser = card.closer ?? null;
+        const cardSdr = card.sdr ?? card.responsavel ?? card.responsible ?? null;
+        const matchCloser = effectiveSelectedClosers.length === 0 || (personRole !== 'sdr' && matchesCloserFilter(cardCloser));
+        const matchSdr = effectiveSelectedSDRs.length === 0 || (personRole !== 'closer' && matchesSdrFilter(cardSdr));
+        return matchCloser && matchSdr;
+      });
+      const countInRange = (startTs: number, endTs: number) =>
+        filtered.filter((c: any) => {
+          const t = c.dataEntrada instanceof Date ? c.dataEntrada.getTime() : new Date(c.dataEntrada).getTime();
+          return t >= startTs && t <= endTs;
+        }).length;
+      const out: number[] = [];
+      if (grouping === 'daily') {
+        const days = eachDayOfInterval({ start: startDate, end: endDate });
+        for (const day of days) {
+          const s = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+          const e = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59, 999).getTime();
+          out.push(countInRange(s, e));
+        }
+      } else if (grouping === 'weekly') {
+        const numWeeks = chartLabels.length;
+        for (let i = 0; i < numWeeks; i++) {
+          const ws = addDays(startDate, i * 7);
+          const we = i === numWeeks - 1 ? endDate : addDays(ws, 6);
+          const s = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate()).getTime();
+          const e = new Date(we.getFullYear(), we.getMonth(), we.getDate(), 23, 59, 59, 999).getTime();
+          out.push(countInRange(s, e));
+        }
+      } else {
+        const months = eachMonthOfInterval({ start: startDate, end: endDate });
+        for (const m of months) {
+          const ms = new Date(m.getFullYear(), m.getMonth(), 1).getTime();
+          const last = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+          const me = new Date(last.getFullYear(), last.getMonth(), last.getDate(), 23, 59, 59, 999).getTime();
+          out.push(countInRange(ms, me));
+        }
+      }
+      return out;
+    };
+
     const getProratedMetaSeries = (totalMetaPeriodo: number): number[] => {
       if (totalMetaPeriodo <= 0) return [];
       const metaPorDia = totalMetaPeriodo / daysInPeriod;
@@ -1039,13 +1090,18 @@ export function IndicatorsTab() {
     // For single BU selection - Franquia
     if (hasSingleBU && includesFranquia) {
       const expansaoData = getExpansaoGroupedData(indicator.key as ExpansaoIndicator, startDate, endDate, grouping);
-      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData?.franquia, indicator.key, startDate, endDate, 'franquia', undefined, sdrFilterForBU('franquia'));
-      const metaPeriodo = calcularMetaDoPeriodo(funnelData?.franquia, indicator.key, startDate, endDate, 'franquia', undefined, sdrFilterForBU('franquia'));
+      const closerFilterFr = selectedClosers.length > 0 ? selectedClosers : undefined;
+      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData?.franquia, indicator.key, startDate, endDate, 'franquia', closerFilterFr, sdrFilterForBU('franquia'));
+      const metaPeriodo = calcularMetaDoPeriodo(funnelData?.franquia, indicator.key, startDate, endDate, 'franquia', closerFilterFr, sdrFilterForBU('franquia'));
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
+      // Bug fix: quando há filtro de closer/SDR, refazer a série filtrando cards
+      const qtyFiltered = hasPeopleFilter
+        ? buildQtyArrayFromFilteredCards(franquiaAnalytics.getCardsForIndicator(indicator.key as IndicatorType))
+        : null;
 
       return chartLabels.map((label, index) => ({
         label,
-        realizado: expansaoData.qty[index] || 0,
+        realizado: qtyFiltered ? (qtyFiltered[index] || 0) : (expansaoData.qty[index] || 0),
         meta:
           grouping === 'monthly'
             ? (funnelMetasMensais[index] ?? 0)
@@ -1060,8 +1116,16 @@ export function IndicatorsTab() {
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
 
       // Build realized data from o2TaxAnalytics (first-entry logic) grouped by period
-      const analyticsCards = o2TaxAnalytics.getCardsForIndicator(indicator.key as IndicatorType);
-      
+      const analyticsCardsAll = o2TaxAnalytics.getCardsForIndicator(indicator.key as IndicatorType);
+      // Bug fix: aplicar filtro de closer/SDR também na série do gráfico
+      const analyticsCards = hasPeopleFilter
+        ? analyticsCardsAll.filter((card: any) => {
+            const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer || card.responsavel);
+            const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsavel);
+            return matchCloser && matchSdr;
+          })
+        : analyticsCardsAll;
+
       const getQtyForPeriodRange = (periodStart: number, periodEnd: number): number => {
         return analyticsCards.filter(card => {
           const entryTime = card.dataEntrada.getTime();
@@ -1109,33 +1173,41 @@ export function IndicatorsTab() {
     // For single BU selection - Oxy Hacker
     if (hasSingleBU && includesOxyHacker) {
       const oxyHackerData = getOxyHackerGroupedData(indicator.key as OxyHackerIndicator, startDate, endDate, grouping);
-      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData?.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker'));
-      const metaPeriodo = calcularMetaDoPeriodo(funnelData?.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', undefined, sdrFilterForBU('oxy_hacker'));
+      const closerFilterOh = selectedClosers.length > 0 ? selectedClosers : undefined;
+      const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData?.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', closerFilterOh, sdrFilterForBU('oxy_hacker'));
+      const metaPeriodo = calcularMetaDoPeriodo(funnelData?.oxyHacker, indicator.key, startDate, endDate, 'oxy_hacker', closerFilterOh, sdrFilterForBU('oxy_hacker'));
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
+      const qtyFiltered = hasPeopleFilter
+        ? buildQtyArrayFromFilteredCards(oxyHackerAnalytics.getCardsForIndicator(indicator.key as IndicatorType))
+        : null;
 
       return chartLabels.map((label, index) => ({
         label,
-        realizado: oxyHackerData.qty[index] || 0,
+        realizado: qtyFiltered ? (qtyFiltered[index] || 0) : (oxyHackerData.qty[index] || 0),
         meta:
           grouping === 'monthly'
             ? (funnelMetasMensais[index] ?? 0)
             : (metasProrateadas[index] ?? 0),
       }));
     }
-    
+
     // For single BU selection - Modelo Atual (with closer filter support)
     if (hasSingleBU && includesModeloAtual) {
       const modeloAtualData = getModeloAtualGroupedData(indicator.key as ModeloAtualIndicator, startDate, endDate, grouping);
-      
+
       // Apply closer filter to metas if closers are selected
       const closerFilter = selectedClosers.length > 0 ? selectedClosers : undefined;
       const funnelMetasMensais = getMonthlyMetasFromFunnel(funnelData?.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual'));
       const metaPeriodo = calcularMetaDoPeriodo(funnelData?.modeloAtual, indicator.key, startDate, endDate, 'modelo_atual', closerFilter, sdrFilterForBU('modelo_atual'));
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(metaPeriodo) : [];
+      // Bug fix: quando há filtro de closer/SDR, refazer série filtrando cards
+      const qtyFiltered = hasPeopleFilter
+        ? buildQtyArrayFromFilteredCards(modeloAtualAnalytics.getCardsForIndicator(indicator.key as IndicatorType))
+        : null;
 
       return chartLabels.map((label, index) => ({
         label,
-        realizado: modeloAtualData.qty[index] || 0,
+        realizado: qtyFiltered ? (qtyFiltered[index] || 0) : (modeloAtualData.qty[index] || 0),
         meta: grouping === 'monthly'
           ? (funnelMetasMensais[index] ?? 0)
           : (metasProrateadas[index] ?? 0),
@@ -1168,13 +1240,27 @@ export function IndicatorsTab() {
       
       const metasProrateadas = grouping !== 'monthly' ? getProratedMetaSeries(totalMetaPeriodo) : [];
 
+      // Bug fix: quando há filtro de closer/SDR, refazer a série por BU usando cards filtrados
+      const maQty = hasPeopleFilter && includesModeloAtual
+        ? buildQtyArrayFromFilteredCards(modeloAtualAnalytics.getCardsForIndicator(indicator.key as IndicatorType))
+        : null;
+      const oxyQty = hasPeopleFilter && includesOxyHacker
+        ? buildQtyArrayFromFilteredCards(oxyHackerAnalytics.getCardsForIndicator(indicator.key as IndicatorType))
+        : null;
+      const o2tQty = hasPeopleFilter && includesO2Tax
+        ? buildQtyArrayFromFilteredCards((o2TaxAnalytics.getCardsForIndicator(indicator.key as IndicatorType)) as any)
+        : null;
+      const frQty = hasPeopleFilter && includesFranquia
+        ? buildQtyArrayFromFilteredCards(franquiaAnalytics.getCardsForIndicator(indicator.key as IndicatorType))
+        : null;
+
       return chartLabels.map((label, index) => {
-        // Sum realized from selected BUs
-        const realizadoModeloAtual = includesModeloAtual ? (modeloAtualData.qty[index] || 0) : 0;
-        const realizadoO2Tax = includesO2Tax ? (o2taxData.qty[index] || 0) : 0;
-        const realizadoOxyHacker = includesOxyHacker ? (oxyHackerData.qty[index] || 0) : 0;
-        const realizadoFranquia = includesFranquia ? (expansaoData.qty[index] || 0) : 0;
-        
+        // Sum realized from selected BUs (filtered series wins when active)
+        const realizadoModeloAtual = includesModeloAtual ? (maQty ? (maQty[index] || 0) : (modeloAtualData.qty[index] || 0)) : 0;
+        const realizadoO2Tax = includesO2Tax ? (o2tQty ? (o2tQty[index] || 0) : (o2taxData.qty[index] || 0)) : 0;
+        const realizadoOxyHacker = includesOxyHacker ? (oxyQty ? (oxyQty[index] || 0) : (oxyHackerData.qty[index] || 0)) : 0;
+        const realizadoFranquia = includesFranquia ? (frQty ? (frQty[index] || 0) : (expansaoData.qty[index] || 0)) : 0;
+
         // Sum metas from selected BUs
         const metaTotal = grouping === 'monthly'
           ? (metasModeloAtual[index] ?? 0) + (metasO2Tax[index] ?? 0) + (metasOxyHacker[index] ?? 0) + (metasFranquia[index] ?? 0)
