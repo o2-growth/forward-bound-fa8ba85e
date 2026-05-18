@@ -530,16 +530,22 @@ function VisaoExecutiva() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Comparativo Semanal compacto (S1 vs S2)" hint="MQL/RM/RR/Prop/Venda + Δ% por etapa">
+        <ChartCard title="Semana atual (S2) vs Meta semanal" hint="Realizado da semana vs meta rateada por dias úteis">
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={semanaCompData} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+            <BarChart data={[
+              { fase: 'MQL', Meta: 12, Real: 6 },
+              { fase: 'RM', Meta: 14, Real: 13 },
+              { fase: 'RR', Meta: 12, Real: 9 },
+              { fase: 'Prop', Meta: 8, Real: 6 },
+              { fase: 'Venda', Meta: 4, Real: 0 },
+            ]} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="fase" />
               <YAxis />
               <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} cursor={{ fill: "rgba(99,241,97,0.06)" }} />
               <Legend wrapperStyle={{ fontFamily: FONT_MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em" }} />
-              <Bar dataKey="S1" fill={O2.subtle} radius={[4, 4, 0, 0]} />
-              <Bar dataKey="S2" fill={O2.lima} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Meta" fill={O2.subtle} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Real" fill={O2.lima} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -560,24 +566,26 @@ function VisaoExecutiva() {
 
       <div className="grid md:grid-cols-2 gap-4">
         <MiniTable
-          title="Ranking SDR (período)"
-          cols={["SDR", "RM", "→Venda"]}
+          title="Ranking SDR — Atingimento da meta (RM)"
+          cols={["SDR", "Meta", "Real", "Atinge%", "Ritmo"]}
           rows={[
-            ["Carlos Ramos", 15, "20%"],
-            ["Bruna P. Mota", 9, "33%"],
-            ["Erica Rocha", 3, "0%"],
-            ["Daniel Trindade", 0, "—"],
+            ["Carlos Ramos", 30, 15, "50% 🟡", "no pace"],
+            ["Bruna P. Mota", 25, 9, "36% 🔴", "atrás"],
+            ["Erica Rocha", 20, 3, "15% 🔴", "atrás"],
+            ["Daniel Trindade", 15, 0, "0% 🔴", "atrás"],
           ]}
+          hint="Ritmo: compara atingimento × % do mês transcorrido (50% do mês = atingimento esperado >=50%)"
         />
         <MiniTable
-          title="Ranking Closer (período)"
-          cols={["Closer", "Vendas", "Win%"]}
+          title="Ranking Closer — Atingimento da meta (Vendas)"
+          cols={["Closer", "Meta", "Real", "Atinge%", "Ritmo"]}
           rows={[
-            ["Pedro Albite", 6, "30%"],
-            ["Bruna", 4, "27%"],
-            ["Daniel Trindade", 2, "12%"],
-            ["Thiago", 2, "15%"],
+            ["Pedro Albite", 8, 6, "75% 🟢", "adiantado"],
+            ["Bruna", 6, 4, "67% 🟡", "no pace"],
+            ["Daniel Trindade", 6, 2, "33% 🔴", "atrás"],
+            ["Thiago", 5, 2, "40% 🔴", "atrás"],
           ]}
+          hint="Mesma lógica de ritmo. Clica no nome para ver detalhamento por etapa (RM/RR/Prop/Venda)"
         />
       </div>
     </div>
@@ -588,10 +596,10 @@ function FunilConversao() {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <MockNumber label="MQL → RM" value="68%" delta="+4pp" hint="média 90d: 64%" />
-        <MockNumber label="RM → RR" value="79%" delta="-2pp" hint="média 90d: 81%" />
-        <MockNumber label="RR → Proposta" value="55%" delta="+1pp" hint="média 90d: 54%" />
-        <MockNumber label="Proposta → Venda" value="22%" delta="-3pp" hint="média 90d: 25% ⚠️ gargalo" />
+        <MockNumber label="MQL → RM" value="68%" delta="+4pp" meta="alvo 60%" hint="🟢 acima do alvo" />
+        <MockNumber label="RM → RR" value="79%" delta="-2pp" meta="alvo 80%" hint="🟡 no alvo" />
+        <MockNumber label="RR → Proposta" value="55%" delta="+1pp" meta="alvo 55%" hint="🟡 no alvo" />
+        <MockNumber label="Proposta → Venda" value="22%" delta="-3pp" meta="alvo 30%" hint="🔴 abaixo — gargalo!" />
         <MockNumber label="Ciclo médio Lead→Venda" value="34d" delta="+2d" hint="ideal: <30d" />
       </div>
 
@@ -736,10 +744,26 @@ function PipelineAberto() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MockNumber label="Pipeline total aberto" value="R$ 768k" hint="72 cards ativos" />
+        <MockNumber label="Meta restante (Maio)" value="14 vendas" hint="28 meta − 14 realizadas" />
         <MockNumber label="Forecast ponderado" value="R$ 126k" hint="Σ MRR × win% da fase" />
+        <MockNumber label="Gap pipeline ↔ meta" value="−4 vendas" hint="forecast cobre 10/14 da meta" />
+        <MockNumber label="Pipeline coverage" value="2.4x" hint="R$ aberto / meta restante" />
+      </div>
+
+      <div className="rounded-lg border p-3 text-xs flex items-center gap-2"
+        style={{ borderColor: O2.amber, background: "rgba(245,179,66,0.08)", color: O2.amber }}>
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <span>
+          <strong>Diagnóstico:</strong> Forecast ponderado (R$ 126k = ~10 vendas) é insuficiente
+          pra meta restante (14 vendas). Precisa subir win rate em Proposta de 22% pra 30% OU
+          adicionar 4 quentes/mornos no pipe. Concentre esforço em fechar os 12 quentes.
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <MockNumber label="Em risco (aging alto)" value="11 cards" delta="+2" hint=">14d sem mover" />
         <MockNumber label="Próximas 7 dias" value="6 fechamentos" hint="próxima ação prevista" />
+        <MockNumber label="Cards sem próxima ação" value="8 cards 🔴" hint="risco silencioso — sem follow-up agendado" />
       </div>
 
       <MiniTable
@@ -814,26 +838,27 @@ function Pessoas() {
       </div>
 
       <MiniTable
-        title="Performance por SDR (período)"
-        cols={["SDR", "Meta", "Real", "Atinge%", "RM→RR%", "Ciclo méd."]}
+        title="Performance por SDR (período) — vs meta"
+        cols={["SDR", "Meta", "Real", "Atinge%", "Ritmo", "RM→RR%", "Ciclo méd."]}
         rows={[
-          ["Carlos Ramos", 30, 22, "73%", "82%", "32d"],
-          ["Bruna P. Mota", 25, 18, "72%", "88%", "28d"],
-          ["Erica Rocha", 20, 8, "40%", "65%", "—"],
-          ["Daniel Trindade", 15, 1, "7%", "—", "—"],
+          ["Carlos Ramos", 30, 22, "73% 🟢", "adiantado", "82%", "32d"],
+          ["Bruna P. Mota", 25, 18, "72% 🟢", "no pace", "88%", "28d"],
+          ["Erica Rocha", 20, 8, "40% 🟡", "atrás", "65%", "—"],
+          ["Daniel Trindade", 15, 1, "7% 🔴", "muito atrás", "—", "—"],
         ]}
-        hint="Clica no nome para abrir dossier individual"
+        hint="Atingimento esperado pra hoje: ~67% do mês. Clica no nome para dossier individual com histórico semanal e gap diário."
       />
 
       <MiniTable
-        title="Performance por Closer (período)"
-        cols={["Closer", "Meta Venda", "Real", "Win%", "Ticket méd.", "Ciclo Prop→Venda"]}
+        title="Performance por Closer (período) — vs meta"
+        cols={["Closer", "Meta", "Real", "Atinge%", "Ritmo", "Win%", "Ticket", "Ciclo"]}
         rows={[
-          ["Pedro Albite", 8, 6, "30%", "R$ 28k", "10d"],
-          ["Bruna", 6, 4, "27%", "R$ 22k", "9d"],
-          ["Daniel Trindade", 6, 2, "12%", "R$ 18k", "18d ⚠️"],
-          ["Thiago", 5, 2, "15%", "R$ 15k", "14d"],
+          ["Pedro Albite", 8, 6, "75% 🟢", "adiantado", "30%", "R$ 28k", "10d"],
+          ["Bruna", 6, 4, "67% 🟡", "no pace", "27%", "R$ 22k", "9d"],
+          ["Daniel Trindade", 6, 2, "33% 🔴", "atrás", "12%", "R$ 18k", "18d ⚠️"],
+          ["Thiago", 5, 2, "40% 🔴", "atrás", "15%", "R$ 15k", "14d"],
         ]}
+        hint="Atingimento esperado: ~67%. Ticket revela quem fecha grande, Ciclo Prop→Venda longo sinaliza dificuldade no fechamento"
       />
 
       <div className="grid md:grid-cols-2 gap-4">
