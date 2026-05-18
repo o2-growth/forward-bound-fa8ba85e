@@ -517,6 +517,80 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     setSheetOpen(true);
   };
 
+  // Helper to build reunião marcada (rm) mini-dashboard
+  const buildReuniaoMiniDashboard = () => {
+    const items = getItemsForIndicator('rm');
+
+    const itemsWithCalcs = items.map(item => {
+      const diasComoMQL = item.duration ? Math.floor(item.duration / 86400) : 0;
+      return { ...item, diasComoMQL };
+    });
+
+    const avgDias = itemsWithCalcs.length > 0
+      ? Math.round(itemsWithCalcs.reduce((sum, i) => sum + (i.diasComoMQL || 0), 0) / itemsWithCalcs.length)
+      : 0;
+
+    // Top SDR
+    const sdrCounts = new Map<string, number>();
+    items.forEach(i => {
+      const sdr = i.sdr || 'Sem SDR';
+      sdrCounts.set(sdr, (sdrCounts.get(sdr) || 0) + 1);
+    });
+    const sortedSdrs = Array.from(sdrCounts.entries()).sort((a, b) => b[1] - a[1]);
+    const topSdr = sortedSdrs[0] ? { name: sortedSdrs[0][0], count: sortedSdrs[0][1] } : { name: '-', count: 0 };
+
+    const kpis: KpiItem[] = [
+      { icon: '📅', value: items.length, label: 'Reuniões', highlight: 'neutral' },
+      { icon: '⏱️', value: `${avgDias}d`, label: 'Tempo Médio', highlight: avgDias <= 7 ? 'success' : avgDias <= 14 ? 'neutral' : 'warning' },
+      { icon: '🏆', value: topSdr.name.split(' ')[0], label: `Top (${topSdr.count})`, highlight: 'neutral' },
+    ];
+
+    // Charts
+    const sdrRankingData = sortedSdrs.map(([label, value]) => ({ label: label.split(' ')[0], value }));
+
+    const tempoDistribution = [
+      { label: '1-7 dias', value: itemsWithCalcs.filter(i => (i.diasComoMQL || 0) <= 7).length, highlight: 'success' as const },
+      { label: '8-14 dias', value: itemsWithCalcs.filter(i => (i.diasComoMQL || 0) > 7 && (i.diasComoMQL || 0) <= 14).length, highlight: 'neutral' as const },
+      { label: '15-30 dias', value: itemsWithCalcs.filter(i => (i.diasComoMQL || 0) > 14 && (i.diasComoMQL || 0) <= 30).length, highlight: 'warning' as const },
+      { label: '30+ dias', value: itemsWithCalcs.filter(i => (i.diasComoMQL || 0) > 30).length, highlight: 'danger' as const },
+    ];
+
+    const tierCounts = new Map<string, number>();
+    items.forEach(i => {
+      const tier = normalizeTier(i.revenueRange);
+      tierCounts.set(tier, (tierCounts.get(tier) || 0) + 1);
+    });
+    const rmByTier = TIER_ORDER
+      .map(label => ({ label, value: tierCounts.get(label) || 0 }))
+      .filter(d => d.value > 0);
+    Array.from(tierCounts.entries())
+      .filter(([label]) => !TIER_ORDER.includes(label))
+      .forEach(([label, value]) => rmByTier.push({ label, value }));
+
+    const charts: ChartConfig[] = [
+      { type: 'bar', title: 'Ranking por SDR', data: sdrRankingData },
+      { type: 'distribution', title: 'Tempo como MQL', data: tempoDistribution },
+      { type: 'bar', title: 'Reuniões por Tier de Faturamento', data: rmByTier },
+    ];
+
+    setSheetKpis(kpis);
+    setSheetCharts(charts);
+    setSheetTitle('Reuniões Agendadas - Estamos Convertendo MQLs em Reuniões?');
+    setSheetDescription(
+      `${items.length} reuniões agendadas | Tempo médio: ${avgDias}d | Top: ${topSdr.name} (${topSdr.count})`
+    );
+    setSheetColumns([
+      { key: 'product', label: 'Produto', format: columnFormatters.product },
+      { key: 'company', label: 'Empresa' },
+      { key: 'sdr', label: 'SDR' },
+      { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
+      { key: 'diasComoMQL', label: 'Dias como MQL', format: columnFormatters.diasAteAgendar },
+      { key: 'date', label: 'Data', format: columnFormatters.date },
+    ]);
+    setSheetItems(itemsWithCalcs);
+    setSheetOpen(true);
+  };
+
   // Handle stage click
   const handleStageClick = (stage: FunnelStage) => {
     if (stage.value === 0) {
@@ -532,6 +606,12 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     // Se for venda, usar mini-dashboard com TCV
     if (stage.indicator === 'venda') {
       buildVendaMiniDashboard();
+      return;
+    }
+
+    // Se for reunião marcada, usar mini-dashboard
+    if (stage.indicator === 'rm') {
+      buildReuniaoMiniDashboard();
       return;
     }
     
