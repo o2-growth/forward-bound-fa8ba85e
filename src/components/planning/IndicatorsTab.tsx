@@ -34,6 +34,7 @@ import { FunnelConversionByTierWidget } from "./indicators/FunnelConversionByTie
 import { DetailSheet, DetailItem, columnFormatters, FilterCriteriaGroup } from "./indicators/DetailSheet";
 import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
+import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
