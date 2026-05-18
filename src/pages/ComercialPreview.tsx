@@ -1,12 +1,17 @@
-import { useState, Fragment } from "react";
+import { useState, Fragment, useEffect, useMemo, useRef, useCallback, createContext, useContext } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import {
   LayoutDashboard, GitBranch, Users, Briefcase, TrendingDown,
   Info, ArrowUpRight, ArrowDownRight, AlertTriangle, Flame, Thermometer, Snowflake,
-  Filter, Calendar, RefreshCw, ChevronDown, Lightbulb, Maximize2
+  Filter, Calendar, RefreshCw, ChevronDown, Lightbulb, Maximize2,
+  ChevronLeft, ChevronRight, X, ExternalLink, Phone, Mail, FileText, Sparkles,
+  Play, Volume2, Search, Keyboard, MessageSquare, Target, Shield, Zap, MoreHorizontal
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -274,6 +279,29 @@ function O2StyleScope() {
           font-size: 10px;
           color: rgba(255,255,255,0.85);
         }
+        .o2-preview .o2-heat-clickable { cursor: pointer; transition: outline 180ms cubic-bezier(0.2,0.8,0.2,1); }
+        .o2-preview .o2-heat-clickable:hover { outline: 1px solid ${O2.lima}; outline-offset: 1px; }
+
+        /* Drill-down clickability */
+        .o2-preview .o2-drill {
+          background: transparent;
+          border: none;
+          padding: 0;
+          color: inherit;
+          font: inherit;
+          cursor: pointer;
+          text-align: inherit;
+          transition: color 180ms cubic-bezier(0.2,0.8,0.2,1);
+        }
+        .o2-preview .o2-drill:hover {
+          color: ${O2.lima};
+          text-decoration: underline;
+          text-decoration-style: dotted;
+          text-decoration-color: ${O2.lima};
+          text-underline-offset: 3px;
+        }
+        .o2-preview .o2-drill-name { font-weight: 500; }
+        .o2-preview .o2-drill-num { font-weight: 700; }
       `}</style>
     </>
   );
@@ -343,7 +371,7 @@ function ChartCard({ title, hint, children, accent }: { title: string; hint?: st
   );
 }
 
-function MiniTable({ title, rows, cols, hint, accent }: { title: string; rows: (string|number)[][]; cols: string[]; hint?: string; accent?: string }) {
+function MiniTable({ title, rows, cols, hint, accent }: { title: string; rows: (string|number|React.ReactNode)[][]; cols: string[]; hint?: string; accent?: string }) {
   return (
     <Card className={accent}>
       <CardHeader className="pb-2">
@@ -363,7 +391,7 @@ function MiniTable({ title, rows, cols, hint, accent }: { title: string; rows: (
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} style={{ borderBottom: `1px solid ${O2.line}` }}>
-                {r.map((cell, j) => <td key={j} className={`py-2 px-2 ${j > 0 ? 'text-right tabular-nums' : ''}`}>{cell}</td>)}
+                {r.map((cell, j) => <td key={j} className={`py-2 px-2 ${j > 0 ? 'text-right tabular-nums' : ''}`}>{cell as any}</td>)}
               </tr>
             ))}
           </tbody>
@@ -371,6 +399,16 @@ function MiniTable({ title, rows, cols, hint, accent }: { title: string; rows: (
       </CardContent>
     </Card>
   );
+}
+
+// Helpers pra criar células clicáveis facilmente
+function DealLink({ id, label }: { id: string; label: string }) {
+  const { open } = useDrill();
+  return <Clickable onClick={() => open({ kind: "deal", id })}>{label}</Clickable>;
+}
+function PersonLink({ id, label }: { id: string; label: string }) {
+  const { open } = useDrill();
+  return <Clickable onClick={() => open({ kind: "person", id, role: PEOPLE[id]?.role || "sdr" })}>{label}</Clickable>;
 }
 
 function AlertCard({ tone, title, body }: { tone: 'critico' | 'alto' | 'info'; title: string; body: string }) {
@@ -394,7 +432,822 @@ function AlertCard({ tone, title, body }: { tone: 'critico' | 'alto' | 'info'; t
   );
 }
 
-// ───────────── mock data ─────────────
+// ═════════════════════════════════════════════════════════════════
+// DRILL-DOWN SYSTEM — contexto global + tipos + dados mock
+// ═════════════════════════════════════════════════════════════════
+
+type DrillTarget =
+  | { kind: "deal"; id: string }
+  | { kind: "person"; id: string; role: "sdr" | "closer" }
+  | { kind: "list"; title: string; items: { id: string; primary: string; secondary: string; right?: string }[] };
+
+type DrillContextValue = {
+  open: (target: DrillTarget) => void;
+  navigateDeal: (delta: 1 | -1) => void;
+};
+const DrillContext = createContext<DrillContextValue | null>(null);
+const useDrill = () => {
+  const v = useContext(DrillContext);
+  if (!v) return { open: (_: DrillTarget) => {}, navigateDeal: (_: 1 | -1) => {} };
+  return v;
+};
+
+// ───────────── Mock deals (com dados pra Deal Drawer) ─────────────
+
+const QUENTES_LIST = ["acme", "casa-viegas", "tech-inova", "construtora-pampa", "grupo-xyz"];
+
+const DEALS: Record<string, {
+  id: string;
+  nome: string;
+  fase: string;
+  faseTemp: "quente" | "morno" | "frio";
+  mrr: number;
+  closer: string;
+  sdr: string;
+  origem: string;
+  diasNaFase: number;
+  produtos: string[];
+  faixa: string;
+  reunioes: number;
+  proxAcao: string;
+  // brief IA
+  statusIA: { text: string; confianca: "alta" | "media" | "baixa"; fonteRef?: string };
+  sinaisCompra: { text: string; ts: string }[];
+  objecoes: { text: string; severidade: "alta" | "media" | "baixa" }[];
+  stakeholders: { nome: string; cargo: string; sentimento: number; tipo: "champion" | "blocker" | "neutro" }[];
+  concorrentes: { nome: string; mencoes: number }[];
+}> = {
+  "acme": {
+    id: "acme", nome: "Acme Holdings", fase: "Proposta Enviada", faseTemp: "quente",
+    mrr: 45000, closer: "Pedro Albite", sdr: "Carlos Ramos", origem: "Indicação",
+    diasNaFase: 8, produtos: ["CFOaaS", "Oxy"], faixa: "200k+", reunioes: 4,
+    proxAcao: "Reunião decisora 18/05",
+    statusIA: {
+      text: "Aguardando retorno após RR de 12/05. Closer reportou interesse alto do CFO. Recomendado: ligar hoje pra desbloquear assinatura.",
+      confianca: "alta", fonteRef: "R3 @ 23:14",
+    },
+    sinaisCompra: [
+      { text: "Mencionou orçamento aprovado pelo CFO", ts: "12/05 · 23:14" },
+      { text: "Pediu proposta formal com cronograma", ts: "08/05 · 18:42" },
+      { text: "Pediu introdução a 2 clientes-referência", ts: "08/05 · 41:20" },
+    ],
+    objecoes: [
+      { text: "Preocupação com prazo de implementação (90 dias)", severidade: "alta" },
+      { text: "Comparando com [Concorrente Conta Azul]", severidade: "media" },
+    ],
+    stakeholders: [
+      { nome: "Roberto Silva", cargo: "CFO", sentimento: 4, tipo: "champion" },
+      { nome: "Marina Costa", cargo: "Controller", sentimento: 3, tipo: "neutro" },
+      { nome: "Pedro Almeida", cargo: "CEO", sentimento: 5, tipo: "champion" },
+    ],
+    concorrentes: [{ nome: "Conta Azul", mencoes: 3 }, { nome: "Omie", mencoes: 1 }],
+  },
+  "casa-viegas": {
+    id: "casa-viegas", nome: "Casa Viegas", fase: "Proposta Enviada", faseTemp: "quente",
+    mrr: 25000, closer: "Pedro Albite", sdr: "Bruna P. Mota", origem: "Google Ads",
+    diasNaFase: 27, produtos: ["Gênio", "SaaS Oxy"], faixa: "50–200k", reunioes: 3,
+    proxAcao: "Follow-up atrasado — ligar HOJE",
+    statusIA: {
+      text: "ESFRIANDO. 27 dias parado sem retorno. Cliente sumiu após enviar proposta. Recomendado: ligar Rodrigo (interlocução) hoje. Se não atender em 24h, considerar mover pra 'aguardando' com alerta de risco.",
+      confianca: "alta", fonteRef: "R3 @ 15:42",
+    },
+    sinaisCompra: [
+      { text: "Aprovou setup de R$ 15k inicial", ts: "23/04 · 15:42" },
+      { text: "Demonstrou urgência (renovação de ERP)", ts: "23/04 · 28:10" },
+    ],
+    objecoes: [
+      { text: "CFO mudou no meio do processo — novo decisor não respondeu", severidade: "alta" },
+      { text: "Comparando com manter contabilidade tradicional", severidade: "media" },
+    ],
+    stakeholders: [
+      { nome: "Rodrigo (Interlocução)", cargo: "Gerente Fin.", sentimento: 4, tipo: "champion" },
+      { nome: "(novo CFO)", cargo: "CFO", sentimento: 2, tipo: "blocker" },
+    ],
+    concorrentes: [{ nome: "Contabilidade local", mencoes: 2 }],
+  },
+  "tech-inova": {
+    id: "tech-inova", nome: "Tech Inova", fase: "Proposta Enviada", faseTemp: "quente",
+    mrr: 28000, closer: "Bruna", sdr: "Carlos Ramos", origem: "Indicação",
+    diasNaFase: 18, produtos: ["CFOaaS"], faixa: "50–200k", reunioes: 5,
+    proxAcao: "Aguardando contraproposta",
+    statusIA: {
+      text: "Cliente pediu contraproposta com escopo reduzido (-30%). Indicação clara de fechamento se aceitarmos. Recomendado: discutir margem com Pedrolo antes de aceitar.",
+      confianca: "alta",
+    },
+    sinaisCompra: [
+      { text: "Pediu contraproposta com escopo (= sinal de fechamento)", ts: "30/04 · 22:00" },
+      { text: "Confirmou budget Q3 disponível", ts: "30/04 · 28:30" },
+    ],
+    objecoes: [{ text: "Acha preço alto pro escopo full", severidade: "media" }],
+    stakeholders: [
+      { nome: "André Tech", cargo: "CEO", sentimento: 4, tipo: "champion" },
+      { nome: "Lara Costa", cargo: "CFO", sentimento: 3, tipo: "neutro" },
+    ],
+    concorrentes: [],
+  },
+  "construtora-pampa": {
+    id: "construtora-pampa", nome: "Construtora Pampa", fase: "Proposta Enviada", faseTemp: "quente",
+    mrr: 32000, closer: "Daniel Trindade", sdr: "Bruna P. Mota", origem: "Outbound",
+    diasNaFase: 15, produtos: ["CFOaaS", "Oxy + Gênio"], faixa: "200k+", reunioes: 3,
+    proxAcao: "Renegociar valor",
+    statusIA: {
+      text: "Cliente sinalizou orçamento R$ 28k vs proposta R$ 32k. Closer Daniel tem dificuldade em fechamentos longos (média 18d). Recomendado: cover do Pedrolo na renegociação.",
+      confianca: "media",
+    },
+    sinaisCompra: [{ text: "Confirmou decisão pra final de maio", ts: "05/05 · 12:15" }],
+    objecoes: [{ text: "Valor 12% acima do orçamento original", severidade: "alta" }],
+    stakeholders: [{ nome: "Carlos Pampa", cargo: "CFO", sentimento: 3, tipo: "neutro" }],
+    concorrentes: [{ nome: "Conta Azul", mencoes: 1 }],
+  },
+  "grupo-xyz": {
+    id: "grupo-xyz", nome: "Grupo XYZ", fase: "Reunião Realizada", faseTemp: "morno",
+    mrr: 22000, closer: "Thiago", sdr: "Erica Rocha", origem: "Google Ads",
+    diasNaFase: 5, produtos: ["CFOaaS"], faixa: "50–200k", reunioes: 2,
+    proxAcao: "Enviar proposta",
+    statusIA: {
+      text: "RR completa com sinais positivos. Sem objeções claras. Recomendado: enviar proposta nas próximas 48h enquanto interesse está fresco.",
+      confianca: "alta",
+    },
+    sinaisCompra: [{ text: "Pediu prazos de implantação", ts: "10/05 · 35:20" }],
+    objecoes: [],
+    stakeholders: [{ nome: "Patrícia Souza", cargo: "CFO", sentimento: 4, tipo: "champion" }],
+    concorrentes: [],
+  },
+};
+
+// Reuniões mock por deal (com transcrição)
+type Reuniao = {
+  id: string;
+  data: string;
+  tipo: "R1" | "R2" | "R3" | "Proposta" | "Outras";
+  duracao: number; // min
+  participantes: string[];
+  sentimento: number; // 1-5
+  trechos: { ts: string; speaker: string; texto: string; tipo?: "compra" | "objecao" | "acao" }[];
+};
+
+const REUNIOES_MOCK: Record<string, Reuniao[]> = {
+  "acme": [
+    {
+      id: "r3", data: "12/05/2026", tipo: "R3", duracao: 47, participantes: ["Roberto Silva (CFO)", "Marina Costa", "Pedro Albite (O2)"], sentimento: 4,
+      trechos: [
+        { ts: "00:08:32", speaker: "Roberto (CFO)", texto: "A gente está com o orçamento aprovado pra esse trimestre, então o que falta é só decidir o cronograma." },
+        { ts: "00:23:14", speaker: "Roberto (CFO)", texto: "Falei com o Pedro CEO e o orçamento foi aprovado. Vamos andar.", tipo: "compra" },
+        { ts: "00:31:05", speaker: "Marina (Controller)", texto: "Mas 90 dias de implementação me preocupa, a gente teria que rodar em paralelo com a Conta Azul.", tipo: "objecao" },
+        { ts: "00:38:20", speaker: "Pedro (O2)", texto: "Posso te enviar 2 cases de implantação em 60 dias até amanhã.", tipo: "acao" },
+      ],
+    },
+    {
+      id: "r2", data: "08/05/2026", tipo: "R2", duracao: 52, participantes: ["Roberto Silva (CFO)", "Pedro Almeida (CEO)", "Pedro Albite (O2)"], sentimento: 5,
+      trechos: [
+        { ts: "00:18:42", speaker: "Roberto (CFO)", texto: "Quero uma proposta formal com cronograma detalhado.", tipo: "compra" },
+        { ts: "00:41:20", speaker: "Pedro Almeida (CEO)", texto: "Tem como me conectar com 2 clientes pra eu ouvir a experiência?", tipo: "compra" },
+      ],
+    },
+  ],
+  "casa-viegas": [
+    {
+      id: "r3", data: "23/04/2026", tipo: "R3", duracao: 38, participantes: ["Rodrigo (Gerente Fin.)", "Pedro Albite (O2)"], sentimento: 3,
+      trechos: [
+        { ts: "00:15:42", speaker: "Rodrigo", texto: "Vou aprovar o setup de R$ 15k inicial e a gente segue.", tipo: "compra" },
+        { ts: "00:28:10", speaker: "Rodrigo", texto: "Nosso ERP atual está renovando agora, precisamos resolver isso rápido.", tipo: "compra" },
+        { ts: "00:34:55", speaker: "Rodrigo", texto: "Mas o CFO vai ser substituído na próxima semana. Tem que apresentar pro novo." },
+      ],
+    },
+  ],
+  "tech-inova": [
+    {
+      id: "r3", data: "30/04/2026", tipo: "R3", duracao: 55, participantes: ["André Tech (CEO)", "Lara Costa (CFO)", "Bruna (O2)"], sentimento: 4,
+      trechos: [
+        { ts: "00:22:00", speaker: "Lara (CFO)", texto: "Vamos fazer uma contraproposta com escopo menor. Tira o módulo Oxy por enquanto.", tipo: "compra" },
+        { ts: "00:28:30", speaker: "Lara (CFO)", texto: "Budget de Q3 está confirmado, podemos começar em julho.", tipo: "compra" },
+        { ts: "00:38:40", speaker: "André", texto: "Acho o preço alto se for tudo, com escopo reduzido faz sentido.", tipo: "objecao" },
+      ],
+    },
+  ],
+  "construtora-pampa": [
+    {
+      id: "r2", data: "05/05/2026", tipo: "R2", duracao: 42, participantes: ["Carlos Pampa (CFO)", "Daniel T. (O2)"], sentimento: 3,
+      trechos: [
+        { ts: "00:12:15", speaker: "Carlos Pampa", texto: "A gente vai decidir até fim de maio.", tipo: "compra" },
+        { ts: "00:32:00", speaker: "Carlos Pampa", texto: "O valor está R$ 4k acima do que aprovamos internamente.", tipo: "objecao" },
+      ],
+    },
+  ],
+  "grupo-xyz": [
+    {
+      id: "r2", data: "10/05/2026", tipo: "R2", duracao: 36, participantes: ["Patrícia Souza (CFO)", "Thiago (O2)"], sentimento: 4,
+      trechos: [
+        { ts: "00:35:20", speaker: "Patrícia", texto: "Qual o prazo de implementação se a gente fechar essa semana?", tipo: "compra" },
+      ],
+    },
+  ],
+};
+
+// Pessoas mock (dossier)
+const PEOPLE: Record<string, { id: string; nome: string; role: "sdr" | "closer"; meta: number; real: number; pace: string; bu: string; ciclo: string; gargalo: string; topClientes: string[] }> = {
+  "carlos": { id: "carlos", nome: "Carlos Ramos", role: "sdr", meta: 30, real: 22, pace: "adiantado", bu: "Modelo Atual", ciclo: "32d", gargalo: "RR→Prop em 50% (média do time: 65%)", topClientes: ["Acme Holdings", "Tech Inova"] },
+  "bruna-sdr": { id: "bruna-sdr", nome: "Bruna P. Mota", role: "sdr", meta: 25, real: 18, pace: "no pace", bu: "Franquia", ciclo: "28d", gargalo: "—", topClientes: ["Casa Viegas", "Distribuidora ABC"] },
+  "erica": { id: "erica", nome: "Erica Rocha", role: "sdr", meta: 20, real: 8, pace: "atrás", bu: "Modelo Atual", ciclo: "—", gargalo: "RM→RR baixo (65%)", topClientes: ["Grupo XYZ"] },
+  "daniel-sdr": { id: "daniel-sdr", nome: "Daniel Trindade", role: "sdr", meta: 15, real: 1, pace: "muito atrás", bu: "Modelo Atual", ciclo: "—", gargalo: "Volume muito baixo — investigar bloqueio", topClientes: [] },
+  "pedro": { id: "pedro", nome: "Pedro Albite", role: "closer", meta: 8, real: 6, pace: "adiantado", bu: "Modelo Atual", ciclo: "10d (Prop→Venda)", gargalo: "—", topClientes: ["Acme Holdings", "Casa Viegas"] },
+  "bruna-closer": { id: "bruna-closer", nome: "Bruna", role: "closer", meta: 6, real: 4, pace: "no pace", bu: "Franquia", ciclo: "9d", gargalo: "—", topClientes: ["Tech Inova"] },
+  "daniel-closer": { id: "daniel-closer", nome: "Daniel Trindade", role: "closer", meta: 6, real: 2, pace: "atrás", bu: "Modelo Atual", ciclo: "18d ⚠️", gargalo: "Ciclo Prop→Venda 18d (média 11d). 70% perdas por concorrência", topClientes: ["Construtora Pampa"] },
+  "thiago": { id: "thiago", nome: "Thiago", role: "closer", meta: 5, real: 2, pace: "atrás", bu: "Modelo Atual", ciclo: "14d", gargalo: "Ticket médio baixo (R$ 15k)", topClientes: ["Grupo XYZ"] },
+};
+
+// ═════════════════════════════════════════════════════════════════
+// COMPONENTES — Clicável, Deal Drawer, Pessoa Drawer, Sheet List, Command Palette
+// ═════════════════════════════════════════════════════════════════
+
+function Clickable({
+  children, onClick, kind = "name",
+}: { children: React.ReactNode; onClick: () => void; kind?: "name" | "num" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`o2-drill o2-drill-${kind}`}
+      data-drill={kind}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ───────────── Deal Drawer ─────────────
+function DealDrawer({ dealId, list, onChange, onClose }: {
+  dealId: string;
+  list: string[];
+  onChange: (newId: string) => void;
+  onClose: () => void;
+}) {
+  const deal = DEALS[dealId];
+  const reunioes = REUNIOES_MOCK[dealId] || [];
+  const [tab, setTab] = useState<"brief" | "reunioes" | "historico" | "dados">("brief");
+  const [trechoFiltro, setTrechoFiltro] = useState<"tudo" | "compra" | "objecao" | "acao">("tudo");
+  const idx = list.indexOf(dealId);
+  const total = list.length;
+  const canPrev = idx > 0;
+  const canNext = idx < total - 1 && idx !== -1;
+
+  // Keyboard nav
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === "j" || e.key === "ArrowRight") { if (canNext) onChange(list[idx + 1]); }
+      if (e.key === "k" || e.key === "ArrowLeft") { if (canPrev) onChange(list[idx - 1]); }
+      if (e.key === "1") setTab("brief");
+      if (e.key === "2") setTab("reunioes");
+      if (e.key === "3") setTab("historico");
+      if (e.key === "4") setTab("dados");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [idx, list, canPrev, canNext, onChange]);
+
+  if (!deal) return null;
+
+  const tempColor = deal.faseTemp === "quente" ? O2.red : deal.faseTemp === "morno" ? O2.amber : O2.blue;
+  const tempLabel = deal.faseTemp === "quente" ? "🔥 QUENTE" : deal.faseTemp === "morno" ? "🟡 MORNO" : "🔵 FRIO";
+  const confColor = deal.statusIA.confianca === "alta" ? O2.lima : deal.statusIA.confianca === "media" ? O2.amber : O2.subtle;
+
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()}>
+      <SheetContent
+        side="right"
+        className="o2-preview p-0 sm:max-w-[720px] w-[720px] flex flex-col"
+        style={{ background: O2.surface, color: O2.fg, borderLeft: `1px solid ${O2.lineStrong}` }}
+      >
+        <O2StyleScope />
+        {/* HEADER */}
+        <div className="shrink-0 px-6 pt-6 pb-4 border-b" style={{ borderColor: O2.line, background: O2.elev3 }}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => canPrev && onChange(list[idx - 1])}
+                disabled={!canPrev}
+                className="rounded-full p-1.5 disabled:opacity-30"
+                style={{ background: O2.surface, border: `1px solid ${O2.lineStrong}`, color: O2.fg }}
+                title="Anterior (K)"
+              ><ChevronLeft className="h-3.5 w-3.5" /></button>
+              <button
+                onClick={() => canNext && onChange(list[idx + 1])}
+                disabled={!canNext}
+                className="rounded-full p-1.5 disabled:opacity-30"
+                style={{ background: O2.surface, border: `1px solid ${O2.lineStrong}`, color: O2.fg }}
+                title="Próximo (J)"
+              ><ChevronRight className="h-3.5 w-3.5" /></button>
+              {idx >= 0 && (
+                <span className="o2-mono ml-2">{idx + 1} de {total} · quentes</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="o2-mono px-2 py-1 rounded-full" style={{ border: `1px solid ${O2.lineStrong}` }}>
+                <MoreHorizontal className="h-3 w-3" />
+              </button>
+              <button onClick={onClose} className="o2-mono px-2 py-1 rounded-full" style={{ border: `1px solid ${O2.lineStrong}` }} title="Fechar (Esc)">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+          <div className="flex items-end gap-3 mb-2">
+            <h2 className="o2-display" style={{ fontSize: 32, lineHeight: 1, margin: 0 }}>{deal.nome}</h2>
+            <span className="o2-mono px-2 py-1 rounded-full" style={{ background: `${tempColor}22`, color: tempColor, border: `1px solid ${tempColor}55` }}>{tempLabel}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: O2.muted }}>
+            <span>Fase: <strong style={{ color: O2.fg }}>{deal.fase}</strong></span>
+            <span>·</span>
+            <span>MRR: <strong style={{ color: O2.lima }}>R$ {(deal.mrr / 1000).toFixed(0)}k</strong></span>
+            <span>·</span>
+            <span>Closer: <strong style={{ color: O2.fg }}>{deal.closer}</strong></span>
+            <span>·</span>
+            <span>{deal.diasNaFase}d na fase</span>
+            <span>·</span>
+            <span>Origem: {deal.origem}</span>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-1 mt-4">
+            {([["brief", "Brief IA"], ["reunioes", `Reuniões ${reunioes.length}`], ["historico", "Histórico"], ["dados", "Dados"]] as const).map(([k, label]) => (
+              <button
+                key={k}
+                onClick={() => setTab(k as any)}
+                className="px-3 py-1.5 rounded-lg o2-mono"
+                style={{
+                  background: tab === k ? O2.surface : "transparent",
+                  color: tab === k ? O2.lima : O2.muted,
+                  border: `1px solid ${tab === k ? O2.limaLine : "transparent"}`,
+                  boxShadow: tab === k ? `inset 0 -2px 0 ${O2.lima}` : undefined,
+                }}
+              >{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* BODY scroll */}
+        <div className="flex-1 overflow-auto px-6 py-5">
+          {tab === "brief" && <BriefIA deal={deal} onSeekReuniao={() => setTab("reunioes")} />}
+          {tab === "reunioes" && <ReunioesTab reunioes={reunioes} filtro={trechoFiltro} setFiltro={setTrechoFiltro} />}
+          {tab === "historico" && <HistoricoTab deal={deal} reunioes={reunioes} />}
+          {tab === "dados" && <DadosTab deal={deal} />}
+        </div>
+
+        {/* FOOTER ACTIONS */}
+        <div className="shrink-0 px-6 py-3 border-t flex items-center gap-2 flex-wrap" style={{ borderColor: O2.line, background: O2.elev3 }}>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full o2-mono" style={{ background: O2.lima, color: "#0A0A0A" }}>
+            Mover fase <ChevronDown className="h-3 w-3" />
+          </button>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full o2-mono" style={{ background: "transparent", color: O2.fg, border: `1px solid ${O2.lineStrong}` }}>
+            <Phone className="h-3 w-3" /> Follow-up
+          </button>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full o2-mono" style={{ background: "transparent", color: O2.fg, border: `1px solid ${O2.lineStrong}` }}>
+            <Mail className="h-3 w-3" /> Gerar email
+          </button>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full o2-mono" style={{ background: "transparent", color: O2.fg, border: `1px solid ${O2.lineStrong}` }}>
+            <FileText className="h-3 w-3" /> Nota
+          </button>
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full o2-mono ml-auto" style={{ background: "transparent", color: O2.muted, border: `1px solid ${O2.lineStrong}` }}>
+            <ExternalLink className="h-3 w-3" /> Abrir no Pipefy
+          </button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function BriefIA({ deal, onSeekReuniao }: { deal: typeof DEALS["acme"]; onSeekReuniao: (ts?: string) => void }) {
+  const confColor = deal.statusIA.confianca === "alta" ? O2.lima : deal.statusIA.confianca === "media" ? O2.amber : O2.subtle;
+  return (
+    <div className="space-y-4">
+      {/* Faixa fina IA */}
+      <div className="flex items-center justify-between text-[10px]" style={{ color: O2.subtle }}>
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-3 w-3" style={{ color: O2.lima }} />
+          <span className="o2-mono">Brief gerado em 14/05 14:32 · baseado em {deal.reunioes} reuniões e 23 mensagens</span>
+        </div>
+        <button className="o2-mono px-2 py-1 rounded-full" style={{ border: `1px solid ${O2.lineStrong}`, color: O2.fg }}>
+          <RefreshCw className="h-3 w-3 inline mr-1" /> Regenerar
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {/* Coluna principal 60% */}
+        <div className="md:col-span-3 space-y-4">
+          {/* Status & Próxima ação */}
+          <div className="rounded-2xl p-4" style={{ background: O2.elev3, border: `1px solid ${O2.limaLine}` }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="h-4 w-4" style={{ color: O2.lima }} />
+              <span className="o2-mono" style={{ color: O2.lima }}>Status & Próxima ação</span>
+              <span className="ml-auto o2-mono px-2 py-0.5 rounded-full" style={{ background: `${confColor}22`, color: confColor, border: `1px solid ${confColor}55` }}>
+                ● Confiança {deal.statusIA.confianca}
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed mb-3" style={{ color: O2.fg }}>{deal.statusIA.text}</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button className="o2-mono px-3 py-1.5 rounded-full" style={{ background: O2.lima, color: "#0A0A0A" }}>
+                Agendar ligação
+              </button>
+              <button className="o2-mono px-3 py-1.5 rounded-full" style={{ background: "transparent", color: O2.fg, border: `1px solid ${O2.lineStrong}` }}>
+                Marcar como feito
+              </button>
+              {deal.statusIA.fonteRef && (
+                <button onClick={() => onSeekReuniao()} className="o2-mono ml-auto" style={{ color: O2.lima, textDecoration: "underline dotted" }}>
+                  Ver fonte: {deal.statusIA.fonteRef} →
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Sinais de compra */}
+          <div className="rounded-2xl p-4" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+            <div className="flex items-center gap-2 mb-3">
+              <ArrowUpRight className="h-4 w-4" style={{ color: O2.lima }} />
+              <span className="o2-mono" style={{ color: O2.lima }}>Sinais de compra ({deal.sinaisCompra.length})</span>
+            </div>
+            <ul className="space-y-2">
+              {deal.sinaisCompra.map((s, i) => (
+                <li key={i} className="flex gap-3 text-sm">
+                  <span className="o2-mono shrink-0 mt-0.5" style={{ color: O2.lima }}>↑</span>
+                  <div className="flex-1">
+                    <span style={{ color: O2.fg }}>{s.text}</span>
+                    <button onClick={() => onSeekReuniao(s.ts)} className="o2-mono ml-2" style={{ color: O2.subtle, textDecoration: "underline dotted" }}>{s.ts}</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Objeções */}
+          {deal.objecoes.length > 0 && (
+            <div className="rounded-2xl p-4" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="h-4 w-4" style={{ color: O2.amber }} />
+                <span className="o2-mono" style={{ color: O2.amber }}>Objeções & Riscos ({deal.objecoes.length})</span>
+              </div>
+              <ul className="space-y-2">
+                {deal.objecoes.map((o, i) => {
+                  const sev = o.severidade === "alta" ? O2.red : o.severidade === "media" ? O2.amber : O2.subtle;
+                  return (
+                    <li key={i} className="flex gap-3 text-sm">
+                      <span className="shrink-0 mt-0.5" style={{ color: sev }}>⚠</span>
+                      <div className="flex-1">
+                        <span style={{ color: O2.fg }}>{o.text}</span>
+                        <span className="o2-mono ml-2 px-1.5 py-0.5 rounded" style={{ background: `${sev}22`, color: sev }}>{o.severidade}</span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Coluna lateral 40% */}
+        <div className="md:col-span-2 space-y-4">
+          {/* Stakeholders */}
+          <div className="rounded-2xl p-4" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Users className="h-4 w-4" style={{ color: O2.fg }} />
+              <span className="o2-mono">Decision Makers</span>
+            </div>
+            <div className="space-y-3">
+              {deal.stakeholders.map((s, i) => {
+                const tipoColor = s.tipo === "champion" ? O2.lima : s.tipo === "blocker" ? O2.red : O2.subtle;
+                const tipoLabel = s.tipo === "champion" ? "Champion" : s.tipo === "blocker" ? "Blocker" : "Neutro";
+                return (
+                  <div key={i} className="flex items-start gap-2">
+                    <div className="rounded-full w-7 h-7 flex items-center justify-center shrink-0" style={{ background: `${tipoColor}22`, color: tipoColor, fontSize: 10, fontWeight: 700 }}>
+                      {s.nome.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold truncate">{s.nome}</div>
+                      <div className="o2-mono" style={{ color: O2.muted }}>{s.cargo}</div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="o2-mono px-1.5 py-0.5 rounded" style={{ background: `${tipoColor}22`, color: tipoColor }}>{tipoLabel}</span>
+                        <span className="o2-mono" style={{ color: O2.muted }}>{"●".repeat(s.sentimento)}{"○".repeat(5 - s.sentimento)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Concorrentes */}
+          {deal.concorrentes.length > 0 && (
+            <div className="rounded-2xl p-4" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="h-4 w-4" style={{ color: O2.amber }} />
+                <span className="o2-mono">Concorrentes mencionados</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {deal.concorrentes.map((c, i) => (
+                  <button key={i} onClick={() => onSeekReuniao()} className="o2-mono px-2 py-1 rounded-full" style={{ background: O2.surface, color: O2.fg, border: `1px solid ${O2.lineStrong}` }}>
+                    {c.nome} · {c.mencoes}x
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReunioesTab({ reunioes, filtro, setFiltro }: { reunioes: Reuniao[]; filtro: "tudo" | "compra" | "objecao" | "acao"; setFiltro: (f: any) => void }) {
+  const filtros: { key: typeof filtro; label: string; color: string }[] = [
+    { key: "tudo", label: "Tudo", color: O2.muted },
+    { key: "compra", label: "🟢 Compra", color: O2.lima },
+    { key: "objecao", label: "🟡 Objeção", color: O2.amber },
+    { key: "acao", label: "🔵 Ação", color: O2.blue },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <span className="o2-mono">Filtrar trechos:</span>
+        {filtros.map(f => (
+          <button key={f.key} onClick={() => setFiltro(f.key)} className="o2-mono px-2.5 py-1 rounded-full"
+            style={{ background: filtro === f.key ? `${f.color}22` : "transparent", color: filtro === f.key ? f.color : O2.muted, border: `1px solid ${filtro === f.key ? f.color : O2.lineStrong}` }}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+      {reunioes.length === 0 && (
+        <div className="text-center py-8 o2-mono" style={{ color: O2.subtle }}>Nenhuma reunião registrada.</div>
+      )}
+      {reunioes.map(r => (
+        <div key={r.id} className="rounded-2xl p-4" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="o2-mono px-2 py-0.5 rounded-full" style={{ background: O2.limaSoft, color: O2.lima, border: `1px solid ${O2.limaLine}` }}>{r.tipo}</span>
+                <span className="text-sm font-semibold">{r.data}</span>
+                <span className="o2-mono" style={{ color: O2.muted }}>· {r.duracao} min</span>
+                <span className="o2-mono" style={{ color: O2.muted }}>· Sentimento {"●".repeat(r.sentimento)}{"○".repeat(5 - r.sentimento)}</span>
+              </div>
+              <div className="text-xs mt-1" style={{ color: O2.muted }}>
+                {r.participantes.join(" · ")}
+              </div>
+            </div>
+            <button className="o2-mono px-3 py-1.5 rounded-full" style={{ background: "transparent", color: O2.fg, border: `1px solid ${O2.lineStrong}` }}>
+              <Play className="h-3 w-3 inline mr-1" /> Reproduzir
+            </button>
+          </div>
+          {/* Trechos */}
+          <div className="space-y-2 pt-2 border-t" style={{ borderColor: O2.line }}>
+            {r.trechos
+              .filter(t => filtro === "tudo" ? true : t.tipo === filtro)
+              .map((t, i) => {
+                const tipoColor = t.tipo === "compra" ? O2.lima : t.tipo === "objecao" ? O2.amber : t.tipo === "acao" ? O2.blue : null;
+                return (
+                  <div key={i} className="flex gap-3 text-xs py-1.5">
+                    <button className="o2-mono shrink-0" style={{ color: O2.lima, textDecoration: "underline dotted" }}>
+                      {t.ts}
+                    </button>
+                    <div className="flex-1">
+                      <div className="o2-mono mb-0.5" style={{ color: O2.muted }}>{t.speaker}</div>
+                      <div className="leading-relaxed" style={tipoColor ? { color: O2.fg, background: `${tipoColor}11`, padding: "4px 8px", borderRadius: 6, borderLeft: `2px solid ${tipoColor}` } : { color: O2.fg }}>
+                        "{t.texto}"
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HistoricoTab({ deal, reunioes }: { deal: typeof DEALS["acme"]; reunioes: Reuniao[] }) {
+  const eventos = [
+    { data: "08/03/2026", tipo: "📥 Entrada Pipefy", desc: `Lead criado · Origem: ${deal.origem}` },
+    { data: "12/03/2026", tipo: "✅ RM realizada", desc: "Cliente Participou: Sim" },
+    ...reunioes.map(r => ({ data: r.data, tipo: `📞 ${r.tipo} realizada`, desc: `${r.duracao} min · sentimento ${r.sentimento}/5` })),
+    { data: "14/05/2026", tipo: "💼 Em proposta", desc: `Valor R$ ${(deal.mrr / 1000).toFixed(0)}k/mês` },
+  ];
+  return (
+    <div className="space-y-3">
+      {eventos.map((e, i) => (
+        <div key={i} className="flex gap-3 items-start">
+          <div className="o2-mono w-20 shrink-0 pt-1" style={{ color: O2.subtle }}>{e.data}</div>
+          <div className="flex-1 rounded-xl p-3" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+            <div className="text-xs font-semibold mb-0.5">{e.tipo}</div>
+            <div className="text-xs" style={{ color: O2.muted }}>{e.desc}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DadosTab({ deal }: { deal: typeof DEALS["acme"] }) {
+  const linhas: [string, string][] = [
+    ["Empresa", deal.nome],
+    ["Fase atual", deal.fase],
+    ["MRR proposto", `R$ ${deal.mrr.toLocaleString("pt-BR")}/mês`],
+    ["Faixa de faturamento", deal.faixa],
+    ["Produtos", deal.produtos.join(", ")],
+    ["Origem", deal.origem],
+    ["SDR", deal.sdr],
+    ["Closer", deal.closer],
+    ["Dias na fase", `${deal.diasNaFase} dias`],
+    ["Próxima ação", deal.proxAcao],
+  ];
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+      {linhas.map(([k, v], i) => (
+        <div key={k} className="flex items-center justify-between px-4 py-2.5" style={{ borderBottom: i < linhas.length - 1 ? `1px solid ${O2.line}` : undefined }}>
+          <span className="o2-mono">{k}</span>
+          <span className="text-sm font-medium" style={{ color: O2.fg }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ───────────── Pessoa Drawer ─────────────
+function PessoaDrawer({ personId, onClose }: { personId: string; onClose: () => void }) {
+  const p = PEOPLE[personId];
+  if (!p) return null;
+  const paceColor = p.pace === "adiantado" ? O2.lima : p.pace === "no pace" ? O2.lima : p.pace === "atrás" ? O2.amber : O2.red;
+  const atinge = (p.real / p.meta) * 100;
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()}>
+      <SheetContent
+        side="right"
+        className="o2-preview p-0 sm:max-w-[560px] w-[560px] flex flex-col"
+        style={{ background: O2.surface, color: O2.fg, borderLeft: `1px solid ${O2.lineStrong}` }}
+      >
+        <O2StyleScope />
+        <div className="px-6 pt-6 pb-4 border-b" style={{ borderColor: O2.line, background: O2.elev3 }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="o2-eyebrow">{p.role === "sdr" ? "SDR" : "Closer"} · {p.bu}</span>
+            <button onClick={onClose} className="o2-mono px-2 py-1 rounded-full" style={{ border: `1px solid ${O2.lineStrong}` }}><X className="h-3 w-3" /></button>
+          </div>
+          <h2 className="o2-display" style={{ fontSize: 28, margin: 0 }}>{p.nome}</h2>
+        </div>
+        <div className="flex-1 overflow-auto px-6 py-5 space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="rounded-xl p-3" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+              <div className="o2-mono">Meta</div>
+              <div className="o2-kpi-sm">{p.meta}</div>
+            </div>
+            <div className="rounded-xl p-3" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+              <div className="o2-mono">Real</div>
+              <div className="o2-kpi-sm" style={{ color: O2.lima }}>{p.real}</div>
+            </div>
+            <div className="rounded-xl p-3" style={{ background: O2.elev3, border: `1px solid ${O2.line}` }}>
+              <div className="o2-mono">Atinge</div>
+              <div className="o2-kpi-sm" style={{ color: paceColor }}>{atinge.toFixed(0)}%</div>
+            </div>
+          </div>
+          <div className="rounded-2xl p-4" style={{ background: O2.elev3, border: `1px solid ${paceColor}55` }}>
+            <div className="o2-mono mb-2" style={{ color: paceColor }}>Diagnóstico</div>
+            <div className="text-sm">
+              Ritmo: <strong style={{ color: paceColor }}>{p.pace}</strong> · Ciclo médio: {p.ciclo}
+            </div>
+            {p.gargalo !== "—" && (
+              <div className="text-sm mt-2" style={{ color: O2.amber }}>
+                ⚠ Gargalo: {p.gargalo}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="o2-mono mb-2">Top clientes ({p.topClientes.length})</div>
+            {p.topClientes.length === 0 && <div className="text-xs" style={{ color: O2.subtle }}>Nenhum cliente atribuído.</div>}
+            <ul className="space-y-1">
+              {p.topClientes.map(c => (
+                <li key={c} className="text-sm flex items-center justify-between p-2 rounded-lg" style={{ background: O2.elev3 }}>
+                  <span>{c}</span>
+                  <ExternalLink className="h-3 w-3" style={{ color: O2.muted }} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ───────────── Sheet (lista compacta — KPI/segmento/fase) ─────────────
+function ListSheet({ data, onClose, onPickDeal }: { data: { title: string; items: { id: string; primary: string; secondary: string; right?: string }[] }; onClose: () => void; onPickDeal: (id: string) => void }) {
+  return (
+    <Sheet open onOpenChange={(o) => !o && onClose()}>
+      <SheetContent
+        side="right"
+        className="o2-preview p-0 sm:max-w-[420px] w-[420px] flex flex-col"
+        style={{ background: O2.surface, color: O2.fg, borderLeft: `1px solid ${O2.lineStrong}` }}
+      >
+        <O2StyleScope />
+        <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: O2.line }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="o2-eyebrow">Drill-down</span>
+            <button onClick={onClose} className="o2-mono px-2 py-1 rounded-full" style={{ border: `1px solid ${O2.lineStrong}` }}><X className="h-3 w-3" /></button>
+          </div>
+          <h3 className="o2-display" style={{ fontSize: 22, margin: 0 }}>{data.title}</h3>
+        </div>
+        <div className="flex-1 overflow-auto py-2">
+          {data.items.length === 0 && <div className="text-center py-8 text-xs" style={{ color: O2.subtle }}>Vazio.</div>}
+          {data.items.map(it => (
+            <button
+              key={it.id}
+              onClick={() => onPickDeal(it.id)}
+              className="w-full text-left px-5 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+              style={{ borderBottom: `1px solid ${O2.line}` }}
+            >
+              <div>
+                <div className="text-sm font-medium">{it.primary}</div>
+                <div className="o2-mono mt-0.5">{it.secondary}</div>
+              </div>
+              {it.right && <div className="text-xs" style={{ color: O2.lima }}>{it.right}</div>}
+            </button>
+          ))}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+// ───────────── Command Palette (⌘K) ─────────────
+function CommandPalette({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (target: DrillTarget) => void }) {
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="o2-preview max-w-xl p-0" style={{ background: O2.surface, color: O2.fg, border: `1px solid ${O2.lineStrong}` }}>
+        <O2StyleScope />
+        <Command className="rounded-lg" style={{ background: O2.surface }}>
+          <div className="flex items-center px-3 border-b" style={{ borderColor: O2.line }}>
+            <Search className="h-4 w-4" style={{ color: O2.muted }} />
+            <CommandInput placeholder="Buscar deal, SDR, closer..." className="border-0 focus:ring-0" />
+          </div>
+          <CommandList className="max-h-[400px]" style={{ background: O2.surface }}>
+            <CommandEmpty className="o2-mono py-6 text-center">Nada encontrado.</CommandEmpty>
+            <CommandGroup heading="Deals">
+              {Object.values(DEALS).map(d => (
+                <CommandItem key={d.id} value={`deal-${d.nome}`} onSelect={() => onPick({ kind: "deal", id: d.id })}>
+                  <Briefcase className="h-3.5 w-3.5 mr-2" /> {d.nome}
+                  <span className="ml-auto o2-mono" style={{ color: O2.muted }}>{d.fase} · R$ {(d.mrr / 1000).toFixed(0)}k</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandGroup heading="Pessoas">
+              {Object.values(PEOPLE).map(p => (
+                <CommandItem key={p.id} value={`pessoa-${p.nome}-${p.role}`} onSelect={() => onPick({ kind: "person", id: p.id, role: p.role })}>
+                  <Users className="h-3.5 w-3.5 mr-2" /> {p.nome}
+                  <span className="ml-auto o2-mono" style={{ color: O2.muted }}>{p.role.toUpperCase()} · {p.bu}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+        <div className="px-3 py-2 border-t flex items-center justify-between o2-mono" style={{ borderColor: O2.line, color: O2.subtle }}>
+          <span>↑↓ navegar · Enter abrir · Esc fechar</span>
+          <span>⌘K</span>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ───────────── Cheat sheet (?) ─────────────
+function CheatSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const atalhos: [string, string][] = [
+    ["⌘K", "Buscar deal ou pessoa"],
+    ["?", "Atalhos (esta janela)"],
+    ["Esc", "Fechar drawer/dialog"],
+    ["J / →", "Próximo deal"],
+    ["K / ←", "Deal anterior"],
+    ["1–4", "Trocar tab no drawer (Brief / Reuniões / Histórico / Dados)"],
+  ];
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="o2-preview max-w-md p-6" style={{ background: O2.surface, color: O2.fg, border: `1px solid ${O2.lineStrong}` }}>
+        <O2StyleScope />
+        <div className="flex items-center gap-2 mb-4">
+          <Keyboard className="h-4 w-4" style={{ color: O2.lima }} />
+          <h3 className="o2-display" style={{ fontSize: 20, margin: 0 }}>Atalhos</h3>
+        </div>
+        <div className="space-y-2">
+          {atalhos.map(([k, l]) => (
+            <div key={k} className="flex items-center justify-between text-sm">
+              <span style={{ color: O2.muted }}>{l}</span>
+              <kbd className="o2-mono px-2 py-1 rounded" style={{ background: O2.elev3, border: `1px solid ${O2.lineStrong}` }}>{k}</kbd>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════
+// mock data (gráficos) — abaixo
+// ═════════════════════════════════════════════════════════════════
+
 const paceData = Array.from({ length: 14 }, (_, i) => {
   const d = i + 1;
   return { dia: `D${d}`, realizado: Math.round(d * 1.0 + (i > 6 ? -0.5 * (i - 6) : 0)), meta: Math.round(d * 2) };
@@ -555,13 +1408,13 @@ function VisaoExecutiva() {
         title="🎯 Top 5 oportunidades por valor (próximas a fechar)"
         cols={["Cliente", "Fase", "MRR", "Dias na fase", "Closer", "Temperatura"]}
         rows={[
-          ["Acme Holdings", "Proposta Enviada", "R$ 45k", "8d", "Pedro Albite", "🔥 Quente"],
-          ["Construtora Pampa", "Proposta Enviada", "R$ 32k", "15d", "Daniel T.", "🔥→🟡 Esfriando"],
-          ["Tech Inova", "Proposta Enviada", "R$ 28k", "18d", "Bruna", "🔥→🟡 Esfriando"],
-          ["Casa Viegas", "Proposta Enviada", "R$ 25k", "27d", "Pedro Albite", "🟡 Morno"],
-          ["Grupo XYZ", "Reunião Realizada", "R$ 22k", "5d", "Thiago", "🟡 Morno"],
+          [<DealLink id="acme" label="Acme Holdings" />, "Proposta Enviada", "R$ 45k", "8d", <PersonLink id="pedro" label="Pedro Albite" />, "🔥 Quente"],
+          [<DealLink id="construtora-pampa" label="Construtora Pampa" />, "Proposta Enviada", "R$ 32k", "15d", <PersonLink id="daniel-closer" label="Daniel T." />, "🔥→🟡 Esfriando"],
+          [<DealLink id="tech-inova" label="Tech Inova" />, "Proposta Enviada", "R$ 28k", "18d", <PersonLink id="bruna-closer" label="Bruna" />, "🔥→🟡 Esfriando"],
+          [<DealLink id="casa-viegas" label="Casa Viegas" />, "Proposta Enviada", "R$ 25k", "27d", <PersonLink id="pedro" label="Pedro Albite" />, "🟡 Morno"],
+          [<DealLink id="grupo-xyz" label="Grupo XYZ" />, "Reunião Realizada", "R$ 22k", "5d", <PersonLink id="thiago" label="Thiago" />, "🟡 Morno"],
         ]}
-        hint="5 deals que sustentam a meta — clicar abre detalhe e histórico"
+        hint="Clique no nome do cliente para abrir Brief IA + transcrição. Clique no closer para o dossier."
       />
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -569,23 +1422,23 @@ function VisaoExecutiva() {
           title="Ranking SDR — Atingimento da meta (RM)"
           cols={["SDR", "Meta", "Real", "Atinge%", "Ritmo"]}
           rows={[
-            ["Carlos Ramos", 30, 15, "50% 🟡", "no pace"],
-            ["Bruna P. Mota", 25, 9, "36% 🔴", "atrás"],
-            ["Erica Rocha", 20, 3, "15% 🔴", "atrás"],
-            ["Daniel Trindade", 15, 0, "0% 🔴", "atrás"],
+            [<PersonLink id="carlos" label="Carlos Ramos" />, 30, 15, "50% 🟡", "no pace"],
+            [<PersonLink id="bruna-sdr" label="Bruna P. Mota" />, 25, 9, "36% 🔴", "atrás"],
+            [<PersonLink id="erica" label="Erica Rocha" />, 20, 3, "15% 🔴", "atrás"],
+            [<PersonLink id="daniel-sdr" label="Daniel Trindade" />, 15, 0, "0% 🔴", "atrás"],
           ]}
-          hint="Ritmo: compara atingimento × % do mês transcorrido (50% do mês = atingimento esperado >=50%)"
+          hint="Clique no nome do SDR para o dossier individual com diagnóstico"
         />
         <MiniTable
           title="Ranking Closer — Atingimento da meta (Vendas)"
           cols={["Closer", "Meta", "Real", "Atinge%", "Ritmo"]}
           rows={[
-            ["Pedro Albite", 8, 6, "75% 🟢", "adiantado"],
-            ["Bruna", 6, 4, "67% 🟡", "no pace"],
-            ["Daniel Trindade", 6, 2, "33% 🔴", "atrás"],
-            ["Thiago", 5, 2, "40% 🔴", "atrás"],
+            [<PersonLink id="pedro" label="Pedro Albite" />, 8, 6, "75% 🟢", "adiantado"],
+            [<PersonLink id="bruna-closer" label="Bruna" />, 6, 4, "67% 🟡", "no pace"],
+            [<PersonLink id="daniel-closer" label="Daniel Trindade" />, 6, 2, "33% 🔴", "atrás"],
+            [<PersonLink id="thiago" label="Thiago" />, 5, 2, "40% 🔴", "atrás"],
           ]}
-          hint="Mesma lógica de ritmo. Clica no nome para ver detalhamento por etapa (RM/RR/Prop/Venda)"
+          hint="Clique no nome do Closer para ver detalhamento + top clientes"
         />
       </div>
     </div>
@@ -770,33 +1623,36 @@ function PipelineAberto() {
         title="🔥 Quentes — Propostas Enviadas (ação prioritária)"
         cols={["Cliente", "Dias parado", "MRR", "Closer", "Próxima ação"]}
         rows={[
-          ["Acme Holdings", "8d", "R$ 45k", "Pedro Albite", "Reunião decisora 18/05"],
-          ["Casa Viegas", "27d ⚠️", "R$ 25k", "Pedro Albite", "Follow-up — atrasou"],
-          ["Tech Inova", "18d ⚠️", "R$ 28k", "Bruna", "Aguardando contraproposta"],
-          ["Construtora Pampa", "15d", "R$ 32k", "Daniel T.", "Renegociar valor"],
+          [<DealLink id="acme" label="Acme Holdings" />, "8d", "R$ 45k", <PersonLink id="pedro" label="Pedro Albite" />, "Reunião decisora 18/05"],
+          [<DealLink id="casa-viegas" label="Casa Viegas" />, "27d ⚠️", "R$ 25k", <PersonLink id="pedro" label="Pedro Albite" />, "Follow-up — atrasou"],
+          [<DealLink id="tech-inova" label="Tech Inova" />, "18d ⚠️", "R$ 28k", <PersonLink id="bruna-closer" label="Bruna" />, "Aguardando contraproposta"],
+          [<DealLink id="construtora-pampa" label="Construtora Pampa" />, "15d", "R$ 32k", <PersonLink id="daniel-closer" label="Daniel T." />, "Renegociar valor"],
           ["+ 8 outros quentes…", "—", "—", "—", "—"],
         ]}
-        hint="Ordenado por valor. Cards >14d destacados — risco de virar Loss"
+        accent="border-red-500/20"
+        hint="Clique no nome do cliente para ver Brief IA + transcrição. Cards >14d destacados — risco de virar Loss."
       />
 
       <MiniTable
         title="🟡 Mornos — RR realizada, em negociação"
         cols={["Cliente", "Dias parado", "MRR", "Closer", "Próxima ação"]}
         rows={[
-          ["Grupo XYZ", "5d", "R$ 22k", "Thiago", "Enviar proposta"],
-          ["Distribuidora ABC", "12d", "R$ 18k", "Bruna", "Reunião técnica"],
+          [<DealLink id="grupo-xyz" label="Grupo XYZ" />, "5d", "R$ 22k", <PersonLink id="thiago" label="Thiago" />, "Enviar proposta"],
+          ["Distribuidora ABC", "12d", "R$ 18k", <PersonLink id="bruna-closer" label="Bruna" />, "Reunião técnica"],
           ["+ 16 outros mornos…", "—", "—", "—", "—"],
         ]}
+        accent="border-amber-500/20"
       />
 
       <MiniTable
         title="🔵 Frios — em qualificação (MQL + RM)"
         cols={["Cliente", "Dias parado", "MRR estimado", "SDR", "Status"]}
         rows={[
-          ["Lead 142", "1d", "R$ 12k", "Carlos Ramos", "RM agendada"],
-          ["Lead 138", "3d", "R$ 8k", "Bruna P.M.", "Em qualificação"],
+          ["Lead 142", "1d", "R$ 12k", <PersonLink id="carlos" label="Carlos Ramos" />, "RM agendada"],
+          ["Lead 138", "3d", "R$ 8k", <PersonLink id="bruna-sdr" label="Bruna P.M." />, "Em qualificação"],
           ["+ 40 outros frios…", "—", "—", "—", "—"],
         ]}
+        accent="border-blue-500/20"
       />
     </div>
   );
@@ -841,22 +1697,22 @@ function Pessoas() {
         title="Performance por SDR (período) — vs meta"
         cols={["SDR", "Meta", "Real", "Atinge%", "Ritmo", "RM→RR%", "Ciclo méd."]}
         rows={[
-          ["Carlos Ramos", 30, 22, "73% 🟢", "adiantado", "82%", "32d"],
-          ["Bruna P. Mota", 25, 18, "72% 🟢", "no pace", "88%", "28d"],
-          ["Erica Rocha", 20, 8, "40% 🟡", "atrás", "65%", "—"],
-          ["Daniel Trindade", 15, 1, "7% 🔴", "muito atrás", "—", "—"],
+          [<PersonLink id="carlos" label="Carlos Ramos" />, 30, 22, "73% 🟢", "adiantado", "82%", "32d"],
+          [<PersonLink id="bruna-sdr" label="Bruna P. Mota" />, 25, 18, "72% 🟢", "no pace", "88%", "28d"],
+          [<PersonLink id="erica" label="Erica Rocha" />, 20, 8, "40% 🟡", "atrás", "65%", "—"],
+          [<PersonLink id="daniel-sdr" label="Daniel Trindade" />, 15, 1, "7% 🔴", "muito atrás", "—", "—"],
         ]}
-        hint="Atingimento esperado pra hoje: ~67% do mês. Clica no nome para dossier individual com histórico semanal e gap diário."
+        hint="Atingimento esperado pra hoje: ~67% do mês. Clique no nome para dossier individual."
       />
 
       <MiniTable
         title="Performance por Closer (período) — vs meta"
         cols={["Closer", "Meta", "Real", "Atinge%", "Ritmo", "Win%", "Ticket", "Ciclo"]}
         rows={[
-          ["Pedro Albite", 8, 6, "75% 🟢", "adiantado", "30%", "R$ 28k", "10d"],
-          ["Bruna", 6, 4, "67% 🟡", "no pace", "27%", "R$ 22k", "9d"],
-          ["Daniel Trindade", 6, 2, "33% 🔴", "atrás", "12%", "R$ 18k", "18d ⚠️"],
-          ["Thiago", 5, 2, "40% 🔴", "atrás", "15%", "R$ 15k", "14d"],
+          [<PersonLink id="pedro" label="Pedro Albite" />, 8, 6, "75% 🟢", "adiantado", "30%", "R$ 28k", "10d"],
+          [<PersonLink id="bruna-closer" label="Bruna" />, 6, 4, "67% 🟡", "no pace", "27%", "R$ 22k", "9d"],
+          [<PersonLink id="daniel-closer" label="Daniel Trindade" />, 6, 2, "33% 🔴", "atrás", "12%", "R$ 18k", "18d ⚠️"],
+          [<PersonLink id="thiago" label="Thiago" />, 5, 2, "40% 🔴", "atrás", "15%", "R$ 15k", "14d"],
         ]}
         hint="Atingimento esperado: ~67%. Ticket revela quem fecha grande, Ciclo Prop→Venda longo sinaliza dificuldade no fechamento"
       />
@@ -1169,6 +2025,48 @@ export default function ComercialPreview() {
   const [sdr, setSdr] = useState("Todos SDRs");
   const [closer, setCloser] = useState("Todos Closers");
 
+  // Drill-down state
+  const [drawerDeal, setDrawerDeal] = useState<string | null>(null);
+  const [drawerDealList, setDrawerDealList] = useState<string[]>(QUENTES_LIST);
+  const [drawerPerson, setDrawerPerson] = useState<string | null>(null);
+  const [sheetList, setSheetList] = useState<{ title: string; items: { id: string; primary: string; secondary: string; right?: string }[] } | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [cheatOpen, setCheatOpen] = useState(false);
+
+  const drill: DrillContextValue = useMemo(() => ({
+    open: (target) => {
+      if (target.kind === "deal") { setDrawerDeal(target.id); setDrawerDealList(QUENTES_LIST.includes(target.id) ? QUENTES_LIST : [target.id]); }
+      if (target.kind === "person") setDrawerPerson(target.id);
+      if (target.kind === "list") setSheetList({ title: target.title, items: target.items });
+    },
+    navigateDeal: (delta) => {
+      if (!drawerDeal) return;
+      const idx = drawerDealList.indexOf(drawerDeal);
+      const next = idx + delta;
+      if (next >= 0 && next < drawerDealList.length) setDrawerDeal(drawerDealList[next]);
+    },
+  }), [drawerDeal, drawerDealList]);
+
+  // Atalhos globais
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target.isContentEditable;
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") { e.preventDefault(); setPaletteOpen(p => !p); return; }
+      if (isInput) return;
+      if (e.key === "?") { e.preventDefault(); setCheatOpen(o => !o); }
+      if (e.key === "Escape") {
+        if (drawerDeal) setDrawerDeal(null);
+        else if (drawerPerson) setDrawerPerson(null);
+        else if (sheetList) setSheetList(null);
+        else if (paletteOpen) setPaletteOpen(false);
+        else if (cheatOpen) setCheatOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawerDeal, drawerPerson, sheetList, paletteOpen, cheatOpen]);
+
   const takeaways: Record<string, { icon: React.ReactNode; label: string; headline: string; sub: string }> = {
     executiva: {
       icon: <Lightbulb className="h-4 w-4" />,
@@ -1204,14 +2102,15 @@ export default function ComercialPreview() {
   const tk = takeaways[tab];
 
   return (
+    <DrillContext.Provider value={drill}>
     <div className="o2-preview">
       <O2StyleScope />
       <div className="p-6 max-w-[1400px] mx-auto">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <span className="o2-eyebrow">● Preview v4 · Weekly Meeting</span>
-            <span className="o2-mono">Mock estático · sem dados reais</span>
+            <span className="o2-eyebrow">● Preview v5 · Drill-down universal</span>
+            <span className="o2-mono">Mock estático · ⌘K busca · ? atalhos</span>
           </div>
           <div className="flex items-end gap-5">
             <img
@@ -1269,14 +2168,63 @@ export default function ComercialPreview() {
 
         <div className="mt-10 p-4 rounded-lg" style={{ border: `1px dashed ${O2.lineStrong}`, background: O2.elev2 }}>
           <p className="text-xs" style={{ color: O2.muted }}>
-            <strong style={{ color: O2.lima }}>v4 — Pensado para weekly meeting:</strong> Barra de
-            filtros sticky no topo (período, BU, SDR, Closer) sempre visível ao navegar entre abas ·
-            Atalhos rápidos de período (Esta semana / Mês / Trimestre) · "Modo weekly" preparado
-            para apresentação · Cada aba abre com <strong>key takeaway</strong> — frase única
-            que resume o que discutir naquela sessão.
+            <strong style={{ color: O2.lima }}>v5 — Drill-down universal:</strong>
+            Clique em qualquer nome de cliente para abrir o <strong>Deal Drawer</strong> com
+            Brief IA + Reuniões com transcrição + Histórico + Dados.
+            Clique em qualquer nome de SDR/Closer para abrir o <strong>Dossier individual</strong>.
+            Use <kbd className="o2-mono px-1.5 py-0.5 rounded" style={{ background: O2.elev3, border: `1px solid ${O2.lineStrong}` }}>⌘K</kbd> para
+            buscar qualquer pessoa ou deal,
+            <kbd className="o2-mono px-1.5 py-0.5 rounded mx-1" style={{ background: O2.elev3, border: `1px solid ${O2.lineStrong}` }}>J/K</kbd>
+            para navegar entre deals,
+            <kbd className="o2-mono px-1.5 py-0.5 rounded mx-1" style={{ background: O2.elev3, border: `1px solid ${O2.lineStrong}` }}>?</kbd>
+            para ver todos os atalhos.
           </p>
         </div>
       </div>
+
+      {/* Drill-down — drawers, sheets, palette */}
+      {drawerDeal && (
+        <DealDrawer
+          dealId={drawerDeal}
+          list={drawerDealList}
+          onChange={setDrawerDeal}
+          onClose={() => setDrawerDeal(null)}
+        />
+      )}
+      {drawerPerson && (
+        <PessoaDrawer personId={drawerPerson} onClose={() => setDrawerPerson(null)} />
+      )}
+      {sheetList && (
+        <ListSheet
+          data={sheetList}
+          onClose={() => setSheetList(null)}
+          onPickDeal={(id) => { setSheetList(null); setDrawerDeal(id); setDrawerDealList(QUENTES_LIST); }}
+        />
+      )}
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        onPick={(t) => {
+          setPaletteOpen(false);
+          if (t.kind === "deal") { setDrawerDeal(t.id); setDrawerDealList(QUENTES_LIST.includes(t.id) ? QUENTES_LIST : [t.id]); }
+          if (t.kind === "person") setDrawerPerson(t.id);
+        }}
+      />
+      <CheatSheet open={cheatOpen} onClose={() => setCheatOpen(false)} />
+
+      {/* Floating ⌘K hint quando nada aberto */}
+      {!drawerDeal && !drawerPerson && !sheetList && !paletteOpen && !cheatOpen && (
+        <button
+          onClick={() => setPaletteOpen(true)}
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-2.5 rounded-full o2-mono"
+          style={{ background: O2.elev3, color: O2.fg, border: `1px solid ${O2.lineStrong}`, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}
+        >
+          <Search className="h-3.5 w-3.5" style={{ color: O2.lima }} />
+          Buscar
+          <kbd style={{ background: O2.surface, padding: "2px 6px", borderRadius: 4, fontSize: 9 }}>⌘K</kbd>
+        </button>
+      )}
     </div>
+    </DrillContext.Provider>
   );
 }
