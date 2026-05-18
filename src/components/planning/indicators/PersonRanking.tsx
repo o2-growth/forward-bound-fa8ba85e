@@ -27,11 +27,13 @@ interface PersonRankingProps {
 }
 
 function getPersonName(item: DetailItem, role: Role): { display: string; group: string } {
+  // SDR: usa SOMENTE item.sdr (sem fallback para responsible/closer)
   const raw = role === 'sdr'
-    ? (item.sdr || item.responsible || '').trim()
+    ? (item.sdr || '').trim()
     : (item.closer || '').trim();
   if (!raw) return { display: role === 'sdr' ? 'Sem SDR' : 'Sem Closer', group: '__none__' };
-  return { display: raw, group: raw.toLowerCase() };
+  // Agrupa por primeiro nome normalizado para não duplicar variações ('Carlos' vs 'Carlos Ramos')
+  return { display: raw, group: firstNameKey(raw) || raw.toLowerCase() };
 }
 
 function aggregateCounts(
@@ -51,6 +53,8 @@ function aggregateCounts(
       const ex = groups.get(group);
       if (ex) {
         ex.counts[key] = (ex.counts[key] || 0) + 1;
+        // Prefere o nome mais longo (geralmente o completo do Pipefy)
+        if (display.length > ex.display.length) ex.display = display;
       } else {
         groups.set(group, {
           display,
