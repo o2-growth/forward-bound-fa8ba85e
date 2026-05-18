@@ -260,6 +260,45 @@ export type Database = {
         }
         Relationships: []
       }
+      closer_absolute_metas: {
+        Row: {
+          closer: string
+          created_at: string
+          id: string
+          month: string
+          prop_meta: number
+          rm_meta: number
+          rr_meta: number
+          updated_at: string
+          venda_meta: number
+          year: number
+        }
+        Insert: {
+          closer: string
+          created_at?: string
+          id?: string
+          month: string
+          prop_meta?: number
+          rm_meta?: number
+          rr_meta?: number
+          updated_at?: string
+          venda_meta?: number
+          year?: number
+        }
+        Update: {
+          closer?: string
+          created_at?: string
+          id?: string
+          month?: string
+          prop_meta?: number
+          rm_meta?: number
+          rr_meta?: number
+          updated_at?: string
+          venda_meta?: number
+          year?: number
+        }
+        Relationships: []
+      }
       closer_metas: {
         Row: {
           bu: string

@@ -16,6 +16,7 @@ import { DeleteUserDialog } from './DeleteUserDialog';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { CloserMetasTab } from './CloserMetasTab';
 import { SdrMetasTab } from './SdrMetasTab';
+import { CloserAbsoluteMetasTab } from './CloserAbsoluteMetasTab';
 import { AdminLogsTab } from './AdminLogsTab';
 
 const TAB_OPTIONS: { key: TabKey; label: string }[] = [
@@ -142,6 +143,10 @@ export function AdminTab() {
         <TabsTrigger value="sdr-metas" className="gap-2">
           <Users className="h-4 w-4" />
           Metas por SDR
+        </TabsTrigger>
+        <TabsTrigger value="closer-abs-metas" className="gap-2">
+          <Target className="h-4 w-4" />
+          Metas Closer (Indicadores)
         </TabsTrigger>
         <TabsTrigger value="logs" className="gap-2">
           <History className="h-4 w-4" />
@@ -322,6 +327,10 @@ export function AdminTab() {
 
       <TabsContent value="sdr-metas">
         <SdrMetasTab />
+      </TabsContent>
+
+      <TabsContent value="closer-abs-metas">
+        <CloserAbsoluteMetasTab />
       </TabsContent>
 
       <TabsContent value="logs">

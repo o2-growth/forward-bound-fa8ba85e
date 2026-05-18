@@ -38,6 +38,7 @@ import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
+import { PersonRanking } from "./indicators/PersonRanking";
 import { CardInvestigator } from "./indicators/CardInvestigator";
 
 type ViewMode = 'daily' | 'accumulated';
@@ -2915,6 +2916,45 @@ export function IndicatorsTab() {
             weeks={getWeeksInRange(startDate, endDate)}
             itemsByIndicator={itemsByIndicator}
             indicatorConfigs={indicatorConfigs}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Rank de SDRs (vs metas absolutas, com rateio por dias úteis) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Rank SDRs (vs Meta)</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Posição por % de atingimento médio (RM/RR). Meta de Proposta e Venda ainda não cadastrada para SDRs.
+            Metas mensais rateadas pelos dias úteis do intervalo. Respeita filtros de data, BU, SDR e Closer.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <PersonRanking
+            role="sdr"
+            itemsByIndicator={itemsByIndicator}
+            startDate={startDate}
+            endDate={endDate}
+            selectedBUs={selectedBUs}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Rank de Closers (vs metas absolutas, com rateio por dias úteis) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Rank Closers (vs Meta)</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Posição por % de atingimento médio dos 4 indicadores. Metas mensais (admin) rateadas pelos dias úteis do intervalo.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <PersonRanking
+            role="closer"
+            itemsByIndicator={itemsByIndicator}
+            startDate={startDate}
+            endDate={endDate}
+            selectedBUs={selectedBUs}
           />
         </CardContent>
       </Card>
