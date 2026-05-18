@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,70 +8,337 @@ import {
   Info, ArrowUpRight, ArrowDownRight, AlertTriangle, Flame, Thermometer, Snowflake,
   Filter
 } from "lucide-react";
+import {
+  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell
+} from "recharts";
 
 /**
- * MOCK ESTÁTICO v2 — Indicadores Comerciais com 5 sub-páginas 100% comercial.
- *
- * Mudanças em relação ao v1 (baseado no feedback):
- * - Removida sub-aba "Origem & Canais" (era marketing-flavored). Virou
- *   widget DENTRO da sub-aba Funil
- * - Sub-aba Pipeline reorganizada por TEMPERATURA: 🔥 Quente / 🟡 Morno
- *   / 🔵 Frio. Quente = Proposta Enviada. Lead pronto pra fechar
- * - Perdas reforça que é "venda perdida" (motivo da perda do card),
- *   NÃO churn de cliente. Conceitos separados
- * - Visão Executiva enxugada — só pace + alertas comerciais + top deals
- *
- * Sem dado real. Tudo placeholder. Depois de aprovar, pluggo widget
- * por widget com hooks existentes (useModeloAtualAnalytics,
- * useExpansaoAnalytics, useFunnelMetas, etc.)
+ * MOCK ESTÁTICO v3 — Indicadores Comerciais com brand O2 aplicado.
+ * Dark mode, accent Lima 400 (#63F161), tipografia editorial (Anton/Montserrat/JetBrains Mono).
+ * Gráficos reais com Recharts substituindo todos os placeholders.
  */
 
-// ───────────── helpers visuais ─────────────
+// ───────────── Brand O2 tokens (escopados) ─────────────
+const O2 = {
+  bg: "#3A3A3A",
+  surface: "#2E2E2E",
+  elev2: "#252525",
+  elev3: "#1F1F1F",
+  line: "rgba(255,255,255,0.08)",
+  lineStrong: "rgba(255,255,255,0.14)",
+  fg: "#FAFAFA",
+  muted: "#C4C4C4",
+  subtle: "#9A9A9A",
+  lima: "#63F161",
+  limaSoft: "rgba(99,241,97,0.16)",
+  limaLine: "rgba(99,241,97,0.4)",
+  amber: "#F5B342",
+  red: "#FF6B6B",
+  blue: "#5BC0EB",
+};
+
+const FONT_DISPLAY = "'Anton', 'Tusker Grotesk', 'Bebas Neue', Impact, sans-serif";
+const FONT_MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace";
+const FONT_BODY = "'Montserrat', system-ui, -apple-system, sans-serif";
+
+// ───────────── style block escopado ao .o2-preview ─────────────
+function O2StyleScope() {
+  return (
+    <>
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=Anton&family=Montserrat:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet"
+      />
+      <style>{`
+        .o2-preview {
+          --o2-bg: ${O2.bg};
+          --o2-surface: ${O2.surface};
+          --o2-elev2: ${O2.elev2};
+          --o2-elev3: ${O2.elev3};
+          --o2-line: ${O2.line};
+          --o2-line-strong: ${O2.lineStrong};
+          --o2-fg: ${O2.fg};
+          --o2-muted: ${O2.muted};
+          --o2-subtle: ${O2.subtle};
+          --o2-lima: ${O2.lima};
+          --o2-lima-soft: ${O2.limaSoft};
+          background: var(--o2-bg);
+          color: var(--o2-fg);
+          font-family: ${FONT_BODY};
+          font-weight: 400;
+          letter-spacing: 0;
+          min-height: 100vh;
+        }
+        .o2-preview * { border-color: var(--o2-line); }
+        .o2-preview .o2-display {
+          font-family: ${FONT_DISPLAY};
+          text-transform: uppercase;
+          line-height: 0.96;
+          letter-spacing: 0.01em;
+          font-weight: 700;
+          color: var(--o2-fg);
+        }
+        .o2-preview .o2-mono {
+          font-family: ${FONT_MONO};
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          font-weight: 500;
+          font-size: 10px;
+          color: var(--o2-muted);
+        }
+        .o2-preview .o2-eyebrow {
+          font-family: ${FONT_MONO};
+          text-transform: uppercase;
+          letter-spacing: 0.18em;
+          font-weight: 600;
+          font-size: 10px;
+          color: var(--o2-lima);
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          border: 1px solid var(--o2-lima);
+          border-radius: 999px;
+          background: var(--o2-lima-soft);
+        }
+        .o2-preview [class*="rounded-lg"],
+        .o2-preview [class*="rounded-md"] { border-radius: 12px; }
+
+        /* Card overrides */
+        .o2-preview [data-slot="card"],
+        .o2-preview .o2-card {
+          background: var(--o2-surface);
+          border: 1px solid var(--o2-line);
+          border-radius: 20px;
+          color: var(--o2-fg);
+          box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset, 0 8px 24px rgba(0,0,0,0.18);
+        }
+        .o2-preview [data-slot="card-title"] {
+          font-family: ${FONT_BODY};
+          font-weight: 600;
+          color: var(--o2-fg);
+          letter-spacing: 0.01em;
+        }
+        .o2-preview .text-muted-foreground { color: var(--o2-muted) !important; }
+        .o2-preview .text-foreground { color: var(--o2-fg) !important; }
+        .o2-preview h1,
+        .o2-preview h2,
+        .o2-preview h3 { color: var(--o2-fg); }
+
+        /* Badge override */
+        .o2-preview [data-slot="badge"] {
+          background: rgba(255,255,255,0.05);
+          color: var(--o2-muted);
+          border: 1px solid var(--o2-line-strong);
+          font-family: ${FONT_MONO};
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          font-weight: 500;
+          border-radius: 999px;
+        }
+        .o2-preview .o2-badge-lima {
+          background: var(--o2-lima-soft) !important;
+          color: var(--o2-lima) !important;
+          border-color: ${O2.limaLine} !important;
+        }
+
+        /* Buttons */
+        .o2-preview [data-slot="button"] {
+          font-family: ${FONT_MONO};
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          font-weight: 500;
+          font-size: 11px;
+          border-radius: 999px;
+          transition: all 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .o2-preview [data-slot="button"][data-variant="outline"],
+        .o2-preview button[class*="border"] {
+          background: transparent;
+          border: 1px solid var(--o2-line-strong);
+          color: var(--o2-fg);
+        }
+        .o2-preview [data-slot="button"][data-variant="default"] {
+          background: var(--o2-lima);
+          color: #0A0A0A;
+        }
+        .o2-preview [data-slot="button"]:hover {
+          border-color: var(--o2-lima);
+          color: var(--o2-lima);
+        }
+
+        /* Tabs */
+        .o2-preview [data-slot="tabs-list"] {
+          background: var(--o2-elev2);
+          border: 1px solid var(--o2-line);
+          padding: 4px;
+          border-radius: 14px;
+        }
+        .o2-preview [data-slot="tabs-trigger"] {
+          font-family: ${FONT_MONO};
+          text-transform: uppercase;
+          letter-spacing: 0.12em;
+          font-size: 10.5px;
+          font-weight: 500;
+          color: var(--o2-muted);
+          border-radius: 10px;
+          position: relative;
+          transition: all 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .o2-preview [data-slot="tabs-trigger"][data-state="active"] {
+          background: var(--o2-elev3);
+          color: var(--o2-lima);
+          box-shadow: inset 0 -2px 0 var(--o2-lima);
+        }
+
+        /* Inputs / tables / dividers */
+        .o2-preview table thead th {
+          font-family: ${FONT_MONO};
+          text-transform: uppercase;
+          letter-spacing: 0.14em;
+          font-size: 10px;
+          color: var(--o2-subtle);
+          font-weight: 500;
+        }
+        .o2-preview table tbody td { color: var(--o2-fg); font-size: 12.5px; }
+        .o2-preview table tr { border-color: var(--o2-line) !important; }
+        .o2-preview table tbody tr:hover { background: rgba(99,241,97,0.04); }
+
+        /* KPI big number */
+        .o2-preview .o2-kpi {
+          font-family: ${FONT_DISPLAY};
+          font-weight: 700;
+          font-size: 38px;
+          line-height: 0.96;
+          letter-spacing: 0.01em;
+          color: var(--o2-fg);
+        }
+        .o2-preview .o2-kpi-sm {
+          font-family: ${FONT_DISPLAY};
+          font-weight: 700;
+          font-size: 30px;
+          line-height: 0.96;
+          color: var(--o2-fg);
+        }
+
+        /* Temperature card gradients */
+        .o2-preview .o2-temp-hot {
+          background: linear-gradient(140deg, ${O2.surface} 0%, rgba(255,107,107,0.08) 100%);
+          border: 1px solid;
+          border-image: linear-gradient(140deg, ${O2.lineStrong}, rgba(255,107,107,0.5)) 1;
+          border-radius: 20px;
+        }
+        .o2-preview .o2-temp-warm {
+          background: linear-gradient(140deg, ${O2.surface} 0%, rgba(245,179,66,0.08) 100%);
+          border: 1px solid;
+          border-image: linear-gradient(140deg, ${O2.lineStrong}, rgba(245,179,66,0.5)) 1;
+          border-radius: 20px;
+        }
+        .o2-preview .o2-temp-cold {
+          background: linear-gradient(140deg, ${O2.surface} 0%, rgba(91,192,235,0.08) 100%);
+          border: 1px solid;
+          border-image: linear-gradient(140deg, ${O2.lineStrong}, rgba(91,192,235,0.5)) 1;
+          border-radius: 20px;
+        }
+
+        /* Recharts text */
+        .o2-preview .recharts-cartesian-axis-tick text,
+        .o2-preview .recharts-text {
+          fill: ${O2.subtle};
+          font-family: ${FONT_MONO};
+          font-size: 10px;
+          letter-spacing: 0.1em;
+        }
+        .o2-preview .recharts-cartesian-grid-horizontal line,
+        .o2-preview .recharts-cartesian-grid-vertical line {
+          stroke: rgba(255,255,255,0.06);
+        }
+        .o2-preview .recharts-default-tooltip {
+          background: ${O2.elev3} !important;
+          border: 1px solid ${O2.lineStrong} !important;
+          border-radius: 12px !important;
+          color: ${O2.fg} !important;
+        }
+
+        /* Heatmap cell */
+        .o2-preview .o2-heat {
+          border-radius: 6px;
+          aspect-ratio: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: ${FONT_MONO};
+          font-size: 10px;
+          color: rgba(255,255,255,0.85);
+        }
+      `}</style>
+    </>
+  );
+}
+
+// ───────────── chart helpers ─────────────
+const tooltipStyle = {
+  background: O2.elev3,
+  border: `1px solid ${O2.lineStrong}`,
+  borderRadius: 12,
+  color: O2.fg,
+  fontFamily: FONT_MONO,
+  fontSize: 11,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase" as const,
+};
+const labelStyle = { color: O2.muted, fontFamily: FONT_MONO, fontSize: 10 };
+
+// ───────────── visual helpers ─────────────
 function MockNumber({ value, delta, meta, label, hint, accent }: { value: string; delta?: string; meta?: string; label: string; hint?: string; accent?: string }) {
   const isPositive = delta?.startsWith('+');
   const isNegative = delta?.startsWith('-');
   return (
     <Card className={accent}>
       <CardContent className="pt-4 pb-3 px-4">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs text-muted-foreground">{label}</span>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="o2-mono">{label}</span>
           <Info className="h-3 w-3 ml-auto opacity-50 cursor-help" />
         </div>
-        <p className="text-2xl font-bold">{value}</p>
-        <div className="flex items-center gap-2 mt-1">
+        <p className="o2-kpi-sm">{value}</p>
+        <div className="flex items-center gap-2 mt-2">
           {delta && (
-            <span className={`text-[11px] flex items-center gap-0.5 ${isPositive ? 'text-emerald-600' : isNegative ? 'text-red-600' : 'text-muted-foreground'}`}>
+            <span
+              className="text-[10px] flex items-center gap-0.5"
+              style={{
+                fontFamily: FONT_MONO,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: isPositive ? O2.lima : isNegative ? O2.red : O2.muted,
+              }}
+            >
               {isPositive && <ArrowUpRight className="h-3 w-3" />}
               {isNegative && <ArrowDownRight className="h-3 w-3" />}
               {delta} vs sem. ant.
             </span>
           )}
-          {meta && <span className="text-[10px] text-muted-foreground">meta: {meta}</span>}
+          {meta && <span className="o2-mono" style={{ fontSize: 9 }}>meta: {meta}</span>}
         </div>
-        {hint && <p className="text-[10px] text-muted-foreground mt-1">{hint}</p>}
+        {hint && <p className="text-[10.5px] mt-2" style={{ color: O2.subtle }}>{hint}</p>}
       </CardContent>
     </Card>
   );
 }
 
-function Placeholder({ title, height = 200, hint }: { title: string; height?: number; hint?: string }) {
+function ChartCard({ title, hint, children, accent }: { title: string; hint?: string; children: React.ReactNode; accent?: string }) {
   return (
-    <Card>
+    <Card className={accent}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-          <Badge variant="outline" className="text-[10px] font-normal">mock</Badge>
+          <CardTitle className="text-sm">{title}</CardTitle>
+          <Badge variant="outline" className="o2-badge-lima text-[9px]">mock</Badge>
         </div>
-        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+        {hint && <p className="text-[11px]" style={{ color: O2.subtle }}>{hint}</p>}
       </CardHeader>
-      <CardContent>
-        <div
-          className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/20 flex items-center justify-center text-xs text-muted-foreground"
-          style={{ height }}
-        >
-          📊 {title} — placeholder
-        </div>
-      </CardContent>
+      <CardContent>{children}</CardContent>
     </Card>
   );
 }
@@ -81,22 +348,22 @@ function MiniTable({ title, rows, cols, hint, accent }: { title: string; rows: (
     <Card className={accent}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold">{title}</CardTitle>
-          <Badge variant="outline" className="text-[10px]">mock</Badge>
+          <CardTitle className="text-sm">{title}</CardTitle>
+          <Badge variant="outline" className="o2-badge-lima text-[9px]">mock</Badge>
         </div>
-        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+        {hint && <p className="text-[11px]" style={{ color: O2.subtle }}>{hint}</p>}
       </CardHeader>
       <CardContent>
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b">
-              {cols.map((c, i) => <th key={i} className={`py-1.5 px-2 text-left font-medium text-muted-foreground ${i > 0 ? 'text-right' : ''}`}>{c}</th>)}
+            <tr style={{ borderBottom: `1px solid ${O2.line}` }}>
+              {cols.map((c, i) => <th key={i} className={`py-2 px-2 text-left ${i > 0 ? 'text-right' : ''}`}>{c}</th>)}
             </tr>
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} className="border-b last:border-b-0 hover:bg-muted/30">
-                {r.map((cell, j) => <td key={j} className={`py-1.5 px-2 ${j > 0 ? 'text-right tabular-nums' : ''}`}>{cell}</td>)}
+              <tr key={i} style={{ borderBottom: `1px solid ${O2.line}` }}>
+                {r.map((cell, j) => <td key={j} className={`py-2 px-2 ${j > 0 ? 'text-right tabular-nums' : ''}`}>{cell}</td>)}
               </tr>
             ))}
           </tbody>
@@ -107,29 +374,118 @@ function MiniTable({ title, rows, cols, hint, accent }: { title: string; rows: (
 }
 
 function AlertCard({ tone, title, body }: { tone: 'critico' | 'alto' | 'info'; title: string; body: string }) {
-  const colors = {
-    critico: 'border-red-500/30 bg-red-500/5 text-red-600',
-    alto: 'border-amber-500/30 bg-amber-500/5 text-amber-700',
-    info: 'border-blue-500/30 bg-blue-500/5 text-blue-700',
-  };
+  const palette = {
+    critico: { bg: "rgba(255,107,107,0.08)", border: "rgba(255,107,107,0.35)", fg: O2.red },
+    alto: { bg: "rgba(245,179,66,0.08)", border: "rgba(245,179,66,0.35)", fg: O2.amber },
+    info: { bg: "rgba(91,192,235,0.08)", border: "rgba(91,192,235,0.35)", fg: O2.blue },
+  }[tone];
   return (
-    <div className={`flex items-start gap-2 p-3 rounded-lg border ${colors[tone]}`}>
-      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+    <div
+      className="flex items-start gap-2 p-3 rounded-lg border"
+      style={{ background: palette.bg, borderColor: palette.border }}
+    >
+      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: palette.fg }} />
       <div className="flex-1 text-xs">
-        <div className="font-semibold mb-0.5">{title}</div>
-        <div className="opacity-90">{body}</div>
+        <div className="font-semibold mb-0.5" style={{ color: palette.fg }}>{title}</div>
+        <div style={{ color: O2.muted }}>{body}</div>
       </div>
       <Button variant="ghost" size="sm" className="h-6 text-[10px]">Ver</Button>
     </div>
   );
 }
 
+// ───────────── mock data ─────────────
+const paceData = Array.from({ length: 14 }, (_, i) => {
+  const d = i + 1;
+  return { dia: `D${d}`, realizado: Math.round(d * 1.0 + (i > 6 ? -0.5 * (i - 6) : 0)), meta: Math.round(d * 2) };
+});
+
+const semanaCompData = [
+  { fase: "MQL", S1: 78, S2: 64 },
+  { fase: "RM", S1: 32, S2: 36 },
+  { fase: "RR", S1: 11, S2: 9 },
+  { fase: "Prop", S1: 14, S2: 16 },
+  { fase: "Venda", S1: 4, S2: 4 },
+];
+
+const funilModeloAtual = [
+  { name: "MQL", value: 142, fill: O2.lima },
+  { name: "RM", value: 68, fill: "#A8F299" },
+  { name: "RR", value: 54, fill: O2.amber },
+  { name: "Proposta", value: 30, fill: "#FF9B5B" },
+  { name: "Venda", value: 8, fill: O2.red },
+];
+const funilExpansao = [
+  { name: "MQL", value: 58, fill: O2.lima },
+  { name: "RM", value: 22, fill: "#A8F299" },
+  { name: "RR", value: 18, fill: O2.amber },
+  { name: "Proposta", value: 10, fill: "#FF9B5B" },
+  { name: "Venda", value: 3, fill: O2.red },
+];
+
+const convTrend = Array.from({ length: 12 }, (_, i) => ({
+  sem: `S${i + 1}`,
+  "MQL→RM": 60 + Math.round(Math.sin(i / 2) * 6 + i * 0.4),
+  "RM→RR": 76 + Math.round(Math.cos(i / 2.4) * 5),
+  "RR→Prop": 52 + Math.round(Math.sin(i / 1.6) * 7),
+  "Prop→Venda": 28 - Math.round(i * 0.5),
+}));
+
+const sankeyBar = [
+  { fase: "MQL", Avança: 68, Loss: 74 },
+  { fase: "RM", Avança: 54, Loss: 14 },
+  { fase: "RR", Avança: 30, Loss: 24 },
+  { fase: "Proposta", Avança: 8, Loss: 22 },
+];
+
+const heatSDR = ["Carlos", "Bruna", "Erica", "Daniel", "Pedro"];
+const heatDias = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+const heatValues = [
+  [18, 14, 16, 12, 10, 4, 1],
+  [15, 17, 13, 14, 12, 3, 0],
+  [8, 6, 9, 7, 5, 1, 0],
+  [4, 3, 2, 5, 3, 0, 0],
+  [12, 11, 10, 13, 9, 2, 1],
+];
+
+const winRateCloser = [
+  { closer: "Pedro Albite", "Até 50k": 38, "50–200k": 32, "200k+": 22 },
+  { closer: "Bruna", "Até 50k": 30, "50–200k": 28, "200k+": 18 },
+  { closer: "Daniel T.", "Até 50k": 22, "50–200k": 12, "200k+": 6 },
+  { closer: "Thiago", "Até 50k": 25, "50–200k": 18, "200k+": 8 },
+];
+
+const perdaCross = {
+  motivos: ["Não viu valor", "Sem orçamento", "Concorrência", "Não respondeu", "Outros"],
+  faixas: ["Até 50k", "50–200k", "200k+"],
+  values: [
+    [4, 3, 2],
+    [3, 2, 1],
+    [1, 1, 2],
+    [2, 1, 0],
+    [1, 0, 0],
+  ],
+};
+const perdaPorFase = [
+  { fase: "MQL", perdas: 32 },
+  { fase: "RM", perdas: 18 },
+  { fase: "RR", perdas: 12 },
+  { fase: "Proposta", perdas: 8 },
+];
+const tendenciaMotivos = Array.from({ length: 6 }, (_, i) => ({
+  mes: ["Dez", "Jan", "Fev", "Mar", "Abr", "Mai"][i],
+  "Não viu valor": 5 + i,
+  "Sem orçamento": 4 + Math.round(i * 0.7),
+  "Concorrência": 2 + Math.round(i * 0.9),
+  "Não respondeu": 3 + Math.round(Math.sin(i) * 1.5),
+  "Outros": 2,
+}));
+
 // ───────────── Sub-páginas ─────────────
 
 function VisaoExecutiva() {
   return (
     <div className="space-y-6">
-      {/* Faixa de KPIs hero */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <MockNumber label="Pace Vendas (Maio)" value="14/28" delta="-12%" meta="28" hint="50% do mês, 67% transcorrido" />
         <MockNumber label="Pace MRR (Maio)" value="R$ 187k" delta="+8%" meta="R$ 320k" hint="58% da meta" />
@@ -138,14 +494,13 @@ function VisaoExecutiva() {
         <MockNumber label="Concentração top 5" value="62%" delta="+5pp" hint="da meta restante em 5 deals" />
       </div>
 
-      {/* Alertas auto */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <CardTitle className="text-sm flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" style={{ color: O2.amber }} />
               Alertas automáticos
-              <Badge variant="outline" className="text-[10px]">3</Badge>
+              <Badge variant="outline" className="text-[9px]">3</Badge>
             </CardTitle>
             <Button variant="ghost" size="sm" className="text-xs">Configurar regras</Button>
           </div>
@@ -161,13 +516,35 @@ function VisaoExecutiva() {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Placeholder title="Pace gráfico — Vendas realizadas vs meta (acumulado Maio)" height={240}
-          hint="Linha realizado vs linha meta + área de gap" />
-        <Placeholder title="Comparativo Semanal compacto (S1 vs S2)" height={240}
-          hint="MQL/RM/RR/Prop/Venda + Δ% por etapa" />
+        <ChartCard title="Pace gráfico — Vendas realizadas vs meta (acumulado Maio)" hint="Linha realizado vs linha meta">
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={paceData} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="dia" />
+              <YAxis />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} />
+              <Legend wrapperStyle={{ fontFamily: FONT_MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em" }} />
+              <Line type="monotone" dataKey="meta" stroke={O2.subtle} strokeWidth={2} strokeDasharray="5 5" dot={false} />
+              <Line type="monotone" dataKey="realizado" stroke={O2.lima} strokeWidth={2.5} dot={{ fill: O2.lima, r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Comparativo Semanal compacto (S1 vs S2)" hint="MQL/RM/RR/Prop/Venda + Δ% por etapa">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={semanaCompData} margin={{ top: 10, right: 12, bottom: 0, left: -10 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="fase" />
+              <YAxis />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} cursor={{ fill: "rgba(99,241,97,0.06)" }} />
+              <Legend wrapperStyle={{ fontFamily: FONT_MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em" }} />
+              <Bar dataKey="S1" fill={O2.subtle} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="S2" fill={O2.lima} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
-      {/* Top 5 oportunidades — destaque de gestão */}
       <MiniTable
         title="🎯 Top 5 oportunidades por valor (próximas a fechar)"
         cols={["Cliente", "Fase", "MRR", "Dias na fase", "Closer", "Temperatura"]}
@@ -219,8 +596,29 @@ function FunilConversao() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Placeholder title="Funil visual — Modelo Atual" height={280} hint="MQL → RM → RR → Prop → Venda com volumes e %" />
-        <Placeholder title="Funil visual — Expansão / Franquia" height={280} hint="Mesmo formato, side-by-side" />
+        <ChartCard title="Funil visual — Modelo Atual" hint="MQL → RM → RR → Prop → Venda com volumes">
+          <ResponsiveContainer width="100%" height={280}>
+            <FunnelChart>
+              <Tooltip contentStyle={tooltipStyle} />
+              <Funnel dataKey="value" data={funilModeloAtual} isAnimationActive>
+                <LabelList position="right" fill={O2.fg} stroke="none" dataKey="name" style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.1em" }} />
+                <LabelList position="center" fill="#0A0A0A" stroke="none" dataKey="value" style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }} />
+              </Funnel>
+            </FunnelChart>
+          </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="Funil visual — Expansão / Franquia" hint="Mesmo formato, side-by-side">
+          <ResponsiveContainer width="100%" height={280}>
+            <FunnelChart>
+              <Tooltip contentStyle={tooltipStyle} />
+              <Funnel dataKey="value" data={funilExpansao} isAnimationActive>
+                <LabelList position="right" fill={O2.fg} stroke="none" dataKey="name" style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.1em" }} />
+                <LabelList position="center" fill="#0A0A0A" stroke="none" dataKey="value" style={{ fontFamily: FONT_DISPLAY, fontSize: 18 }} />
+              </Funnel>
+            </FunnelChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -236,19 +634,42 @@ function FunilConversao() {
           ]}
           hint="Calculado de Saída - Entrada por fase. Gargalo: Proposta crescendo."
         />
-        <Placeholder title="Conversion rate por fase — tendência 12 semanas" height={240}
-          hint="Linhas sobrepostas: MQL→RM, RM→RR, etc." />
+        <ChartCard title="Conversion rate por fase — tendência 12 semanas" hint="Linhas sobrepostas">
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={convTrend} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="sem" />
+              <YAxis />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} />
+              <Legend wrapperStyle={{ fontFamily: FONT_MONO, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em" }} />
+              <Line type="monotone" dataKey="MQL→RM" stroke={O2.lima} strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="RM→RR" stroke={O2.amber} strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="RR→Prop" stroke={O2.blue} strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="Prop→Venda" stroke={O2.red} strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
-      <Placeholder title="Sankey: para onde vão os cards de cada fase" height={300}
-        hint="Visualiza quanto avança vs quanto vai pra Loss em cada etapa" />
+      <ChartCard title="Sankey: para onde vão os cards de cada fase" hint="Avança vs Loss por etapa (barra horizontal empilhada)">
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={sankeyBar} layout="vertical" margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis type="number" />
+            <YAxis type="category" dataKey="fase" width={80} />
+            <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} cursor={{ fill: "rgba(99,241,97,0.06)" }} />
+            <Legend wrapperStyle={{ fontFamily: FONT_MONO, fontSize: 10, textTransform: "uppercase", letterSpacing: "0.1em" }} />
+            <Bar dataKey="Avança" stackId="a" fill={O2.lima} radius={[4, 0, 0, 4]} />
+            <Bar dataKey="Loss" stackId="a" fill={O2.red} radius={[0, 4, 4, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
 
-      {/* Sub-seção: Origem do lead (era sub-aba — agora widget aqui dentro) */}
       <div>
         <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Filter className="h-4 w-4" style={{ color: O2.muted }} />
           Origem do lead (como entra no funil)
-          <Badge variant="outline" className="text-[10px] font-normal">filtro auxiliar</Badge>
+          <Badge variant="outline" className="text-[9px]">filtro auxiliar</Badge>
         </h3>
         <MiniTable
           title="Conversão por fonte"
@@ -278,44 +699,40 @@ function PipelineAberto() {
         <Button variant="outline" size="sm" className="text-xs">Produto: todos</Button>
       </div>
 
-      {/* KPIs por temperatura */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-red-500/30 bg-red-500/5">
-          <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Flame className="h-5 w-5 text-red-600" />
-              <span className="text-sm font-bold text-red-700">🔥 QUENTES</span>
-              <Badge variant="outline" className="ml-auto text-[10px] border-red-500/40">Proposta Enviada</Badge>
-            </div>
-            <p className="text-3xl font-bold">12 cards</p>
-            <p className="text-xs text-muted-foreground mt-1">R$ 268k em MRR · forecast ponderado R$ 67k (25% win)</p>
-            <p className="text-[11px] text-red-700 mt-2">⚠️ 3 esfriando (&gt;14d sem fechar)</p>
-          </CardContent>
-        </Card>
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Thermometer className="h-5 w-5 text-amber-600" />
-              <span className="text-sm font-bold text-amber-700">🟡 MORNOS</span>
-              <Badge variant="outline" className="ml-auto text-[10px] border-amber-500/40">RR realizada</Badge>
-            </div>
-            <p className="text-3xl font-bold">18 cards</p>
-            <p className="text-xs text-muted-foreground mt-1">R$ 312k em MRR · forecast ponderado R$ 47k (15% win)</p>
-            <p className="text-[11px] text-amber-700 mt-2">Próximo passo: enviar proposta</p>
-          </CardContent>
-        </Card>
-        <Card className="border-blue-500/30 bg-blue-500/5">
-          <CardContent className="pt-4 pb-3 px-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Snowflake className="h-5 w-5 text-blue-600" />
-              <span className="text-sm font-bold text-blue-700">🔵 FRIOS</span>
-              <Badge variant="outline" className="ml-auto text-[10px] border-blue-500/40">MQL + RM</Badge>
-            </div>
-            <p className="text-3xl font-bold">42 cards</p>
-            <p className="text-xs text-muted-foreground mt-1">R$ 188k em MRR · forecast ponderado R$ 12k (6% win)</p>
-            <p className="text-[11px] text-blue-700 mt-2">Próximo passo: qualificar e agendar RM/RR</p>
-          </CardContent>
-        </Card>
+        <div className="o2-temp-hot p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Flame className="h-5 w-5" style={{ color: O2.red }} />
+            <span className="o2-mono" style={{ color: O2.red, fontSize: 11 }}>🔥 Quentes</span>
+            <Badge variant="outline" className="ml-auto text-[9px]">Proposta Enviada</Badge>
+          </div>
+          <p className="o2-kpi">12</p>
+          <p className="o2-mono mt-1" style={{ color: O2.muted }}>cards</p>
+          <p className="text-xs mt-2" style={{ color: O2.muted }}>R$ 268k em MRR · forecast ponderado R$ 67k (25% win)</p>
+          <p className="text-[11px] mt-2" style={{ color: O2.red }}>⚠️ 3 esfriando (&gt;14d sem fechar)</p>
+        </div>
+        <div className="o2-temp-warm p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Thermometer className="h-5 w-5" style={{ color: O2.amber }} />
+            <span className="o2-mono" style={{ color: O2.amber, fontSize: 11 }}>🟡 Mornos</span>
+            <Badge variant="outline" className="ml-auto text-[9px]">RR realizada</Badge>
+          </div>
+          <p className="o2-kpi">18</p>
+          <p className="o2-mono mt-1" style={{ color: O2.muted }}>cards</p>
+          <p className="text-xs mt-2" style={{ color: O2.muted }}>R$ 312k em MRR · forecast ponderado R$ 47k (15% win)</p>
+          <p className="text-[11px] mt-2" style={{ color: O2.amber }}>Próximo passo: enviar proposta</p>
+        </div>
+        <div className="o2-temp-cold p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Snowflake className="h-5 w-5" style={{ color: O2.blue }} />
+            <span className="o2-mono" style={{ color: O2.blue, fontSize: 11 }}>🔵 Frios</span>
+            <Badge variant="outline" className="ml-auto text-[9px]">MQL + RM</Badge>
+          </div>
+          <p className="o2-kpi">42</p>
+          <p className="o2-mono mt-1" style={{ color: O2.muted }}>cards</p>
+          <p className="text-xs mt-2" style={{ color: O2.muted }}>R$ 188k em MRR · forecast ponderado R$ 12k (6% win)</p>
+          <p className="text-[11px] mt-2" style={{ color: O2.blue }}>Próximo passo: qualificar e agendar RM/RR</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -325,7 +742,6 @@ function PipelineAberto() {
         <MockNumber label="Próximas 7 dias" value="6 fechamentos" hint="próxima ação prevista" />
       </div>
 
-      {/* Tabela de quentes (destaque máximo) */}
       <MiniTable
         title="🔥 Quentes — Propostas Enviadas (ação prioritária)"
         cols={["Cliente", "Dias parado", "MRR", "Closer", "Próxima ação"]}
@@ -336,7 +752,6 @@ function PipelineAberto() {
           ["Construtora Pampa", "15d", "R$ 32k", "Daniel T.", "Renegociar valor"],
           ["+ 8 outros quentes…", "—", "—", "—", "—"],
         ]}
-        accent="border-red-500/20"
         hint="Ordenado por valor. Cards >14d destacados — risco de virar Loss"
       />
 
@@ -348,7 +763,6 @@ function PipelineAberto() {
           ["Distribuidora ABC", "12d", "R$ 18k", "Bruna", "Reunião técnica"],
           ["+ 16 outros mornos…", "—", "—", "—", "—"],
         ]}
-        accent="border-amber-500/20"
       />
 
       <MiniTable
@@ -359,9 +773,34 @@ function PipelineAberto() {
           ["Lead 138", "3d", "R$ 8k", "Bruna P.M.", "Em qualificação"],
           ["+ 40 outros frios…", "—", "—", "—", "—"],
         ]}
-        accent="border-blue-500/20"
       />
     </div>
+  );
+}
+
+function HeatmapAtividade() {
+  const max = 20;
+  return (
+    <ChartCard title="Heatmap: atividade × dia da semana" hint="Quando os SDRs estão agendando RM/RR? (revela produtividade)">
+      <div style={{ display: "grid", gridTemplateColumns: "80px repeat(7, 1fr)", gap: 6 }}>
+        <div />
+        {heatDias.map((d) => (
+          <div key={d} className="o2-mono text-center" style={{ fontSize: 9 }}>{d}</div>
+        ))}
+        {heatSDR.map((sdr, i) => (
+          <Fragment key={sdr}>
+            <div className="o2-mono flex items-center" style={{ fontSize: 9 }}>{sdr}</div>
+            {heatValues[i].map((v, j) => {
+              const intensity = v / max;
+              const bg = `rgba(99,241,97,${0.08 + intensity * 0.72})`;
+              return (
+                <div key={`${i}-${j}`} className="o2-heat" style={{ background: bg }}>{v}</div>
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
+    </ChartCard>
   );
 }
 
@@ -371,7 +810,7 @@ function Pessoas() {
       <div className="flex items-center gap-2">
         <Button variant="default" size="sm">SDR</Button>
         <Button variant="ghost" size="sm">Closer</Button>
-        <span className="text-xs text-muted-foreground ml-2">filtro: BU, período</span>
+        <span className="o2-mono ml-2">filtro: BU, período</span>
       </div>
 
       <MiniTable
@@ -398,22 +837,89 @@ function Pessoas() {
       />
 
       <div className="grid md:grid-cols-2 gap-4">
-        <Placeholder title="Heatmap: atividade × dia da semana" height={240}
-          hint="Quando os SDRs estão agendando RM/RR? (revela produtividade)" />
-        <Placeholder title="Win rate por closer × faixa de faturamento" height={240}
-          hint="Quem ganha mais em ticket alto vs ticket baixo" />
+        <HeatmapAtividade />
+        <ChartCard title="Win rate por closer × faixa de faturamento" hint="Quem ganha mais em ticket alto vs ticket baixo">
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={winRateCloser} layout="vertical" margin={{ top: 8, right: 12, bottom: 0, left: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis type="number" />
+              <YAxis type="category" dataKey="closer" width={90} />
+              <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} cursor={{ fill: "rgba(99,241,97,0.06)" }} />
+              <Legend wrapperStyle={{ fontFamily: FONT_MONO, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em" }} />
+              <Bar dataKey="Até 50k" fill={O2.lima} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="50–200k" fill={O2.amber} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="200k+" fill={O2.blue} radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
-      <Placeholder title="Dossier individual (drill-down ao clicar no nome)" height={180}
-        hint="Histórico mensal, deals fechados/perdidos, motivos de perda, top clientes" />
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm">Dossier individual (drill-down ao clicar no nome)</CardTitle>
+            <Badge variant="outline" className="o2-badge-lima text-[9px]">preview</Badge>
+          </div>
+          <p className="text-[11px]" style={{ color: O2.subtle }}>Histórico mensal, deals fechados/perdidos, motivos de perda, top clientes</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-3 gap-4">
+            <div>
+              <p className="o2-mono mb-1">Nome</p>
+              <p className="o2-display" style={{ fontSize: 22 }}>Pedro Albite</p>
+              <p className="text-xs mt-1" style={{ color: O2.muted }}>Closer · 18 meses</p>
+            </div>
+            <div>
+              <p className="o2-mono mb-1">Win Rate 12m</p>
+              <p className="o2-kpi-sm" style={{ color: O2.lima }}>31%</p>
+            </div>
+            <div>
+              <p className="o2-mono mb-1">Ticket médio</p>
+              <p className="o2-kpi-sm">R$ 28K</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+function CrossTabPerdas() {
+  const maxV = 4;
+  return (
+    <ChartCard title="Cross-tab Motivo da Perda × Faixa de Faturamento" hint="Heatmap: onde cada motivo aparece mais? (revela padrão de objeção por porte)">
+      <div style={{ display: "grid", gridTemplateColumns: "150px repeat(3, 1fr)", gap: 8 }}>
+        <div />
+        {perdaCross.faixas.map((f) => (
+          <div key={f} className="o2-mono text-center">{f}</div>
+        ))}
+        {perdaCross.motivos.map((m, i) => (
+          <Fragment key={m}>
+            <div className="o2-mono flex items-center" style={{ fontSize: 10 }}>{m}</div>
+            {perdaCross.values[i].map((v, j) => {
+              const bg = `rgba(255,107,107,${0.1 + (v / maxV) * 0.65})`;
+              return (
+                <div key={`${i}-${j}`} className="o2-heat" style={{ background: bg, aspectRatio: "auto", height: 36 }}>{v}</div>
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
+    </ChartCard>
   );
 }
 
 function Perdas() {
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-800 dark:text-blue-300">
+      <div
+        className="rounded-lg p-3 text-xs"
+        style={{
+          border: `1px solid rgba(91,192,235,0.3)`,
+          background: "rgba(91,192,235,0.06)",
+          color: O2.blue,
+        }}
+      >
         💡 <strong>Importante:</strong> Esta aba mostra <strong>venda perdida no funil</strong>
         — cards que entraram em fase de Loss antes do fechamento. NÃO confundir com churn
         (cliente que cancelou depois de virar cliente) — isso está em Operação → Churn.
@@ -426,8 +932,7 @@ function Perdas() {
         <MockNumber label="Dias até perda" value="12d médio" hint="cedo = qualificação ruim" />
       </div>
 
-      <Placeholder title="Cross-tab Motivo da Perda × Faixa de Faturamento" height={260}
-        hint="Heatmap: onde cada motivo aparece mais? (revela padrão de objeção por porte)" />
+      <CrossTabPerdas />
 
       <div className="grid md:grid-cols-2 gap-4">
         <MiniTable
@@ -455,10 +960,38 @@ function Perdas() {
         />
       </div>
 
-      <Placeholder title="Em qual fase as perdas estão acontecendo?" height={220}
-        hint="Distribuição: perdemos em MQL, RM, RR ou Proposta? Cada fase pede ação diferente" />
+      <ChartCard title="Em qual fase as perdas estão acontecendo?" hint="Distribuição: perdemos em MQL, RM, RR ou Proposta? Cada fase pede ação diferente">
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={perdaPorFase} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="fase" />
+            <YAxis />
+            <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} cursor={{ fill: "rgba(255,107,107,0.08)" }} />
+            <Bar dataKey="perdas" radius={[4, 4, 0, 0]}>
+              {perdaPorFase.map((entry, i) => (
+                <Cell key={i} fill={i === 0 ? O2.lima : i === 1 ? O2.amber : i === 2 ? "#FF9B5B" : O2.red} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </ChartCard>
 
-      <Placeholder title="Tendência: motivos crescendo MoM (radar de alerta)" height={220} />
+      <ChartCard title="Tendência: motivos crescendo MoM (radar de alerta)" hint="Top 5 motivos nos últimos 6 meses">
+        <ResponsiveContainer width="100%" height={240}>
+          <LineChart data={tendenciaMotivos} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="mes" />
+            <YAxis />
+            <Tooltip contentStyle={tooltipStyle} labelStyle={labelStyle} />
+            <Legend wrapperStyle={{ fontFamily: FONT_MONO, fontSize: 9, textTransform: "uppercase", letterSpacing: "0.1em" }} />
+            <Line type="monotone" dataKey="Não viu valor" stroke={O2.lima} strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="Sem orçamento" stroke={O2.amber} strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="Concorrência" stroke={O2.red} strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="Não respondeu" stroke={O2.blue} strokeWidth={2} dot={false} />
+            <Line type="monotone" dataKey="Outros" stroke={O2.subtle} strokeWidth={2} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartCard>
     </div>
   );
 }
@@ -469,60 +1002,70 @@ export default function ComercialPreview() {
   const [tab, setTab] = useState("executiva");
 
   return (
-    <div className="min-h-screen bg-background p-6 max-w-[1400px] mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Badge variant="secondary">PREVIEW v2</Badge>
-          <span className="text-xs text-muted-foreground">Mock estático — sem dados reais · 100% comercial (sem churn / sem marketing puro)</span>
+    <div className="o2-preview">
+      <O2StyleScope />
+      <div className="p-6 max-w-[1400px] mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="o2-eyebrow">● Preview v3</span>
+            <span className="o2-mono">Mock estático · sem dados reais · 100% comercial</span>
+          </div>
+          <div className="flex items-end gap-5">
+            <img
+              src="/o2-brand/logos/logo-white.png"
+              alt="O2"
+              style={{ height: 56, width: "auto", objectFit: "contain" }}
+            />
+            <h1 className="o2-display" style={{ fontSize: "clamp(40px, 6vw, 78px)", margin: 0 }}>
+              Indicadores<br />Comerciais
+            </h1>
+          </div>
+          <p className="text-sm mt-4 max-w-3xl" style={{ color: O2.muted }}>
+            Reorganização em 5 sub-páginas focadas em diagnóstico de vendas.
+            Pipeline organizado por <strong style={{ color: O2.lima }}>temperatura</strong> (🔥 Quente / 🟡 Morno / 🔵 Frio).
+          </p>
         </div>
-        <h1 className="text-2xl font-bold">Indicadores Comerciais</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Reorganização em 5 sub-páginas focadas em diagnóstico de vendas.
-          Pipeline organizado por <strong>temperatura</strong> (🔥 Quente / 🟡 Morno / 🔵 Frio).
-          Tudo aqui são placeholders pra validar a hierarquia.
-        </p>
-      </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full mb-4">
-          <TabsTrigger value="executiva" className="gap-1.5">
-            <LayoutDashboard className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Visão</span> Executiva
-          </TabsTrigger>
-          <TabsTrigger value="funil" className="gap-1.5">
-            <GitBranch className="h-3.5 w-3.5" />
-            Funil & Conversão
-          </TabsTrigger>
-          <TabsTrigger value="pipeline" className="gap-1.5">
-            <Flame className="h-3.5 w-3.5 text-red-500" />
-            Pipeline 🔥🟡🔵
-          </TabsTrigger>
-          <TabsTrigger value="pessoas" className="gap-1.5">
-            <Users className="h-3.5 w-3.5" />
-            Pessoas
-          </TabsTrigger>
-          <TabsTrigger value="perdas" className="gap-1.5">
-            <TrendingDown className="h-3.5 w-3.5" />
-            Perdas
-          </TabsTrigger>
-        </TabsList>
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full mb-6">
+            <TabsTrigger value="executiva" className="gap-1.5">
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Visão</span> Executiva
+            </TabsTrigger>
+            <TabsTrigger value="funil" className="gap-1.5">
+              <GitBranch className="h-3.5 w-3.5" />
+              Funil & Conversão
+            </TabsTrigger>
+            <TabsTrigger value="pipeline" className="gap-1.5">
+              <Flame className="h-3.5 w-3.5" />
+              Pipeline 🔥🟡🔵
+            </TabsTrigger>
+            <TabsTrigger value="pessoas" className="gap-1.5">
+              <Users className="h-3.5 w-3.5" />
+              Pessoas
+            </TabsTrigger>
+            <TabsTrigger value="perdas" className="gap-1.5">
+              <TrendingDown className="h-3.5 w-3.5" />
+              Perdas
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="executiva"><VisaoExecutiva /></TabsContent>
-        <TabsContent value="funil"><FunilConversao /></TabsContent>
-        <TabsContent value="pipeline"><PipelineAberto /></TabsContent>
-        <TabsContent value="pessoas"><Pessoas /></TabsContent>
-        <TabsContent value="perdas"><Perdas /></TabsContent>
-      </Tabs>
+          <TabsContent value="executiva"><VisaoExecutiva /></TabsContent>
+          <TabsContent value="funil"><FunilConversao /></TabsContent>
+          <TabsContent value="pipeline"><PipelineAberto /></TabsContent>
+          <TabsContent value="pessoas"><Pessoas /></TabsContent>
+          <TabsContent value="perdas"><Perdas /></TabsContent>
+        </Tabs>
 
-      <div className="mt-8 p-4 rounded-lg border border-dashed bg-muted/30">
-        <p className="text-xs text-muted-foreground">
-          <strong>Mudanças nesta v2 vs v1:</strong> ❌ Removida sub-aba "Origem & Canais"
-          (virou widget dentro de Funil) · 🔥 Pipeline agora organizado por temperatura
-          (Quente=Proposta Enviada / Morno=RR / Frio=MQL+RM) · 🚧 Perdas reforçada como
-          "venda perdida no funil" (NÃO churn) · 📊 Top 5 oportunidades passou pra
-          Visão Executiva com coluna de temperatura.
-        </p>
+        <div className="mt-10 p-4 rounded-lg" style={{ border: `1px dashed ${O2.lineStrong}`, background: O2.elev2 }}>
+          <p className="text-xs" style={{ color: O2.muted }}>
+            <strong style={{ color: O2.lima }}>Mudanças nesta v3 vs v2:</strong> Brand O2 aplicado
+            (dark, Lima accent, Tusker/Anton + Montserrat + JetBrains Mono) · Gráficos reais
+            com Recharts substituindo todos os placeholders · Pipeline temperatura ganhou bordas
+            gradiente · Tabs com underline lima quando ativa.
+          </p>
+        </div>
       </div>
     </div>
   );
