@@ -95,11 +95,12 @@ export function PersonRanking({ role, itemsByIndicator, startDate, endDate, sele
       };
 
       if (role === 'sdr') {
-        // Mapeia metas mensais somando todas BUs ativas para esse SDR
+        // Mapeia metas mensais somando todas BUs ativas para esse SDR (match por primeiro nome)
         const monthlyRm: Record<string, number> = {};
         const monthlyRr: Record<string, number> = {};
+        const targetKey = firstNameKey(g.display);
         for (const m of sdrMetasHook.metas) {
-          if (m.sdr.trim().toLowerCase() !== g.display.toLowerCase()) continue;
+          if (firstNameKey(m.sdr) !== targetKey) continue;
           if (selectedBUs.length > 0 && !selectedBUs.includes(m.bu)) continue;
           const key = `${m.month}-${m.year}`;
           monthlyRm[key] = (monthlyRm[key] || 0) + (m.rm_meta || 0);
