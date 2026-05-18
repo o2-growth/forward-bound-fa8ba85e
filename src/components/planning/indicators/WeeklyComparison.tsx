@@ -45,7 +45,7 @@ const INDICATOR_SHORT_LABELS: Record<string, string> = {
   venda: "Venda",
 };
 
-function getWeeksInRange(startDate: Date, endDate: Date): WeekRange[] {
+export function getWeeksInRange(startDate: Date, endDate: Date): WeekRange[] {
   const weeks: WeekRange[] = [];
   let current = new Date(startDate);
   let weekNum = 1;
@@ -149,7 +149,7 @@ function aggregateSdrCounts(
   return groups;
 }
 
-function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs, role = 'sdr' }: SdrBreakdownProps) {
+export function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs, role = 'sdr' }: SdrBreakdownProps) {
   const roleLabel = role === 'sdr' ? 'SDR' : 'Closer';
   const startTime = startDate.getTime();
   const endTime = new Date(
@@ -246,7 +246,7 @@ interface SdrBreakdownWeeklyProps {
   role?: PersonRole; // default 'sdr'
 }
 
-function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs, role = 'sdr' }: SdrBreakdownWeeklyProps) {
+export function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs, role = 'sdr' }: SdrBreakdownWeeklyProps) {
   const presentKeys = new Set(indicatorConfigs.map(c => c.key));
   const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
   const roleLabel = role === 'sdr' ? 'SDR' : 'Closer';
@@ -545,22 +545,8 @@ export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicat
               role="sdr"
             />
 
-            {/* Breakdown por Closer (RM, RR, Proposta, Venda) — período completo */}
-            <SdrBreakdown
-              itemsByIndicator={allItemsByIndicator}
-              startDate={startDate}
-              endDate={endDate}
-              indicatorConfigs={indicatorConfigs}
-              role="closer"
-            />
+            {/* Breakdown por Closer foi movido para card dedicado em IndicatorsTab */}
 
-            {/* Breakdown por Closer semana a semana */}
-            <SdrBreakdownWeekly
-              weeks={weeks}
-              itemsByIndicator={allItemsByIndicator}
-              indicatorConfigs={indicatorConfigs}
-              role="closer"
-            />
 
             {/* Grouped bar chart */}
             <div className="h-[280px] w-full">

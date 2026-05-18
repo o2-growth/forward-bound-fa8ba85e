@@ -37,7 +37,7 @@ import { ChartConfig } from "./indicators/DrillDownCharts";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
-import { WeeklyComparison } from "./indicators/WeeklyComparison";
+import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { CardInvestigator } from "./indicators/CardInvestigator";
 
 type ViewMode = 'daily' | 'accumulated';
@@ -2893,6 +2893,31 @@ export function IndicatorsTab() {
         itemsByIndicator={itemsByIndicator}
         indicatorConfigs={indicatorConfigs}
       />
+
+      {/* Comparativo por Closer (card dedicado, respeita Data + BU + filtros de SDR/Closer) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Comparativo por Closer</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            RM, RR, Proposta e Venda por closer no período e BUs selecionados. Respeita os filtros ativos de data, BU, SDR e Closer.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <SdrBreakdown
+            role="closer"
+            itemsByIndicator={itemsByIndicator}
+            startDate={startDate}
+            endDate={endDate}
+            indicatorConfigs={indicatorConfigs}
+          />
+          <SdrBreakdownWeekly
+            role="closer"
+            weeks={getWeeksInRange(startDate, endDate)}
+            itemsByIndicator={itemsByIndicator}
+            indicatorConfigs={indicatorConfigs}
+          />
+        </CardContent>
+      </Card>
 
       {/* Contratos por Faixa de Faturamento foi movido para dentro do RevenuePaceChart */}
 
