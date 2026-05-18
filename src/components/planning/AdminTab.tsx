@@ -144,6 +144,10 @@ export function AdminTab() {
           <Users className="h-4 w-4" />
           Metas por SDR
         </TabsTrigger>
+        <TabsTrigger value="closer-abs-metas" className="gap-2">
+          <Target className="h-4 w-4" />
+          Metas Closer (Indicadores)
+        </TabsTrigger>
         <TabsTrigger value="logs" className="gap-2">
           <History className="h-4 w-4" />
           Logs
