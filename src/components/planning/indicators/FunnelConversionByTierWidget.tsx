@@ -40,22 +40,6 @@ interface FunnelConversionByTierWidgetProps {
   getItemsWithFullHistory?: (indicator: IndicatorType) => DetailItem[];
 }
 
-// Normalize tier string to standard format
-const normalizeTier = (revenueRange?: string): string => {
-  if (!revenueRange) return 'Não informado';
-  
-  // Try direct match first
-  const normalized = TIER_NORMALIZATION[revenueRange];
-  if (normalized) return normalized;
-  
-  // Try case-insensitive match
-  const lowerRange = revenueRange.toLowerCase().trim();
-  for (const [key, value] of Object.entries(TIER_NORMALIZATION)) {
-    if (key.toLowerCase() === lowerRange) return value;
-  }
-  
-  return 'Não informado';
-};
 
 // Group items by normalized tier
 const groupByTier = (items: DetailItem[]): Map<string, DetailItem[]> => {
