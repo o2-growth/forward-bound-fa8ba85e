@@ -14,6 +14,7 @@ import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 
 const formatCompactCurrency = (value: number): string => {
   if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
