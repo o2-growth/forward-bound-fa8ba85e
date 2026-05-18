@@ -545,22 +545,8 @@ export function WeeklyComparison({ startDate, endDate, itemsByIndicator, indicat
               role="sdr"
             />
 
-            {/* Breakdown por Closer (RM, RR, Proposta, Venda) — período completo */}
-            <SdrBreakdown
-              itemsByIndicator={allItemsByIndicator}
-              startDate={startDate}
-              endDate={endDate}
-              indicatorConfigs={indicatorConfigs}
-              role="closer"
-            />
+            {/* Breakdown por Closer foi movido para card dedicado em IndicatorsTab */}
 
-            {/* Breakdown por Closer semana a semana */}
-            <SdrBreakdownWeekly
-              weeks={weeks}
-              itemsByIndicator={allItemsByIndicator}
-              indicatorConfigs={indicatorConfigs}
-              role="closer"
-            />
 
             {/* Grouped bar chart */}
             <div className="h-[280px] w-full">
