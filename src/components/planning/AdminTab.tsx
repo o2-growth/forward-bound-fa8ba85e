@@ -329,6 +329,10 @@ export function AdminTab() {
         <SdrMetasTab />
       </TabsContent>
 
+      <TabsContent value="closer-abs-metas">
+        <CloserAbsoluteMetasTab />
+      </TabsContent>
+
       <TabsContent value="logs">
         <AdminLogsTab />
       </TabsContent>
