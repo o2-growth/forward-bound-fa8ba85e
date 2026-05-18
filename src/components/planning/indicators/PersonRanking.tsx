@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { DetailItem } from "./DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { useSdrMetas } from "@/hooks/useSdrMetas";
-import { useCloserAbsoluteMetas } from "@/hooks/useCloserAbsoluteMetas";
+import { useCloserAbsoluteMetas, firstNameKey } from "@/hooks/useCloserAbsoluteMetas";
 import { getMonthFactors, MonthFactor } from "@/lib/businessDayProrate";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -27,11 +27,13 @@ interface PersonRankingProps {
 }
 
 function getPersonName(item: DetailItem, role: Role): { display: string; group: string } {
+  // SDR: usa SOMENTE item.sdr (sem fallback para responsible/closer)
   const raw = role === 'sdr'
-    ? (item.sdr || item.responsible || '').trim()
+    ? (item.sdr || '').trim()
     : (item.closer || '').trim();
   if (!raw) return { display: role === 'sdr' ? 'Sem SDR' : 'Sem Closer', group: '__none__' };
-  return { display: raw, group: raw.toLowerCase() };
+  // Agrupa por primeiro nome normalizado para não duplicar variações ('Carlos' vs 'Carlos Ramos')
+  return { display: raw, group: firstNameKey(raw) || raw.toLowerCase() };
 }
 
 function aggregateCounts(
@@ -51,6 +53,8 @@ function aggregateCounts(
       const ex = groups.get(group);
       if (ex) {
         ex.counts[key] = (ex.counts[key] || 0) + 1;
+        // Prefere o nome mais longo (geralmente o completo do Pipefy)
+        if (display.length > ex.display.length) ex.display = display;
       } else {
         groups.set(group, {
           display,
@@ -91,11 +95,12 @@ export function PersonRanking({ role, itemsByIndicator, startDate, endDate, sele
       };
 
       if (role === 'sdr') {
-        // Mapeia metas mensais somando todas BUs ativas para esse SDR
+        // Mapeia metas mensais somando todas BUs ativas para esse SDR (match por primeiro nome)
         const monthlyRm: Record<string, number> = {};
         const monthlyRr: Record<string, number> = {};
+        const targetKey = firstNameKey(g.display);
         for (const m of sdrMetasHook.metas) {
-          if (m.sdr.trim().toLowerCase() !== g.display.toLowerCase()) continue;
+          if (firstNameKey(m.sdr) !== targetKey) continue;
           if (selectedBUs.length > 0 && !selectedBUs.includes(m.bu)) continue;
           const key = `${m.month}-${m.year}`;
           monthlyRm[key] = (monthlyRm[key] || 0) + (m.rm_meta || 0);
