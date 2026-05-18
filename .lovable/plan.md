@@ -1,60 +1,73 @@
 ## Objetivo
 
-Corrigir o cálculo de `mrrBaseRealPorMes` para que os meses sem dado real da Oxy (Mai/2026 em diante) usem a fórmula:
+Adicionar um card próprio "Por Closer" na aba Indicadores → Comercial, fora do `WeeklyComparison`, com o mesmo visual/comportamento do bloco "Por SDR" existente. Mostra contagem de RM, RR, Proposta e Venda por closer, respeitando os filtros globais já ativos (Data, BUs, SDR e Closer).
 
-```
-projetado[m] = projetado[m-1] × (1 − 5%) + 25% × aVender[m-1]
-```
+## Onde vai aparecer
 
-usando como `aVender[m-1]` o valor de **"A Vender" do plano** (mesma fonte exibida na tabela do Modelo Atual).
+Logo abaixo do bloco "Por SDR" atual (que está embutido em `WeeklyComparison`), porém renderizado **diretamente em `IndicatorsTab.tsx`** como card próprio (`<Card>` shadcn) com header destacado, igual ao padrão dos outros cards da página. Sempre visível quando houver dados — não embutido em collapsible.
 
-## Resultado esperado para Mai/2026
+## Conteúdo do card
 
-- Real Abr (Oxy) = R$ 700.153
-- A Vender Abr (do plano) = X
-- Mai = 700.153 × 0,95 + 0,25 × X = 665.145 + 0,25 × X
+Duas tabelas, exatamente como o "Por SDR" hoje:
 
-E a mesma regra propaga em cascata para Jun → Dez, cada mês adicionando 25% do A Vender do mês anterior.
+1. **Por Closer (período completo)** — uma linha por closer, colunas: RM | RR | Proposta | Venda + linha de Total. Ordenado pelo maior valor de RM (ou primeira coluna disponível).
+2. **Por Closer (semana a semana)** — toggle de indicador (RM/RR/Prop/Venda); linhas = closers, colunas = semanas dentro do range. Mesma estética da versão SDR.
 
-## Mudanças
+Sem metas, sem ticket, sem conversão. Apenas contagem.
 
-### Arquivo único: `src/components/planning/MediaInvestmentTab.tsx`
+## Respeito aos filtros
 
-**1. Ajustar `mrrBaseRealPorMes` (linhas 1180–1202)**
+O card vai consumir o **mesmo dataset já filtrado** que o `WeeklyComparison` recebe (`allItemsByIndicator` agregado por `IndicatorsTab`), garantindo automaticamente que:
 
-Trocar a projeção churn-only (`lastKnown × (1-churn)^n`) por uma cascata mês a mês que aplica retenção de vendas:
+- **Data:** intervalo `startDate`/`endDate` do filtro de período.
+- **BU:** o agregador em `IndicatorsTab` (linhas ~870–1000) só inclui cards das BUs ativas, então closers que só atuam em BUs desligadas somem da tabela.
+- **SDR:** se o usuário filtrar por SDR, o dataset já vem reduzido (linhas ~919–1003 aplicam `matchesSdrFilter`), o que naturalmente reduz também os closers que aparecerem.
+- **Closer:** se houver filtro de Closer ativo (`effectiveSelectedClosers`), o agregador já filtra por `matchesCloserFilter` antes de chegar no card — então a tabela só listará closers selecionados.
 
-```ts
-const RETENCAO_OXY = 0.25;
-let lastKnown = 0;
-MONTHS_ORDER.forEach((m, idx) => {
-  const real = lookup.get(`${PLAN_YEAR}-${m}`) || 0;
-  if (real > 0) {
-    map[m] = real;
-    lastKnown = real;
-  } else if (lastKnown > 0) {
-    const mesAnterior = MONTHS_ORDER[idx - 1];
-    const aVenderAnterior = mrrDynamic.revenueToSell[mesAnterior] || 0;
-    map[m] = lastKnown * (1 - CHURN_OXY) + RETENCAO_OXY * aVenderAnterior;
-    lastKnown = map[m];
-  }
-});
-```
+Agrupamento de nomes: usa `(item.closer || '').trim()` lowercase como chave (mesma função `getCloserName` já existente no `WeeklyComparison`). Cards sem closer caem em "Sem Closer".
 
-**2. Adicionar `mrrDynamic` como dependência do `useMemo`**
+## Implementação técnica
 
-A fonte `mrrDynamic.revenueToSell` já existe (linha 1446/1486) e representa o "A Vender do plano" antes do recálculo com Oxy real — exatamente o valor pedido. Adicionar `mrrDynamic` ao array de dependências.
+1. **Extrair as funções `SdrBreakdown` e `SdrBreakdownWeekly`** de `WeeklyComparison.tsx` para um novo arquivo `src/components/planning/indicators/PersonBreakdown.tsx`, exportando:
+   - `PersonBreakdown` (período completo)
+   - `PersonBreakdownWeekly` (semanal)
+   - Tipos `PersonRole = 'sdr' | 'closer'`
+   - Helpers `getSdrName`, `getCloserName`, `getPersonName`, `aggregatePersonCounts`, `getWeeksInRange`
 
-**3. Não mexer em**:
-- `mrrBaseRealMonthsSet` (badge "Oxy" continua só para meses com dado real).
-- `applyPendingToFunnel` (continua sem sobrescrever `mrrBase`).
-- `Δ Gap a Realocar` permanece R$ 0 em Mai+ (não há real para comparar).
+   Isso elimina duplicação e mantém o "Por SDR/Closer" interno do `WeeklyComparison` funcionando importando do novo módulo.
 
-## Validação
+2. **Adicionar em `IndicatorsTab.tsx`**, dentro do JSX da seção Comercial, logo após o `<WeeklyComparison ... />`, um novo `<Card>`:
 
-Após a mudança, abrir o popover em Mai/2026 e conferir:
-- Badge "Projeção" (não "Oxy").
-- Valor projetado ≈ 665.145 + 25% × A Vender de Abr.
-- Cascata para Jun usa o novo Mai como base + 25% × A Vender de Mai.
+   ```tsx
+   <Card>
+     <CardHeader>
+       <CardTitle>Comparativo por Closer</CardTitle>
+       <CardDescription>RM, RR, Proposta e Venda por closer no período/BUs selecionados.</CardDescription>
+     </CardHeader>
+     <CardContent className="space-y-4">
+       <PersonBreakdown role="closer" itemsByIndicator={allItemsByIndicator} startDate={...} endDate={...} indicatorConfigs={...} />
+       <PersonBreakdownWeekly role="closer" weeks={weeks} itemsByIndicator={allItemsByIndicator} indicatorConfigs={...} />
+     </CardContent>
+   </Card>
+   ```
 
-Sem mudanças de UI, sem mudanças de schema, sem novos hooks.
+   Reaproveita exatamente os mesmos `startDate`, `endDate`, `allItemsByIndicator` e `indicatorConfigs` já passados ao `WeeklyComparison`.
+
+3. **Remover** as duas chamadas `role="closer"` que hoje estão dentro do `WeeklyComparison` (linhas 549–563) para não duplicar a informação. O bloco SDR continua lá dentro.
+
+4. **Tokens de design:** todos os elementos usam classes semânticas já presentes nos breakdowns (`bg-muted/40`, `border`, `text-muted-foreground`, cores de indicador via `INDICATOR_COLORS` já mapeadas).
+
+## Fora de escopo
+
+- Não cria tabela `closer_rm_rr_metas` nem comparativo vs meta.
+- Não muda lógica de atribuição de closer nos cards.
+- Não toca em `useCloserMetas` (que é só rateio %).
+- Não mexe nos gauges monetários (esses já têm closer filter via memory `monetary-gauges-closer-filter`).
+
+## Validação após implementar
+
+- Selecionar uma BU única e verificar que só closers daquela BU aparecem.
+- Mudar range de data: linhas e totais devem atualizar.
+- Aplicar filtro de Closer no topo: tabela deve listar apenas os selecionados.
+- Aplicar filtro de SDR: contagens devem cair (apenas cards desses SDRs entram).
+- Conferir que totais batem com os gauges agregados de RM/RR/Prop/Venda da página.
