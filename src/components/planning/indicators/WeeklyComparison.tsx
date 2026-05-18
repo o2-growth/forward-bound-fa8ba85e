@@ -45,7 +45,7 @@ const INDICATOR_SHORT_LABELS: Record<string, string> = {
   venda: "Venda",
 };
 
-function getWeeksInRange(startDate: Date, endDate: Date): WeekRange[] {
+export function getWeeksInRange(startDate: Date, endDate: Date): WeekRange[] {
   const weeks: WeekRange[] = [];
   let current = new Date(startDate);
   let weekNum = 1;
