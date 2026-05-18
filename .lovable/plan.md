@@ -1,73 +1,87 @@
 ## Objetivo
 
-Adicionar um card próprio "Por Closer" na aba Indicadores → Comercial, fora do `WeeklyComparison`, com o mesmo visual/comportamento do bloco "Por SDR" existente. Mostra contagem de RM, RR, Proposta e Venda por closer, respeitando os filtros globais já ativos (Data, BUs, SDR e Closer).
+Cadastrar metas mensais absolutas por Closer (RM/RR/Prop/Venda) no admin e adicionar dois cards de **Rank** na aba "Indicadores Comercial" — um para SDRs e outro para Closers — mostrando Realizado, Meta e % de atingimento por indicador, com rateio proporcional pelos dias úteis filtrados.
 
-## Onde vai aparecer
+## 1. Backend — Nova tabela `closer_absolute_metas`
 
-Logo abaixo do bloco "Por SDR" atual (que está embutido em `WeeklyComparison`), porém renderizado **diretamente em `IndicatorsTab.tsx`** como card próprio (`<Card>` shadcn) com header destacado, igual ao padrão dos outros cards da página. Sempre visível quando houver dados — não embutido em collapsible.
+Tabela global (sem split por BU), espelhando `sdr_metas`:
 
-## Conteúdo do card
+| Coluna | Tipo |
+|---|---|
+| closer | text |
+| month | text |
+| year | int (default 2026) |
+| rm_meta | int (default 0) |
+| rr_meta | int (default 0) |
+| prop_meta | int (default 0) |
+| venda_meta | int (default 0) |
 
-Duas tabelas, exatamente como o "Por SDR" hoje:
+- Unique key `(closer, month, year)`.
+- RLS: leitura para autenticados, escrita só para admin (mesma política do `sdr_metas`).
+- Seed inicial de Maio/2026:
+  - Daniel Trindade — RM 119, RR 31, Prop 14, Venda 6
+  - Amanda Serafim — RM 44, RR 23, Prop 10, Venda 5
+  - Thiago — RM 44, RR 23, Prop 10, Venda 5
 
-1. **Por Closer (período completo)** — uma linha por closer, colunas: RM | RR | Proposta | Venda + linha de Total. Ordenado pelo maior valor de RM (ou primeira coluna disponível).
-2. **Por Closer (semana a semana)** — toggle de indicador (RM/RR/Prop/Venda); linhas = closers, colunas = semanas dentro do range. Mesma estética da versão SDR.
+## 2. Frontend — Admin: aba "Metas Closer"
 
-Sem metas, sem ticket, sem conversão. Apenas contagem.
+Novo hook `useCloserAbsoluteMetas` (CRUD por closer/mês/ano). Nova aba no admin (ao lado de "Metas SDR") com tabela editável: linhas = closers ativos (`CLOSERS` do `useCloserMetas.ts`), colunas = RM / RR / Prop / Venda. Seletor de mês/ano no topo.
 
-## Respeito aos filtros
+> Observação: as metas % de rateio já existentes em `closer_metas` permanecem intocadas (continuam usadas para split de meta da BU). Esta nova tabela é independente e serve apenas ao rank por pessoa.
 
-O card vai consumir o **mesmo dataset já filtrado** que o `WeeklyComparison` recebe (`allItemsByIndicator` agregado por `IndicatorsTab`), garantindo automaticamente que:
+## 3. Frontend — Cards de Rank em `IndicatorsTab`
 
-- **Data:** intervalo `startDate`/`endDate` do filtro de período.
-- **BU:** o agregador em `IndicatorsTab` (linhas ~870–1000) só inclui cards das BUs ativas, então closers que só atuam em BUs desligadas somem da tabela.
-- **SDR:** se o usuário filtrar por SDR, o dataset já vem reduzido (linhas ~919–1003 aplicam `matchesSdrFilter`), o que naturalmente reduz também os closers que aparecerem.
-- **Closer:** se houver filtro de Closer ativo (`effectiveSelectedClosers`), o agregador já filtra por `matchesCloserFilter` antes de chegar no card — então a tabela só listará closers selecionados.
+Dois novos `<Card>` abaixo do "Por Closer" já existente:
 
-Agrupamento de nomes: usa `(item.closer || '').trim()` lowercase como chave (mesma função `getCloserName` já existente no `WeeklyComparison`). Cards sem closer caem em "Sem Closer".
+### Layout (mesmo para SDR e Closer)
 
-## Implementação técnica
+Tabela ranqueada por % de atingimento médio dos 4 indicadores. Colunas:
 
-1. **Extrair as funções `SdrBreakdown` e `SdrBreakdownWeekly`** de `WeeklyComparison.tsx` para um novo arquivo `src/components/planning/indicators/PersonBreakdown.tsx`, exportando:
-   - `PersonBreakdown` (período completo)
-   - `PersonBreakdownWeekly` (semanal)
-   - Tipos `PersonRole = 'sdr' | 'closer'`
-   - Helpers `getSdrName`, `getCloserName`, `getPersonName`, `aggregatePersonCounts`, `getWeeksInRange`
+```text
+| # | Pessoa | RM (real/meta/%) | RR (real/meta/%) | Prop (real/meta/%) | Venda (real/meta/%) | % Médio |
+```
 
-   Isso elimina duplicação e mantém o "Por SDR/Closer" interno do `WeeklyComparison` funcionando importando do novo módulo.
+- Badge de posição (1º, 2º, 3º destacados em cor).
+- Barra de progresso fina por célula.
+- Respeita filtros ativos de **data, BU, SDR, Closer**.
 
-2. **Adicionar em `IndicatorsTab.tsx`**, dentro do JSX da seção Comercial, logo após o `<WeeklyComparison ... />`, um novo `<Card>`:
+### Cálculo do Realizado
 
-   ```tsx
-   <Card>
-     <CardHeader>
-       <CardTitle>Comparativo por Closer</CardTitle>
-       <CardDescription>RM, RR, Proposta e Venda por closer no período/BUs selecionados.</CardDescription>
-     </CardHeader>
-     <CardContent className="space-y-4">
-       <PersonBreakdown role="closer" itemsByIndicator={allItemsByIndicator} startDate={...} endDate={...} indicatorConfigs={...} />
-       <PersonBreakdownWeekly role="closer" weeks={weeks} itemsByIndicator={allItemsByIndicator} indicatorConfigs={...} />
-     </CardContent>
-   </Card>
-   ```
+Reusa `itemsByIndicator` já filtrado em `IndicatorsTab`. Para cada pessoa (SDR ou Closer), conta itens por indicador (RM, RR, Proposta, Venda) onde a pessoa é responsável — usando a mesma lógica de atribuição já presente (`sdr` field para SDR, `responsible`/closer field para Closer).
 
-   Reaproveita exatamente os mesmos `startDate`, `endDate`, `allItemsByIndicator` e `indicatorConfigs` já passados ao `WeeklyComparison`.
+### Cálculo da Meta com rateio por dias úteis
 
-3. **Remover** as duas chamadas `role="closer"` que hoje estão dentro do `WeeklyComparison` (linhas 549–563) para não duplicar a informação. O bloco SDR continua lá dentro.
+Função utilitária `prorateMeta(monthlyMeta, startDate, endDate)`:
 
-4. **Tokens de design:** todos os elementos usam classes semânticas já presentes nos breakdowns (`bg-muted/40`, `border`, `text-muted-foreground`, cores de indicador via `INDICATOR_COLORS` já mapeadas).
+1. Conta dias úteis (seg–sex) no mês de referência → `totalBusinessDays`.
+2. Conta dias úteis no intervalo filtrado dentro daquele mês → `filteredBusinessDays`.
+3. `metaRateada = monthlyMeta × (filteredBusinessDays / totalBusinessDays)`.
+4. Quando o filtro cruza vários meses, soma o rateio mês a mês.
 
-## Fora de escopo
+Aplicada às 4 metas (RM/RR/Prop/Venda) de cada pessoa.
 
-- Não cria tabela `closer_rm_rr_metas` nem comparativo vs meta.
-- Não muda lógica de atribuição de closer nos cards.
-- Não toca em `useCloserMetas` (que é só rateio %).
-- Não mexe nos gauges monetários (esses já têm closer filter via memory `monetary-gauges-closer-filter`).
+- **SDR**: lê de `sdr_metas` (já existe). Hoje só tem `rm_meta` e `rr_meta` — Prop/Venda do rank de SDR ficam sem meta (mostra "—" em vez de %).
+- **Closer**: lê da nova `closer_absolute_metas`.
 
-## Validação após implementar
+### Ranking
 
-- Selecionar uma BU única e verificar que só closers daquela BU aparecem.
-- Mudar range de data: linhas e totais devem atualizar.
-- Aplicar filtro de Closer no topo: tabela deve listar apenas os selecionados.
-- Aplicar filtro de SDR: contagens devem cair (apenas cards desses SDRs entram).
-- Conferir que totais batem com os gauges agregados de RM/RR/Prop/Venda da página.
+Score = média dos % de atingimento dos indicadores que **têm meta > 0**. Empates desempata por Vendas realizadas.
+
+## 4. Arquivos
+
+**Novos**
+- `supabase/migrations/...closer_absolute_metas.sql`
+- `src/hooks/useCloserAbsoluteMetas.ts`
+- `src/components/admin/CloserAbsoluteMetasTab.tsx`
+- `src/components/planning/indicators/PersonRanking.tsx` (componente compartilhado SDR/Closer)
+- `src/lib/businessDayProrate.ts` (utilitário rateio)
+
+**Editados**
+- `src/components/admin/AdminPanel.tsx` (ou equivalente) — adicionar nova aba "Metas Closer".
+- `src/components/planning/IndicatorsTab.tsx` — montar dois cards de rank consumindo `PersonRanking` com `role="sdr"` e `role="closer"`.
+
+## 5. Fora de escopo
+
+- Não altera `closer_metas` (% rateio por BU continua igual).
+- Não altera os cards "Por SDR" e "Por Closer" já existentes (breakdown por período/semana).
+- Sem gráficos extras; só tabela ranqueada.
