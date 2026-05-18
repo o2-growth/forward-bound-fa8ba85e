@@ -37,7 +37,7 @@ import { ChartConfig } from "./indicators/DrillDownCharts";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
-import { WeeklyComparison } from "./indicators/WeeklyComparison";
+import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { CardInvestigator } from "./indicators/CardInvestigator";
 
 type ViewMode = 'daily' | 'accumulated';
