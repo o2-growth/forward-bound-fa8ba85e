@@ -246,7 +246,7 @@ interface SdrBreakdownWeeklyProps {
   role?: PersonRole; // default 'sdr'
 }
 
-function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs, role = 'sdr' }: SdrBreakdownWeeklyProps) {
+export function SdrBreakdownWeekly({ weeks, itemsByIndicator, indicatorConfigs, role = 'sdr' }: SdrBreakdownWeeklyProps) {
   const presentKeys = new Set(indicatorConfigs.map(c => c.key));
   const columns = SDR_INDICATORS.filter(i => presentKeys.has(i.key));
   const roleLabel = role === 'sdr' ? 'SDR' : 'Closer';
