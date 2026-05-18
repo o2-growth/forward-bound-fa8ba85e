@@ -1,68 +1,69 @@
 ## Objetivo
 
-Adicionar um terceiro gráfico **"Propostas por Tier de Faturamento"** dentro do acelerômetro/mini-dashboard de Propostas, ao lado de "Pipeline por Closer" e "Aging das Propostas".
+1. Adicionar gráfico **"Reuniões por Tier de Faturamento"** dentro do acelerômetro/mini-dashboard de **Reunião Marcada (RM)**, ao lado dos charts existentes.
+2. Garantir que a faixa **"> R$ 5M"** apareça em todos os charts de tier nos acelerômetros.
 
-## Onde
+## Diagnóstico do tier >R$ 5M
 
-O mini-dashboard de Propostas é montado em dois lugares (mesma estrutura, mesmo array de `charts: ChartConfig[]`):
+Em `src/lib/revenueTiers.ts`, tanto `TIER_NORMALIZATION` (`'Acima de R$ 5 milhões' → '> R$ 5M'`) quanto `TIER_ORDER` (último item) e `TIER_COLORS` já contemplam essa faixa. **Nada a corrigir aqui** — a faixa aparece automaticamente sempre que houver pelo menos 1 card com esse valor (os charts filtram `value > 0` para evitar barras vazias). Vou apenas validar visualmente na entrega.
 
-1. `src/components/planning/ClickableFunnelChart.tsx` — linhas ~301-350 (`buildPropostaMiniDashboard`)
-2. `src/components/planning/IndicatorsTab.tsx` — linhas ~1830-1860 (bloco proposta)
+## Onde alterar
 
-Os dois precisam receber o mesmo novo chart para manter consistência.
+### A) `src/components/planning/IndicatorsTab.tsx` — case `'rm'` (~linhas 1662-1736)
 
-## Implementação
+Hoje os charts de RM são:
+- Ranking por SDR
+- Tempo como MQL (distribution)
 
-### 1. Helper de normalização de tier
-
-Reutilizar o mapa `TIER_NORMALIZATION` / `TIER_ORDER` de `FunnelConversionByTierWidget.tsx`. Extrair para um helper compartilhado em `src/lib/revenueTiers.ts`:
-
+Adicionar um terceiro:
 ```ts
-export const TIER_NORMALIZATION: Record<string, string> = { ... }; // copiar do widget
-export const TIER_ORDER = [ ... ];
-export function normalizeTier(range?: string): string { ... }
-```
-
-Atualizar `FunnelConversionByTierWidget.tsx` para importar deste helper (sem mudar comportamento).
-
-### 2. Novo chart em ambos os builders
-
-Logo após o cálculo de `agingDistribution`, adicionar:
-
-```ts
-// Charts - Propostas por Tier de Faturamento
-const tierMap = new Map<string, number>();
-TIER_ORDER.forEach(t => tierMap.set(t, 0));
-itemsWithAging.forEach(i => {
+// 3. Reuniões por Tier de Faturamento
+const tierCounts = new Map<string, number>();
+items.forEach(i => {
   const tier = normalizeTier(i.revenueRange);
-  tierMap.set(tier, (tierMap.get(tier) || 0) + 1);
+  tierCounts.set(tier, (tierCounts.get(tier) || 0) + 1);
 });
-const propostasByTier = Array.from(tierMap.entries())
-  .filter(([, v]) => v > 0)
-  .map(([label, value]) => ({ label, value }));
+const rmByTier = TIER_ORDER
+  .map(label => ({ label, value: tierCounts.get(label) || 0 }))
+  .filter(d => d.value > 0);
+Array.from(tierCounts.entries())
+  .filter(([label]) => !TIER_ORDER.includes(label))
+  .forEach(([label, value]) => rmByTier.push({ label, value }));
 ```
-
-E incluir no array `charts`:
-
+Incluir em `charts`:
 ```ts
-{ type: 'bar', title: 'Propostas por Tier de Faturamento', data: propostasByTier },
+{ type: 'bar', title: 'Reuniões por Tier de Faturamento', data: rmByTier },
 ```
+(Imports `TIER_ORDER` e `normalizeTier` já existem no arquivo — usados no case `proposta`.)
 
-Resultado: o mini-dashboard passa a ter 3 gráficos lado a lado (Pipeline por Closer | Aging | Tier de Faturamento).
+### B) `src/components/planning/ClickableFunnelChart.tsx`
+
+Hoje `handleStageClick` só chama mini-dashboard para `proposta` e `venda`; para `rm` cai no fluxo "items + columns" sem KPIs/charts. Criar `buildReuniaoMiniDashboard()` espelhando o padrão de `buildPropostaMiniDashboard`:
+
+- **Items:** `getItemsForIndicator('rm')`
+- **KPIs:** Reuniões (total), Top SDR, Tempo médio como MQL (se `duration` disponível), Taxa MQL→RM se possível
+- **Charts:**
+  - `Ranking por SDR` (bar)
+  - `Tempo como MQL` (distribution: 1-7 / 8-14 / 15-30 / 30+ dias) — só se `duration` existir nos items
+  - `Reuniões por Tier de Faturamento` (bar usando `normalizeTier` + `TIER_ORDER`)
+- **Columns:** Produto, Empresa, SDR, Faixa Faturamento, Data
+
+Wire em `handleStageClick`:
+```ts
+if (stage.indicator === 'rm') { buildReuniaoMiniDashboard(); return; }
+```
 
 ## Fora do escopo
 
-- Não criar widget standalone na aba Segmentação (descartado — a visão fica dentro do acelerômetro de Propostas).
-- Não mexer no `FunnelConversionByTierWidget` além da extração do helper.
-- Sem mudanças de DB ou hooks de analytics.
+- Não mexer em `rr` (Reunião Realizada) — já tem chart "Por Faixa Faturamento" próprio (não normalizado, mas usuário não pediu).
+- Sem mudanças em hooks, DB ou edge functions.
+- Sem ajustes em `revenueTiers.ts` (>R$ 5M já contemplado).
 
-## Arquivos editados
+## Arquivos a editar
 
-- `src/lib/revenueTiers.ts` — novo (extrai TIER_NORMALIZATION/TIER_ORDER/normalizeTier)
-- `src/components/planning/indicators/FunnelConversionByTierWidget.tsx` — passa a importar do helper
-- `src/components/planning/ClickableFunnelChart.tsx` — adiciona chart de tier no mini-dashboard
-- `src/components/planning/IndicatorsTab.tsx` — adiciona chart de tier no mini-dashboard
+- `src/components/planning/IndicatorsTab.tsx` — adiciona 3º chart no case `rm`
+- `src/components/planning/ClickableFunnelChart.tsx` — cria `buildReuniaoMiniDashboard` + roteamento em `handleStageClick`
 
 ## Validação
 
-Abrir o card "Propostas" em qualquer BU (Modelo Atual / O2 TAX / Oxy / Franquia). O sheet de detalhes deve mostrar 3 gráficos. A soma das barras do tier deve igualar o KPI "Propostas" do mesmo sheet.
+Abrir o card "Reuniões Agendadas" em qualquer BU (Modelo Atual / O2 TAX / Oxy Hacker / Franquia) tanto pelo funil clicável quanto pela aba Indicadores. O sheet deve mostrar 3 gráficos lado a lado (Ranking SDR | Tempo como MQL | Tier de Faturamento). Soma das barras de tier deve igualar o KPI "Reuniões". Verificar que a barra "> R$ 5M" aparece quando há cards nessa faixa (testar em Modelo Atual onde há cards desse tier).

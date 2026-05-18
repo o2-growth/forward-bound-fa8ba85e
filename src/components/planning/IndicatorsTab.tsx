@@ -1701,9 +1701,23 @@ export function IndicatorsTab() {
           { label: '30+ dias', value: itemsWithCalcs.filter(i => (i.diasComoMQL || 0) > 30).length, highlight: 'danger' as const },
         ];
 
+        // 3. Reuniões por Tier de Faturamento
+        const rmTierCounts = new Map<string, number>();
+        items.forEach(i => {
+          const tier = normalizeTier(i.revenueRange);
+          rmTierCounts.set(tier, (rmTierCounts.get(tier) || 0) + 1);
+        });
+        const rmByTier = TIER_ORDER
+          .map(label => ({ label, value: rmTierCounts.get(label) || 0 }))
+          .filter(d => d.value > 0);
+        Array.from(rmTierCounts.entries())
+          .filter(([label]) => !TIER_ORDER.includes(label))
+          .forEach(([label, value]) => rmByTier.push({ label, value }));
+
         const charts: ChartConfig[] = [
           { type: 'bar', title: 'Ranking por SDR', data: sdrRankingData },
           { type: 'distribution', title: 'Tempo como MQL', data: tempoDistribution },
+          { type: 'bar', title: 'Reuniões por Tier de Faturamento', data: rmByTier },
         ];
         
         setDetailSheetTitle('RM - Estamos Convertendo MQLs em Reuniões?');
