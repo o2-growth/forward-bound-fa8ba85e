@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { DetailItem } from "./DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { useSdrMetas } from "@/hooks/useSdrMetas";
-import { useCloserAbsoluteMetas } from "@/hooks/useCloserAbsoluteMetas";
+import { useCloserAbsoluteMetas, firstNameKey } from "@/hooks/useCloserAbsoluteMetas";
 import { getMonthFactors, MonthFactor } from "@/lib/businessDayProrate";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
