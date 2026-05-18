@@ -15,6 +15,9 @@ export interface CloserAbsoluteMeta {
 export const CLOSER_ABS_MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
 export const CLOSERS_ABS = ['Pedro Albite', 'Daniel Trindade', 'Lucas Ilha', 'Thiago', 'Amanda Serafim', 'Bruna'] as const;
 
+export const firstNameKey = (n: string): string =>
+  (n || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/\s+/)[0] || '';
+
 export function useCloserAbsoluteMetas(year: number = 2026) {
   const queryClient = useQueryClient();
 
