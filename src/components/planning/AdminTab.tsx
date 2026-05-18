@@ -16,6 +16,7 @@ import { DeleteUserDialog } from './DeleteUserDialog';
 import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { CloserMetasTab } from './CloserMetasTab';
 import { SdrMetasTab } from './SdrMetasTab';
+import { CloserAbsoluteMetasTab } from './CloserAbsoluteMetasTab';
 import { AdminLogsTab } from './AdminLogsTab';
 
 const TAB_OPTIONS: { key: TabKey; label: string }[] = [
