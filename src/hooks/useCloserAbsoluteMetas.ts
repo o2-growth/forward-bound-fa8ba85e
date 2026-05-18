@@ -34,7 +34,7 @@ export function useCloserAbsoluteMetas(year: number = 2026) {
     staleTime: 5 * 60 * 1000,
   });
 
-  /** Retorna metas mensais (uma entrada por mês) de um closer específico. */
+  /** Retorna metas mensais (uma entrada por mês) de um closer (match por primeiro nome normalizado). */
   const getMonthlyMap = (closer: string): {
     rm: Record<string, number>;
     rr: Record<string, number>;
@@ -46,9 +46,10 @@ export function useCloserAbsoluteMetas(year: number = 2026) {
     const prop: Record<string, number> = {};
     const venda: Record<string, number> = {};
     if (!metas) return { rm, rr, prop, venda };
-    const target = closer.trim().toLowerCase();
+    const target = firstNameKey(closer);
+    if (!target) return { rm, rr, prop, venda };
     for (const m of metas) {
-      if (m.closer.trim().toLowerCase() !== target) continue;
+      if (firstNameKey(m.closer) !== target) continue;
       const key = `${m.month}-${m.year}`;
       rm[key] = (rm[key] || 0) + (m.rm_meta || 0);
       rr[key] = (rr[key] || 0) + (m.rr_meta || 0);
