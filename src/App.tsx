@@ -9,6 +9,7 @@ import Planning2026 from "./pages/Planning2026";
 import Auth from "./pages/Auth";
 import DebugReuniao from "./pages/DebugReuniao";
 import DebugCliente from "./pages/DebugCliente";
+import ComercialPreview from "./pages/ComercialPreview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DebugCliente />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/comercial-preview"
+              element={
+                <ProtectedRoute>
+                  <ComercialPreview />
                 </ProtectedRoute>
               }
             />
