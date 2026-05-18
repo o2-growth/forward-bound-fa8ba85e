@@ -1,47 +1,68 @@
-## Diagnóstico
+## Objetivo
 
-1. **Closer**: meta cadastrada como "Amanda Serafim" / "Thiago" / "Bruna" não casa com "Amanda Teixeira Serafim" / "Thiago Zanoni" / "Bruna Patricio Mota" no Pipefy. Match exato lowercase falha.
-2. **SDR**: `sdr_metas` armazena nomes curtos ('Carlos', 'Amanda', 'Matheus', 'Erica', 'Ana'), Pipefy retorna nome completo ("Carlos Ramos", etc). Nenhuma meta casa.
-3. **Rank SDR poluído**: `getPersonName(role='sdr')` faz fallback para `item.responsible` (closer) quando `sdr` está vazio, então closers aparecem na tabela de SDRs.
+Adicionar um terceiro gráfico **"Propostas por Tier de Faturamento"** dentro do acelerômetro/mini-dashboard de Propostas, ao lado de "Pipeline por Closer" e "Aging das Propostas".
 
-## Correção
+## Onde
 
-### Match por primeiro nome (normalizado)
+O mini-dashboard de Propostas é montado em dois lugares (mesma estrutura, mesmo array de `charts: ChartConfig[]`):
 
-Em `src/components/planning/indicators/PersonRanking.tsx`:
+1. `src/components/planning/ClickableFunnelChart.tsx` — linhas ~301-350 (`buildPropostaMiniDashboard`)
+2. `src/components/planning/IndicatorsTab.tsx` — linhas ~1830-1860 (bloco proposta)
+
+Os dois precisam receber o mesmo novo chart para manter consistência.
+
+## Implementação
+
+### 1. Helper de normalização de tier
+
+Reutilizar o mapa `TIER_NORMALIZATION` / `TIER_ORDER` de `FunnelConversionByTierWidget.tsx`. Extrair para um helper compartilhado em `src/lib/revenueTiers.ts`:
 
 ```ts
-const firstName = (n: string) => n.trim().toLowerCase()
-  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-  .split(/\s+/)[0] || '';
+export const TIER_NORMALIZATION: Record<string, string> = { ... }; // copiar do widget
+export const TIER_ORDER = [ ... ];
+export function normalizeTier(range?: string): string { ... }
 ```
 
-- Agregação por pessoa: chave de grupo = primeiro nome normalizado; `display` = nome completo do Pipefy (primeira ocorrência encontrada).
-- Lookup de meta: compara `firstName(metaRow.sdr/closer)` com `firstName(personDisplay)`.
+Atualizar `FunnelConversionByTierWidget.tsx` para importar deste helper (sem mudar comportamento).
 
-Aplica nos dois lookups:
-- SDR: filtra `sdrMetasHook.metas` por primeiro nome.
-- Closer: ajusta `useCloserAbsoluteMetas.getMonthlyMap` para receber `firstName` e iterar comparando por primeiro nome.
+### 2. Novo chart em ambos os builders
 
-### Remover fallback de closer no SDR
+Logo após o cálculo de `agingDistribution`, adicionar:
 
-Em `PersonRanking.tsx`, `getPersonName` para `role='sdr'` usa apenas `item.sdr` (sem `item.responsible`). Cards sem SDR vão para "Sem SDR".
+```ts
+// Charts - Propostas por Tier de Faturamento
+const tierMap = new Map<string, number>();
+TIER_ORDER.forEach(t => tierMap.set(t, 0));
+itemsWithAging.forEach(i => {
+  const tier = normalizeTier(i.revenueRange);
+  tierMap.set(tier, (tierMap.get(tier) || 0) + 1);
+});
+const propostasByTier = Array.from(tierMap.entries())
+  .filter(([, v]) => v > 0)
+  .map(([label, value]) => ({ label, value }));
+```
+
+E incluir no array `charts`:
+
+```ts
+{ type: 'bar', title: 'Propostas por Tier de Faturamento', data: propostasByTier },
+```
+
+Resultado: o mini-dashboard passa a ter 3 gráficos lado a lado (Pipeline por Closer | Aging | Tier de Faturamento).
+
+## Fora do escopo
+
+- Não criar widget standalone na aba Segmentação (descartado — a visão fica dentro do acelerômetro de Propostas).
+- Não mexer no `FunnelConversionByTierWidget` além da extração do helper.
+- Sem mudanças de DB ou hooks de analytics.
 
 ## Arquivos editados
 
-- `src/components/planning/indicators/PersonRanking.tsx` — adicionar helper `firstName`, ajustar agregação e os dois lookups de meta, remover fallback `responsible` no role SDR.
-- `src/hooks/useCloserAbsoluteMetas.ts` — `getMonthlyMap` passa a comparar por primeiro nome normalizado.
-
-## Não muda
-
-- Schema do DB (nomes cadastrados continuam como estão).
-- Cards "Por SDR" / "Por Closer" / breakdown semanal (não tocar — só o `PersonRanking`).
-- `useSdrMetas.getSdrMetaTotals` (usado em outros pontos do dashboard com filtros próprios).
+- `src/lib/revenueTiers.ts` — novo (extrai TIER_NORMALIZATION/TIER_ORDER/normalizeTier)
+- `src/components/planning/indicators/FunnelConversionByTierWidget.tsx` — passa a importar do helper
+- `src/components/planning/ClickableFunnelChart.tsx` — adiciona chart de tier no mini-dashboard
+- `src/components/planning/IndicatorsTab.tsx` — adiciona chart de tier no mini-dashboard
 
 ## Validação
 
-Após o fix, com filtro de Maio/26:
-- Daniel: meta continua aparecendo (já casava).
-- Amanda Teixeira Serafim: deve mostrar RM 44 (rateado por dias úteis), RR 23, Prop 10, Venda 5.
-- Thiago Zanoni: idem Amanda.
-- SDR rank: só Carlos Ramos, Erica, Ana, Matheus, Bruna (se cadastrada como SDR) aparecem; closers somem da lista.
+Abrir o card "Propostas" em qualquer BU (Modelo Atual / O2 TAX / Oxy / Franquia). O sheet de detalhes deve mostrar 3 gráficos. A soma das barras do tier deve igualar o KPI "Propostas" do mesmo sheet.

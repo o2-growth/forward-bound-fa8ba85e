@@ -10,56 +10,7 @@ import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
-// Tier normalization map - maps database values to 8 standardized display labels
-const TIER_NORMALIZATION: Record<string, string> = {
-  // Tier 1: Ainda não fatura
-  'Ainda não faturamos': 'Ainda não fatura',
-  
-  // Tier 2: Menos de R$ 100k
-  'Menos de R$ 100 mil': '< R$ 100k',
-  
-  // Tier 3: R$ 100k - 200k (não qualifica como MQL)
-  'Entre R$ 100 mil e R$ 200 mil': 'R$ 100k - 200k',
-  
-  // Tier 4: R$ 200k - 350k
-  'Entre R$ 200 mil e R$ 350 mil': 'R$ 200k - 350k',
-  
-  // Tier 5: R$ 350k - 500k
-  'Entre R$ 350 mil e R$ 500 mil': 'R$ 350k - 500k',
-  
-  // Tier 6: R$ 500k - 1M
-  'Entre R$ 500 mil e R$ 1 milhão': 'R$ 500k - 1M',
-  
-  // Tier 7: R$ 1M - 5M
-  'Entre R$ 1 milhão e R$ 5 milhões': 'R$ 1M - 5M',
-  
-  // Tier 8: Acima de R$ 5M
-  'Acima de R$ 5 milhões': '> R$ 5M',
-};
-
-// Ordered tiers for display (8 distinct categories)
-const TIER_ORDER = [
-  'Ainda não fatura',
-  '< R$ 100k',
-  'R$ 100k - 200k',
-  'R$ 200k - 350k',
-  'R$ 350k - 500k',
-  'R$ 500k - 1M',
-  'R$ 1M - 5M',
-  '> R$ 5M',
-];
-
-// Tier colors for charts (7 distinct colors)
-const TIER_COLORS: Record<string, string> = {
-  'Ainda não fatura': 'hsl(var(--chart-5))',
-  '< R$ 100k': 'hsl(var(--chart-4))',
-  'R$ 100k - 200k': 'hsl(30, 70%, 50%)',
-  'R$ 200k - 350k': 'hsl(var(--chart-3))',
-  'R$ 350k - 500k': 'hsl(210, 70%, 50%)',
-  'R$ 500k - 1M': 'hsl(var(--chart-2))',
-  'R$ 1M - 5M': 'hsl(270, 70%, 50%)',
-  '> R$ 5M': 'hsl(var(--chart-1))',
-};
+import { TIER_NORMALIZATION, TIER_ORDER, TIER_COLORS, normalizeTier } from "@/lib/revenueTiers";
 
 // Conversion stage labels
 const STAGE_LABELS = [
@@ -89,22 +40,6 @@ interface FunnelConversionByTierWidgetProps {
   getItemsWithFullHistory?: (indicator: IndicatorType) => DetailItem[];
 }
 
-// Normalize tier string to standard format
-const normalizeTier = (revenueRange?: string): string => {
-  if (!revenueRange) return 'Não informado';
-  
-  // Try direct match first
-  const normalized = TIER_NORMALIZATION[revenueRange];
-  if (normalized) return normalized;
-  
-  // Try case-insensitive match
-  const lowerRange = revenueRange.toLowerCase().trim();
-  for (const [key, value] of Object.entries(TIER_NORMALIZATION)) {
-    if (key.toLowerCase() === lowerRange) return value;
-  }
-  
-  return 'Não informado';
-};
 
 // Group items by normalized tier
 const groupByTier = (items: DetailItem[]): Map<string, DetailItem[]> => {

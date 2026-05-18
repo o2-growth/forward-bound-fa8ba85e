@@ -14,6 +14,7 @@ import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 
 const formatCompactCurrency = (value: number): string => {
   if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
@@ -343,10 +344,25 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
       { label: '15-30 dias', value: itemsWithAging.filter(i => (i.diasEmProposta || 0) > 14 && (i.diasEmProposta || 0) <= 30).length, highlight: 'warning' as const },
       { label: '30+ dias', value: itemsWithAging.filter(i => (i.diasEmProposta || 0) > 30).length, highlight: 'danger' as const },
     ];
-    
+
+    // Charts - Propostas por Tier de Faturamento
+    const tierCounts = new Map<string, number>();
+    itemsWithAging.forEach(i => {
+      const tier = normalizeTier(i.revenueRange);
+      tierCounts.set(tier, (tierCounts.get(tier) || 0) + 1);
+    });
+    const propostasByTier = TIER_ORDER
+      .map(label => ({ label, value: tierCounts.get(label) || 0 }))
+      .filter(d => d.value > 0);
+    // Append any non-standard tiers (e.g. "Não informado")
+    Array.from(tierCounts.entries())
+      .filter(([label]) => !TIER_ORDER.includes(label))
+      .forEach(([label, value]) => propostasByTier.push({ label, value }));
+
     const charts: ChartConfig[] = [
       { type: 'bar', title: 'Pipeline por Closer', data: pipelineByCloserData, formatValue: formatCompactCurrency },
       { type: 'distribution', title: 'Aging das Propostas', data: agingDistribution },
+      { type: 'bar', title: 'Propostas por Tier de Faturamento', data: propostasByTier },
     ];
     
     setSheetKpis(kpis);

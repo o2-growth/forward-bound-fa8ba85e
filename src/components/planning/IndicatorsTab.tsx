@@ -34,6 +34,7 @@ import { FunnelConversionByTierWidget } from "./indicators/FunnelConversionByTie
 import { DetailSheet, DetailItem, columnFormatters, FilterCriteriaGroup } from "./indicators/DetailSheet";
 import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
+import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
@@ -1854,10 +1855,24 @@ export function IndicatorsTab() {
           { label: '15-30 dias', value: itemsWithAging.filter(i => (i.diasEmProposta || 0) > 14 && (i.diasEmProposta || 0) <= 30).length, highlight: 'warning' as const },
           { label: '30+ dias', value: itemsWithAging.filter(i => (i.diasEmProposta || 0) > 30).length, highlight: 'danger' as const },
         ];
-        
+
+        // 3. Propostas por Tier de Faturamento
+        const tierCounts = new Map<string, number>();
+        itemsWithAging.forEach(i => {
+          const tier = normalizeTier(i.revenueRange);
+          tierCounts.set(tier, (tierCounts.get(tier) || 0) + 1);
+        });
+        const propostasByTier = TIER_ORDER
+          .map(label => ({ label, value: tierCounts.get(label) || 0 }))
+          .filter(d => d.value > 0);
+        Array.from(tierCounts.entries())
+          .filter(([label]) => !TIER_ORDER.includes(label))
+          .forEach(([label, value]) => propostasByTier.push({ label, value }));
+
         const charts: ChartConfig[] = [
           { type: 'bar', title: 'Pipeline por Closer', data: pipelineByCloserData, formatValue: formatCompactCurrency },
           { type: 'distribution', title: 'Aging das Propostas', data: agingDistribution },
+          { type: 'bar', title: 'Propostas por Tier de Faturamento', data: propostasByTier },
         ];
         
         const descricao = `${items.length} propostas | ${pipelineLabel}: ${formatCompactCurrency(pipeline)} | Ticket médio: ${formatCompactCurrency(ticketMedio)}` +
