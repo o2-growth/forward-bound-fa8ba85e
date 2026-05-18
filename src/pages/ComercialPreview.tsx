@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard, GitBranch, Users, Briefcase, TrendingDown,
   Info, ArrowUpRight, ArrowDownRight, AlertTriangle, Flame, Thermometer, Snowflake,
-  Filter
+  Filter, Calendar, RefreshCw, ChevronDown, Lightbulb, Maximize2
 } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -1023,18 +1023,195 @@ function Perdas() {
 
 // ───────────── Página principal ─────────────
 
+// ───────────── Sticky filter bar (contexto: weekly meeting) ─────────────
+
+const PERIODO_PRESETS = [
+  { key: "semana", label: "Esta semana" },
+  { key: "semana-ant", label: "Semana anterior" },
+  { key: "mes", label: "Mês atual" },
+  { key: "mes-ant", label: "Mês anterior" },
+  { key: "tri", label: "Trimestre" },
+  { key: "custom", label: "Customizado" },
+];
+
+const BU_OPTIONS = [
+  { key: "consolidado", label: "Consolidado" },
+  { key: "modelo_atual", label: "Modelo Atual" },
+  { key: "franquia", label: "Franquia" },
+  { key: "o2_tax", label: "O2 Tax" },
+  { key: "oxy_hacker", label: "Oxy Hacker" },
+];
+
+const SDR_OPTIONS = ["Todos SDRs", "Carlos Ramos", "Bruna P. Mota", "Erica Rocha", "Daniel Trindade", "Matheus", "Ana"];
+const CLOSER_OPTIONS = ["Todos Closers", "Pedro Albite", "Bruna", "Daniel Trindade", "Thiago", "Lucas Ilha", "Amanda Serafim"];
+
+function StickyFilterBar({
+  periodo, setPeriodo, bu, setBu, sdr, setSdr, closer, setCloser,
+}: {
+  periodo: string; setPeriodo: (v: string) => void;
+  bu: string; setBu: (v: string) => void;
+  sdr: string; setSdr: (v: string) => void;
+  closer: string; setCloser: (v: string) => void;
+}) {
+  return (
+    <div
+      className="sticky top-0 z-30 -mx-6 px-6 py-3 mb-6 backdrop-blur-md"
+      style={{
+        background: "rgba(37,37,37,0.92)",
+        borderBottom: `1px solid ${O2.lineStrong}`,
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-2 max-w-[1400px] mx-auto">
+        <Calendar className="h-3.5 w-3.5" style={{ color: O2.lima }} />
+        <div className="flex gap-1 flex-wrap">
+          {PERIODO_PRESETS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPeriodo(p.key)}
+              className="px-2.5 py-1 rounded-full text-[10px] o2-mono transition-colors"
+              style={{
+                background: periodo === p.key ? O2.lima : "transparent",
+                color: periodo === p.key ? "#0A0A0A" : O2.muted,
+                border: `1px solid ${periodo === p.key ? O2.lima : O2.lineStrong}`,
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <span className="o2-mono mx-2" style={{ color: O2.subtle }}>·</span>
+        <span className="o2-mono">BU:</span>
+        <select
+          value={bu}
+          onChange={(e) => setBu(e.target.value)}
+          className="px-3 py-1 rounded-full text-[11px] o2-mono cursor-pointer"
+          style={{ background: O2.elev3, color: O2.fg, border: `1px solid ${O2.lineStrong}` }}
+        >
+          {BU_OPTIONS.map(o => <option key={o.key} value={o.key}>{o.label}</option>)}
+        </select>
+        <select
+          value={sdr}
+          onChange={(e) => setSdr(e.target.value)}
+          className="px-3 py-1 rounded-full text-[11px] o2-mono cursor-pointer"
+          style={{ background: O2.elev3, color: O2.fg, border: `1px solid ${O2.lineStrong}` }}
+        >
+          {SDR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <select
+          value={closer}
+          onChange={(e) => setCloser(e.target.value)}
+          className="px-3 py-1 rounded-full text-[11px] o2-mono cursor-pointer"
+          style={{ background: O2.elev3, color: O2.fg, border: `1px solid ${O2.lineStrong}` }}
+        >
+          {CLOSER_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="o2-mono hidden md:inline" style={{ color: O2.subtle }}>
+            Atualizado: hoje 09:42
+          </span>
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] o2-mono transition-colors"
+            style={{ background: "transparent", color: O2.fg, border: `1px solid ${O2.lineStrong}` }}
+            title="Atualizar dados"
+          >
+            <RefreshCw className="h-3 w-3" /> Atualizar
+          </button>
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] o2-mono transition-colors"
+            style={{ background: O2.elev3, color: O2.fg, border: `1px solid ${O2.lineStrong}` }}
+            title="Modo apresentação (weekly)"
+          >
+            <Maximize2 className="h-3 w-3" /> Modo weekly
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────── Key takeaway banner (por sub-aba) ─────────────
+function TakeawayBanner({ icon, label, headline, sub }: { icon: React.ReactNode; label: string; headline: string; sub: string }) {
+  return (
+    <div
+      className="rounded-2xl p-4 mb-5 flex items-start gap-3"
+      style={{
+        background: `linear-gradient(135deg, ${O2.elev3}, ${O2.surface})`,
+        border: `1px solid ${O2.limaLine}`,
+        boxShadow: `0 0 0 1px rgba(99,241,97,0.04) inset, 0 16px 48px rgba(0,0,0,0.18)`,
+      }}
+    >
+      <div
+        className="rounded-full p-2 shrink-0"
+        style={{ background: O2.limaSoft, color: O2.lima }}
+      >
+        {icon}
+      </div>
+      <div className="flex-1">
+        <div className="o2-mono mb-1" style={{ color: O2.lima }}>{label}</div>
+        <div
+          className="o2-display"
+          style={{ fontSize: "clamp(18px, 2.2vw, 24px)", lineHeight: 1.1, marginBottom: 6 }}
+        >
+          {headline}
+        </div>
+        <div className="text-xs" style={{ color: O2.muted }}>{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+// ───────────── Página principal ─────────────
+
 export default function ComercialPreview() {
   const [tab, setTab] = useState("executiva");
+  const [periodo, setPeriodo] = useState("semana");
+  const [bu, setBu] = useState("consolidado");
+  const [sdr, setSdr] = useState("Todos SDRs");
+  const [closer, setCloser] = useState("Todos Closers");
+
+  const takeaways: Record<string, { icon: React.ReactNode; label: string; headline: string; sub: string }> = {
+    executiva: {
+      icon: <Lightbulb className="h-4 w-4" />,
+      label: "Resumo da semana — para abrir a reunião",
+      headline: "Estamos 12% atrás do pace de vendas",
+      sub: "Top oportunidades concentram 62% da meta restante. Daniel Trindade precisa de coaching — 25% de atingimento no D+15.",
+    },
+    funil: {
+      icon: <GitBranch className="h-4 w-4" />,
+      label: "Gargalo identificado",
+      headline: "Proposta → Venda em 22% (alvo: 30%)",
+      sub: "Conversão na última etapa caiu 3pp WoW. Velocity em Proposta subiu pra 12d (média era 9d). Possíveis causas a discutir: objeção de preço? Closer? Faixa errada?",
+    },
+    pipeline: {
+      icon: <Flame className="h-4 w-4" />,
+      label: "Onde focar nas próximas 2 semanas",
+      headline: "12 quentes — mas 3 esfriando há +14d",
+      sub: "Forecast ponderado de R$ 126k cobre ~10/14 da meta restante. Precisa subir win rate em Proposta para 30% OU fechar os 3 quentes parados (Casa Viegas, Tech Inova, Construtora Pampa).",
+    },
+    pessoas: {
+      icon: <Users className="h-4 w-4" />,
+      label: "Gestão de pessoas — 1:1 desta semana",
+      headline: "2 closers atrás do pace, 1 SDR muito atrás",
+      sub: "Daniel Trindade (Closer): 33% atinge, ciclo Prop→Venda 18d (média 11d). Daniel Trindade (SDR): 7% atinge — investigar bloqueio. Bruna no pace em ambos os papéis.",
+    },
+    perdas: {
+      icon: <TrendingDown className="h-4 w-4" />,
+      label: "Padrões de perda — onde investir treinamento",
+      headline: "Daniel Trindade perde 70% por concorrência",
+      sub: "Concorrência cresceu +2 cards MoM. Maior MRR perdido (R$ 45k) vem desse motivo. Outros padrões por closer revelam necessidade de coaching específico.",
+    },
+  };
+  const tk = takeaways[tab];
 
   return (
     <div className="o2-preview">
       <O2StyleScope />
       <div className="p-6 max-w-[1400px] mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <span className="o2-eyebrow">● Preview v3</span>
-            <span className="o2-mono">Mock estático · sem dados reais · 100% comercial</span>
+            <span className="o2-eyebrow">● Preview v4 · Weekly Meeting</span>
+            <span className="o2-mono">Mock estático · sem dados reais</span>
           </div>
           <div className="flex items-end gap-5">
             <img
@@ -1046,14 +1223,18 @@ export default function ComercialPreview() {
               Indicadores<br />Comerciais
             </h1>
           </div>
-          <p className="text-sm mt-4 max-w-3xl" style={{ color: O2.muted }}>
-            Reorganização em 5 sub-páginas focadas em diagnóstico de vendas.
-            Pipeline organizado por <strong style={{ color: O2.lima }}>temperatura</strong> (🔥 Quente / 🟡 Morno / 🔵 Frio).
-          </p>
         </div>
 
+        {/* Sticky filter bar — sempre visível em reunião */}
+        <StickyFilterBar
+          periodo={periodo} setPeriodo={setPeriodo}
+          bu={bu} setBu={setBu}
+          sdr={sdr} setSdr={setSdr}
+          closer={closer} setCloser={setCloser}
+        />
+
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full mb-6">
+          <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full mb-5">
             <TabsTrigger value="executiva" className="gap-1.5">
               <LayoutDashboard className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Visão</span> Executiva
@@ -1076,6 +1257,9 @@ export default function ComercialPreview() {
             </TabsTrigger>
           </TabsList>
 
+          {/* Key takeaway no topo de cada aba — bate-pronto pro gestor */}
+          <TakeawayBanner icon={tk.icon} label={tk.label} headline={tk.headline} sub={tk.sub} />
+
           <TabsContent value="executiva"><VisaoExecutiva /></TabsContent>
           <TabsContent value="funil"><FunilConversao /></TabsContent>
           <TabsContent value="pipeline"><PipelineAberto /></TabsContent>
@@ -1085,10 +1269,11 @@ export default function ComercialPreview() {
 
         <div className="mt-10 p-4 rounded-lg" style={{ border: `1px dashed ${O2.lineStrong}`, background: O2.elev2 }}>
           <p className="text-xs" style={{ color: O2.muted }}>
-            <strong style={{ color: O2.lima }}>Mudanças nesta v3 vs v2:</strong> Brand O2 aplicado
-            (dark, Lima accent, Tusker/Anton + Montserrat + JetBrains Mono) · Gráficos reais
-            com Recharts substituindo todos os placeholders · Pipeline temperatura ganhou bordas
-            gradiente · Tabs com underline lima quando ativa.
+            <strong style={{ color: O2.lima }}>v4 — Pensado para weekly meeting:</strong> Barra de
+            filtros sticky no topo (período, BU, SDR, Closer) sempre visível ao navegar entre abas ·
+            Atalhos rápidos de período (Esta semana / Mês / Trimestre) · "Modo weekly" preparado
+            para apresentação · Cada aba abre com <strong>key takeaway</strong> — frase única
+            que resume o que discutir naquela sessão.
           </p>
         </div>
       </div>
