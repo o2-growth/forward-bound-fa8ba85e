@@ -149,7 +149,7 @@ function aggregateSdrCounts(
   return groups;
 }
 
-function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs, role = 'sdr' }: SdrBreakdownProps) {
+export function SdrBreakdown({ itemsByIndicator, startDate, endDate, indicatorConfigs, role = 'sdr' }: SdrBreakdownProps) {
   const roleLabel = role === 'sdr' ? 'SDR' : 'Closer';
   const startTime = startDate.getTime();
   const endTime = new Date(
