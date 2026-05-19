@@ -665,13 +665,74 @@ function SimuladorCarteira({ mrrTotal, custoSquad, clientes, totalClientes }: Si
 interface CfoViewProps {
   cfos: JornadaCfo[];
   clientes: JornadaCliente[];
+  /** Range de período (Q1-Q4 ou custom). Quando informado, métricas são
+   *  recalculadas pra o snapshot de fim de período + eventos no range. */
+  dateRange?: { from: Date; to: Date };
 }
 
 type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco" | "churns" | "custoSquad" | "margem" | "ticketMedio";
 
 const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
+const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
 
-export function CfoView({ cfos, clientes }: CfoViewProps) {
+export function CfoView({ cfos: propCfos, clientes, dateRange }: CfoViewProps) {
+  // Snapshot dos clientes considerando o período selecionado:
+  // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
+  // - Churns ocorridos NO período: faseAtual em CHURN_PHASES AND dataEntrada (entrada na fase de churn) dentro do range
+  // Quando dateRange não é informado, retorna tudo como hoje (compatibilidade).
+  const clientesPeriodo = useMemo(() => {
+    if (!dateRange) return clientes;
+    const fromTs = dateRange.from.getTime();
+    const toTs = dateRange.to.getTime();
+    return clientes.filter(c => {
+      if (CHURN_PHASES.includes(c.faseAtual)) {
+        // Churn no período (dataEntrada = quando entrou na fase atual de churn)
+        const t = c.dataEntrada.getTime();
+        return t >= fromTs && t <= toTs;
+      }
+      // Cliente ainda ativo (não-churn): precisa ter assinado até o fim do período
+      if (!c.dataAssinatura) return false;
+      return c.dataAssinatura.getTime() <= toTs;
+    });
+  }, [clientes, dateRange]);
+
+  // Re-aggregate métricas por CFO quando há filtro de período (caso contrário, usa as do prop)
+  const cfos = useMemo<JornadaCfo[]>(() => {
+    if (!dateRange) return propCfos;
+    const groups = new Map<string, JornadaCliente[]>();
+    for (const c of clientesPeriodo) {
+      if (!c.cfo) continue;
+      if (!groups.has(c.cfo)) groups.set(c.cfo, []);
+      groups.get(c.cfo)!.push(c);
+    }
+    return Array.from(groups.entries()).map(([nome, lista]) => {
+      const ativos = lista.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
+      const mrrTotal = ativos.reduce((s, c) => s + c.mrr, 0);
+      const emRisco = ativos.filter(c => c.tratativaAtiva);
+      const mrrEmRisco = emRisco.reduce((s, c) => s + c.mrr, 0);
+      const clientesChurn = lista.filter(c => CHURN_PHASES.includes(c.faseAtual)).length;
+      const tarefasAtrasadas = ativos.reduce((s, c) => s + c.tarefasAtrasadas, 0);
+      const totalTarefas = ativos.reduce((s, c) => s + c.tarefasAtivas, 0);
+      const taxaEntrega = totalTarefas > 0 ? Math.round(((totalTarefas - tarefasAtrasadas) / totalTarefas) * 100) : 100;
+      const npsScores = ativos.filter(c => c.ultimoNps !== null).map(c => c.ultimoNps as number);
+      const npsMediaClientes = npsScores.length > 0 ? Math.round(npsScores.reduce((a, b) => a + b, 0) / npsScores.length) : null;
+      const healthScoreMedio = ativos.length > 0 ? Math.round(ativos.reduce((s, c) => s + c.healthScore, 0) / ativos.length) : 0;
+      return {
+        nome,
+        clientes: ativos.length,
+        mrrTotal,
+        mrrEmRisco,
+        clientesAtivos: ativos.length,
+        clientesSetup: ativos.filter(c => c.setupStatus === 'em_andamento' || c.setupStatus === 'atrasado').length,
+        clientesTratativa: emRisco.length,
+        clientesChurn,
+        tarefasAtrasadas,
+        taxaEntrega,
+        npsMediaClientes,
+        healthScoreMedio,
+      } as JornadaCfo;
+    });
+  }, [propCfos, clientesPeriodo, dateRange]);
   const [selectedCfo, setSelectedCfo] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<SortCol>("mrrTotal");
   const [sortAsc, setSortAsc] = useState(false);
@@ -703,7 +764,10 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
     const mesAnteriorEnd = new Date(now.getFullYear(), now.getMonth(), 1);
     const isMariOrPedrolo = (cfo: string) =>
       cfo.includes('Mariana') || cfo.includes('Pedrolo');
-    return clientes.filter(c => {
+    // Quando há dateRange ativo, usar clientesPeriodo (snapshot do fim do período);
+    // caso contrário, lista crua de clientes (compatibilidade com comportamento anterior).
+    const source = dateRange ? clientesPeriodo : clientes;
+    return source.filter(c => {
       if (INACTIVE_PHASES.includes(c.faseAtual)) return false;
       if (isMariOrPedrolo(c.cfo)) {
         const dt = c.dataAssinatura;
@@ -711,18 +775,20 @@ export function CfoView({ cfos, clientes }: CfoViewProps) {
       }
       return true;
     });
-  }, [clientes]);
+  }, [clientes, clientesPeriodo, dateRange]);
 
-  // A1: Count churns per CFO
+  // A1: Count churns per CFO (usa clientesPeriodo quando filtro ativo,
+  // assim churns refletem só os do período selecionado)
   const CHURN_PHASES_LOCAL = ['Churn', 'Atividades finalizadas', 'Desistência'];
   const churnsPerCfo = useMemo(() => {
+    const source = dateRange ? clientesPeriodo : clientes;
     const map: Record<string, number> = {};
-    clientes.filter(c => CHURN_PHASES_LOCAL.includes(c.faseAtual)).forEach(c => {
+    source.filter(c => CHURN_PHASES_LOCAL.includes(c.faseAtual)).forEach(c => {
       const cfo = c.cfo || 'Sem CFO';
       map[cfo] = (map[cfo] || 0) + 1;
     });
     return map;
-  }, [clientes]);
+  }, [clientes, clientesPeriodo, dateRange]);
 
   const sortedCfos = useMemo(() => {
     return [...cfos].sort((a, b) => {

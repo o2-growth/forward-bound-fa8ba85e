@@ -30,7 +30,7 @@ import { VisaoGeralCS } from './cs/VisaoGeralCS';
 import { OperacaoKpisStrip } from './cs/OperacaoKpisStrip';
 import type { JornadaCliente, JornadaCfo, PipelineFase } from './jornada/types';
 import { DateRange } from 'react-day-picker';
-import { isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { isWithinInterval, startOfDay, endOfDay, startOfQuarter, endOfQuarter } from 'date-fns';
 import { AlertCircle } from 'lucide-react';
 
 function CustomerSuccessTabInner() {
@@ -38,14 +38,40 @@ function CustomerSuccessTabInner() {
   const [activeTab, setActiveTab] = useState('visao-geral');
 
   // Date range for CS filtering (same pattern as Indicadores Comercial)
-  const now = new Date();
+  // `now` é estável (computado uma vez por instância de componente) — usado apenas
+  // para inicializar o range default.
+  const now = useMemo(() => new Date(), []);
   const [csStartDate, setCsStartDate] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
-  const [csEndDate, setCsEndDate] = useState(() => now);
+  const [csEndDate, setCsEndDate] = useState(() => endOfDay(now));
 
   const handleCsDateChange = (start: Date, end: Date) => {
-    setCsStartDate(start);
-    setCsEndDate(end);
+    // Garante que o end inclui o último dia inteiro (até 23:59:59.999),
+    // senão filtros que usam `date <= end` perdem cards do próprio dia.
+    setCsStartDate(startOfDay(start));
+    setCsEndDate(endOfDay(end));
   };
+
+  // Quarters do ano atual, normalizados via date-fns (startOfQuarter / endOfQuarter
+  // já entregam o início do trimestre 00:00 e o fim 23:59:59.999, então não há
+  // problema de "midnight do último dia").
+  const quarters = useMemo(() => {
+    const year = now.getFullYear();
+    return [1, 2, 3, 4].map((qNum) => {
+      const ref = new Date(year, (qNum - 1) * 3, 1);
+      return {
+        label: `Q${qNum}`,
+        start: startOfQuarter(ref),
+        end: endOfQuarter(ref),
+      };
+    });
+  }, [now]);
+
+  // Compara dia/mês/ano em vez de timestamp exato — evita falsos negativos por
+  // diferenças de milissegundos vindas do calendário externo.
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
 
   // Data hooks
   const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, operacao, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
@@ -302,13 +328,8 @@ function CustomerSuccessTabInner() {
           />
 
           <div className="flex gap-1">
-            {[
-              { label: 'Q1', start: new Date(now.getFullYear(), 0, 1), end: new Date(now.getFullYear(), 2, 31) },
-              { label: 'Q2', start: new Date(now.getFullYear(), 3, 1), end: new Date(now.getFullYear(), 5, 30) },
-              { label: 'Q3', start: new Date(now.getFullYear(), 6, 1), end: new Date(now.getFullYear(), 8, 30) },
-              { label: 'Q4', start: new Date(now.getFullYear(), 9, 1), end: new Date(now.getFullYear(), 11, 31) },
-            ].map(q => {
-              const isActive = csStartDate.getTime() === q.start.getTime() && csEndDate.getTime() === q.end.getTime();
+            {quarters.map(q => {
+              const isActive = sameDay(csStartDate, q.start) && sameDay(csEndDate, q.end);
               return (
                 <Button
                   key={q.label}
@@ -383,7 +404,11 @@ function CustomerSuccessTabInner() {
           </TabsContent>
 
           <TabsContent value="cfos" className="mt-4">
-            <CfoView cfos={filteredCfos} clientes={filteredClientes} />
+            <CfoView
+              cfos={filteredCfos}
+              clientes={filteredClientes}
+              dateRange={{ from: csStartDate, to: csEndDate }}
+            />
           </TabsContent>
 
           <TabsContent value="reunioes" className="mt-4">
