@@ -238,6 +238,95 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
 
       {/* Operação KPIs movidos para a aba Churns (OperacaoKpisStrip) */}
 
+      {/* Distribuição de Clientes Ativos — Por CFO + Por Tipo (SaaS/Pontual) */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-600" />
+              Distribuição de Clientes Ativos
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  <p><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
+                  <p className="mt-1"><strong>Por Tipo</strong>: SaaS = clientes com pelo menos um produto recorrente (CFOaaS, Gênio, Oxy etc.). Pontual = clientes que só têm Diagnóstico, Turnaround, Valuation ou Educação.</p>
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
+            <Badge variant="outline" className="text-[10px]">{activeClientes.length} ativos</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Por Tipo */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por tipo de produto</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">SaaS</p>
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{clientesByTipo.saas}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {activeClientes.length > 0 ? Math.round((clientesByTipo.saas / activeClientes.length) * 100) : 0}% da carteira
+                  </p>
+                </div>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pontual</p>
+                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{clientesByTipo.pontual}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    {activeClientes.length > 0 ? Math.round((clientesByTipo.pontual / activeClientes.length) * 100) : 0}% da carteira
+                  </p>
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">
+                Pontual = só Diagnóstico / Turnaround / Valuation / Educação
+              </p>
+            </div>
+
+            {/* Por CFO — tabela compacta */}
+            <div className="md:col-span-2 space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por CFO</p>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider">CFO</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">Clientes</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">MRR</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">% Carteira</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientesByCfo.map(([cfo, data]) => {
+                      const pct = activeClientes.length > 0 ? (data.count / activeClientes.length) * 100 : 0;
+                      return (
+                        <TableRow key={cfo} className="hover:bg-muted/30">
+                          <TableCell className="py-1.5 font-medium text-xs">{cfo}</TableCell>
+                          <TableCell className="py-1.5 text-right tabular-nums text-xs">{data.count}</TableCell>
+                          <TableCell className="py-1.5 text-right tabular-nums text-xs">{formatCurrency(data.mrr)}</TableCell>
+                          <TableCell className="py-1.5 text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              <div className="w-12 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground tabular-nums w-9 text-right">{pct.toFixed(0)}%</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {clientesByCfo.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-4 text-xs text-muted-foreground">Nenhum CFO ativo no período.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Alert Summary Strip */}
       {(alertSummary.criticos > 0 || alertSummary.altos > 0) && (
         <button
