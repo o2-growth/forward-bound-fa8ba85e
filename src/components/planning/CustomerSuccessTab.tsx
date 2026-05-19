@@ -218,6 +218,19 @@ function CustomerSuccessTabInner() {
     });
   }, [activeOnly, filters.cfos, filters.produtos]);
 
+  // Versão de filteredClientes que TAMBÉM respeita o range de período (Q1/Q2/Q3/Q4).
+  // Usado pela Visão Geral (KPIs, Distribuição) — outras subabas (Clientes, Reuniões)
+  // continuam com a visão "snapshot atual" via filteredClientes puro.
+  // Regra: cliente "ativo ao fim do período" = dataAssinatura <= csEndDate.
+  const filteredClientesPeriodo = useMemo(() => {
+    const endTs = csEndDate.getTime();
+    return filteredClientes.filter(c => {
+      // Sem dataAssinatura = considerar como ativo (fallback conservador)
+      if (!c.dataAssinatura) return true;
+      return c.dataAssinatura.getTime() <= endTs;
+    });
+  }, [filteredClientes, csEndDate]);
+
   const filteredCfos = useMemo((): JornadaCfo[] => {
     if (filters.cfos.length === 0 && filters.produtos.length === 0) return cfos;
     const cfoNames = [...new Set(filteredClientes.map(c => c.cfo).filter(Boolean))];
@@ -389,7 +402,7 @@ function CustomerSuccessTabInner() {
 
           <TabsContent value="visao-geral" className="mt-4">
             <VisaoGeralCS
-              clientes={clientes}
+              clientes={filteredClientesPeriodo}
               cfos={filteredCfos}
               alertas={filteredAlertas}
               npsScore={displayNpsData?.metrics?.nps?.score ?? null}
