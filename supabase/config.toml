@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.manage-redistribution]
 verify_jwt = false
+
+[functions.admin-create-vinicios]
+verify_jwt = false
