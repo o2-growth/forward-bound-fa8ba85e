@@ -50,3 +50,4 @@ verify_jwt = false
 
 [functions.manage-redistribution]
 verify_jwt = false
+
