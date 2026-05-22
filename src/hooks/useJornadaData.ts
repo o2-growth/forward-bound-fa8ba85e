@@ -495,6 +495,7 @@ export function useJornadaData() {
         uf: (row['UF'] || '').trim(),
         dataAssinatura,
         dataEntrada: entrada,
+        dataChurnOficial: churnDateByTitulo.get(tituloLower) ?? null,
         healthScore: health,
         healthLevel,
         setupStatus,
