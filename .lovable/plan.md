@@ -1,19 +1,61 @@
-## Mudanças em `VisaoGeralCS.tsx` (Distribuição de Clientes Ativos)
+## Problema
 
-1. **Renomear "SaaS" para "MRR"** no card de tipo de produto (label, header e textos auxiliares).
+A aba Churn mostra **125 cards no Q1/2026**, mas ~99 deles são "fantasmas" de uma migração em massa feita no Pipefy em **11–12/Jan/2026** (60 cards movidos pra `Churn`, 30 pra `Atividades finalizadas`, 9 pra `Desistência` no mesmo dia, sem nenhuma data oficial de churn preenchida).
 
-2. **Tornar os cards "MRR" e "Pontual" clicáveis** — ao clicar, abre um Dialog com a lista de clientes daquele tipo (mesmo padrão visual dos Dialogs já existentes para KPIs).
+Como o código usa `Entrada na fase` como último fallback de `dataEncerramento`, esses cards históricos aparecem como se tivessem churnado todos juntos em Jan/2026.
 
-### Detalhes técnicos
+## Solução
 
-- Adicionar novo estado `tipoDialog: 'mrr' | 'pontual' | null` (separado do `KpiDialogType` para não colidir com o KPI "MRR Base" já existente).
-- Adicionar classes `cursor-pointer hover:bg-*/10 transition-colors` nos dois cards e `onClick` para abrir o dialog correspondente.
-- Criar um único `<Dialog>` que filtra `activeClientes` pelo critério atual:
-  - MRR: `c.mrr > 0`
-  - Pontual: `c.mrr === 0 && c.pontual > 0`
-- Listar cada cliente em uma `<Table>` com colunas: Cliente, CFO, MRR, Pontual, Fase Atual — ordenado por MRR desc.
-- Atualizar o tooltip do header para refletir "MRR" no lugar de "SaaS".
+Mudar a regra de elegibilidade do dossier de churn em `src/hooks/useOperationsData.ts` (função `processProjects`).
 
-### Fora do escopo
-- Nenhuma mudança em lógica de classificação, cálculos de MRR ou outros componentes.
-- Sem alteração no KPI "MRR Base" da linha superior.
+### Regra atual (linhas 357–441)
+
+Inclui qualquer card em `Churn`, `Atividades finalizadas` ou `Desistência` que tenha `_refDate >= 2025-10-01`, usando `entrada_fase` como fallback final pra data.
+
+### Regra nova
+
+Para o card entrar no `churnDossier`, deve ter pelo menos **uma** das duas datas oficiais preenchidas:
+
+1. `Data do churn` (campo do card em Central de Projetos), OU
+2. `Finalizacao contrato ultimo dia` (campo da tratativa correspondente)
+
+Se nenhuma das duas existir, o card é **descartado** (não importa em que fase terminal esteja).
+
+### Implementação
+
+1. **Mover a hierarquia de `dataEncerramento` para ANTES do `return`** já está assim, mas adicionar um guard:
+   ```ts
+   const dataOficial = finalizacaoContrato || dataChurnManual;
+   if (!dataOficial) return null;  // descarta cards sem evidência oficial
+   ```
+
+2. **Remover `dataPhaseEntry` e os fallbacks legados** (`card['Data encerramento']`, `saidaDate`, `tratEntradaDate`) da composição de `dataEncerramento` — passam a ser ignorados como fonte primária. `dataEncerramento` = sempre `dataOficial`.
+
+3. **Filtrar nulls** no `.filter()` final.
+
+4. **Manter intactos**:
+   - Os overrides oficiais de Abr/2026 (`APR_2026_OFFICIAL`) — injetam cards sintéticos com data fixa.
+   - O card sintético do Protectface (Mar/2026).
+   - Todos os `CHURN_OVERRIDES` existentes.
+   - O `CHURN_CUTOFF` (Out/2025).
+
+### Resultado esperado
+
+Distribuição mensal corrigida (simulada via SQL):
+
+```
+Jan/2026:  ~5 churns reais (vs 104 hoje)
+Fev/2026:  ~3–5
+Mar/2026:  ~10
+Abr/2026:   8 (oficial)
+```
+
+Q1/2026 cai de **125 → ~20–25 churns reais**.
+
+### Risco
+
+Cards onde a operação esqueceu de preencher `Data do churn` ficam fora do dossier. Mitigação: se aparecer cliente real ausente, adicionar override manual em `CHURN_OVERRIDES` ou no bloco de injeção (mesmo padrão de Abr/2026).
+
+## Arquivo afetado
+
+- `src/hooks/useOperationsData.ts` — função `processProjects`, bloco do `churnDossier` (linhas ~357–441).

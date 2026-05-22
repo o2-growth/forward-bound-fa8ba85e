@@ -383,30 +383,20 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       ?? (trat as any)?.['Finalizacao do contrato ultimo dia']
       ?? null;
     const finalizacaoContrato = toLocalDateBR(finalizacaoContratoRaw as any);
-    const churnPhaseEntry = parsePipefyDate(card['Entrada']);
-    // Hierarquia: data oficial de fim do contrato (corrigida) > Data do churn manual >
-    // entrada na fase de churn. Isso garante que o filtro mensal use o mês oficial
-    // de finalização do contrato (fonte de verdade do XLSX/financeiro).
+    // Regra nova: só entra no dossier quem tem data oficial de fim de contrato.
+    // Isso evita que migrações em massa de cards no Pipefy (clientes movidos pra
+    // fases terminais sem preencher "Data do churn" nem "Finalizacao contrato
+    // ultimo dia") apareçam como churns fantasmas no mês da migração.
     const dataChurnManual = toLocalDateBR((card as any)['Data do churn']);
-    const dataPhaseEntry = churnPhaseEntry ? toLocalDateBR(churnPhaseEntry) : '';
-    let dataEncerramento = finalizacaoContrato || dataChurnManual || dataPhaseEntry || '';
-    // Fallbacks legados quando nenhuma das 3 fontes oficiais existe
-    if (!dataEncerramento) {
-      dataEncerramento =
-        toLocalDateBR(card['Data encerramento']) ||
-        (saidaDate ? toLocalDateBR(saidaDate) : '') ||
-        (tratEntradaDate ? toLocalDateBR(tratEntradaDate) : '') ||
-        '';
-    }
-    // mesChurn segue a mesma hierarquia de dataEncerramento (deriva direto dela quando possível).
-    // Parse local de YYYY-MM-DD para evitar shift de timezone no início/fim de mês.
+    const dataOficial = finalizacaoContrato || dataChurnManual || '';
+    if (!dataOficial) return null as any;
+    const dataEncerramento = dataOficial;
+    // mesChurn deriva direto de dataEncerramento (sempre YYYY-MM-DD vindo de toLocalDateBR).
     let mesChurn = '';
     const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dataEncerramento);
     if (ymdMatch) {
       const monthsBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
       mesChurn = `${monthsBR[Number(ymdMatch[2]) - 1]}/${ymdMatch[1]}`;
-    } else {
-      mesChurn = (trat ? formatMonthYear(trat['Entrada']) : '') || (card['Mes do Churn'] || '');
     }
     const ltMeses = diffInMonths(dataAssinatura, dataEncerramento) || (card['LT (meses)'] || '');
 
@@ -436,8 +426,9 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       diagnostico: parseNumber(card['Valor Diagnostico']),
       _refDate: refDate,
     };
-  }).filter(c => c._refDate >= CHURN_CUTOFF)
-    .filter(c => c.motivoPrincipal || c.dataEncerramento || c.mesChurn)
+  }).filter((c): c is NonNullable<typeof c> => c !== null)
+    .filter(c => c._refDate >= CHURN_CUTOFF)
+    .filter(c => c.dataEncerramento)
     .map(({ _refDate, ...rest }) => rest);
 
   // Inject synthetic cards for clients in the Q1 spreadsheet but missing from Pipefy
