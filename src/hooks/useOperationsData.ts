@@ -426,8 +426,9 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       diagnostico: parseNumber(card['Valor Diagnostico']),
       _refDate: refDate,
     };
-  }).filter(c => c._refDate >= CHURN_CUTOFF)
-    .filter(c => c.motivoPrincipal || c.dataEncerramento || c.mesChurn)
+  }).filter((c): c is NonNullable<typeof c> => c !== null)
+    .filter(c => c._refDate >= CHURN_CUTOFF)
+    .filter(c => c.dataEncerramento)
     .map(({ _refDate, ...rest }) => rest);
 
   // Inject synthetic cards for clients in the Q1 spreadsheet but missing from Pipefy
