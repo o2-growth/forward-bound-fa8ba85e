@@ -672,7 +672,17 @@ interface CfoViewProps {
   /** Dossiê oficial de churn (mesma fonte da aba Churn). Quando informado,
    *  a contagem de Churns por CFO usa essa lista (com overrides oficiais)
    *  filtrada por dataEncerramento dentro do dateRange. */
-  churnDossier?: Array<{ cliente: string; cfo: string; dataEncerramento: string }>;
+  churnDossier?: Array<{
+    id?: string;
+    cliente: string;
+    cfo: string;
+    dataEncerramento: string;
+    mrr?: number;
+    setup?: number;
+    ltMeses?: string | number;
+    motivoPrincipal?: string;
+    faseAtual?: string;
+  }>;
 }
 
 type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco" | "churns" | "custoSquad" | "margem" | "ticketMedio";
