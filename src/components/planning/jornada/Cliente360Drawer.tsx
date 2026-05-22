@@ -6,6 +6,8 @@ import { Loader2, RefreshCw, AlertCircle, Sparkles } from "lucide-react";
 import { useCliente360 } from "@/hooks/useCliente360";
 import { useQueryClient } from "@tanstack/react-query";
 import type { JornadaCliente } from "./types";
+import { DataSourceInfo } from "@/components/planning/cs/DataSourceInfo";
+import { DS } from "@/components/planning/cs/dataSources";
 
 interface Cliente360DrawerProps {
   cliente: JornadaCliente | null;
@@ -79,6 +81,7 @@ export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerPro
                   <h3 className="text-sm font-semibold flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
                     Análise IA — diagnóstico de processo
+                    <DataSourceInfo source={DS.CLIENTE_360} />
                   </h3>
                   <Button
                     variant="ghost"
