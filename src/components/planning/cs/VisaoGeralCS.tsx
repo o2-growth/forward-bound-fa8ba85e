@@ -54,14 +54,6 @@ type TipoDialogType = 'mrr' | 'pontual' | null;
 export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNavigateToAlertas, operacao }: VisaoGeralCSProps) {
   const [openDialog, setOpenDialog] = useState<KpiDialogType>(null);
   const [tipoDialog, setTipoDialog] = useState<TipoDialogType>(null);
-
-  const clientesTipoList = useMemo(() => {
-    if (!tipoDialog) return [];
-    const filtered = activeClientesAll => activeClientesAll.filter((c: JornadaCliente) =>
-      tipoDialog === 'pontual' ? (c.mrr === 0 && c.pontual > 0) : c.mrr > 0
-    );
-    return filtered;
-  }, [tipoDialog]);
   
 
   const activeClientes = useMemo(() => {
