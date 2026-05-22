@@ -332,37 +332,37 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Estado atual</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <Card className={`border-emerald-500/20 bg-emerald-500/5 ${clickableCardCls} hover:border-emerald-500/50`} role="button" tabIndex={0} onClick={openMrrAtivo} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMrrAtivo(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
                 <Wallet className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">MRR</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Soma de Valor CFOaaS + Valor OXY dos clientes ativos. Snapshot atual (não filtrado por período).</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{formatCurrency(activeMrr)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">MRR ativo no momento</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">MRR ativo · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className="border-blue-500/20 bg-blue-500/5">
+          <Card className={`border-blue-500/20 bg-blue-500/5 ${clickableCardCls} hover:border-blue-500/50`} role="button" tabIndex={0} onClick={openClientesAtivos} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesAtivos(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
                 <Users className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Clientes Ativos</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Clientes em fase Onboarding ou Em Operação Recorrente. Exclui Churn / Desistência / Arquivado.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{activeClientesCount}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Carteira atual</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Carteira atual · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className="border-violet-500/20 bg-violet-500/5">
+          <Card className={`border-violet-500/20 bg-violet-500/5 ${clickableCardCls} hover:border-violet-500/50`} role="button" tabIndex={0} onClick={openLtMedio} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLtMedio(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 mb-1">
                 <Clock className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">LT Médio (churns)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tempo médio em meses entre Data de assinatura e Data de encerramento dos clientes que caíram no período.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{avgLt} <span className="text-sm font-normal text-muted-foreground">meses</span></p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">dos clientes que caíram</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">dos clientes que caíram · clique</p>
             </CardContent>
           </Card>
         </div>
