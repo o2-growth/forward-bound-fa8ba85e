@@ -9,6 +9,8 @@ import { Calendar, CheckCircle2, XCircle, Circle, AlertTriangle, ArrowUpDown, Ex
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { PipefyCardLink, PIPEFY_PIPES } from "../nps/PipefyCardLink";
 import type { JornadaCliente } from "./types";
+import { DataSourceInfo } from "@/components/planning/cs/DataSourceInfo";
+import { DS } from "@/components/planning/cs/dataSources";
 
 const MONTH_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
@@ -313,31 +315,31 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
         <div className="flex flex-col items-center p-3 rounded-lg border bg-muted/50">
           <Calendar className="h-5 w-5 mb-1 text-blue-500" />
           <span className="text-xl font-bold">{totalClientes}</span>
-          <span className="text-xs text-muted-foreground">Clientes</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Clientes <DataSourceInfo source={DS.REUNIOES} /></span>
         </div>
         <div className="flex flex-col items-center p-3 rounded-lg border bg-muted/50">
           <CheckCircle2 className="h-5 w-5 mb-1 text-green-500" />
           <span className="text-xl font-bold text-green-600">{totalDone}/{totalExpected}</span>
-          <span className="text-xs text-muted-foreground">Reuniões Feitas</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Reuniões Feitas <DataSourceInfo source={DS.REUNIOES} /></span>
         </div>
         <div className="flex flex-col items-center p-3 rounded-lg border bg-muted/50">
           <span className="text-xl font-bold text-blue-600">{taxaRealizacao}%</span>
-          <span className="text-xs text-muted-foreground">Taxa Realização</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Taxa Realização <DataSourceInfo source={DS.REUNIOES} /></span>
         </div>
         <div className="flex flex-col items-center p-3 rounded-lg border bg-muted/50">
           <CheckCircle2 className="h-5 w-5 mb-1 text-green-500" />
           <span className="text-xl font-bold text-green-600">{clientesEmDia}</span>
-          <span className="text-xs text-muted-foreground">Em Dia</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Em Dia <DataSourceInfo source={DS.REUNIOES} /></span>
         </div>
         <div className="flex flex-col items-center p-3 rounded-lg border bg-muted/50">
           <AlertTriangle className="h-5 w-5 mb-1 text-red-500" />
           <span className="text-xl font-bold text-red-600">{clientesAtrasados}</span>
-          <span className="text-xs text-muted-foreground">Atrasados</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Atrasados <DataSourceInfo source={DS.REUNIOES} /></span>
         </div>
         <div className="flex flex-col items-center p-3 rounded-lg border bg-muted/50">
           <XCircle className="h-5 w-5 mb-1 text-muted-foreground" />
           <span className="text-xl font-bold">{clientesSemReuniao}</span>
-          <span className="text-xs text-muted-foreground">Sem Reunião</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Sem Reunião <DataSourceInfo source={DS.REUNIOES} /></span>
         </div>
       </div>
 
