@@ -691,6 +691,44 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Tipo (MRR / Pontual) Dialog */}
+      <Dialog open={tipoDialog !== null} onOpenChange={(open) => !open && setTipoDialog(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {tipoDialog === 'mrr' ? 'Clientes MRR' : 'Clientes Pontual'} — {
+                activeClientes.filter(c => tipoDialog === 'pontual' ? (c.mrr === 0 && c.pontual > 0) : c.mrr > 0).length
+              }
+            </DialogTitle>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Cliente</TableHead>
+                <TableHead className="text-xs">CFO</TableHead>
+                <TableHead className="text-xs text-right">MRR</TableHead>
+                <TableHead className="text-xs text-right">Pontual</TableHead>
+                <TableHead className="text-xs">Fase</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {activeClientes
+                .filter(c => tipoDialog === 'pontual' ? (c.mrr === 0 && c.pontual > 0) : c.mrr > 0)
+                .sort((a, b) => (tipoDialog === 'pontual' ? b.pontual - a.pontual : b.mrr - a.mrr))
+                .map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-xs font-medium">{c.titulo}</TableCell>
+                    <TableCell className="text-xs">{c.cfo || '—'}</TableCell>
+                    <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.mrr)}</TableCell>
+                    <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.pontual)}</TableCell>
+                    <TableCell className="text-xs">{c.faseAtual}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
     </div>
     </TooltipProvider>
   );
