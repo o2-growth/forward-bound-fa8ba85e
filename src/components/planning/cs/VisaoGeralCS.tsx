@@ -46,7 +46,7 @@ const HEALTH_LABELS: Record<string, string> = {
 
 const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
 const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
-const PONTUAL_PRODUCTS = ['Diagnostico', 'Turnaround', 'Valuation', 'Educacao'];
+
 
 type KpiDialogType = 'clientes' | 'mrr' | 'health' | 'nps' | 'churn' | null;
 
