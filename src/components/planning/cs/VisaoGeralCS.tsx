@@ -278,7 +278,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 </div>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                Pontual = só Diagnóstico / Turnaround / Valuation / Educação
+                Pontual = cliente sem MRR recorrente (só receita pontual)
               </p>
             </div>
 
