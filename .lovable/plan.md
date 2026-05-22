@@ -1,73 +1,36 @@
-## Objetivo
+## Problema
 
-Tornar todos os 7 KPI cards da página de Churn (`ChurnDossierSection.tsx`) clicáveis, abrindo um drawer com a lista detalhada dos clientes que compõem cada métrica.
+Na aba **CFOs > Comparativo P&L por CFO**, a linha **Churns** está zerada para todos os CFOs quando o filtro de data está em meses recentes (ex.: 01/04/2026 – 30/04/2026), mesmo havendo churns reais no período.
 
-## Cards alvo
+Causa raiz: o `CfoView` filtra churns pelo campo `dataEntrada` (data em que o card entrou na fase atual no Pipefy). Esse valor pode ser bem diferente da data oficial do churn — e em muitos casos os clientes considerados churn pelo dossiê **não têm `dataEntrada` no período filtrado**, então caem fora da contagem.
 
-**Linha 1 — Estado atual:**
-1. **MRR** (ativo) → lista de clientes ativos com seu MRR
-2. **Clientes Ativos** → mesma lista, mas focada em qtd
-3. **LT Médio (churns)** → lista de churns do período com LT individual
+A regra oficial (já aplicada no `ChurnDossierSection` e no `useOperationsData`) é usar:
+1. `Data encerramento` / `Data de encerramento` do card Central de Projetos, **ou**
+2. `Data do churn` (campo manual), como fallback.
 
-**Linha 2 — Churn no período:**
-4. **Revenue Churn (R$)** → lista de churns ordenada por MRR desc
-5. **Revenue Churn (%)** → mesma lista + base de cálculo no header
-6. **Logo Churn (Qtd.)** → lista de churns ordenada por data
-7. **Logo Churn (%)** → mesma + base de cálculo
-8. **Taxa de Salvamento** → 2 grupos: tratativas salvas e churns
+Sem uma dessas datas, o cliente não conta como churn do período.
 
-## Implementação
+## Mudanças
 
-### 1. Novo componente `ChurnKpiDrawer.tsx`
+### 1. `src/components/planning/jornada/types.ts`
+- Adicionar `dataChurnOficial: Date | null` em `JornadaCliente`.
 
-`src/components/planning/cs/ChurnKpiDrawer.tsx` — drawer (Sheet) lateral genérico que recebe:
+### 2. `src/hooks/useJornadaData.ts`
+- Já existe `churnDateByTitulo` (linhas 256-264) que lê `Data encerramento` da Central de Projetos.
+- Estender para também considerar `Data do churn` como fallback (alinhado ao `useOperationsData`).
+- Ao montar cada `JornadaCliente` (linhas 474-489), preencher `dataChurnOficial = churnDateByTitulo.get(titulo.toLowerCase()) ?? null`.
 
-```ts
-type KpiDrawerData = {
-  title: string;              // ex: "Revenue Churn no período"
-  subtitle?: string;          // ex: "R$ 450.000 · 18 clientes"
-  formula?: string;           // breve explicação do cálculo
-  columns: ('cliente'|'cfo'|'mrr'|'setup'|'lt'|'motivo'|'data'|'fase')[];
-  rows: Array<ChurnDossierCard | ActiveClient>;
-};
-```
-
-Renderiza header com título + subtítulo + fórmula, e tabela compacta com link pro Pipefy em cada linha (reusa `PipefyCardLink`).
-
-### 2. Receber dados de clientes ativos
-
-`ChurnDossierSection` hoje recebe só `activeClientesCount` e `activeMrr` (números). Precisa também da **lista** de clientes ativos pra alimentar os drawers de MRR e Clientes Ativos.
-
-- Em `useOperationsData.ts`: expor `activeClients: CfoClient[]` (já existe agregado por CFO em `cfoDistribution[].clients` — vou achatar num array único).
-- Propagar via `NpsTab` → `ChurnDossierSection` como nova prop `activeClients?: ActiveClient[]`.
-
-### 3. Tornar cards clicáveis
-
-Cada `<Card>` ganha:
-- `role="button"`, `tabIndex={0}`, `onClick={() => setDrawer({...})}`
-- `cursor-pointer hover:border-{cor}/50 transition` (manter cores existentes)
-- Pequeno ícone `ChevronRight` no canto pra indicar interatividade
-
-### 4. Estado central
-
-```ts
-const [drawerKpi, setDrawerKpi] = useState<KpiDrawerData | null>(null);
-```
-
-Cada handler monta o `KpiDrawerData` apropriado a partir de `filtered`, `activeClients`, `tratativasResolvidasCount`.
-
-### 5. Tratativas salvas
-
-Pro card "Taxa de Salvamento" precisamos da **lista** de tratativas resolvidas. Hoje só vem a contagem (`tratativasResolvidasCount`). Adicionar prop opcional `tratativasResolvidas?: TratativaResolvida[]` propagada de cima — se vier vazia, o drawer mostra apenas a contagem + lista de churns no outro grupo.
-
-## Arquivos afetados
-
-- **novo:** `src/components/planning/cs/ChurnKpiDrawer.tsx`
-- `src/components/planning/nps/ChurnDossierSection.tsx` — cards clicáveis + handlers + drawer
-- `src/hooks/useOperationsData.ts` — expor `activeClients` no retorno
-- `src/components/planning/NpsTab.tsx` (e/ou `CustomerSuccessTab.tsx`) — propagar `activeClients` e `tratativasResolvidas`
+### 3. `src/components/planning/jornada/CfoView.tsx`
+- Em `clientesPeriodo` (linhas 683-697): para clientes em `CHURN_PHASES`, filtrar por `c.dataChurnOficial` (em vez de `c.dataEntrada`). Cliente em fase de churn **sem** `dataChurnOficial` é **excluído** do período (mesma regra do dossiê).
+- Em `churnsPerCfo` (linhas 783-791): contar apenas clientes com `dataChurnOficial` dentro do `dateRange` quando filtro ativo; sem filtro, contar todos em CHURN_PHASES com data oficial presente.
+- Manter a lógica de "clientes ativos" intacta (continua usando `dataAssinatura`).
 
 ## Fora de escopo
 
-- Charts (motivos/CFO/timeline) não vão virar clicáveis nesta iteração.
-- Comportamento da tabela do dossiê (já tem expand + análise) permanece igual.
+- Não alterar a tabela do dossiê de churn nem os KPIs da aba Churn.
+- Não mexer em outras views (Visão Geral, Clientes, Reuniões, NPS, Alertas).
+- Não alterar gráficos da aba CFOs além da linha **Churns** da tabela comparativa.
+
+## Validação
+
+Após aplicar, com filtro 01/04/2026–30/04/2026, a linha Churns deve refletir os mesmos churns que aparecem no dossiê de Churn para abril/2026, distribuídos por CFO.
