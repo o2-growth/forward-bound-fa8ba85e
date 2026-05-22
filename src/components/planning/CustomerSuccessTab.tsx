@@ -256,10 +256,10 @@ function CustomerSuccessTabInner() {
     return reunioes.filter(r => filters.cfos.includes(r.cfo));
   }, [reunioes, filters.cfos]);
 
-  // Compute MRR base from active clients
+  // Compute MRR base from active clients (respects CFO + Produto + Data)
   const mrrBase = useMemo(() => {
-    return filteredClientes.reduce((s, c) => s + c.mrr, 0);
-  }, [filteredClientes]);
+    return filteredClientesPeriodo.reduce((s, c) => s + c.mrr, 0);
+  }, [filteredClientesPeriodo]);
 
   const isLoading = jornadaLoading || npsLoading;
   const error = jornadaError || npsError;
