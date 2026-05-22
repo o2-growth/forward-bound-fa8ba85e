@@ -406,7 +406,7 @@ function CustomerSuccessTabInner() {
               cfos={filteredCfos}
               alertas={filteredAlertas}
               npsScore={displayNpsData?.metrics?.nps?.score ?? null}
-              mrrBase={724400}
+              mrrBase={mrrBase}
               onNavigateToAlertas={() => setActiveTab('alertas')}
               operacao={operacao}
             />
