@@ -1598,6 +1598,9 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Drawer de detalhe dos Churns por CFO */}
+      <ChurnKpiDrawer data={churnDrawerData} onClose={() => setChurnDrawerCfo(null)} />
     </div>
     </TooltipProvider>
   );
