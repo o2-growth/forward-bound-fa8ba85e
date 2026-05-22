@@ -419,7 +419,7 @@ function CustomerSuccessTabInner() {
           <TabsContent value="cfos" className="mt-4">
             <CfoView
               cfos={filteredCfos}
-              clientes={filteredClientes}
+              clientes={filteredClientesPeriodo}
               dateRange={{ from: csStartDate, to: csEndDate }}
               churnDossier={opsData?.churnDossier || []}
             />
