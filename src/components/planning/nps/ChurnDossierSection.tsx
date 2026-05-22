@@ -12,6 +12,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LabelList } from 'recharts';
 import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawer';
 import { ChurnKpiDrawer, type KpiDrawerData, type DrawerRow } from '@/components/planning/cs/ChurnKpiDrawer';
+import { DataSourceInfo } from '@/components/planning/cs/DataSourceInfo';
+import { DS } from '@/components/planning/cs/dataSources';
 
 /* ─── helpers ─── */
 function formatDate(dateStr: string | null | undefined): string {
@@ -468,7 +470,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         {/* Motivos Pie */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Distribuição por Motivo</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2">Distribuição por Motivo <DataSourceInfo source={DS.CHURN_DOSSIE} /></CardTitle>
           </CardHeader>
           <CardContent className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -495,7 +497,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         {/* CFO Bar */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Churn por CFO — MRR e Clientes</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2">Churn por CFO — MRR e Clientes <DataSourceInfo source={DS.CHURN_MRR} /></CardTitle>
           </CardHeader>
           <CardContent className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -521,7 +523,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         {/* Timeline */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Timeline de Churn</CardTitle>
+            <CardTitle className="text-sm flex items-center gap-2">Timeline de Churn <DataSourceInfo source={DS.CHURN_QTD} /></CardTitle>
           </CardHeader>
           <CardContent className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
