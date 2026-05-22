@@ -335,12 +335,11 @@ export function useJornadaData() {
 
       const titulo = (row['Título'] || '').trim().toLowerCase();
       if (!titulo) continue;
-      // Rotinas continuam com o bug histórico DD↔MM (sync invertido).
-      // Usar parsePipefyDateOnly que corrige a inversão.
-      const r1 = parsePipefyDateOnly(row['Data Reuniao 1']);
-      const r2 = parsePipefyDateOnly(row['Data Reuniao 2']);
-      const r3 = parsePipefyDateOnly(row['Data Reuniao 3']);
-      const r4 = parsePipefyDateOnly(row['Data Mensal']);
+      // Sync do Pipefy foi corrigido — datas vêm corretas, sem swap DD↔MM.
+      const r1 = parseRotinaDateOnly(row['Data Reuniao 1']);
+      const r2 = parseRotinaDateOnly(row['Data Reuniao 2']);
+      const r3 = parseRotinaDateOnly(row['Data Reuniao 3']);
+      const r4 = parseRotinaDateOnly(row['Data Mensal']);
       const feitas = [r1, r2, r3, r4].filter(d => d !== null).length;
       reunioesByTitulo.set(titulo, { feitas });
     }
