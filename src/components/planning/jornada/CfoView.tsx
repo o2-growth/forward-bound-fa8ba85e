@@ -838,6 +838,51 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
     return map;
   }, [churnDossier, clientes, clientesPeriodo, dateRange]);
 
+  // Drawer de detalhe dos churns por CFO (lista de clientes do período)
+  const [churnDrawerCfo, setChurnDrawerCfo] = useState<string | null>(null);
+
+  const churnDrawerData = useMemo<KpiDrawerData | null>(() => {
+    if (!churnDrawerCfo) return null;
+    const fromTs = dateRange?.from.getTime();
+    const toTs = dateRange?.to.getTime();
+    const periodoLabel = dateRange
+      ? `${dateRange.from.toLocaleDateString('pt-BR')} → ${dateRange.to.toLocaleDateString('pt-BR')}`
+      : 'Todo o período';
+
+    const rows = (churnDossier || [])
+      .filter(d => {
+        if (normalizeCfo(d.cfo) !== churnDrawerCfo) return false;
+        if (fromTs === undefined || toTs === undefined) return true;
+        const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.dataEncerramento || '');
+        if (!ymd) return false;
+        const dt = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])).getTime();
+        return dt >= fromTs && dt <= toTs;
+      })
+      .map(d => ({
+        id: d.id,
+        cliente: d.cliente,
+        mrr: d.mrr,
+        setup: d.setup,
+        ltMeses: d.ltMeses,
+        motivo: d.motivoPrincipal,
+        dataEncerramento: d.dataEncerramento,
+        faseAtual: d.faseAtual,
+      }))
+      .sort((a, b) => (b.dataEncerramento || '').localeCompare(a.dataEncerramento || ''));
+
+    return {
+      title: `Churns — ${churnDrawerCfo}`,
+      subtitle: periodoLabel,
+      formula: 'Mesma fonte da aba Churn (dossiê oficial com overrides). Filtrado por Data de encerramento dentro do período selecionado.',
+      columns: ['cliente', 'data', 'mrr', 'setup', 'lt', 'motivo'],
+      groups: [{
+        title: `${rows.length} ${rows.length === 1 ? 'churn' : 'churns'} no período`,
+        rows,
+        emptyHint: 'Nenhum churn registrado neste CFO para o período.',
+      }],
+    };
+  }, [churnDrawerCfo, churnDossier, dateRange]);
+
   const sortedCfos = useMemo(() => {
     return [...cfos].sort((a, b) => {
       // Colunas calculadas (não existem diretamente no JornadaCfo)
