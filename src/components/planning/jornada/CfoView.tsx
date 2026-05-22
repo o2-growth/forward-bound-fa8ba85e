@@ -1073,7 +1073,15 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                 {comparisonData.map((cfo) => (
                   <td key={cfo.nome} className="text-center py-1.5 px-3">
                     {cfo.churns > 0 ? (
-                      <><Badge variant="destructive" className="text-[10px]">{cfo.churns}</Badge>{rankBadge(rankings[cfo.nome]?.churns ?? 0)}</>
+                      <button
+                        type="button"
+                        onClick={() => setChurnDrawerCfo(cfo.nome)}
+                        className="inline-flex items-center gap-1 rounded hover:ring-2 hover:ring-destructive/40 focus:outline-none focus:ring-2 focus:ring-destructive/60 transition-shadow cursor-pointer"
+                        title="Ver clientes que entraram em churn no período"
+                      >
+                        <Badge variant="destructive" className="text-[10px]">{cfo.churns}</Badge>
+                        {rankBadge(rankings[cfo.nome]?.churns ?? 0)}
+                      </button>
                     ) : <span className="text-muted-foreground">0{rankBadge(rankings[cfo.nome]?.churns ?? 0)}</span>}
                   </td>
                 ))}
