@@ -56,6 +56,23 @@ const CHART_COLORS = [
   'hsl(var(--franquia))',
 ];
 
+export interface ActiveClientLite {
+  id: string;
+  titulo: string;
+  cfo?: string;
+  mrr: number;
+  produto?: string;
+  faseAtual?: string;
+}
+
+export interface TratativaResolvidaLite {
+  id?: string;
+  titulo: string;
+  cfo?: string;
+  motivo?: string;
+  data?: Date | string;
+}
+
 interface Props {
   data: ChurnDossierCard[];
   selectedProdutos?: string[];
@@ -64,14 +81,17 @@ interface Props {
   activeClientesCount?: number;
   activeMrr?: number;
   tratativasResolvidasCount?: number;
+  activeClients?: ActiveClientLite[];
+  tratativasResolvidas?: TratativaResolvidaLite[];
 }
 
-export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0, tratativasResolvidasCount = 0 }: Props) {
+export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0, tratativasResolvidasCount = 0, activeClients = [], tratativasResolvidas = [] }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
   const [excludeMotivos, setExcludeMotivos] = useState<string[]>([]);
   const [analysisChurn, setAnalysisChurn] = useState<ChurnDossierCard | null>(null);
+  const [drawerKpi, setDrawerKpi] = useState<KpiDrawerData | null>(null);
 
   /* ─── derived data ─── */
   const motivos = useMemo(() => [...new Set(data.map(d => d.motivoPrincipal).filter(Boolean))], [data]);
