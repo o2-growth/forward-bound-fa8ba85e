@@ -668,6 +668,10 @@ interface CfoViewProps {
   /** Range de período (Q1-Q4 ou custom). Quando informado, métricas são
    *  recalculadas pra o snapshot de fim de período + eventos no range. */
   dateRange?: { from: Date; to: Date };
+  /** Dossiê oficial de churn (mesma fonte da aba Churn). Quando informado,
+   *  a contagem de Churns por CFO usa essa lista (com overrides oficiais)
+   *  filtrada por dataEncerramento dentro do dateRange. */
+  churnDossier?: Array<{ cliente: string; cfo: string; dataEncerramento: string }>;
 }
 
 type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco" | "churns" | "custoSquad" | "margem" | "ticketMedio";
@@ -675,7 +679,7 @@ type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntr
 const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
 const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
 
-export function CfoView({ cfos: propCfos, clientes, dateRange }: CfoViewProps) {
+export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: CfoViewProps) {
   // Snapshot dos clientes considerando o período selecionado:
   // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
   // - Churns ocorridos NO período: faseAtual em CHURN_PHASES AND dataEntrada (entrada na fase de churn) dentro do range
@@ -779,12 +783,41 @@ export function CfoView({ cfos: propCfos, clientes, dateRange }: CfoViewProps) {
     });
   }, [clientes, clientesPeriodo, dateRange]);
 
-  // A1: Count churns per CFO (usa clientesPeriodo quando filtro ativo,
-  // assim churns refletem só os do período selecionado)
+  // A1: Count churns per CFO
+  // Fonte preferida: dossiê oficial (mesmos overrides da aba Churn), filtrado pelo dateRange.
+  // Fallback: clientes + dataChurnOficial (comportamento anterior).
   const CHURN_PHASES_LOCAL = ['Churn', 'Atividades finalizadas', 'Desistência'];
+  // Mapa de normalização de CFO (dossiê traz nomes "raw" do Pipefy).
+  const CFO_NAME_NORMALIZE: Record<string, string> = {
+    'Douglas Pinheiro Schossler': 'Douglas Schossler',
+    'Gustavo Ferreira Cochlar': 'Gustavo Cochlar',
+    'Luis Eduardo Dagostini': "Eduardo D'Agostini",
+    'Rafael Marchioretto Bokorni': 'Rafael Marchioretto',
+    'Adivilso Souza de Oliveira Junior': 'Oliveira',
+  };
+  const normalizeCfo = (raw: string) => {
+    const t = (raw || '').trim();
+    return CFO_NAME_NORMALIZE[t] || t;
+  };
   const churnsPerCfo = useMemo(() => {
-    const source = dateRange ? clientesPeriodo : clientes;
     const map: Record<string, number> = {};
+    if (churnDossier && churnDossier.length > 0) {
+      const fromTs = dateRange?.from.getTime();
+      const toTs = dateRange?.to.getTime();
+      for (const d of churnDossier) {
+        if (fromTs !== undefined && toTs !== undefined) {
+          const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.dataEncerramento || '');
+          if (!ymd) continue;
+          const dt = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])).getTime();
+          if (dt < fromTs || dt > toTs) continue;
+        }
+        const cfo = normalizeCfo(d.cfo) || 'Sem CFO';
+        map[cfo] = (map[cfo] || 0) + 1;
+      }
+      return map;
+    }
+    // Fallback: lógica antiga baseada em clientes
+    const source = dateRange ? clientesPeriodo : clientes;
     source
       .filter(c => CHURN_PHASES_LOCAL.includes(c.faseAtual) && !!c.dataChurnOficial)
       .forEach(c => {
@@ -792,7 +825,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange }: CfoViewProps) {
         map[cfo] = (map[cfo] || 0) + 1;
       });
     return map;
-  }, [clientes, clientesPeriodo, dateRange]);
+  }, [churnDossier, clientes, clientesPeriodo, dateRange]);
 
   const sortedCfos = useMemo(() => {
     return [...cfos].sort((a, b) => {
