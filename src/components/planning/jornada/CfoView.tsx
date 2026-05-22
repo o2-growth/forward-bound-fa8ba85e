@@ -785,10 +785,12 @@ export function CfoView({ cfos: propCfos, clientes, dateRange }: CfoViewProps) {
   const churnsPerCfo = useMemo(() => {
     const source = dateRange ? clientesPeriodo : clientes;
     const map: Record<string, number> = {};
-    source.filter(c => CHURN_PHASES_LOCAL.includes(c.faseAtual)).forEach(c => {
-      const cfo = c.cfo || 'Sem CFO';
-      map[cfo] = (map[cfo] || 0) + 1;
-    });
+    source
+      .filter(c => CHURN_PHASES_LOCAL.includes(c.faseAtual) && !!c.dataChurnOficial)
+      .forEach(c => {
+        const cfo = c.cfo || 'Sem CFO';
+        map[cfo] = (map[cfo] || 0) + 1;
+      });
     return map;
   }, [clientes, clientesPeriodo, dateRange]);
 
