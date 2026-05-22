@@ -314,64 +314,10 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     if (key) tratativaMap.set(key, t);
   });
 
-  // Âncora para correção de data: entrada na fase "Tratativa finalizada" por título.
-  // Esse timestamp é gerado pelo Pipefy (movimentação real) e não é afetado pelo
-  // bug de sync que inverte dia/mês em "Finalizacao contrato ultimo dia".
-  const tratativaFinalizadaAnchor = new Map<string, Date>();
-  tratativas.forEach(t => {
-    if ((t['Fase'] || '').trim().toLowerCase() !== 'tratativa finalizada') return;
-    const key = (t['Título'] || '').trim().toLowerCase();
-    if (!key) return;
-    const entrada = parsePipefyDate(t['Entrada']);
-    if (!entrada) return;
-    const existing = tratativaFinalizadaAnchor.get(key);
-    if (!existing || entrada.getTime() > existing.getTime()) {
-      tratativaFinalizadaAnchor.set(key, entrada);
-    }
-  });
+  // Datas das tratativas (Finalizacao contrato ultimo dia, Solicitação, Início) foram
+  // corrigidas na origem (Pipefy/sync) — não há mais necessidade de inverter dia/mês.
+  // Usa toLocalDateBR direto para normalizar para YYYY-MM-DD no fuso BR.
 
-  /**
-   * Corrige datas de "Finalizacao contrato ultimo dia" que vieram com dia/mês
-   * invertidos pelo sync. Só inverte quando todas as condições abaixo são
-   * verdadeiras (margem de segurança ampla):
-   *  - data no formato YYYY-MM-DD com mês ≤ 12 e dia ≤ 12 (ambígua)
-   *  - existe uma âncora "Tratativa finalizada" para o mesmo título
-   *  - a versão original está a > 60 dias da âncora
-   *  - a versão invertida está a < 60 dias da âncora
-   *  - a versão invertida é estritamente mais próxima da âncora
-   * Em qualquer outro caso retorna a data original. Loga toda inversão.
-   */
-  function correctChurnDate(raw: unknown, titleKey: string): string {
-    const dateStr = toLocalDateBR(raw as any);
-    if (!dateStr) return dateStr;
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-    if (!m) return dateStr;
-    const Y = Number(m[1]);
-    const M = Number(m[2]);
-    const D = Number(m[3]);
-    if (M > 12 || D > 12 || M === D) return dateStr;
-    const anchor = tratativaFinalizadaAnchor.get(titleKey);
-    if (!anchor) return dateStr;
-    const orig = new Date(Y, M - 1, D);
-    const swap = new Date(Y, D - 1, M);
-    const anchorMs = anchor.getTime();
-    const dayMs = 86400000;
-    const origDiff = Math.abs(orig.getTime() - anchorMs) / dayMs;
-    const swapDiff = Math.abs(swap.getTime() - anchorMs) / dayMs;
-    if (origDiff > 60 && swapDiff < 60 && swapDiff < origDiff) {
-      const swapStr = `${Y}-${String(D).padStart(2, '0')}-${String(M).padStart(2, '0')}`;
-      console.log('[CHURN_DATE_FIX]', {
-        title: titleKey,
-        original: dateStr,
-        corrected: swapStr,
-        anchor: toLocalDateBR(anchor),
-        origDiffDays: Math.round(origDiff),
-        swapDiffDays: Math.round(swapDiff),
-      });
-      return swapStr;
-    }
-    return dateStr;
-  }
 
   // Mapa título → NPS (buscar detratores ou último feedback com comentário)
   const npsCurrentPhase = npsRows.filter(r => r['Fase'] === r['Fase Atual']);
