@@ -723,6 +723,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         open={!!analysisChurn}
         onClose={() => setAnalysisChurn(null)}
       />
+      <ChurnKpiDrawer data={drawerKpi} onClose={() => setDrawerKpi(null)} />
     </div>
     </TooltipProvider>
   );
