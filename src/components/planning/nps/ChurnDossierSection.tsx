@@ -11,6 +11,7 @@ import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Cloc
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LabelList } from 'recharts';
 import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawer';
+import { ChurnKpiDrawer, type KpiDrawerData, type DrawerRow } from '@/components/planning/cs/ChurnKpiDrawer';
 
 /* ─── helpers ─── */
 function formatDate(dateStr: string | null | undefined): string {
