@@ -6,6 +6,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
   ResponsiveContainer, ReferenceLine, ComposedChart, Cell, LabelList,
 } from 'recharts';
+import { DataSourceInfo } from '@/components/planning/cs/DataSourceInfo';
+import { DS } from '@/components/planning/cs/dataSources';
 
 interface QuarterlyComparisonProps {
   visible: boolean;
@@ -78,7 +80,7 @@ export function QuarterlyComparison({ visible }: QuarterlyComparisonProps) {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold">Comparativo Trimestral — Q4/2025 vs Q1/2026</h3>
+      <h3 className="text-lg font-semibold flex items-center gap-2">Comparativo Trimestral — Q4/2025 vs Q1/2026 <DataSourceInfo source={DS.CHURN_DOSSIE} /></h3>
 
       {/* Summary cards - compact grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -126,7 +128,7 @@ export function QuarterlyComparison({ visible }: QuarterlyComparisonProps) {
         {/* Revenue Churn — Q4 vs Q1 totals */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Revenue Churn — Q4 vs Q1 (Total)</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">Revenue Churn — Q4 vs Q1 (Total) <DataSourceInfo source={DS.CHURN_MRR} /></CardTitle>
             <p className="text-xs text-muted-foreground">Valores consolidados por trimestre</p>
           </CardHeader>
           <CardContent>
@@ -158,7 +160,7 @@ export function QuarterlyComparison({ visible }: QuarterlyComparisonProps) {
         {/* Logo Churn — Q4 vs Q1 totals */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Logo Churn — Q4 vs Q1 (Total)</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">Logo Churn — Q4 vs Q1 (Total) <DataSourceInfo source={DS.CHURN_QTD} /></CardTitle>
             <p className="text-xs text-muted-foreground">Quantidade de clientes por trimestre</p>
           </CardHeader>
           <CardContent>
@@ -189,7 +191,7 @@ export function QuarterlyComparison({ visible }: QuarterlyComparisonProps) {
         {/* Revenue Churn monthly chart */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Revenue Churn Mensal (Q1/2026)</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">Revenue Churn Mensal (Q1/2026) <DataSourceInfo source={DS.CHURN_MRR} /></CardTitle>
             <p className="text-xs text-muted-foreground">Linha tracejada = média mensal Q4/2025 (R$ 57.534)</p>
           </CardHeader>
           <CardContent>
@@ -223,7 +225,7 @@ export function QuarterlyComparison({ visible }: QuarterlyComparisonProps) {
         {/* Logo Churn monthly chart */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Logo Churn Mensal (Q1/2026)</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">Logo Churn Mensal (Q1/2026) <DataSourceInfo source={DS.CHURN_QTD} /></CardTitle>
             <p className="text-xs text-muted-foreground">Linha tracejada = média mensal Q4/2025 (7,3 clientes)</p>
           </CardHeader>
           <CardContent>
@@ -254,7 +256,7 @@ export function QuarterlyComparison({ visible }: QuarterlyComparisonProps) {
       {/* Revenue Churn % trend — gauge-like comparison */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">Revenue Churn % — Tendência Trimestral</CardTitle>
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">Revenue Churn % — Tendência Trimestral <DataSourceInfo source={DS.CHURN_MRR} /></CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center gap-8 py-4">

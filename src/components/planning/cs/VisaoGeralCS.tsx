@@ -7,6 +7,8 @@ import { Users, DollarSign, Heart, SmilePlus, TrendingDown, AlertTriangle, Info,
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import type { JornadaCliente, JornadaCfo, JornadaAlerta } from '@/components/planning/jornada/types';
+import { DataSourceInfo } from './DataSourceInfo';
+import { DS } from './dataSources';
 
 interface VisaoGeralCSProps {
   clientes: JornadaCliente[];
@@ -360,7 +362,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
         {/* Health Distribution Donut */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Distribuicao de Saude</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">Distribuicao de Saude <DataSourceInfo source={DS.HEALTH_SCORE} /></CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
@@ -401,7 +403,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
         {/* CFO Heatmap */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">CFOs — Saude e Carteira</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">CFOs — Saude e Carteira <DataSourceInfo source={DS.CLIENTES_ATIVOS} /></CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -423,7 +425,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
         {/* Recent Churns — B2: add date */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">Churns Recentes</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">Churns Recentes <DataSourceInfo source={DS.CHURN_DOSSIE} /></CardTitle>
           </CardHeader>
           <CardContent>
             {recentChurns.length === 0 ? (

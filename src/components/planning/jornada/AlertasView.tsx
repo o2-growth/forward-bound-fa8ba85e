@@ -5,6 +5,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, AlertTriangle, ListTodo, ThumbsDown, MessageCircleOff, XCircle, ExternalLink, Check, Eye, EyeOff, Info } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import type { JornadaAlerta } from "./types";
+import { DataSourceInfo } from "@/components/planning/cs/DataSourceInfo";
+import { DS } from "@/components/planning/cs/dataSources";
 
 const formatBRL = (value: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(value);
@@ -167,19 +169,19 @@ export function AlertasView({ alertas }: AlertasViewProps) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="flex flex-col items-center p-3 rounded-lg border bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
           <span className="text-xl font-bold text-red-600">{counts.critico}</span>
-          <span className="text-xs text-muted-foreground">Críticos</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Críticos <DataSourceInfo source={DS.ALERTAS} /></span>
         </div>
         <div className="flex flex-col items-center p-3 rounded-lg border bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
           <span className="text-xl font-bold text-amber-600">{counts.alto}</span>
-          <span className="text-xs text-muted-foreground">Altos</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Altos <DataSourceInfo source={DS.ALERTAS} /></span>
         </div>
         <div className="flex flex-col items-center p-3 rounded-lg border bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800">
           <span className="text-xl font-bold text-yellow-600">{counts.medio}</span>
-          <span className="text-xs text-muted-foreground">Médios</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">Médios <DataSourceInfo source={DS.ALERTAS} /></span>
         </div>
         <div className="flex flex-col items-center p-3 rounded-lg border bg-muted/50">
           <span className="text-xl font-bold text-red-600">{formatCompact(counts.mrrRisco)}</span>
-          <span className="text-xs text-muted-foreground">MRR em Risco</span>
+          <span className="text-xs text-muted-foreground flex items-center gap-1">MRR em Risco <DataSourceInfo source={DS.MRR_TOTAL} /></span>
         </div>
       </div>
 

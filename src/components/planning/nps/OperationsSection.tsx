@@ -10,6 +10,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 import { PipefyCardLink, PIPEFY_PIPES } from './PipefyCardLink';
 import { DateRange } from 'react-day-picker';
+import { DataSourceInfo } from '@/components/planning/cs/DataSourceInfo';
+import { DS } from '@/components/planning/cs/dataSources';
 
 const COLORS = [
   'hsl(var(--primary))',
@@ -580,7 +582,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
         {/* CFO Distribution Table */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Clientes por CFO — clique para ver lista</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">Clientes por CFO — clique para ver lista <DataSourceInfo source={DS.CLIENTES_ATIVOS} /></CardTitle>
           </CardHeader>
           <CardContent>
             <div className="max-h-[300px] overflow-auto">
@@ -617,7 +619,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
         {/* Tarefas por CFO */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Tarefas por CFO — clique para ver atrasadas</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">Tarefas por CFO — clique para ver atrasadas <DataSourceInfo source={DS.TAREFAS_ATRASADAS} /></CardTitle>
           </CardHeader>
           <CardContent>
             <div className="max-h-[300px] overflow-auto">
@@ -676,7 +678,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
         {setupByErp.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Tempo Médio de Setup por ERP (concluídos)</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">Tempo Médio de Setup por ERP (concluídos) <DataSourceInfo source={DS.SETUP_STATUS} /></CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={Math.max(200, setupByErp.length * 40)}>
@@ -708,7 +710,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
         {satisfacaoDistribution.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Satisfação — Tratativas Finalizadas</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">Satisfação — Tratativas Finalizadas <DataSourceInfo source={DS.TRATATIVAS_ATIVAS} /></CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -736,7 +738,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
         {/* Motivos das Tratativas */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Motivos das Tratativas</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">Motivos das Tratativas <DataSourceInfo source={DS.TRATATIVAS_ATIVAS} /></CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={250}>
@@ -762,7 +764,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
         {motivoChurnData.length > 0 && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Motivos de Churn (Tratativas Finalizadas)</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">Motivos de Churn (Tratativas Finalizadas) <DataSourceInfo source={DS.CHURN_DOSSIE} /></CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={250}>
@@ -834,7 +836,7 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
       {tratativasAtivas.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Tratativas Ativas ({tratativasAtivas.length})</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">Tratativas Ativas ({tratativasAtivas.length}) <DataSourceInfo source={DS.TRATATIVAS_ATIVAS} /></CardTitle>
           </CardHeader>
           <CardContent>
             <div className="max-h-[400px] overflow-auto">

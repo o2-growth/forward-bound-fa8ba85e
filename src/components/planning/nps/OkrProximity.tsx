@@ -1,3 +1,6 @@
+import { DataSourceInfo } from '@/components/planning/cs/DataSourceInfo';
+import { DS } from '@/components/planning/cs/dataSources';
+
 interface OkrProximityProps {
   npsScore: number;
   csatScore: number;
@@ -24,6 +27,7 @@ export function OkrProximity({ npsScore, csatScore, visible }: OkrProximityProps
     <div className="space-y-3">
       <h3 className="text-lg font-semibold flex items-center gap-2">
         <span>&#8857;</span> Proximidade das Metas (KRs) — Q1/2026 (Consolidado)
+        <DataSourceInfo source={DS.NPS_OKR} />
       </h3>
       <p className="text-sm text-muted-foreground">Responsável: Andréa Franzen</p>
       <div className="space-y-2">
