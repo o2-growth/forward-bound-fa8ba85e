@@ -256,10 +256,10 @@ function CustomerSuccessTabInner() {
     return reunioes.filter(r => filters.cfos.includes(r.cfo));
   }, [reunioes, filters.cfos]);
 
-  // Compute MRR base from active clients
+  // Compute MRR base from active clients (respects CFO + Produto + Data)
   const mrrBase = useMemo(() => {
-    return filteredClientes.reduce((s, c) => s + c.mrr, 0);
-  }, [filteredClientes]);
+    return filteredClientesPeriodo.reduce((s, c) => s + c.mrr, 0);
+  }, [filteredClientesPeriodo]);
 
   const isLoading = jornadaLoading || npsLoading;
   const error = jornadaError || npsError;
@@ -419,7 +419,7 @@ function CustomerSuccessTabInner() {
           <TabsContent value="cfos" className="mt-4">
             <CfoView
               cfos={filteredCfos}
-              clientes={filteredClientes}
+              clientes={filteredClientesPeriodo}
               dateRange={{ from: csStartDate, to: csEndDate }}
               churnDossier={opsData?.churnDossier || []}
             />
@@ -507,10 +507,10 @@ function CustomerSuccessTabInner() {
                     data={opsData?.churnDossier || []}
                     selectedProdutos={filters.produtos}
                     globalCfos={filters.cfos}
-                    activeClientesCount={filteredClientes.length}
-                    activeMrr={724400}
+                    activeClientesCount={filteredClientesPeriodo.length}
+                    activeMrr={mrrBase}
                     tratativasResolvidasCount={resolvidasNoPeriodo}
-                    activeClients={filteredClientes.map(c => ({
+                    activeClients={filteredClientesPeriodo.map(c => ({
                       id: c.id,
                       titulo: c.titulo,
                       cfo: c.cfo,
