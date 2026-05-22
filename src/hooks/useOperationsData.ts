@@ -382,7 +382,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       ?? (trat as any)?.['Finalização contrato último dia']
       ?? (trat as any)?.['Finalizacao do contrato ultimo dia']
       ?? null;
-    const finalizacaoContrato = correctChurnDate(finalizacaoContratoRaw, key);
+    const finalizacaoContrato = toLocalDateBR(finalizacaoContratoRaw as any);
     const churnPhaseEntry = parsePipefyDate(card['Entrada']);
     // Hierarquia: data oficial de fim do contrato (corrigida) > Data do churn manual >
     // entrada na fase de churn. Isso garante que o filtro mensal use o mês oficial
