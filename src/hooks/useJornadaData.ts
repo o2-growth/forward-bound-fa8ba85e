@@ -253,13 +253,21 @@ export function useJornadaData() {
       tratativaMap.set(titulo, { motivo, motivoChurn: motivoChurnTrat, dias, fase });
     }
 
-    // Data de encerramento (churn date) por título
+    // Data de encerramento (churn date) por título — regra oficial:
+    // 1) Data encerramento (Central de Projetos) OU 2) Data do churn (campo manual) como fallback.
     const churnDateByTitulo = new Map<string, Date>();
     for (const row of projetos) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const titulo = (row['Título'] || '').trim().toLowerCase();
       if (!titulo) continue;
-      const enc = parseDate(row['Data encerramento'] || row['Data de encerramento'] || row['Saída'] || row['Saida']);
+      const enc = parseDate(
+        row['Data encerramento'] ||
+        row['Data de encerramento'] ||
+        row['Saída'] ||
+        row['Saida'] ||
+        row['Data do churn'] ||
+        row['Data Churn']
+      );
       if (enc) churnDateByTitulo.set(titulo, enc);
     }
 
