@@ -382,62 +382,64 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
           </h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <Card className="border-destructive/30 bg-destructive/5">
+          <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openRevenueChurnR} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRevenueChurnR(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
                 <DollarSign className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Revenue Churn (R$)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Soma do MRR dos clientes que caíram dentro do período selecionado.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{formatCurrency(totalMrrPerdido)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido no período</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className="border-destructive/30 bg-destructive/5">
+          <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openRevenueChurnPct} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRevenueChurnPct(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
                 <Percent className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Revenue Churn (%)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Revenue Churn / (MRR ativo + Revenue Churn) × 100. Aproxima o % do MRR base inicial que foi perdido.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{revenueChurnPct.toFixed(2)}%</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">sobre MRR base do período</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">sobre MRR base · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className="border-destructive/30 bg-destructive/5">
+          <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openLogoChurnQtd} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLogoChurnQtd(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
                 <UserMinus className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn (Qtd.)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Quantidade de clientes que caíram dentro do período (Churn + Desistência + Atividades finalizadas).</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{filtered.length}</p>
-              {hasFilters && <p className="text-[10px] text-muted-foreground mt-0.5">de {data.length} total registrado</p>}
+              {hasFilters
+                ? <p className="text-[10px] text-muted-foreground mt-0.5">de {data.length} total · clique pra ver</p>
+                : <p className="text-[10px] text-muted-foreground mt-0.5">clique pra ver lista</p>}
             </CardContent>
           </Card>
-          <Card className="border-destructive/30 bg-destructive/5">
+          <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openLogoChurnPct} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLogoChurnPct(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
                 <Percent className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn (%)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Logo Churn / (Clientes ativos + Logo Churn) × 100. Aproxima o % da base inicial de clientes que caiu no período.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{logoChurnPct.toFixed(2)}%</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">sobre base de clientes</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">sobre base · clique pra ver</p>
             </CardContent>
           </Card>
           {(() => {
             const totalDeals = tratativasResolvidasCount + filtered.length;
             const saveRate = totalDeals > 0 ? (tratativasResolvidasCount / totalDeals) * 100 : 0;
             const saveColor = saveRate >= 50 ? 'text-emerald-600 dark:text-emerald-400' : saveRate >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-destructive';
-            const saveBorder = saveRate >= 50 ? 'border-emerald-500/30 bg-emerald-500/5' : saveRate >= 30 ? 'border-amber-500/30 bg-amber-500/5' : 'border-destructive/30 bg-destructive/5';
+            const saveBorder = saveRate >= 50 ? 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/60' : saveRate >= 30 ? 'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/60' : 'border-destructive/30 bg-destructive/5 hover:border-destructive/60';
             return (
-              <Card className={saveBorder}>
+              <Card className={`${saveBorder} ${clickableCardCls}`} role="button" tabIndex={0} onClick={openSaveRate} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSaveRate(); } }}>
                 <CardContent className="p-4">
                   <div className={`flex items-center gap-2 mb-1 ${saveColor}`}>
                     <ShieldCheck className="h-4 w-4" />
                     <span className="text-[11px] font-medium uppercase tracking-wider">Taxa de Salvamento</span>
-                    <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tratativas salvas / (Tratativas salvas + Churns) × 100. Mede a eficácia em recuperar clientes em tratativa antes que virem churn. Usa a contagem do período selecionado (mesma do card "Tratativas resolvidas com sucesso" acima).</p></TooltipContent></Tooltip>
+                    <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
                   </div>
                   <p className="text-2xl font-bold text-foreground">{saveRate.toFixed(1)}%</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">{tratativasResolvidasCount} salvas / {filtered.length} churns</p>
