@@ -686,8 +686,10 @@ export function CfoView({ cfos: propCfos, clientes, dateRange }: CfoViewProps) {
     const toTs = dateRange.to.getTime();
     return clientes.filter(c => {
       if (CHURN_PHASES.includes(c.faseAtual)) {
-        // Churn no período (dataEntrada = quando entrou na fase atual de churn)
-        const t = c.dataEntrada.getTime();
+        // Churn no período — usa a data oficial (Data encerramento / Data do churn).
+        // Sem data oficial, o cliente é excluído (mesma regra do dossiê).
+        if (!c.dataChurnOficial) return false;
+        const t = c.dataChurnOficial.getTime();
         return t >= fromTs && t <= toTs;
       }
       // Cliente ainda ativo (não-churn): precisa ter assinado até o fim do período
