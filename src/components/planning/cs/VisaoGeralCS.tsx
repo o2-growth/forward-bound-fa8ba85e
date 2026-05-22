@@ -718,7 +718,16 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 .sort((a, b) => (tipoDialog === 'pontual' ? b.pontual - a.pontual : b.mrr - a.mrr))
                 .map(c => (
                   <TableRow key={c.id}>
-                    <TableCell className="text-xs font-medium">{c.titulo}</TableCell>
+                    <TableCell className="text-xs font-medium">
+                      <a
+                        href={`https://app.pipefy.com/open-cards/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        {c.titulo}
+                      </a>
+                    </TableCell>
                     <TableCell className="text-xs">{c.cfo || '—'}</TableCell>
                     <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.mrr)}</TableCell>
                     <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.pontual)}</TableCell>
