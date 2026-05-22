@@ -1175,9 +1175,16 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                   </Badge>
 
                   {cfoChurns > 0 && (
-                    <Badge variant="destructive" className="text-[10px]">
-                      {cfoChurns} {cfoChurns === 1 ? 'churn' : 'churns'}
-                    </Badge>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setChurnDrawerCfo(cfo.nome); }}
+                      className="rounded hover:ring-2 hover:ring-destructive/40 focus:outline-none focus:ring-2 focus:ring-destructive/60 transition-shadow cursor-pointer"
+                      title="Ver clientes que entraram em churn no período"
+                    >
+                      <Badge variant="destructive" className="text-[10px]">
+                        {cfoChurns} {cfoChurns === 1 ? 'churn' : 'churns'}
+                      </Badge>
+                    </button>
                   )}
                 </div>
 
