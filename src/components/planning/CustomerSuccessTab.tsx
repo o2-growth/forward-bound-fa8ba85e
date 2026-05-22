@@ -509,6 +509,26 @@ function CustomerSuccessTabInner() {
                     activeClientesCount={filteredClientes.length}
                     activeMrr={724400}
                     tratativasResolvidasCount={resolvidasNoPeriodo}
+                    activeClients={filteredClientes.map(c => ({
+                      id: c.id,
+                      titulo: c.titulo,
+                      cfo: c.cfo,
+                      mrr: c.mrr,
+                      produto: c.produto,
+                      faseAtual: c.faseAtual,
+                    }))}
+                    tratativasResolvidas={(operacao?.tratativasResolvidas || [])
+                      .filter((t: any) => {
+                        const d = t?.data;
+                        return d && d >= csStartDate && d <= csEndDate;
+                      })
+                      .map((t: any) => ({
+                        id: t.id,
+                        titulo: t.titulo || t.cliente || t.empresa || '—',
+                        cfo: t.cfo,
+                        motivo: t.motivo,
+                        data: t.data,
+                      }))}
                     globalDateRange={{ from: csStartDate, to: csEndDate }}
                   />
                 );

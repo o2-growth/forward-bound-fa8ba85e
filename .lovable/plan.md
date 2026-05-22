@@ -1,61 +1,73 @@
-## Problema
+## Objetivo
 
-A aba Churn mostra **125 cards no Q1/2026**, mas ~99 deles são "fantasmas" de uma migração em massa feita no Pipefy em **11–12/Jan/2026** (60 cards movidos pra `Churn`, 30 pra `Atividades finalizadas`, 9 pra `Desistência` no mesmo dia, sem nenhuma data oficial de churn preenchida).
+Tornar todos os 7 KPI cards da página de Churn (`ChurnDossierSection.tsx`) clicáveis, abrindo um drawer com a lista detalhada dos clientes que compõem cada métrica.
 
-Como o código usa `Entrada na fase` como último fallback de `dataEncerramento`, esses cards históricos aparecem como se tivessem churnado todos juntos em Jan/2026.
+## Cards alvo
 
-## Solução
+**Linha 1 — Estado atual:**
+1. **MRR** (ativo) → lista de clientes ativos com seu MRR
+2. **Clientes Ativos** → mesma lista, mas focada em qtd
+3. **LT Médio (churns)** → lista de churns do período com LT individual
 
-Mudar a regra de elegibilidade do dossier de churn em `src/hooks/useOperationsData.ts` (função `processProjects`).
+**Linha 2 — Churn no período:**
+4. **Revenue Churn (R$)** → lista de churns ordenada por MRR desc
+5. **Revenue Churn (%)** → mesma lista + base de cálculo no header
+6. **Logo Churn (Qtd.)** → lista de churns ordenada por data
+7. **Logo Churn (%)** → mesma + base de cálculo
+8. **Taxa de Salvamento** → 2 grupos: tratativas salvas e churns
 
-### Regra atual (linhas 357–441)
+## Implementação
 
-Inclui qualquer card em `Churn`, `Atividades finalizadas` ou `Desistência` que tenha `_refDate >= 2025-10-01`, usando `entrada_fase` como fallback final pra data.
+### 1. Novo componente `ChurnKpiDrawer.tsx`
 
-### Regra nova
+`src/components/planning/cs/ChurnKpiDrawer.tsx` — drawer (Sheet) lateral genérico que recebe:
 
-Para o card entrar no `churnDossier`, deve ter pelo menos **uma** das duas datas oficiais preenchidas:
-
-1. `Data do churn` (campo do card em Central de Projetos), OU
-2. `Finalizacao contrato ultimo dia` (campo da tratativa correspondente)
-
-Se nenhuma das duas existir, o card é **descartado** (não importa em que fase terminal esteja).
-
-### Implementação
-
-1. **Mover a hierarquia de `dataEncerramento` para ANTES do `return`** já está assim, mas adicionar um guard:
-   ```ts
-   const dataOficial = finalizacaoContrato || dataChurnManual;
-   if (!dataOficial) return null;  // descarta cards sem evidência oficial
-   ```
-
-2. **Remover `dataPhaseEntry` e os fallbacks legados** (`card['Data encerramento']`, `saidaDate`, `tratEntradaDate`) da composição de `dataEncerramento` — passam a ser ignorados como fonte primária. `dataEncerramento` = sempre `dataOficial`.
-
-3. **Filtrar nulls** no `.filter()` final.
-
-4. **Manter intactos**:
-   - Os overrides oficiais de Abr/2026 (`APR_2026_OFFICIAL`) — injetam cards sintéticos com data fixa.
-   - O card sintético do Protectface (Mar/2026).
-   - Todos os `CHURN_OVERRIDES` existentes.
-   - O `CHURN_CUTOFF` (Out/2025).
-
-### Resultado esperado
-
-Distribuição mensal corrigida (simulada via SQL):
-
-```
-Jan/2026:  ~5 churns reais (vs 104 hoje)
-Fev/2026:  ~3–5
-Mar/2026:  ~10
-Abr/2026:   8 (oficial)
+```ts
+type KpiDrawerData = {
+  title: string;              // ex: "Revenue Churn no período"
+  subtitle?: string;          // ex: "R$ 450.000 · 18 clientes"
+  formula?: string;           // breve explicação do cálculo
+  columns: ('cliente'|'cfo'|'mrr'|'setup'|'lt'|'motivo'|'data'|'fase')[];
+  rows: Array<ChurnDossierCard | ActiveClient>;
+};
 ```
 
-Q1/2026 cai de **125 → ~20–25 churns reais**.
+Renderiza header com título + subtítulo + fórmula, e tabela compacta com link pro Pipefy em cada linha (reusa `PipefyCardLink`).
 
-### Risco
+### 2. Receber dados de clientes ativos
 
-Cards onde a operação esqueceu de preencher `Data do churn` ficam fora do dossier. Mitigação: se aparecer cliente real ausente, adicionar override manual em `CHURN_OVERRIDES` ou no bloco de injeção (mesmo padrão de Abr/2026).
+`ChurnDossierSection` hoje recebe só `activeClientesCount` e `activeMrr` (números). Precisa também da **lista** de clientes ativos pra alimentar os drawers de MRR e Clientes Ativos.
 
-## Arquivo afetado
+- Em `useOperationsData.ts`: expor `activeClients: CfoClient[]` (já existe agregado por CFO em `cfoDistribution[].clients` — vou achatar num array único).
+- Propagar via `NpsTab` → `ChurnDossierSection` como nova prop `activeClients?: ActiveClient[]`.
 
-- `src/hooks/useOperationsData.ts` — função `processProjects`, bloco do `churnDossier` (linhas ~357–441).
+### 3. Tornar cards clicáveis
+
+Cada `<Card>` ganha:
+- `role="button"`, `tabIndex={0}`, `onClick={() => setDrawer({...})}`
+- `cursor-pointer hover:border-{cor}/50 transition` (manter cores existentes)
+- Pequeno ícone `ChevronRight` no canto pra indicar interatividade
+
+### 4. Estado central
+
+```ts
+const [drawerKpi, setDrawerKpi] = useState<KpiDrawerData | null>(null);
+```
+
+Cada handler monta o `KpiDrawerData` apropriado a partir de `filtered`, `activeClients`, `tratativasResolvidasCount`.
+
+### 5. Tratativas salvas
+
+Pro card "Taxa de Salvamento" precisamos da **lista** de tratativas resolvidas. Hoje só vem a contagem (`tratativasResolvidasCount`). Adicionar prop opcional `tratativasResolvidas?: TratativaResolvida[]` propagada de cima — se vier vazia, o drawer mostra apenas a contagem + lista de churns no outro grupo.
+
+## Arquivos afetados
+
+- **novo:** `src/components/planning/cs/ChurnKpiDrawer.tsx`
+- `src/components/planning/nps/ChurnDossierSection.tsx` — cards clicáveis + handlers + drawer
+- `src/hooks/useOperationsData.ts` — expor `activeClients` no retorno
+- `src/components/planning/NpsTab.tsx` (e/ou `CustomerSuccessTab.tsx`) — propagar `activeClients` e `tratativasResolvidas`
+
+## Fora de escopo
+
+- Charts (motivos/CFO/timeline) não vão virar clicáveis nesta iteração.
+- Comportamento da tabela do dossiê (já tem expand + análise) permanece igual.

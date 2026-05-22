@@ -11,6 +11,7 @@ import { ExternalLink, ChevronDown, ChevronRight, TrendingDown, DollarSign, Cloc
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LabelList } from 'recharts';
 import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawer';
+import { ChurnKpiDrawer, type KpiDrawerData, type DrawerRow } from '@/components/planning/cs/ChurnKpiDrawer';
 
 /* ─── helpers ─── */
 function formatDate(dateStr: string | null | undefined): string {
@@ -55,6 +56,23 @@ const CHART_COLORS = [
   'hsl(var(--franquia))',
 ];
 
+export interface ActiveClientLite {
+  id: string;
+  titulo: string;
+  cfo?: string;
+  mrr: number;
+  produto?: string;
+  faseAtual?: string;
+}
+
+export interface TratativaResolvidaLite {
+  id?: string;
+  titulo: string;
+  cfo?: string;
+  motivo?: string;
+  data?: Date | string;
+}
+
 interface Props {
   data: ChurnDossierCard[];
   selectedProdutos?: string[];
@@ -63,14 +81,17 @@ interface Props {
   activeClientesCount?: number;
   activeMrr?: number;
   tratativasResolvidasCount?: number;
+  activeClients?: ActiveClientLite[];
+  tratativasResolvidas?: TratativaResolvidaLite[];
 }
 
-export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0, tratativasResolvidasCount = 0 }: Props) {
+export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0, tratativasResolvidasCount = 0, activeClients = [], tratativasResolvidas = [] }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
   const [excludeMotivos, setExcludeMotivos] = useState<string[]>([]);
   const [analysisChurn, setAnalysisChurn] = useState<ChurnDossierCard | null>(null);
+  const [drawerKpi, setDrawerKpi] = useState<KpiDrawerData | null>(null);
 
   /* ─── derived data ─── */
   const motivos = useMemo(() => [...new Set(data.map(d => d.motivoPrincipal).filter(Boolean))], [data]);
@@ -183,6 +204,123 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
 
   const hasFilters = filterMotivo !== 'all' || filterTipoChurn !== 'all' || excludeMotivos.length > 0 || globalCfos.length > 0 || selectedProdutos.length > 0 || !!globalDateRange?.from;
 
+  /* ─── builders dos drawers de KPI ─── */
+  const periodoLabel = globalDateRange?.from && globalDateRange?.to
+    ? `${globalDateRange.from.toLocaleDateString('pt-BR')} → ${globalDateRange.to.toLocaleDateString('pt-BR')}`
+    : 'período atual';
+
+  const churnRows = (sortBy: 'mrr' | 'data' = 'mrr'): DrawerRow[] => {
+    const rows = filtered.map(d => ({
+      id: d.id,
+      pipeId: PIPEFY_PIPES.CENTRAL_PROJETOS,
+      cliente: d.cliente,
+      cfo: d.cfo,
+      mrr: d.mrr,
+      setup: d.setup,
+      ltMeses: d.ltMeses,
+      motivo: d.motivoPrincipal,
+      dataEncerramento: d.dataEncerramento,
+      faseAtual: d.faseAtual,
+    } as DrawerRow));
+    if (sortBy === 'mrr') return rows.sort((a, b) => (b.mrr || 0) - (a.mrr || 0));
+    return rows.sort((a, b) => (a.dataEncerramento || '').localeCompare(b.dataEncerramento || ''));
+  };
+
+  const activeRows = (sortBy: 'mrr' | 'cliente' = 'mrr'): DrawerRow[] => {
+    const rows = activeClients.map(c => ({
+      id: c.id,
+      pipeId: PIPEFY_PIPES.CENTRAL_PROJETOS,
+      cliente: c.titulo,
+      cfo: c.cfo,
+      mrr: c.mrr,
+      faseAtual: c.faseAtual,
+    } as DrawerRow));
+    if (sortBy === 'mrr') return rows.sort((a, b) => (b.mrr || 0) - (a.mrr || 0));
+    return rows.sort((a, b) => a.cliente.localeCompare(b.cliente));
+  };
+
+  const openMrrAtivo = () => setDrawerKpi({
+    title: 'MRR Ativo — clientes que compõem',
+    subtitle: `${formatCurrency(activeMrr)} · ${activeClientesCount} cliente(s)`,
+    formula: 'Soma de Valor CFOaaS + Valor OXY dos clientes em Onboarding ou Em Operação Recorrente.',
+    columns: ['cliente', 'cfo', 'mrr', 'fase'],
+    groups: [{ title: 'Clientes ativos', rows: activeRows('mrr'), emptyHint: 'Lista de clientes ativos não disponível neste contexto.' }],
+  });
+
+  const openClientesAtivos = () => setDrawerKpi({
+    title: 'Clientes Ativos',
+    subtitle: `${activeClientesCount} cliente(s) · ${formatCurrency(activeMrr)} de MRR`,
+    formula: 'Clientes em fase Onboarding ou Em Operação Recorrente. Exclui Churn / Desistência / Arquivado.',
+    columns: ['cliente', 'cfo', 'mrr', 'fase'],
+    groups: [{ title: 'Carteira ativa', rows: activeRows('cliente'), emptyHint: 'Lista de clientes ativos não disponível neste contexto.' }],
+  });
+
+  const openLtMedio = () => setDrawerKpi({
+    title: 'LT Médio — churns do período',
+    subtitle: `${avgLt} meses · ${filtered.length} churn(s)`,
+    formula: 'Tempo médio em meses entre Data de assinatura e Data de encerramento dos clientes que caíram no período.',
+    columns: ['cliente', 'cfo', 'lt', 'data', 'motivo'],
+    groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('data') }],
+  });
+
+  const openRevenueChurnR = () => setDrawerKpi({
+    title: 'Revenue Churn (R$)',
+    subtitle: `${formatCurrency(totalMrrPerdido)} · ${filtered.length} cliente(s)`,
+    formula: 'Soma do MRR (Valor CFOaaS + Valor OXY) dos clientes que caíram no período.',
+    columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
+    groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('mrr') }],
+  });
+
+  const openRevenueChurnPct = () => setDrawerKpi({
+    title: 'Revenue Churn (%)',
+    subtitle: `${revenueChurnPct.toFixed(2)}% · ${formatCurrency(totalMrrPerdido)} perdidos sobre ${formatCurrency(activeMrr + totalMrrPerdido)}`,
+    formula: 'Revenue Churn / (MRR ativo + Revenue Churn) × 100. Aproxima o % do MRR base inicial que foi perdido.',
+    columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
+    groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('mrr') }],
+  });
+
+  const openLogoChurnQtd = () => setDrawerKpi({
+    title: 'Logo Churn (Qtd.)',
+    subtitle: `${filtered.length} cliente(s) que caíram em ${periodoLabel}`,
+    formula: 'Quantidade de clientes em fase Churn, Desistência ou Atividades finalizadas dentro do período.',
+    columns: ['cliente', 'cfo', 'mrr', 'data', 'fase', 'motivo'],
+    groups: [{ title: 'Churns', rows: churnRows('data') }],
+  });
+
+  const openLogoChurnPct = () => setDrawerKpi({
+    title: 'Logo Churn (%)',
+    subtitle: `${logoChurnPct.toFixed(2)}% · ${filtered.length} de ${activeClientesCount + filtered.length} clientes`,
+    formula: 'Logo Churn / (Clientes ativos + Logo Churn) × 100. Aproxima o % da base inicial de clientes que caiu no período.',
+    columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
+    groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('data') }],
+  });
+
+  const openSaveRate = () => {
+    const totalDeals = tratativasResolvidasCount + filtered.length;
+    const saveRate = totalDeals > 0 ? (tratativasResolvidasCount / totalDeals) * 100 : 0;
+    const salvasRows: DrawerRow[] = tratativasResolvidas.map(t => ({
+      id: t.id,
+      pipeId: PIPEFY_PIPES.TRATATIVAS,
+      cliente: t.titulo,
+      cfo: t.cfo,
+      motivo: t.motivo,
+      dataEncerramento: typeof t.data === 'string' ? t.data : t.data?.toISOString().slice(0, 10),
+    }));
+    setDrawerKpi({
+      title: 'Taxa de Salvamento',
+      subtitle: `${saveRate.toFixed(1)}% · ${tratativasResolvidasCount} salvas / ${filtered.length} churns`,
+      formula: 'Tratativas salvas / (Tratativas salvas + Churns) × 100. Mede a eficácia em recuperar clientes em tratativa antes que virem churn.',
+      columns: ['cliente', 'cfo', 'motivo', 'data'],
+      groups: [
+        { title: `Tratativas salvas (${tratativasResolvidasCount})`, rows: salvasRows, emptyHint: 'Lista detalhada de tratativas salvas não disponível neste contexto.' },
+        { title: `Churns (${filtered.length})`, rows: churnRows('data') },
+      ],
+    });
+  };
+
+  const clickableCardCls = 'cursor-pointer transition hover:shadow-md hover:scale-[1.01]';
+
+
   return (
     <TooltipProvider>
     <div className="space-y-6">
@@ -194,37 +332,37 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Estado atual</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <Card className={`border-emerald-500/20 bg-emerald-500/5 ${clickableCardCls} hover:border-emerald-500/50`} role="button" tabIndex={0} onClick={openMrrAtivo} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMrrAtivo(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
                 <Wallet className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">MRR</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Soma de Valor CFOaaS + Valor OXY dos clientes ativos. Snapshot atual (não filtrado por período).</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{formatCurrency(activeMrr)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">MRR ativo no momento</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">MRR ativo · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className="border-blue-500/20 bg-blue-500/5">
+          <Card className={`border-blue-500/20 bg-blue-500/5 ${clickableCardCls} hover:border-blue-500/50`} role="button" tabIndex={0} onClick={openClientesAtivos} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesAtivos(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
                 <Users className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Clientes Ativos</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Clientes em fase Onboarding ou Em Operação Recorrente. Exclui Churn / Desistência / Arquivado.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{activeClientesCount}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Carteira atual</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Carteira atual · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className="border-violet-500/20 bg-violet-500/5">
+          <Card className={`border-violet-500/20 bg-violet-500/5 ${clickableCardCls} hover:border-violet-500/50`} role="button" tabIndex={0} onClick={openLtMedio} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLtMedio(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 mb-1">
                 <Clock className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">LT Médio (churns)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tempo médio em meses entre Data de assinatura e Data de encerramento dos clientes que caíram no período.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{avgLt} <span className="text-sm font-normal text-muted-foreground">meses</span></p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">dos clientes que caíram</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">dos clientes que caíram · clique</p>
             </CardContent>
           </Card>
         </div>
@@ -244,62 +382,64 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
           </h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <Card className="border-destructive/30 bg-destructive/5">
+          <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openRevenueChurnR} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRevenueChurnR(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
                 <DollarSign className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Revenue Churn (R$)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Soma do MRR dos clientes que caíram dentro do período selecionado.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{formatCurrency(totalMrrPerdido)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido no período</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">MRR perdido · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className="border-destructive/30 bg-destructive/5">
+          <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openRevenueChurnPct} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRevenueChurnPct(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
                 <Percent className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Revenue Churn (%)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Revenue Churn / (MRR ativo + Revenue Churn) × 100. Aproxima o % do MRR base inicial que foi perdido.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{revenueChurnPct.toFixed(2)}%</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">sobre MRR base do período</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">sobre MRR base · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className="border-destructive/30 bg-destructive/5">
+          <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openLogoChurnQtd} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLogoChurnQtd(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
                 <UserMinus className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn (Qtd.)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Quantidade de clientes que caíram dentro do período (Churn + Desistência + Atividades finalizadas).</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{filtered.length}</p>
-              {hasFilters && <p className="text-[10px] text-muted-foreground mt-0.5">de {data.length} total registrado</p>}
+              {hasFilters
+                ? <p className="text-[10px] text-muted-foreground mt-0.5">de {data.length} total · clique pra ver</p>
+                : <p className="text-[10px] text-muted-foreground mt-0.5">clique pra ver lista</p>}
             </CardContent>
           </Card>
-          <Card className="border-destructive/30 bg-destructive/5">
+          <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openLogoChurnPct} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLogoChurnPct(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-destructive mb-1">
                 <Percent className="h-4 w-4" />
                 <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn (%)</span>
-                <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Logo Churn / (Clientes ativos + Logo Churn) × 100. Aproxima o % da base inicial de clientes que caiu no período.</p></TooltipContent></Tooltip>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{logoChurnPct.toFixed(2)}%</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">sobre base de clientes</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">sobre base · clique pra ver</p>
             </CardContent>
           </Card>
           {(() => {
             const totalDeals = tratativasResolvidasCount + filtered.length;
             const saveRate = totalDeals > 0 ? (tratativasResolvidasCount / totalDeals) * 100 : 0;
             const saveColor = saveRate >= 50 ? 'text-emerald-600 dark:text-emerald-400' : saveRate >= 30 ? 'text-amber-600 dark:text-amber-400' : 'text-destructive';
-            const saveBorder = saveRate >= 50 ? 'border-emerald-500/30 bg-emerald-500/5' : saveRate >= 30 ? 'border-amber-500/30 bg-amber-500/5' : 'border-destructive/30 bg-destructive/5';
+            const saveBorder = saveRate >= 50 ? 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/60' : saveRate >= 30 ? 'border-amber-500/30 bg-amber-500/5 hover:border-amber-500/60' : 'border-destructive/30 bg-destructive/5 hover:border-destructive/60';
             return (
-              <Card className={saveBorder}>
+              <Card className={`${saveBorder} ${clickableCardCls}`} role="button" tabIndex={0} onClick={openSaveRate} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSaveRate(); } }}>
                 <CardContent className="p-4">
                   <div className={`flex items-center gap-2 mb-1 ${saveColor}`}>
                     <ShieldCheck className="h-4 w-4" />
                     <span className="text-[11px] font-medium uppercase tracking-wider">Taxa de Salvamento</span>
-                    <Tooltip><TooltipTrigger asChild><Info className="h-3 w-3 ml-auto opacity-60 cursor-help" /></TooltipTrigger><TooltipContent className="max-w-xs text-xs"><p>Tratativas salvas / (Tratativas salvas + Churns) × 100. Mede a eficácia em recuperar clientes em tratativa antes que virem churn. Usa a contagem do período selecionado (mesma do card "Tratativas resolvidas com sucesso" acima).</p></TooltipContent></Tooltip>
+                    <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
                   </div>
                   <p className="text-2xl font-bold text-foreground">{saveRate.toFixed(1)}%</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">{tratativasResolvidasCount} salvas / {filtered.length} churns</p>
@@ -583,6 +723,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         open={!!analysisChurn}
         onClose={() => setAnalysisChurn(null)}
       />
+      <ChurnKpiDrawer data={drawerKpi} onClose={() => setDrawerKpi(null)} />
     </div>
     </TooltipProvider>
   );
