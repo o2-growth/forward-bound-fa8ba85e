@@ -668,6 +668,10 @@ interface CfoViewProps {
   /** Range de período (Q1-Q4 ou custom). Quando informado, métricas são
    *  recalculadas pra o snapshot de fim de período + eventos no range. */
   dateRange?: { from: Date; to: Date };
+  /** Dossiê oficial de churn (mesma fonte da aba Churn). Quando informado,
+   *  a contagem de Churns por CFO usa essa lista (com overrides oficiais)
+   *  filtrada por dataEncerramento dentro do dateRange. */
+  churnDossier?: Array<{ cliente: string; cfo: string; dataEncerramento: string }>;
 }
 
 type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco" | "churns" | "custoSquad" | "margem" | "ticketMedio";
@@ -675,7 +679,7 @@ type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntr
 const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
 const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
 
-export function CfoView({ cfos: propCfos, clientes, dateRange }: CfoViewProps) {
+export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: CfoViewProps) {
   // Snapshot dos clientes considerando o período selecionado:
   // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
   // - Churns ocorridos NO período: faseAtual em CHURN_PHASES AND dataEntrada (entrada na fase de churn) dentro do range
