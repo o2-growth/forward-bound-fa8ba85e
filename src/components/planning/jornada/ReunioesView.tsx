@@ -351,13 +351,13 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-xs text-xs">
               <p className="font-semibold mb-1">Status por reunião (novo):</p>
-              <p>🟢 <strong>Feita</strong> = data preenchida + cliente confirmou participação (campo <code>Cliente Participou</code> = Sim)</p>
+              <p>🟢 <strong>Feita</strong> = data preenchida + cliente confirmou participação (campo <code>cliente</code> = Sim)</p>
               <p>🔵 <strong>Preenchida</strong> = data preenchida mas sem confirmação de participação do cliente</p>
-              <p>🔴 <strong>Não feita</strong> = cliente marcou que não participou (<code>Cliente Participou</code> = Não)</p>
+              <p>🔴 <strong>Não feita</strong> = cliente marcou que não participou (<code>cliente</code> = Não)</p>
               <p>🟠 <strong>Atrasada</strong> = passou do deadline sem preencher</p>
               <p>⚪ <strong>Pendente</strong> = deadline futuro</p>
               <p className="mt-2"><strong>Deadlines:</strong> R1 dia 7, R2 dia 14, R3 dia 21, Comitê dia 28.</p>
-              <p className="mt-2"><strong>Fonte:</strong> Pipefy → pipe Rotinas (306755752) → tabela <code>pipefy_moviment_rotinas</code> → campos <code>Data Reuniao 1/2/3</code>, <code>Data Mensal</code>, <code>Cliente Participou</code> (e variantes <code>participou2/3/m</code>).</p>
+              <p className="mt-2"><strong>Fonte:</strong> Pipefy → pipe Rotinas (306755752) → tabela <code>pipefy_moviment_rotinas</code> → campos <code>Data Reuniao 1/2/3</code>, <code>Data Mensal</code> e colunas de participação <code>cliente</code> (R1), <code>participou2</code> (R2), <code>participou3</code> (R3), <code>participoum</code> (Mensal).</p>
             </TooltipContent>
           </Tooltip>
         </h4>
@@ -439,7 +439,7 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs">
                     <p>🟢 Feita = data + cliente confirmou. 🔵 Preenchida = data sem confirmação. 🔴 Não feita = cliente marcou Não. 🟠 Atrasada = passou do prazo. ⚪ Pendente = prazo futuro.</p>
-                    <p className="mt-1"><strong>Fonte:</strong> Pipefy Rotinas (306755752) — campos <code>Data Reuniao X</code> + <code>Cliente Participou</code> (e variantes).</p>
+                    <p className="mt-1"><strong>Fonte:</strong> Pipefy Rotinas (306755752) — <code>Data Reuniao X</code>/<code>Data Mensal</code> + colunas <code>cliente</code> (R1), <code>participou2</code> (R2), <code>participou3</code> (R3), <code>participoum</code> (Mensal).</p>
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
