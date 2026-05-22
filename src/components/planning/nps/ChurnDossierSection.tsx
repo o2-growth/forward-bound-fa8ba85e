@@ -204,6 +204,123 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
 
   const hasFilters = filterMotivo !== 'all' || filterTipoChurn !== 'all' || excludeMotivos.length > 0 || globalCfos.length > 0 || selectedProdutos.length > 0 || !!globalDateRange?.from;
 
+  /* ─── builders dos drawers de KPI ─── */
+  const periodoLabel = globalDateRange?.from && globalDateRange?.to
+    ? `${globalDateRange.from.toLocaleDateString('pt-BR')} → ${globalDateRange.to.toLocaleDateString('pt-BR')}`
+    : 'período atual';
+
+  const churnRows = (sortBy: 'mrr' | 'data' = 'mrr'): DrawerRow[] => {
+    const rows = filtered.map(d => ({
+      id: d.id,
+      pipeId: PIPEFY_PIPES.CENTRAL_PROJETOS,
+      cliente: d.cliente,
+      cfo: d.cfo,
+      mrr: d.mrr,
+      setup: d.setup,
+      ltMeses: d.ltMeses,
+      motivo: d.motivoPrincipal,
+      dataEncerramento: d.dataEncerramento,
+      faseAtual: d.faseAtual,
+    } as DrawerRow));
+    if (sortBy === 'mrr') return rows.sort((a, b) => (b.mrr || 0) - (a.mrr || 0));
+    return rows.sort((a, b) => (a.dataEncerramento || '').localeCompare(b.dataEncerramento || ''));
+  };
+
+  const activeRows = (sortBy: 'mrr' | 'cliente' = 'mrr'): DrawerRow[] => {
+    const rows = activeClients.map(c => ({
+      id: c.id,
+      pipeId: PIPEFY_PIPES.CENTRAL_PROJETOS,
+      cliente: c.titulo,
+      cfo: c.cfo,
+      mrr: c.mrr,
+      faseAtual: c.faseAtual,
+    } as DrawerRow));
+    if (sortBy === 'mrr') return rows.sort((a, b) => (b.mrr || 0) - (a.mrr || 0));
+    return rows.sort((a, b) => a.cliente.localeCompare(b.cliente));
+  };
+
+  const openMrrAtivo = () => setDrawerKpi({
+    title: 'MRR Ativo — clientes que compõem',
+    subtitle: `${formatCurrency(activeMrr)} · ${activeClientesCount} cliente(s)`,
+    formula: 'Soma de Valor CFOaaS + Valor OXY dos clientes em Onboarding ou Em Operação Recorrente.',
+    columns: ['cliente', 'cfo', 'mrr', 'fase'],
+    groups: [{ title: 'Clientes ativos', rows: activeRows('mrr'), emptyHint: 'Lista de clientes ativos não disponível neste contexto.' }],
+  });
+
+  const openClientesAtivos = () => setDrawerKpi({
+    title: 'Clientes Ativos',
+    subtitle: `${activeClientesCount} cliente(s) · ${formatCurrency(activeMrr)} de MRR`,
+    formula: 'Clientes em fase Onboarding ou Em Operação Recorrente. Exclui Churn / Desistência / Arquivado.',
+    columns: ['cliente', 'cfo', 'mrr', 'fase'],
+    groups: [{ title: 'Carteira ativa', rows: activeRows('cliente'), emptyHint: 'Lista de clientes ativos não disponível neste contexto.' }],
+  });
+
+  const openLtMedio = () => setDrawerKpi({
+    title: 'LT Médio — churns do período',
+    subtitle: `${avgLt} meses · ${filtered.length} churn(s)`,
+    formula: 'Tempo médio em meses entre Data de assinatura e Data de encerramento dos clientes que caíram no período.',
+    columns: ['cliente', 'cfo', 'lt', 'data', 'motivo'],
+    groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('data') }],
+  });
+
+  const openRevenueChurnR = () => setDrawerKpi({
+    title: 'Revenue Churn (R$)',
+    subtitle: `${formatCurrency(totalMrrPerdido)} · ${filtered.length} cliente(s)`,
+    formula: 'Soma do MRR (Valor CFOaaS + Valor OXY) dos clientes que caíram no período.',
+    columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
+    groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('mrr') }],
+  });
+
+  const openRevenueChurnPct = () => setDrawerKpi({
+    title: 'Revenue Churn (%)',
+    subtitle: `${revenueChurnPct.toFixed(2)}% · ${formatCurrency(totalMrrPerdido)} perdidos sobre ${formatCurrency(activeMrr + totalMrrPerdido)}`,
+    formula: 'Revenue Churn / (MRR ativo + Revenue Churn) × 100. Aproxima o % do MRR base inicial que foi perdido.',
+    columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
+    groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('mrr') }],
+  });
+
+  const openLogoChurnQtd = () => setDrawerKpi({
+    title: 'Logo Churn (Qtd.)',
+    subtitle: `${filtered.length} cliente(s) que caíram em ${periodoLabel}`,
+    formula: 'Quantidade de clientes em fase Churn, Desistência ou Atividades finalizadas dentro do período.',
+    columns: ['cliente', 'cfo', 'mrr', 'data', 'fase', 'motivo'],
+    groups: [{ title: 'Churns', rows: churnRows('data') }],
+  });
+
+  const openLogoChurnPct = () => setDrawerKpi({
+    title: 'Logo Churn (%)',
+    subtitle: `${logoChurnPct.toFixed(2)}% · ${filtered.length} de ${activeClientesCount + filtered.length} clientes`,
+    formula: 'Logo Churn / (Clientes ativos + Logo Churn) × 100. Aproxima o % da base inicial de clientes que caiu no período.',
+    columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
+    groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('data') }],
+  });
+
+  const openSaveRate = () => {
+    const totalDeals = tratativasResolvidasCount + filtered.length;
+    const saveRate = totalDeals > 0 ? (tratativasResolvidasCount / totalDeals) * 100 : 0;
+    const salvasRows: DrawerRow[] = tratativasResolvidas.map(t => ({
+      id: t.id,
+      pipeId: PIPEFY_PIPES.TRATATIVAS,
+      cliente: t.titulo,
+      cfo: t.cfo,
+      motivo: t.motivo,
+      dataEncerramento: typeof t.data === 'string' ? t.data : t.data?.toISOString().slice(0, 10),
+    }));
+    setDrawerKpi({
+      title: 'Taxa de Salvamento',
+      subtitle: `${saveRate.toFixed(1)}% · ${tratativasResolvidasCount} salvas / ${filtered.length} churns`,
+      formula: 'Tratativas salvas / (Tratativas salvas + Churns) × 100. Mede a eficácia em recuperar clientes em tratativa antes que virem churn.',
+      columns: ['cliente', 'cfo', 'motivo', 'data'],
+      groups: [
+        { title: `Tratativas salvas (${tratativasResolvidasCount})`, rows: salvasRows, emptyHint: 'Lista detalhada de tratativas salvas não disponível neste contexto.' },
+        { title: `Churns (${filtered.length})`, rows: churnRows('data') },
+      ],
+    });
+  };
+
+  const clickableCardCls = 'cursor-pointer transition hover:shadow-md hover:scale-[1.01]';
+
+
   return (
     <TooltipProvider>
     <div className="space-y-6">
