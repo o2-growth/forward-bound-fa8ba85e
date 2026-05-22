@@ -1,36 +1,23 @@
-## Problema
+## Plano
 
-Na aba **CFOs > Comparativo P&L por CFO**, a linha **Churns** está zerada para todos os CFOs quando o filtro de data está em meses recentes (ex.: 01/04/2026 – 30/04/2026), mesmo havendo churns reais no período.
+1. **Usar a mesma fonte do dossiê de churn na tabela de CFOs**
+   - Passar `opsData.churnDossier` para `CfoView` a partir de `CustomerSuccessTab`.
+   - Essa lista já contém os overrides oficiais, incluindo os 8 churns de Abr/2026.
 
-Causa raiz: o `CfoView` filtra churns pelo campo `dataEntrada` (data em que o card entrou na fase atual no Pipefy). Esse valor pode ser bem diferente da data oficial do churn — e em muitos casos os clientes considerados churn pelo dossiê **não têm `dataEntrada` no período filtrado**, então caem fora da contagem.
+2. **Recalcular “Churns” por CFO com base no filtro de data global**
+   - Em `CfoView`, contar churns por CFO a partir de `dataEncerramento` do dossiê.
+   - Aplicar o intervalo `csStartDate → csEndDate` já usado na página.
+   - Respeitar filtros de CFO/produto que já chegam via dados filtrados.
 
-A regra oficial (já aplicada no `ChurnDossierSection` e no `useOperationsData`) é usar:
-1. `Data encerramento` / `Data de encerramento` do card Central de Projetos, **ou**
-2. `Data do churn` (campo manual), como fallback.
+3. **Manter fallback seguro**
+   - Se o dossiê não estiver disponível, manter a lógica atual com `clientes` + `dataChurnOficial`.
+   - Assim a tabela não quebra em carregamento parcial.
 
-Sem uma dessas datas, o cliente não conta como churn do período.
+4. **Atualizar todos os pontos que mostram churns no CFO**
+   - Linha “Churns” no comparativo P&L por CFO.
+   - Coluna “Churns” na tabela inferior.
+   - Badge de churns nos cards dos CFOs.
 
-## Mudanças
+## Resultado esperado
 
-### 1. `src/components/planning/jornada/types.ts`
-- Adicionar `dataChurnOficial: Date | null` em `JornadaCliente`.
-
-### 2. `src/hooks/useJornadaData.ts`
-- Já existe `churnDateByTitulo` (linhas 256-264) que lê `Data encerramento` da Central de Projetos.
-- Estender para também considerar `Data do churn` como fallback (alinhado ao `useOperationsData`).
-- Ao montar cada `JornadaCliente` (linhas 474-489), preencher `dataChurnOficial = churnDateByTitulo.get(titulo.toLowerCase()) ?? null`.
-
-### 3. `src/components/planning/jornada/CfoView.tsx`
-- Em `clientesPeriodo` (linhas 683-697): para clientes em `CHURN_PHASES`, filtrar por `c.dataChurnOficial` (em vez de `c.dataEntrada`). Cliente em fase de churn **sem** `dataChurnOficial` é **excluído** do período (mesma regra do dossiê).
-- Em `churnsPerCfo` (linhas 783-791): contar apenas clientes com `dataChurnOficial` dentro do `dateRange` quando filtro ativo; sem filtro, contar todos em CHURN_PHASES com data oficial presente.
-- Manter a lógica de "clientes ativos" intacta (continua usando `dataAssinatura`).
-
-## Fora de escopo
-
-- Não alterar a tabela do dossiê de churn nem os KPIs da aba Churn.
-- Não mexer em outras views (Visão Geral, Clientes, Reuniões, NPS, Alertas).
-- Não alterar gráficos da aba CFOs além da linha **Churns** da tabela comparativa.
-
-## Validação
-
-Após aplicar, com filtro 01/04/2026–30/04/2026, a linha Churns deve refletir os mesmos churns que aparecem no dossiê de Churn para abril/2026, distribuídos por CFO.
+Com o filtro `01/04/2026–30/04/2026`, a tabela deve deixar de mostrar todos os CFOs com `0` e passar a refletir os churns oficiais de abril distribuídos por CFO, igual ao dossiê de churn.
