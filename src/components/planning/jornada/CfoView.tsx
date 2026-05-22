@@ -14,6 +14,7 @@ import { ArrowUpDown, ExternalLink, Info, ChevronDown, ChevronRight, ChevronUp, 
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from "recharts";
 import type { JornadaCfo, JornadaCliente } from "./types";
+import { ChurnKpiDrawer, type KpiDrawerData } from "@/components/planning/cs/ChurnKpiDrawer";
 
 /* ── Simulator types ── */
 interface SimulatedClient {
@@ -671,7 +672,17 @@ interface CfoViewProps {
   /** Dossiê oficial de churn (mesma fonte da aba Churn). Quando informado,
    *  a contagem de Churns por CFO usa essa lista (com overrides oficiais)
    *  filtrada por dataEncerramento dentro do dateRange. */
-  churnDossier?: Array<{ cliente: string; cfo: string; dataEncerramento: string }>;
+  churnDossier?: Array<{
+    id?: string;
+    cliente: string;
+    cfo: string;
+    dataEncerramento: string;
+    mrr?: number;
+    setup?: number;
+    ltMeses?: string | number;
+    motivoPrincipal?: string;
+    faseAtual?: string;
+  }>;
 }
 
 type SortCol = "nome" | "clientes" | "mrrTotal" | "healthScoreMedio" | "taxaEntrega" | "clientesTratativa" | "mrrEmRisco" | "churns" | "custoSquad" | "margem" | "ticketMedio";
@@ -826,6 +837,51 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
       });
     return map;
   }, [churnDossier, clientes, clientesPeriodo, dateRange]);
+
+  // Drawer de detalhe dos churns por CFO (lista de clientes do período)
+  const [churnDrawerCfo, setChurnDrawerCfo] = useState<string | null>(null);
+
+  const churnDrawerData = useMemo<KpiDrawerData | null>(() => {
+    if (!churnDrawerCfo) return null;
+    const fromTs = dateRange?.from.getTime();
+    const toTs = dateRange?.to.getTime();
+    const periodoLabel = dateRange
+      ? `${dateRange.from.toLocaleDateString('pt-BR')} → ${dateRange.to.toLocaleDateString('pt-BR')}`
+      : 'Todo o período';
+
+    const rows = (churnDossier || [])
+      .filter(d => {
+        if (normalizeCfo(d.cfo) !== churnDrawerCfo) return false;
+        if (fromTs === undefined || toTs === undefined) return true;
+        const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.dataEncerramento || '');
+        if (!ymd) return false;
+        const dt = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])).getTime();
+        return dt >= fromTs && dt <= toTs;
+      })
+      .map(d => ({
+        id: d.id,
+        cliente: d.cliente,
+        mrr: d.mrr,
+        setup: d.setup,
+        ltMeses: d.ltMeses,
+        motivo: d.motivoPrincipal,
+        dataEncerramento: d.dataEncerramento,
+        faseAtual: d.faseAtual,
+      }))
+      .sort((a, b) => (b.dataEncerramento || '').localeCompare(a.dataEncerramento || ''));
+
+    return {
+      title: `Churns — ${churnDrawerCfo}`,
+      subtitle: periodoLabel,
+      formula: 'Mesma fonte da aba Churn (dossiê oficial com overrides). Filtrado por Data de encerramento dentro do período selecionado.',
+      columns: ['cliente', 'data', 'mrr', 'setup', 'lt', 'motivo'],
+      groups: [{
+        title: `${rows.length} ${rows.length === 1 ? 'churn' : 'churns'} no período`,
+        rows,
+        emptyHint: 'Nenhum churn registrado neste CFO para o período.',
+      }],
+    };
+  }, [churnDrawerCfo, churnDossier, dateRange]);
 
   const sortedCfos = useMemo(() => {
     return [...cfos].sort((a, b) => {
@@ -1017,7 +1073,15 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                 {comparisonData.map((cfo) => (
                   <td key={cfo.nome} className="text-center py-1.5 px-3">
                     {cfo.churns > 0 ? (
-                      <><Badge variant="destructive" className="text-[10px]">{cfo.churns}</Badge>{rankBadge(rankings[cfo.nome]?.churns ?? 0)}</>
+                      <button
+                        type="button"
+                        onClick={() => setChurnDrawerCfo(cfo.nome)}
+                        className="inline-flex items-center gap-1 rounded hover:ring-2 hover:ring-destructive/40 focus:outline-none focus:ring-2 focus:ring-destructive/60 transition-shadow cursor-pointer"
+                        title="Ver clientes que entraram em churn no período"
+                      >
+                        <Badge variant="destructive" className="text-[10px]">{cfo.churns}</Badge>
+                        {rankBadge(rankings[cfo.nome]?.churns ?? 0)}
+                      </button>
                     ) : <span className="text-muted-foreground">0{rankBadge(rankings[cfo.nome]?.churns ?? 0)}</span>}
                   </td>
                 ))}
@@ -1111,9 +1175,16 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                   </Badge>
 
                   {cfoChurns > 0 && (
-                    <Badge variant="destructive" className="text-[10px]">
-                      {cfoChurns} {cfoChurns === 1 ? 'churn' : 'churns'}
-                    </Badge>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setChurnDrawerCfo(cfo.nome); }}
+                      className="rounded hover:ring-2 hover:ring-destructive/40 focus:outline-none focus:ring-2 focus:ring-destructive/60 transition-shadow cursor-pointer"
+                      title="Ver clientes que entraram em churn no período"
+                    >
+                      <Badge variant="destructive" className="text-[10px]">
+                        {cfoChurns} {cfoChurns === 1 ? 'churn' : 'churns'}
+                      </Badge>
+                    </button>
                   )}
                 </div>
 
@@ -1253,7 +1324,14 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                     </TableCell>
                     <TableCell>
                       {(churnsPerCfo[cfo.nome] || 0) > 0 ? (
-                        <Badge variant="destructive" className="text-[10px]">{churnsPerCfo[cfo.nome]}</Badge>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setChurnDrawerCfo(cfo.nome); }}
+                          className="rounded hover:ring-2 hover:ring-destructive/40 focus:outline-none focus:ring-2 focus:ring-destructive/60 transition-shadow cursor-pointer"
+                          title="Ver clientes que entraram em churn no período"
+                        >
+                          <Badge variant="destructive" className="text-[10px]">{churnsPerCfo[cfo.nome]}</Badge>
+                        </button>
                       ) : <span className="text-muted-foreground">0</span>}
                     </TableCell>
                     <TableCell className="text-right">{custoSquad > 0 ? formatCompact(custoSquad) : '—'}</TableCell>
@@ -1520,6 +1598,9 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Drawer de detalhe dos Churns por CFO */}
+      <ChurnKpiDrawer data={churnDrawerData} onClose={() => setChurnDrawerCfo(null)} />
     </div>
     </TooltipProvider>
   );
