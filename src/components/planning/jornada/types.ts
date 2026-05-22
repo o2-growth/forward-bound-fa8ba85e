@@ -14,6 +14,7 @@ export interface JornadaCliente {
   uf: string;
   dataAssinatura: Date | null;
   dataEntrada: Date;
+  dataChurnOficial: Date | null; // Data oficial: Data encerramento (Central de Projetos) ou Data do churn (fallback)
 
   // Health (calculated)
   healthScore: number;
