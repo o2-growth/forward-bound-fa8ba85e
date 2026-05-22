@@ -249,7 +249,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-xs">
                   <p><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
-                  <p className="mt-1"><strong>Por Tipo</strong>: SaaS = clientes com pelo menos um produto recorrente (CFOaaS, Gênio, Oxy etc.). Pontual = clientes que só têm Diagnóstico, Turnaround, Valuation ou Educação.</p>
+                  <p className="mt-1"><strong>Por Tipo</strong>: SaaS = cliente com MRR recorrente (CFOaaS, Oxy, Gênio etc.). Pontual = cliente sem MRR, apenas com receita pontual (Setup, Diagnóstico, Turnaround, Valuation, Educação).</p>
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
