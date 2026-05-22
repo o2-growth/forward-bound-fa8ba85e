@@ -14,6 +14,7 @@ import { ArrowUpDown, ExternalLink, Info, ChevronDown, ChevronRight, ChevronUp, 
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from "recharts";
 import type { JornadaCfo, JornadaCliente } from "./types";
+import { ChurnKpiDrawer, type KpiDrawerData } from "@/components/planning/cs/ChurnKpiDrawer";
 
 /* ── Simulator types ── */
 interface SimulatedClient {
