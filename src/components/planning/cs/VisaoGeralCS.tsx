@@ -251,7 +251,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-xs">
                   <p><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
-                  <p className="mt-1"><strong>Por Tipo</strong>: SaaS = cliente com MRR recorrente (CFOaaS, Oxy, Gênio etc.). Pontual = cliente sem MRR, apenas com receita pontual (Setup, Diagnóstico, Turnaround, Valuation, Educação).</p>
+                  <p className="mt-1"><strong>Por Tipo</strong>: MRR = cliente com receita recorrente (CFOaaS, Oxy, Gênio etc.). Pontual = cliente sem MRR, apenas com receita pontual (Setup, Diagnóstico, Turnaround, Valuation, Educação).</p>
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
@@ -264,25 +264,34 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por tipo de produto</p>
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-3">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">SaaS</p>
+                <button
+                  type="button"
+                  onClick={() => setTipoDialog('mrr')}
+                  className="text-left rounded-lg border border-green-500/30 bg-green-500/5 p-3 cursor-pointer hover:bg-green-500/10 hover:border-green-500/50 transition-colors"
+                >
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">MRR</p>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-400">{clientesByTipo.saas}</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     {activeClientes.length > 0 ? Math.round((clientesByTipo.saas / activeClientes.length) * 100) : 0}% da carteira
                   </p>
-                </div>
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipoDialog('pontual')}
+                  className="text-left rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 cursor-pointer hover:bg-amber-500/10 hover:border-amber-500/50 transition-colors"
+                >
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Pontual</p>
                   <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{clientesByTipo.pontual}</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     {activeClientes.length > 0 ? Math.round((clientesByTipo.pontual / activeClientes.length) * 100) : 0}% da carteira
                   </p>
-                </div>
+                </button>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
                 Pontual = cliente sem MRR recorrente (só receita pontual)
               </p>
             </div>
+
 
             {/* Por CFO — tabela compacta */}
             <div className="md:col-span-2 space-y-2">
