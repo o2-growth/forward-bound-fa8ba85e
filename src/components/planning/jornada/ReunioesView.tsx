@@ -439,7 +439,7 @@ export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps)
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs text-xs">
                     <p>🟢 Feita = data + cliente confirmou. 🔵 Preenchida = data sem confirmação. 🔴 Não feita = cliente marcou Não. 🟠 Atrasada = passou do prazo. ⚪ Pendente = prazo futuro.</p>
-                    <p className="mt-1"><strong>Fonte:</strong> Pipefy Rotinas (306755752) — campos <code>Data Reuniao X</code> + <code>Cliente Participou</code> (e variantes).</p>
+                    <p className="mt-1"><strong>Fonte:</strong> Pipefy Rotinas (306755752) — <code>Data Reuniao X</code>/<code>Data Mensal</code> + colunas <code>cliente</code> (R1), <code>participou2</code> (R2), <code>participou3</code> (R3), <code>participoum</code> (Mensal).</p>
                   </TooltipContent>
                 </Tooltip>
               </TableHead>
