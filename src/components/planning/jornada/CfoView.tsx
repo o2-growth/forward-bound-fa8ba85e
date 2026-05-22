@@ -783,12 +783,41 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
     });
   }, [clientes, clientesPeriodo, dateRange]);
 
-  // A1: Count churns per CFO (usa clientesPeriodo quando filtro ativo,
-  // assim churns refletem só os do período selecionado)
+  // A1: Count churns per CFO
+  // Fonte preferida: dossiê oficial (mesmos overrides da aba Churn), filtrado pelo dateRange.
+  // Fallback: clientes + dataChurnOficial (comportamento anterior).
   const CHURN_PHASES_LOCAL = ['Churn', 'Atividades finalizadas', 'Desistência'];
+  // Mapa de normalização de CFO (dossiê traz nomes "raw" do Pipefy).
+  const CFO_NAME_NORMALIZE: Record<string, string> = {
+    'Douglas Pinheiro Schossler': 'Douglas Schossler',
+    'Gustavo Ferreira Cochlar': 'Gustavo Cochlar',
+    'Luis Eduardo Dagostini': "Eduardo D'Agostini",
+    'Rafael Marchioretto Bokorni': 'Rafael Marchioretto',
+    'Adivilso Souza de Oliveira Junior': 'Oliveira',
+  };
+  const normalizeCfo = (raw: string) => {
+    const t = (raw || '').trim();
+    return CFO_NAME_NORMALIZE[t] || t;
+  };
   const churnsPerCfo = useMemo(() => {
-    const source = dateRange ? clientesPeriodo : clientes;
     const map: Record<string, number> = {};
+    if (churnDossier && churnDossier.length > 0) {
+      const fromTs = dateRange?.from.getTime();
+      const toTs = dateRange?.to.getTime();
+      for (const d of churnDossier) {
+        if (fromTs !== undefined && toTs !== undefined) {
+          const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d.dataEncerramento || '');
+          if (!ymd) continue;
+          const dt = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])).getTime();
+          if (dt < fromTs || dt > toTs) continue;
+        }
+        const cfo = normalizeCfo(d.cfo) || 'Sem CFO';
+        map[cfo] = (map[cfo] || 0) + 1;
+      }
+      return map;
+    }
+    // Fallback: lógica antiga baseada em clientes
+    const source = dateRange ? clientesPeriodo : clientes;
     source
       .filter(c => CHURN_PHASES_LOCAL.includes(c.faseAtual) && !!c.dataChurnOficial)
       .forEach(c => {
@@ -796,7 +825,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
         map[cfo] = (map[cfo] || 0) + 1;
       });
     return map;
-  }, [clientes, clientesPeriodo, dateRange]);
+  }, [churnDossier, clientes, clientesPeriodo, dateRange]);
 
   const sortedCfos = useMemo(() => {
     return [...cfos].sort((a, b) => {
