@@ -120,10 +120,8 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
     let saas = 0;
     let pontual = 0;
     activeClientes.forEach(c => {
-      const isPontual = c.produtos.length > 0 && c.produtos.every(p =>
-        PONTUAL_PRODUCTS.some(pp => p.toLowerCase().includes(pp.toLowerCase()))
-      );
-      if (isPontual) pontual++;
+      // Pontual = sem recorrência (mesmo critério do PipelineView / useJornadaData)
+      if (c.mrr === 0 && c.pontual > 0) pontual++;
       else saas++;
     });
     return { saas, pontual };
