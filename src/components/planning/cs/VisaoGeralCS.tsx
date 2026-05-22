@@ -46,7 +46,7 @@ const HEALTH_LABELS: Record<string, string> = {
 
 const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
 const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
-const PONTUAL_PRODUCTS = ['Diagnostico', 'Turnaround', 'Valuation', 'Educacao'];
+
 
 type KpiDialogType = 'clientes' | 'mrr' | 'health' | 'nps' | 'churn' | null;
 
@@ -120,10 +120,8 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
     let saas = 0;
     let pontual = 0;
     activeClientes.forEach(c => {
-      const isPontual = c.produtos.length > 0 && c.produtos.every(p =>
-        PONTUAL_PRODUCTS.some(pp => p.toLowerCase().includes(pp.toLowerCase()))
-      );
-      if (isPontual) pontual++;
+      // Pontual = sem recorrência (mesmo critério do PipelineView / useJornadaData)
+      if (c.mrr === 0 && c.pontual > 0) pontual++;
       else saas++;
     });
     return { saas, pontual };
@@ -251,7 +249,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-xs">
                   <p><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
-                  <p className="mt-1"><strong>Por Tipo</strong>: SaaS = clientes com pelo menos um produto recorrente (CFOaaS, Gênio, Oxy etc.). Pontual = clientes que só têm Diagnóstico, Turnaround, Valuation ou Educação.</p>
+                  <p className="mt-1"><strong>Por Tipo</strong>: SaaS = cliente com MRR recorrente (CFOaaS, Oxy, Gênio etc.). Pontual = cliente sem MRR, apenas com receita pontual (Setup, Diagnóstico, Turnaround, Valuation, Educação).</p>
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
@@ -280,7 +278,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 </div>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                Pontual = só Diagnóstico / Turnaround / Valuation / Educação
+                Pontual = cliente sem MRR recorrente (só receita pontual)
               </p>
             </div>
 

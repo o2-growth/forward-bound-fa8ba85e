@@ -1,65 +1,55 @@
-## Causa raiz
+## Diagnóstico
 
-A coluna `Cliente Participou` (campo legado) está marcada na nova estrutura como **SEMPRE NULL** — Pipefy migrou para colunas separadas por reunião. Como o frontend ainda lê primariamente `Cliente Participou`, os campos `p1` e `clienteParticipou` chegam como `null`, e o status cai em "Preenchida (só preench.)" mesmo quando o cliente confirmou.
+### 1. Distribuição SaaS × Pontual está errada (131/2)
 
-## Mapeamento correto (conforme schema enviado)
+`src/components/planning/cs/VisaoGeralCS.tsx:49`:
+```ts
+const PONTUAL_PRODUCTS = ['Diagnostico', 'Turnaround', 'Valuation', 'Educacao'];
+```
+A comparação na linha 124 é `p.toLowerCase().includes(pp.toLowerCase())`, mas os produtos vindos do banco/Pipefy vêm **com acento**: `"Diagnóstico Estratégico"`, `"Diagnóstico"`, `"Educação"`. Como a lista local não tem acento, `"diagnóstico estratégico".includes("diagnostico")` → **false**, então quase ninguém é classificado como Pontual (só os 2 que casam por acaso em `Turnaround`/`Valuation`).
 
-| Campo UI | Coluna nova no banco | Legado (manter como último fallback) |
-|---|---|---|
-| p1 (R1 participou) | `cliente` | `Cliente Participou` |
-| p2 (R2 participou) | `participou2` | — |
-| p3 (R3 participou) | `participou3` | — |
-| p4 (Mensal participou) | `participoum` | — |
-| motivo1 | `motivo` | — |
-| motivo2 | `motivo2` | — |
-| motivo3 | `motivo_3` | — |
-| motivoMensal | `motivom` | — |
-| ata1 | `ata1` | — |
-| ata2 | `ata2` | — |
-| ata3 | `ata3` | — |
-| ata4 (mensal) | `atam` | — |
-| linka1/linkt1 | `linka1` / `linkt1` | — |
-| linka2/linkt2 | `linka2` / `linkt2` | — |
-| linka3/linkt3 | `linka3` / `linkt3` | — |
-| linkaM/linktM/linkgM | `linkam` / `linktm` / `linkgm` | — |
-| interno1/2/3/M | `interno1` / `interno2` / `interno3` / `internom` | — |
+Pior: essa heurística diverge do critério já consolidado em `useJornadaData.ts` (`PONTUAL_ONLY_PRODUCTS` com acento + override "pontual-only quando todos os produtos são pontuais"), que produz exatamente o flag `mrr === 0 && pontual > 0` usado no `PipelineView`.
 
-Observação: o campo `clienteParticipou` (linha 750) é hoje só usado para R1 na coluna "Participou" da tabela — deve apontar para `cliente` (com fallback no legado).
+**Correção:** alinhar a Visão Geral ao mesmo critério do resto do app — um cliente é Pontual quando `mrr === 0 && pontual > 0` (sem recorrência, só receita pontual). Isso elimina o bug de acentos e dá consistência entre Pipeline / CFO / Visão Geral.
+
+### 2. MRR Base hardcoded em R$ 724.400
+
+`src/components/planning/CustomerSuccessTab.tsx:409`:
+```tsx
+mrrBase={724400}
+```
+Existe já um `const mrrBase` calculado na linha 260 a partir da carteira real (`filteredClientes.reduce((s, c) => s + c.mrr, 0)`), mas ele não está sendo passado — o valor mostrado no card "MRR Base" é fixo.
+
+**Correção:** trocar `mrrBase={724400}` por `mrrBase={mrrBase}` para refletir o MRR real da carteira filtrada (mesma fonte usada pelos demais cards: Valor CFOaaS + Valor OXY dos clientes ativos, com overrides do Dago/Guará/Pedrolo já aplicados).
 
 ## Alterações
 
-### 1. `src/hooks/useJornadaData.ts`
+### `src/components/planning/cs/VisaoGeralCS.tsx`
 
-**Linhas 750 e 761-764** — substituir mapeamento de participação:
+Substituir o cálculo de `clientesByTipo` (linhas 119–130) por:
 ```ts
-clienteParticipou: row['cliente'] || row['Cliente Participou'] || null,
-...
-p1: row['cliente'] || row['Cliente Participou'] || null,
-p2: row['participou2'] || null,
-p3: row['participou3'] || null,
-p4: row['participoum'] || null,
+const clientesByTipo = useMemo(() => {
+  let saas = 0;
+  let pontual = 0;
+  activeClientes.forEach(c => {
+    // Pontual = sem recorrência (mesmo critério do PipelineView / useJornadaData)
+    if (c.mrr === 0 && c.pontual > 0) pontual++;
+    else saas++;
+  });
+  return { saas, pontual };
+}, [activeClientes]);
 ```
+Remover a constante `PONTUAL_PRODUCTS` (linha 49) que vira código morto. Atualizar o tooltip (linhas 254 e 283) para refletir o critério novo: "Pontual = cliente sem MRR recorrente (apenas receita pontual de Setup/Diagnóstico/Turnaround/Valuation/Educação)".
 
-**Linhas 765-768** — corrigir atas para os nomes reais:
-```ts
-ata1: row['ata1'] || null,
-ata2: row['ata2'] || null,
-ata3: row['ata3'] || null,
-ata4: row['atam'] || null,
-```
+### `src/components/planning/CustomerSuccessTab.tsx`
 
-### 2. `src/components/planning/jornada/ReunioesView.tsx`
-
-**Linhas 354-360 e 441-442** (painel de ajuda / tooltip "Fonte") — atualizar texto para refletir os novos nomes de coluna (`cliente`, `participou2`, `participou3`, `participoum`) em vez de `Cliente Participou`/`participou2/3/m`.
-
-Sem mudança de lógica de status — `getReunionStatus` já aceita `Sim/sim/yes` e `Não/nao/no`, que é exatamente o que o Pipefy envia nas novas colunas (confirmado nos exemplos: "Sim"/"Não").
+Linha 409: trocar `mrrBase={724400}` por `mrrBase={mrrBase}`.
 
 ## Validação após o build
 
-1. Abrir a aba Reuniões e verificar que linhas com R1 preenchida + cliente "Sim" agora aparecem 🟢 **Feita** (e não mais 🔵 "só preench.").
-2. Conferir um card com R2/R3 preenchidos e cliente "Não" — deve aparecer 🔴.
-3. Coluna "Participou" da última reunião (R1) deve mostrar ✓/✗ corretamente.
+1. Card "MRR Base" da Visão Geral deve mostrar valor calculado da carteira (não mais R$ 724.400 fixo) e mudar conforme filtros de CFO/produto.
+2. "Distribuição de Clientes Ativos → Por tipo de produto" deve mostrar uma divisão coerente — SaaS ~ clientes com CFOaaS/Oxy/Gênio, Pontual = só Diagnóstico/Turnaround/Valuation/Educação. Comparar com a coluna "Pontual" do `PipelineView` (mesma base).
 
 ## Fora de escopo
 
-Não vou mexer em telas, regras de health score, agregados por CFO, nem outros campos de rotinas — apenas o mapeamento de participação/motivo/ata/links das reuniões R1–R4 conforme pedido.
+Não vou mexer em outras telas, no cálculo de health/NPS/churn nem no `mrrBase` global de outras abas — só os dois pontos pedidos da Visão Geral de Operação.
