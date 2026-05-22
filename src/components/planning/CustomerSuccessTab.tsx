@@ -507,10 +507,10 @@ function CustomerSuccessTabInner() {
                     data={opsData?.churnDossier || []}
                     selectedProdutos={filters.produtos}
                     globalCfos={filters.cfos}
-                    activeClientesCount={filteredClientes.length}
-                    activeMrr={724400}
+                    activeClientesCount={filteredClientesPeriodo.length}
+                    activeMrr={mrrBase}
                     tratativasResolvidasCount={resolvidasNoPeriodo}
-                    activeClients={filteredClientes.map(c => ({
+                    activeClients={filteredClientesPeriodo.map(c => ({
                       id: c.id,
                       titulo: c.titulo,
                       cfo: c.cfo,
