@@ -60,15 +60,29 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     const sdrOk = !selectedSDRs?.length || sdrs.length > 0;
     return closerOk && sdrOk;
   };
+  // Token-based fuzzy matching (mesmo do gauge): "Bruna" casa com "Bruna Patricio Mota"
+  const tokenize = (value: string): string[] =>
+    value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
   const matchCardCloser = (closer: string | null | undefined) => {
     if (!selectedClosers?.length) return true;
-    const v = (closer || '').trim();
-    return !!v && selectedClosers.includes(v);
+    if (!closer) return false;
+    const cardTokens = tokenize(closer);
+    if (!cardTokens.length) return false;
+    return selectedClosers.some(sel => {
+      const selTokens = tokenize(sel);
+      return selTokens.length > 0 && selTokens.every(t => cardTokens.includes(t));
+    });
   };
   const matchCardSdr = (sdr: string | null | undefined) => {
     if (!selectedSDRs?.length) return true;
-    const v = (sdr || '').trim();
-    return !!v && selectedSDRs.some(s => v.startsWith(s) || v.includes(s));
+    if (!sdr) return false;
+    const cardTokens = tokenize(sdr);
+    if (!cardTokens.length) return false;
+    return selectedSDRs.some(sel => {
+      const selTokens = tokenize(sel);
+      return selTokens.length > 0 && selTokens.every(t => cardTokens.includes(t));
+    });
   };
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState('');
