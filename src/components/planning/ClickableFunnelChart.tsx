@@ -9,6 +9,15 @@ import { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { BUType, IndicatorType } from "@/hooks/useFunnelRealized";
+import { BU_CLOSERS, type CloserType } from "@/hooks/useCloserMetas";
+
+// Mesmo mapping usado em IndicatorsTab (mantido em sync manualmente — pequeno)
+const BU_SDRS: Record<BUType, string[]> = {
+  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Matheus', 'Ana'],
+  o2_tax: ['Carlos'],
+  oxy_hacker: ['Carlos'],
+  franquia: ['Carlos', 'Bruna'],
+};
 import { DetailSheet, DetailItem, columnFormatters } from "./indicators/DetailSheet";
 import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
@@ -28,6 +37,7 @@ interface ClickableFunnelChartProps {
   selectedBU: BUType | 'all';
   selectedBUs?: BUType[];
   selectedClosers?: string[];
+  selectedSDRs?: string[];
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -41,7 +51,25 @@ interface FunnelStage {
   conversionPercent: number;
 }
 
-export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedBUs, selectedClosers }: ClickableFunnelChartProps) {
+export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedBUs, selectedClosers, selectedSDRs }: ClickableFunnelChartProps) {
+  // Gate por BU: closer/SDR só conta se operam nessa BU (mesma lógica do gauge)
+  const buHasMatch = (bu: BUType) => {
+    const closers = (selectedClosers || []).filter(c => BU_CLOSERS[bu]?.includes(c as CloserType));
+    const sdrs = (selectedSDRs || []).filter(s => BU_SDRS[bu]?.includes(s));
+    const closerOk = !selectedClosers?.length || closers.length > 0;
+    const sdrOk = !selectedSDRs?.length || sdrs.length > 0;
+    return closerOk && sdrOk;
+  };
+  const matchCardCloser = (closer: string | null | undefined) => {
+    if (!selectedClosers?.length) return true;
+    const v = (closer || '').trim();
+    return !!v && selectedClosers.includes(v);
+  };
+  const matchCardSdr = (sdr: string | null | undefined) => {
+    if (!selectedSDRs?.length) return true;
+    const v = (sdr || '').trim();
+    return !!v && selectedSDRs.some(s => v.startsWith(s) || v.includes(s));
+  };
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetTitle, setSheetTitle] = useState('');
   const [sheetDescription, setSheetDescription] = useState('');
@@ -87,50 +115,44 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
   
   // Helper to get qty for Modelo Atual - ALWAYS uses analytics for "first entry" logic
   const getFilteredModeloAtualQty = (indicator: IndicatorType): number => {
+    if (!buHasMatch('modelo_atual')) return 0;
     const cards = modeloAtualAnalytics.getCardsForIndicator(indicator);
-    
-    // Apply closer filter if active
-    if (selectedClosers?.length && selectedClosers.length > 0) {
-      const filteredCards = cards.filter(c => {
-        const closerValue = (c.closer || '').trim();
-        return closerValue && selectedClosers.includes(closerValue);
-      });
-      return filteredCards.length;
-    }
-    
-    return cards.length;
+    return cards.filter((c: any) => matchCardCloser(c.closer) && matchCardSdr(c.responsavel || c.sdr)).length;
   };
 
-  // Helper to get filtered value for Modelo Atual when closers filter is active
+  // Helper to get filtered value for Modelo Atual when closers/SDRs filter is active
   const getFilteredModeloAtualValue = (indicator: 'proposta' | 'venda'): number => {
-    if (selectedClosers?.length && selectedClosers.length > 0) {
+    if (!buHasMatch('modelo_atual')) return 0;
+    if (selectedClosers?.length || selectedSDRs?.length) {
       const cards = modeloAtualAnalytics.getCardsForIndicator(indicator);
-      const filteredCards = cards.filter(c => {
-        const closerValue = (c.closer || '').trim();
-        return closerValue && selectedClosers.includes(closerValue);
-      });
-      return filteredCards.reduce((sum, card) => sum + card.valor, 0);
+      return cards
+        .filter((c: any) => matchCardCloser(c.closer) && matchCardSdr(c.responsavel || c.sdr))
+        .reduce((sum: number, card: any) => sum + (card.valor || 0), 0);
     }
     return getModeloAtualValue(indicator, startDate, endDate);
   };
 
-  // Get totals based on selected BUs array - using analytics hooks for "first entry" consistency
+  // Generic helper: filter analytics items by closer+sdr respecting BU gate
+  const filterAnalyticsItems = (items: any[], bu: BUType) => {
+    if (!buHasMatch(bu)) return [];
+    if (!selectedClosers?.length && !selectedSDRs?.length) return items;
+    return items.filter(i => matchCardCloser(i.closer || i.responsible) && matchCardSdr(i.sdr || i.responsible));
+  };
+
   const getO2TaxAnalyticsQty = (indicator: IndicatorType): number => {
-    if (indicator === 'leads') {
-      return o2TaxAnalytics.getDetailItemsForIndicator('leads').length;
-    }
-    if (indicator === 'mql') {
-      return o2TaxAnalytics.getMqlsByRevenue.flatMap(r => r.cards).length;
-    }
-    return o2TaxAnalytics.getDetailItemsForIndicator(indicator).length;
+    let items: any[];
+    if (indicator === 'leads') items = o2TaxAnalytics.getDetailItemsForIndicator('leads');
+    else if (indicator === 'mql') items = o2TaxAnalytics.getMqlsByRevenue.flatMap(r => r.cards);
+    else items = o2TaxAnalytics.getDetailItemsForIndicator(indicator);
+    return filterAnalyticsItems(items, 'o2_tax').length;
   };
-  
+
   const getOxyHackerAnalyticsQty = (indicator: IndicatorType): number => {
-    return oxyHackerAnalytics.getDetailItemsForIndicator(indicator).length;
+    return filterAnalyticsItems(oxyHackerAnalytics.getDetailItemsForIndicator(indicator), 'oxy_hacker').length;
   };
-  
+
   const getFranquiaAnalyticsQty = (indicator: IndicatorType): number => {
-    return franquiaAnalytics.getDetailItemsForIndicator(indicator).length;
+    return filterAnalyticsItems(franquiaAnalytics.getDetailItemsForIndicator(indicator), 'franquia').length;
   };
   
   const totals = {
@@ -171,17 +193,18 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
   ];
 
   // Calculate monetary values based on selected BUs array
-  const propostaValue = 
+  // Para outras BUs (O2 Tax/Oxy/Franquia), zera quando o closer/SDR selecionado não opera lá
+  const propostaValue =
     (includesModeloAtual ? getFilteredModeloAtualValue('proposta') : 0) +
-    (includesO2Tax ? getO2TaxValue('proposta', startDate, endDate) : 0) +
-    (includesOxyHacker ? getOxyHackerValue('proposta', startDate, endDate) : 0) +
-    (includesFranquia ? getExpansaoValue('proposta', startDate, endDate) : 0);
+    (includesO2Tax && buHasMatch('o2_tax') ? getO2TaxValue('proposta', startDate, endDate) : 0) +
+    (includesOxyHacker && buHasMatch('oxy_hacker') ? getOxyHackerValue('proposta', startDate, endDate) : 0) +
+    (includesFranquia && buHasMatch('franquia') ? getExpansaoValue('proposta', startDate, endDate) : 0);
 
-  const vendaValue = 
+  const vendaValue =
     (includesModeloAtual ? getFilteredModeloAtualValue('venda') : 0) +
-    (includesO2Tax ? getO2TaxValue('venda', startDate, endDate) : 0) +
-    (includesOxyHacker ? getOxyHackerValue('venda', startDate, endDate) : 0) +
-    (includesFranquia ? getExpansaoValue('venda', startDate, endDate) : 0);
+    (includesO2Tax && buHasMatch('o2_tax') ? getO2TaxValue('venda', startDate, endDate) : 0) +
+    (includesOxyHacker && buHasMatch('oxy_hacker') ? getOxyHackerValue('venda', startDate, endDate) : 0) +
+    (includesFranquia && buHasMatch('franquia') ? getExpansaoValue('venda', startDate, endDate) : 0);
 
   // Width percentages for funnel visualization (6 stages now)
   const widthPercentages = [100, 85, 70, 55, 45, 35];
