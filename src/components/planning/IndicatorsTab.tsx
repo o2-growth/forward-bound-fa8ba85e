@@ -1566,6 +1566,7 @@ export function IndicatorsTab() {
   const handleRadialCardClick = (indicator: IndicatorConfig) => {
     const items = getItemsForIndicator(indicator.key);
     const now = new Date();
+    setDetailSheetExtraContent(null);
     
     switch (indicator.key) {
       case 'mql': {
