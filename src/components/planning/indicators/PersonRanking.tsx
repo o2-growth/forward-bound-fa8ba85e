@@ -8,14 +8,27 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
 type Role = 'sdr' | 'closer';
-type Field = 'rm' | 'rr' | 'proposta' | 'venda';
+type Field = 'rm' | 'rr' | 'proposta' | 'venda' | 'faturamento';
 
-const FIELDS: { key: Field; label: string; color: string }[] = [
+const FIELDS: { key: Field; label: string; color: string; monetary?: boolean }[] = [
   { key: 'rm', label: 'RM', color: '#22c55e' },
   { key: 'rr', label: 'RR', color: '#f59e0b' },
   { key: 'proposta', label: 'Prop', color: '#a855f7' },
   { key: 'venda', label: 'Venda', color: '#ef4444' },
+  { key: 'faturamento', label: 'Faturamento', color: '#10b981', monetary: true },
 ];
+
+// Para o cálculo: faturamento só faz sentido para closer (não SDR).
+const FIELDS_BY_ROLE: Record<Role, Field[]> = {
+  sdr: ['rm', 'rr', 'proposta', 'venda'],
+  closer: ['rm', 'rr', 'proposta', 'venda', 'faturamento'],
+};
+
+const formatCurrencyCompact = (v: number) => {
+  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}k`;
+  return `R$ ${Math.round(v)}`;
+};
 
 interface PersonRankingProps {
   role: Role;
@@ -42,8 +55,12 @@ function aggregateCounts(
   endTime: number,
   role: Role,
 ) {
+  // counts: quantidade de cards por etapa do funil (rm/rr/proposta/venda)
+  // faturamento: soma do .value das vendas (mesma definição usada nos cards de
+  // Vendas em R$ do gauge) — só faz sentido para closer.
   const groups = new Map<string, { display: string; counts: Record<Field, number> }>();
-  for (const { key } of FIELDS) {
+  const countableFields: Field[] = ['rm', 'rr', 'proposta', 'venda'];
+  for (const key of countableFields) {
     const arr = items[key] || [];
     for (const it of arr) {
       if (!it.date) continue;
@@ -53,14 +70,31 @@ function aggregateCounts(
       const ex = groups.get(group);
       if (ex) {
         ex.counts[key] = (ex.counts[key] || 0) + 1;
-        // Prefere o nome mais longo (geralmente o completo do Pipefy)
         if (display.length > ex.display.length) ex.display = display;
       } else {
         groups.set(group, {
           display,
-          counts: { rm: 0, rr: 0, proposta: 0, venda: 0, [key]: 1 } as Record<Field, number>,
+          counts: { rm: 0, rr: 0, proposta: 0, venda: 0, faturamento: 0, [key]: 1 } as Record<Field, number>,
         });
       }
+    }
+  }
+  // Faturamento: soma .value dos itens de venda no período
+  const vendas = items['venda'] || [];
+  for (const it of vendas) {
+    if (!it.date) continue;
+    const t = new Date(it.date).getTime();
+    if (t < startTime || t > endTime) continue;
+    const { display, group } = getPersonName(it, role);
+    const valor = it.value || 0;
+    const ex = groups.get(group);
+    if (ex) {
+      ex.counts.faturamento = (ex.counts.faturamento || 0) + valor;
+    } else {
+      groups.set(group, {
+        display,
+        counts: { rm: 0, rr: 0, proposta: 0, venda: 0, faturamento: valor } as Record<Field, number>,
+      });
     }
   }
   return groups;
@@ -91,7 +125,7 @@ export function PersonRanking({ role, itemsByIndicator, startDate, endDate, sele
     const out = Array.from(groups.values()).map(g => {
       // Meta por pessoa, com rateio por dias úteis
       const metasByField: Record<Field, number | null> = {
-        rm: null, rr: null, proposta: null, venda: null,
+        rm: null, rr: null, proposta: null, venda: null, faturamento: null,
       };
 
       if (role === 'sdr') {
@@ -117,16 +151,19 @@ export function PersonRanking({ role, itemsByIndicator, startDate, endDate, sele
         const rr = sumProrated(monthly.rr, monthFactors);
         const prop = sumProrated(monthly.prop, monthFactors);
         const venda = sumProrated(monthly.venda, monthFactors);
+        const fat = sumProrated(monthly.faturamento, monthFactors);
         metasByField.rm = rm > 0 ? rm : null;
         metasByField.rr = rr > 0 ? rr : null;
         metasByField.proposta = prop > 0 ? prop : null;
         metasByField.venda = venda > 0 ? venda : null;
+        metasByField.faturamento = fat > 0 ? fat : null;
       }
 
-      // % atingimento por field
-      const pcts: Record<Field, number | null> = { rm: null, rr: null, proposta: null, venda: null };
+      // % atingimento por field — só considera fields aplicáveis ao role
+      const pcts: Record<Field, number | null> = { rm: null, rr: null, proposta: null, venda: null, faturamento: null };
       const validPcts: number[] = [];
-      for (const { key } of FIELDS) {
+      const fieldsForRole = FIELDS.filter(f => FIELDS_BY_ROLE[role].includes(f.key));
+      for (const { key } of fieldsForRole) {
         const meta = metasByField[key];
         if (meta === null || meta <= 0) {
           pcts[key] = null;
@@ -167,6 +204,8 @@ export function PersonRanking({ role, itemsByIndicator, startDate, endDate, sele
     );
   }
 
+  const visibleFields = FIELDS.filter(f => FIELDS_BY_ROLE[role].includes(f.key));
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -174,7 +213,7 @@ export function PersonRanking({ role, itemsByIndicator, startDate, endDate, sele
           <tr className="border-b bg-muted/40">
             <th className="text-left px-2 py-2 font-medium text-muted-foreground w-12">#</th>
             <th className="text-left px-2 py-2 font-medium text-muted-foreground min-w-[160px]">{roleLabel}</th>
-            {FIELDS.map(f => (
+            {visibleFields.map(f => (
               <th key={f.key} className="text-right px-2 py-2 font-medium text-muted-foreground min-w-[140px]" style={{ color: f.color }}>
                 {f.label} (real / meta / %)
               </th>
@@ -195,19 +234,21 @@ export function PersonRanking({ role, itemsByIndicator, startDate, endDate, sele
                   <Badge variant="outline" className={posColor}>{pos}º</Badge>
                 </td>
                 <td className="px-2 py-2 font-medium">{r.display}</td>
-                {FIELDS.map(f => {
+                {visibleFields.map(f => {
                   const real = r.counts[f.key] || 0;
                   const meta = r.metas[f.key];
                   const pct = r.pcts[f.key];
+                  const fmtReal = f.monetary ? formatCurrencyCompact(real) : String(real);
+                  const fmtMeta = meta === null ? '—' : (f.monetary ? formatCurrencyCompact(meta) : meta.toFixed(1));
                   return (
                     <td key={f.key} className="px-2 py-2 text-right tabular-nums">
                       {meta === null ? (
-                        <span className="text-muted-foreground">{real} / — / —</span>
+                        <span className="text-muted-foreground">{fmtReal} / — / —</span>
                       ) : (
                         <div className="space-y-1">
                           <div className="text-xs">
-                            <span className="font-medium">{real}</span>
-                            <span className="text-muted-foreground"> / {meta.toFixed(1)} / </span>
+                            <span className="font-medium">{fmtReal}</span>
+                            <span className="text-muted-foreground"> / {fmtMeta} / </span>
                             <span className={(pct ?? 0) >= 1 ? 'text-green-600 dark:text-green-400 font-medium' : (pct ?? 0) >= 0.7 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-red-600 dark:text-red-400 font-medium'}>
                               {((pct ?? 0) * 100).toFixed(0)}%
                             </span>

@@ -9,12 +9,13 @@ import { Loader2, Save } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useAuditLogs } from '@/hooks/useAuditLogs';
 
-type Field = 'rm' | 'rr' | 'prop' | 'venda';
-const FIELDS: { key: Field; label: string }[] = [
+type Field = 'rm' | 'rr' | 'prop' | 'venda' | 'faturamento';
+const FIELDS: { key: Field; label: string; monetary?: boolean }[] = [
   { key: 'rm', label: 'RM' },
   { key: 'rr', label: 'RR' },
   { key: 'prop', label: 'Prop' },
   { key: 'venda', label: 'Venda' },
+  { key: 'faturamento', label: 'Faturamento (R$)', monetary: true },
 ];
 
 type LocalKey = string; // `${closer}-${month}-${field}`
@@ -35,6 +36,7 @@ export function CloserAbsoluteMetasTab() {
       map[`${m.closer}-${m.month}-rr`] = m.rr_meta;
       map[`${m.closer}-${m.month}-prop`] = m.prop_meta;
       map[`${m.closer}-${m.month}-venda`] = m.venda_meta;
+      map[`${m.closer}-${m.month}-faturamento`] = m.faturamento_meta || 0;
     });
     setLocal(map);
     dbSnapshot.current = { ...map };
@@ -45,7 +47,9 @@ export function CloserAbsoluteMetasTab() {
     local[`${closer}-${month}-${field}`] ?? 0;
 
   const setVal = (closer: string, month: string, field: Field, v: number) => {
-    setLocal(prev => ({ ...prev, [`${closer}-${month}-${field}`]: Math.max(0, Math.floor(v || 0)) }));
+    // Faturamento aceita decimais; demais campos são inteiros (qtd).
+    const sanitized = field === 'faturamento' ? Math.max(0, v || 0) : Math.max(0, Math.floor(v || 0));
+    setLocal(prev => ({ ...prev, [`${closer}-${month}-${field}`]: sanitized }));
     setHasChanges(true);
   };
 
@@ -58,15 +62,17 @@ export function CloserAbsoluteMetasTab() {
         rr_meta: getVal(closer, month, 'rr'),
         prop_meta: getVal(closer, month, 'prop'),
         venda_meta: getVal(closer, month, 'venda'),
+        faturamento_meta: getVal(closer, month, 'faturamento'),
       }))
     );
 
     try {
       await bulkUpdateMetas.mutateAsync(updates);
       for (const u of updates) {
-        (['rm', 'rr', 'prop', 'venda'] as Field[]).forEach(async (f) => {
+        (['rm', 'rr', 'prop', 'venda', 'faturamento'] as Field[]).forEach(async (f) => {
           const old = dbSnapshot.current[`${u.closer}-${u.month}-${f}`] ?? 0;
-          const next = u[`${f}_meta` as 'rm_meta'];
+          const dbKey = `${f}_meta` as 'rm_meta' | 'rr_meta' | 'prop_meta' | 'venda_meta' | 'faturamento_meta';
+          const next = u[dbKey];
           if (old !== next) {
             await logAction(`closer_meta_abs_${f}`, `${u.month}: ${u.closer} ${f.toUpperCase()} ${old} → ${next}`, { ...u, field: f, old, new: next });
           }
@@ -78,6 +84,7 @@ export function CloserAbsoluteMetasTab() {
         snap[`${u.closer}-${u.month}-rr`] = u.rr_meta;
         snap[`${u.closer}-${u.month}-prop`] = u.prop_meta;
         snap[`${u.closer}-${u.month}-venda`] = u.venda_meta;
+        snap[`${u.closer}-${u.month}-faturamento`] = u.faturamento_meta;
       });
       dbSnapshot.current = snap;
       toast({ title: 'Metas Closer salvas com sucesso!' });
@@ -136,9 +143,11 @@ export function CloserAbsoluteMetasTab() {
                           <Input
                             type="number"
                             min={0}
+                            step={f.monetary ? 1000 : 1}
                             value={getVal(closer, month, f.key)}
-                            onChange={(e) => setVal(closer, month, f.key, parseInt(e.target.value) || 0)}
-                            className="w-20 h-8 text-center text-sm mx-auto"
+                            onChange={(e) => setVal(closer, month, f.key, parseFloat(e.target.value) || 0)}
+                            className={`${f.monetary ? 'w-28' : 'w-20'} h-8 text-center text-sm mx-auto`}
+                            placeholder={f.monetary ? 'R$' : ''}
                           />
                         </TableCell>
                       ))}
