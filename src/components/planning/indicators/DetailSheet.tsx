@@ -48,6 +48,11 @@ export interface DetailItem {
   cicloVenda?: number;           // Venda: Lead → Fechamento
   percentualTotal?: number;      // % deste item no total
   slaStatus?: 'ok' | 'warning' | 'danger'; // Visual do SLA
+  // Lead-source attribution fields (for origem filter classification)
+  tipoOrigem?: string;
+  origemLead?: string;
+  fonte?: string;
+  campanha?: string;
 }
 
 interface DetailSheetProps {

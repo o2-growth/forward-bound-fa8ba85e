@@ -437,6 +437,10 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
         ? card.valorPontual 
         : (card.produto === 'Franquia' ? 140000 : 54000),
     revenueRange: cardInvestimentoMap.get(card.id) || card.investimentoDisponivel || undefined,
+    tipoOrigem: card.tipoOrigem,
+    origemLead: card.origemLead,
+    fonte: card.fonte,
+    campanha: card.campanha,
   });
 
   // Get detail items for an indicator (uses same FIRST ENTRY logic)

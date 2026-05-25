@@ -24,6 +24,7 @@ import { ChartConfig } from "./indicators/DrillDownCharts";
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
+import { classifyLeadSource, LeadSource } from "@/lib/leadSource";
 
 const formatCompactCurrency = (value: number): string => {
   if (value >= 1000000) return `R$ ${(value / 1000000).toFixed(1)}M`;
@@ -38,6 +39,7 @@ interface ClickableFunnelChartProps {
   selectedBUs?: BUType[];
   selectedClosers?: string[];
   selectedSDRs?: string[];
+  selectedOrigens?: LeadSource[];
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -51,7 +53,18 @@ interface FunnelStage {
   conversionPercent: number;
 }
 
-export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedBUs, selectedClosers, selectedSDRs }: ClickableFunnelChartProps) {
+export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedBUs, selectedClosers, selectedSDRs, selectedOrigens }: ClickableFunnelChartProps) {
+  const matchCardOrigem = (card: any): boolean => {
+    if (!selectedOrigens?.length) return true;
+    if (!card) return false;
+    const src = classifyLeadSource({
+      tipoOrigem: card.tipoOrigem,
+      origemLead: card.origemLead,
+      fonte: card.fonte,
+      campanha: card.campanha,
+    });
+    return selectedOrigens.includes(src);
+  };
   // Gate por BU: closer/SDR só conta se operam nessa BU (mesma lógica do gauge)
   const buHasMatch = (bu: BUType) => {
     const closers = (selectedClosers || []).filter(c => BU_CLOSERS[bu]?.includes(c as CloserType));
@@ -131,26 +144,26 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
   const getFilteredModeloAtualQty = (indicator: IndicatorType): number => {
     if (!buHasMatch('modelo_atual')) return 0;
     const cards = modeloAtualAnalytics.getCardsForIndicator(indicator);
-    return cards.filter((c: any) => matchCardCloser(c.closer) && matchCardSdr(c.responsavel || c.sdr)).length;
+    return cards.filter((c: any) => matchCardCloser(c.closer) && matchCardSdr(c.responsavel || c.sdr) && matchCardOrigem(c)).length;
   };
 
-  // Helper to get filtered value for Modelo Atual when closers/SDRs filter is active
+  // Helper to get filtered value for Modelo Atual when closers/SDRs/origem filter is active
   const getFilteredModeloAtualValue = (indicator: 'proposta' | 'venda'): number => {
     if (!buHasMatch('modelo_atual')) return 0;
-    if (selectedClosers?.length || selectedSDRs?.length) {
+    if (selectedClosers?.length || selectedSDRs?.length || selectedOrigens?.length) {
       const cards = modeloAtualAnalytics.getCardsForIndicator(indicator);
       return cards
-        .filter((c: any) => matchCardCloser(c.closer) && matchCardSdr(c.responsavel || c.sdr))
+        .filter((c: any) => matchCardCloser(c.closer) && matchCardSdr(c.responsavel || c.sdr) && matchCardOrigem(c))
         .reduce((sum: number, card: any) => sum + (card.valor || 0), 0);
     }
     return getModeloAtualValue(indicator, startDate, endDate);
   };
 
-  // Generic helper: filter analytics items by closer+sdr respecting BU gate
+  // Generic helper: filter analytics items by closer+sdr+origem respecting BU gate
   const filterAnalyticsItems = (items: any[], bu: BUType) => {
     if (!buHasMatch(bu)) return [];
-    if (!selectedClosers?.length && !selectedSDRs?.length) return items;
-    return items.filter(i => matchCardCloser(i.closer || i.responsible) && matchCardSdr(i.sdr || i.responsible));
+    if (!selectedClosers?.length && !selectedSDRs?.length && !selectedOrigens?.length) return items;
+    return items.filter(i => matchCardCloser(i.closer || i.responsible) && matchCardSdr(i.sdr || i.responsible) && matchCardOrigem(i));
   };
 
   const getO2TaxAnalyticsQty = (indicator: IndicatorType): number => {
@@ -266,19 +279,22 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
 
   // Get detail items for an indicator based on selected BU
   const getItemsForIndicator = (indicator: IndicatorType): DetailItem[] => {
+    const origemPostFilter = (items: DetailItem[]): DetailItem[] =>
+      selectedOrigens?.length ? items.filter(i => matchCardOrigem(i)) : items;
+
     // For Franquia
     if (useExpansaoData) {
-      return franquiaAnalytics.getDetailItemsForIndicator(indicator);
+      return origemPostFilter(franquiaAnalytics.getDetailItemsForIndicator(indicator));
     }
 
     // For Oxy Hacker
     if (useOxyHackerData) {
-      return oxyHackerAnalytics.getDetailItemsForIndicator(indicator);
+      return origemPostFilter(oxyHackerAnalytics.getDetailItemsForIndicator(indicator));
     }
 
     // For O2 TAX - use analytics hook directly (now supports all indicators with date filtering)
     if (useO2TaxData) {
-      return o2TaxAnalytics.getDetailItemsForIndicator(indicator);
+      return origemPostFilter(o2TaxAnalytics.getDetailItemsForIndicator(indicator));
     }
 
     // For Modelo Atual or Consolidado (use Modelo Atual data)
@@ -301,7 +317,7 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
         // For leads, only Modelo Atual and O2 TAX have data
         if (indicator === 'leads') {
           const o2TaxLeadsItems = o2TaxAnalytics.getDetailItemsForIndicator('leads');
-          return [...items, ...o2TaxLeadsItems];
+          return origemPostFilter([...items, ...o2TaxLeadsItems]);
         }
         const o2TaxPhaseMap: Record<string, string> = {
           'mql': 'MQL',
@@ -326,10 +342,10 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
         // Oxy Hacker items
         const oxyHackerItems = oxyHackerAnalytics.getDetailItemsForIndicator(indicator);
         
-        return [...items, ...o2TaxItems, ...franquiaItems, ...oxyHackerItems];
+        return origemPostFilter([...items, ...o2TaxItems, ...franquiaItems, ...oxyHackerItems]);
       }
-      
-      return items;
+
+      return origemPostFilter(items);
     }
 
     return [];

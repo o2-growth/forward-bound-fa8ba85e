@@ -487,6 +487,10 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
     closer: card.closer,
     sdr: card.sdr,
     dataAssinatura: card.dataAssinatura?.toISOString() || undefined,
+    tipoOrigem: card.tipoOrigem,
+    origemLead: card.origemLead,
+    fonte: card.fonte,
+    campanha: card.campanha,
   });
 
   // Get detail items for a specific indicator

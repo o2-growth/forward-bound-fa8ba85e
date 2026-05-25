@@ -36,6 +36,7 @@ import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
 import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
+import { classifyLeadSource, LeadSource, LEAD_SOURCE_LABELS } from "@/lib/leadSource";
 import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
@@ -393,6 +394,8 @@ export function IndicatorsTab() {
   const [selectedClosers, setSelectedClosers] = useState<string[]>([]);
   // Multi-selection state for SDRs (empty = all SDRs)
   const [selectedSDRs, setSelectedSDRs] = useState<string[]>([]);
+  // Multi-selection state for lead origin (empty = all origens)
+  const [selectedOrigens, setSelectedOrigens] = useState<LeadSource[]>([]);
   const [startDate, setStartDate] = useState<Date>(startOfMonth(new Date()));
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
@@ -693,7 +696,20 @@ export function IndicatorsTab() {
       return sdrTokens.every(t => cardTokens.includes(t));
     });
   };
-  
+
+  // Lead-source (origem) filter — returns true if no filter, or card classifies into selected set
+  const matchesOrigemFilter = (card: any): boolean => {
+    if (selectedOrigens.length === 0) return true;
+    if (!card) return false;
+    const source = classifyLeadSource({
+      tipoOrigem: card.tipoOrigem,
+      origemLead: card.origemLead,
+      fonte: card.fonte,
+      campanha: card.campanha,
+    });
+    return selectedOrigens.includes(source);
+  };
+
   // Month name mapping for funnelData lookup
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   
@@ -915,12 +931,12 @@ export function IndicatorsTab() {
       
       if (includeByCloser && includeBySdr) {
         // If either filter is active, use card-level filtering
-        if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0) {
+        if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0) {
           const cards = modeloAtualAnalytics.getCardsForIndicator(indicator.key);
           const filteredCards = cards.filter(card => {
             const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer);
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.responsavel || card.sdr);
-            return matchCloser && matchSdr;
+            return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
           total += filteredCards.length;
         } else {
@@ -929,7 +945,7 @@ export function IndicatorsTab() {
         }
       }
     }
-    
+
     if (includesO2Tax) {
       // Check if any selected closer/SDR operates in O2 TAX
       const closersForBU = effectiveSelectedClosers.filter(c => 
@@ -943,12 +959,12 @@ export function IndicatorsTab() {
       const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
       
       if (includeByCloser && includeBySdr) {
-        if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0) {
+        if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0) {
           const cards = o2TaxAnalytics.getDetailItemsForIndicator(indicator.key);
           const filteredCards = cards.filter(card => {
             const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer || card.responsible);
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
-            return matchCloser && matchSdr;
+            return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
           total += filteredCards.length;
         } else {
@@ -957,7 +973,7 @@ export function IndicatorsTab() {
         }
       }
     }
-    
+
     if (includesOxyHacker) {
       // Check if any selected closer/SDR operates in Oxy Hacker
       const closersForBU = effectiveSelectedClosers.filter(c => 
@@ -971,12 +987,12 @@ export function IndicatorsTab() {
       const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
       
       if (includeByCloser && includeBySdr) {
-        if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0) {
+        if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0) {
           const cards = oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key);
           const filteredCards = cards.filter(card => {
             const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer || card.responsible);
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
-            return matchCloser && matchSdr;
+            return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
           total += filteredCards.length;
         } else {
@@ -985,7 +1001,7 @@ export function IndicatorsTab() {
         }
       }
     }
-    
+
     if (includesFranquia) {
       // Check if any selected closer/SDR operates in Franquia
       const closersForBU = effectiveSelectedClosers.filter(c => 
@@ -999,12 +1015,12 @@ export function IndicatorsTab() {
       const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
       
       if (includeByCloser && includeBySdr) {
-        if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0) {
+        if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0) {
           const cards = franquiaAnalytics.getDetailItemsForIndicator(indicator.key);
           const filteredCards = cards.filter(card => {
             const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer || card.responsible);
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
-            return matchCloser && matchSdr;
+            return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
           total += filteredCards.length;
         } else {
@@ -1013,7 +1029,7 @@ export function IndicatorsTab() {
         }
       }
     }
-    
+
     return total;
   };
 
@@ -1021,7 +1037,7 @@ export function IndicatorsTab() {
     // Helper: agrupa cards (com filtro de closer/SDR aplicado) na mesma granularidade
     // do gráfico. Usado quando há filtro de closer/SDR ativo — caso contrário, o
     // gráfico cai no caminho original (getXxxGroupedData) que é mais barato.
-    const hasPeopleFilter = effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0;
+    const hasPeopleFilter = effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0;
     const buildQtyArrayFromFilteredCards = (
       cards: Array<{ dataEntrada: Date; closer?: string | null; responsavel?: string | null; sdr?: string | null; responsible?: string | null }>,
       personRole: 'closer' | 'sdr' | 'both' = 'both'
@@ -1031,7 +1047,7 @@ export function IndicatorsTab() {
         const cardSdr = card.sdr ?? card.responsavel ?? card.responsible ?? null;
         const matchCloser = effectiveSelectedClosers.length === 0 || (personRole !== 'sdr' && matchesCloserFilter(cardCloser));
         const matchSdr = effectiveSelectedSDRs.length === 0 || (personRole !== 'closer' && matchesSdrFilter(cardSdr));
-        return matchCloser && matchSdr;
+        return matchCloser && matchSdr && matchesOrigemFilter(card);
       });
       const countInRange = (startTs: number, endTs: number) =>
         filtered.filter((c: any) => {
@@ -1125,7 +1141,7 @@ export function IndicatorsTab() {
         ? analyticsCardsAll.filter((card: any) => {
             const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer || card.responsavel);
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsavel);
-            return matchCloser && matchSdr;
+            return matchCloser && matchSdr && matchesOrigemFilter(card);
           })
         : analyticsCardsAll;
 
@@ -1350,12 +1366,12 @@ export function IndicatorsTab() {
         const filteredItems = buItems.filter(item => {
           const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer);
           const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr;
+          return matchCloser && matchSdr && matchesOrigemFilter(item);
         });
         items = [...items, ...filteredItems];
       }
     }
-    
+
     // O2 TAX: Include if no closer/SDR filter OR at least one selected closer/SDR operates here
     if (includesO2Tax) {
       const closersForBU = effectiveSelectedClosers.filter(c => 
@@ -1373,12 +1389,12 @@ export function IndicatorsTab() {
         const filteredItems = buItems.filter(item => {
           const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
           const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr;
+          return matchCloser && matchSdr && matchesOrigemFilter(item);
         });
         items = [...items, ...filteredItems];
       }
     }
-    
+
     // Franquia: Include if no closer/SDR filter OR at least one selected closer/SDR operates here
     if (includesFranquia) {
       const closersForBU = effectiveSelectedClosers.filter(c => 
@@ -1396,12 +1412,12 @@ export function IndicatorsTab() {
         const filteredItems = buItems.filter(item => {
           const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
           const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr;
+          return matchCloser && matchSdr && matchesOrigemFilter(item);
         });
         items = [...items, ...filteredItems];
       }
     }
-    
+
     // Oxy Hacker: Include if no closer/SDR filter OR at least one selected closer/SDR operates here
     if (includesOxyHacker) {
       const closersForBU = effectiveSelectedClosers.filter(c => 
@@ -1419,12 +1435,12 @@ export function IndicatorsTab() {
         const filteredItems = buItems.filter(item => {
           const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
           const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr;
+          return matchCloser && matchSdr && matchesOrigemFilter(item);
         });
         items = [...items, ...filteredItems];
       }
     }
-    
+
     return items;
   };
 
@@ -1444,7 +1460,7 @@ export function IndicatorsTab() {
     oxyHackerAnalytics.isLoading,
     // Re-compute when BU/closer/SDR filters change
     includesModeloAtual, includesO2Tax, includesFranquia, includesOxyHacker,
-    effectiveSelectedClosers, effectiveSelectedSDRs,
+    effectiveSelectedClosers, effectiveSelectedSDRs, selectedOrigens,
     // Re-compute when date range changes
     startDate, endDate,
   ]);
@@ -1471,7 +1487,7 @@ export function IndicatorsTab() {
         const filteredItems = buItems.filter(item => {
           const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer);
           const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr;
+          return matchCloser && matchSdr && matchesOrigemFilter(item);
         });
         items = [...items, ...filteredItems];
       }
@@ -1494,7 +1510,7 @@ export function IndicatorsTab() {
         const filteredItems = buItems.filter(item => {
           const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
           const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr;
+          return matchCloser && matchSdr && matchesOrigemFilter(item);
         });
         items = [...items, ...filteredItems];
       }
@@ -1517,7 +1533,7 @@ export function IndicatorsTab() {
         const filteredItems = buItems.filter(item => {
           const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
           const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr;
+          return matchCloser && matchSdr && matchesOrigemFilter(item);
         });
         items = [...items, ...filteredItems];
       }
@@ -1540,7 +1556,7 @@ export function IndicatorsTab() {
         const filteredItems = buItems.filter(item => {
           const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
           const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr;
+          return matchCloser && matchSdr && matchesOrigemFilter(item);
         });
         items = [...items, ...filteredItems];
       }
@@ -2306,7 +2322,7 @@ export function IndicatorsTab() {
       return vendas.filter(card => {
         const matchCloser = !closerFilterActive || matchesCloserFilter((card.closer || '').trim());
         const matchSdr = !sdrFilterActive || matchesSdrFilter((card.sdr || card.responsavel || '').trim());
-        return matchCloser && matchSdr;
+        return matchCloser && matchSdr && matchesOrigemFilter(card);
       });
     };
 
@@ -2926,6 +2942,21 @@ export function IndicatorsTab() {
               />
             )}
 
+            <MultiSelect
+              options={[
+                { value: 'inbound', label: LEAD_SOURCE_LABELS.inbound },
+                { value: 'outbound', label: LEAD_SOURCE_LABELS.outbound },
+                { value: 'evento', label: LEAD_SOURCE_LABELS.evento },
+                { value: 'indicacao', label: LEAD_SOURCE_LABELS.indicacao },
+                { value: 'sem_origem', label: LEAD_SOURCE_LABELS.sem_origem },
+              ]}
+              selected={selectedOrigens}
+              onSelectionChange={(v) => setSelectedOrigens(v as LeadSource[])}
+              placeholder="Todas Origens"
+              allLabel="Todas Origens"
+              className="w-44"
+            />
+
             <DateRangePickerGA
               startDate={startDate}
               endDate={endDate}
@@ -3342,7 +3373,7 @@ export function IndicatorsTab() {
           <LeadsMqlsStackedChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
           <MeetingsScheduledChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
         </div>
-        <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} selectedSDRs={selectedSDRs} />
+        <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} selectedSDRs={selectedSDRs} selectedOrigens={selectedOrigens} />
       </div>
 
       {/* Charts Section with View Mode Toggle */}
