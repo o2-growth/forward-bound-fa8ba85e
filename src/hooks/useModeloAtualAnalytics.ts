@@ -40,6 +40,7 @@ export interface ModeloAtualCard {
   gclid?: string;
   motivoPerda?: string;
   faseAtual?: string;
+  produto?: string; // Sub-produto vendido (campo "Produtos" do Pipefy)
 }
 
 // Map destination phases to indicators (based on pipefy_moviment_cfos table)
@@ -193,6 +194,7 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
     gclid: row['gclid'] || undefined,
     motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
     faseAtual: row['Fase Atual'] || row['fase_atual'] || undefined,
+    produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
   };
 }
 
@@ -478,7 +480,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
     revenueRange: card.faixa || undefined,
     responsible: card.closer || card.responsavel || undefined, // Prioritize closer for display
     duration: card.duracao,
-    product: 'CaaS',
+    product: card.produto || 'CaaS',
     mrr: card.valorMRR,
     setup: card.valorSetup,
     pontual: card.valorPontual,
