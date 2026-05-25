@@ -1950,7 +1950,24 @@ export function IndicatorsTab() {
           const itemTCV = ((item.mrr || 0) * 12) + (item.setup || 0) + (item.pontual || 0);
           return { ...item, cicloVenda, value: itemTCV };
         });
-        
+
+        // Ciclo Médio (apenas contratos com ciclo > 0)
+        const ciclosValidos = itemsWithTCV.map(i => i.cicloVenda).filter(c => c > 0);
+        const cicloMedio = ciclosValidos.length > 0
+          ? Math.round(ciclosValidos.reduce((s, c) => s + c, 0) / ciclosValidos.length)
+          : 0;
+
+        // Produto Contratado: agrupar TCV por produto
+        const produtoTotals = new Map<string, number>();
+        itemsWithTCV.forEach(i => {
+          const produto = i.product || 'Não informado';
+          produtoTotals.set(produto, (produtoTotals.get(produto) || 0) + (i.value || 0));
+        });
+        const produtoData = Array.from(produtoTotals.entries())
+          .map(([label, value]) => ({ label, value }))
+          .filter(d => d.value > 0)
+          .sort((a, b) => b.value - a.value);
+
         const podium = findTopPerformerByRevenue(items);
         const podiumStr = podium.map((p, i) => {
           const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
@@ -1964,6 +1981,7 @@ export function IndicatorsTab() {
           { icon: '🔁', value: formatCompactCurrency(totalMrr), label: 'MRR', highlight: 'neutral' },
           { icon: '⚡', value: formatCompactCurrency(totalPontual), label: 'Pontual', highlight: 'neutral' },
           { icon: '📊', value: formatCompactCurrency(tcv), label: 'TCV', highlight: 'success' },
+          { icon: '⏱️', value: cicloMedio > 0 ? `${cicloMedio}d` : '-', label: 'Ciclo Médio', highlight: 'neutral' },
         ];
         
         // Charts para Venda
