@@ -3380,6 +3380,7 @@ export function IndicatorsTab() {
         kpis={detailSheetKpis}
         charts={detailSheetCharts}
         filterCriteria={detailSheetFilterCriteria}
+        extraContent={detailSheetExtraContent}
       />
     </div>
   );
