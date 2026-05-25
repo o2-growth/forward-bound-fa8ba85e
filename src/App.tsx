@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import DebugReuniao from "./pages/DebugReuniao";
 import DebugCliente from "./pages/DebugCliente";
 import ComercialPreview from "./pages/ComercialPreview";
+import DebugOrigens from "./pages/DebugOrigens";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ComercialPreview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/debug-origens"
+              element={
+                <ProtectedRoute>
+                  <DebugOrigens />
                 </ProtectedRoute>
               }
             />
