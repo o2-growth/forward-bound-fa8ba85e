@@ -2067,7 +2067,6 @@ export function IndicatorsTab() {
           .sort((a, b) => b.value - a.value);
         
         const charts: ChartConfig[] = [
-          ...(produtoData.length > 0 ? [{ type: 'pie' as const, title: 'Produto Contratado (TCV)', data: produtoData, formatValue: formatCompactCurrency }] : []),
           { type: 'pie', title: 'Composição do Faturamento', data: compositionData, formatValue: formatCompactCurrency },
           ...(conversionByTierData.length > 0 ? [{ 
             type: 'bar' as const, 
