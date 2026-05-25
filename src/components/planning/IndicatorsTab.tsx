@@ -1959,16 +1959,65 @@ export function IndicatorsTab() {
           ? Math.round(ciclosValidos.reduce((s, c) => s + c, 0) / ciclosValidos.length)
           : 0;
 
-        // Produto Contratado: agrupar TCV por produto
-        const produtoTotals = new Map<string, number>();
+        // Produto Contratado: agregados detalhados por produto
+        type ProdutoAgg = { produto: string; count: number; mrr: number; setup: number; pontual: number; tcv: number };
+        const produtoMap = new Map<string, ProdutoAgg>();
         itemsWithTCV.forEach(i => {
           const produto = i.product || 'Não informado';
-          produtoTotals.set(produto, (produtoTotals.get(produto) || 0) + (i.value || 0));
+          const agg = produtoMap.get(produto) || { produto, count: 0, mrr: 0, setup: 0, pontual: 0, tcv: 0 };
+          agg.count += 1;
+          agg.mrr += i.mrr || 0;
+          agg.setup += i.setup || 0;
+          agg.pontual += i.pontual || 0;
+          agg.tcv += i.value || 0;
+          produtoMap.set(produto, agg);
         });
-        const produtoData = Array.from(produtoTotals.entries())
-          .map(([label, value]) => ({ label, value }))
-          .filter(d => d.value > 0)
-          .sort((a, b) => b.value - a.value);
+        const produtoBreakdown = Array.from(produtoMap.values()).sort((a, b) => b.tcv - a.tcv);
+
+        const produtoExtraContent = produtoBreakdown.length > 0 ? (
+          <div className="mt-4 border rounded-lg overflow-hidden">
+            <div className="px-4 py-2 bg-muted/50 border-b">
+              <h4 className="text-sm font-semibold text-foreground">Detalhamento por Produto Contratado</h4>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/30">
+                  <tr className="text-left text-xs text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">Produto</th>
+                    <th className="px-3 py-2 font-medium text-right">Contratos</th>
+                    <th className="px-3 py-2 font-medium text-right">MRR</th>
+                    <th className="px-3 py-2 font-medium text-right">Setup</th>
+                    <th className="px-3 py-2 font-medium text-right">Pontual</th>
+                    <th className="px-3 py-2 font-medium text-right">TCV</th>
+                    <th className="px-3 py-2 font-medium text-right">Ticket Médio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {produtoBreakdown.map(row => (
+                    <tr key={row.produto} className="border-t border-border">
+                      <td className="px-3 py-2">{columnFormatters.product(row.produto)}</td>
+                      <td className="px-3 py-2 text-right font-medium">{row.count}</td>
+                      <td className="px-3 py-2 text-right">{formatCompactCurrency(row.mrr)}</td>
+                      <td className="px-3 py-2 text-right">{formatCompactCurrency(row.setup)}</td>
+                      <td className="px-3 py-2 text-right">{formatCompactCurrency(row.pontual)}</td>
+                      <td className="px-3 py-2 text-right font-semibold text-chart-2">{formatCompactCurrency(row.tcv)}</td>
+                      <td className="px-3 py-2 text-right">{formatCompactCurrency(row.count > 0 ? row.tcv / row.count : 0)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-border bg-muted/30 font-semibold">
+                    <td className="px-3 py-2">Total</td>
+                    <td className="px-3 py-2 text-right">{items.length}</td>
+                    <td className="px-3 py-2 text-right">{formatCompactCurrency(totalMrr)}</td>
+                    <td className="px-3 py-2 text-right">{formatCompactCurrency(totalSetup)}</td>
+                    <td className="px-3 py-2 text-right">{formatCompactCurrency(totalPontual)}</td>
+                    <td className="px-3 py-2 text-right text-chart-2">{formatCompactCurrency(tcv)}</td>
+                    <td className="px-3 py-2 text-right">{formatCompactCurrency(ticketMedioTCV)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null;
 
         const podium = findTopPerformerByRevenue(items);
         const podiumStr = podium.map((p, i) => {
