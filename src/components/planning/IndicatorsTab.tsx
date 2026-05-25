@@ -2143,6 +2143,7 @@ export function IndicatorsTab() {
         );
         setDetailSheetKpis(kpis);
         setDetailSheetCharts(charts);
+        setDetailSheetExtraContent(produtoExtraContent);
         setDetailSheetColumns([
           { key: 'product', label: 'Produto', format: columnFormatters.product },
           { key: 'company', label: 'Empresa' },
