@@ -1,0 +1,1 @@
+ALTER TABLE public.closer_absolute_metas ADD COLUMN IF NOT EXISTS faturamento_meta numeric NOT NULL DEFAULT 0;
