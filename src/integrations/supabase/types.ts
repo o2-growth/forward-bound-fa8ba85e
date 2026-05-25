@@ -264,6 +264,7 @@ export type Database = {
         Row: {
           closer: string
           created_at: string
+          faturamento_meta: number
           id: string
           month: string
           prop_meta: number
@@ -276,6 +277,7 @@ export type Database = {
         Insert: {
           closer: string
           created_at?: string
+          faturamento_meta?: number
           id?: string
           month: string
           prop_meta?: number
@@ -288,6 +290,7 @@ export type Database = {
         Update: {
           closer?: string
           created_at?: string
+          faturamento_meta?: number
           id?: string
           month?: string
           prop_meta?: number
