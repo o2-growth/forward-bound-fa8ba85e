@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export type ActionType = 'monetary_meta' | 'closer_meta' | 'plan_growth_meta' | 'update_cost_stage_metas' | 'sdr_meta_rm' | 'sdr_meta_rr' | 'closer_meta_abs_rm' | 'closer_meta_abs_rr' | 'closer_meta_abs_prop' | 'closer_meta_abs_venda';
+export type ActionType = 'monetary_meta' | 'closer_meta' | 'plan_growth_meta' | 'update_cost_stage_metas' | 'sdr_meta_rm' | 'sdr_meta_rr' | 'closer_meta_abs_rm' | 'closer_meta_abs_rr' | 'closer_meta_abs_prop' | 'closer_meta_abs_venda' | 'closer_meta_abs_faturamento';
 
 interface AuditLogMetadata {
   bu?: string;
