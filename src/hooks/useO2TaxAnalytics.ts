@@ -165,43 +165,39 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['o2tax-movements-analytics', startDateStr, endDateStr],
     queryFn: async () => {
-      // Step 1: Fetch movements in the selected period
-      const { data: responseData, error: fetchError } = await supabase.functions.invoke('query-external-db', {
-        body: { 
-          table: 'pipefy_cards_movements', 
-          action: 'query_period',
-          startDate: `${startDateStr}T00:00:00`,
-          endDate: `${endDateStr}T23:59:59`,
-          limit: 10000 
-        }
-      });
+      // Perf: as 3 queries iniciais (period, signature, mqlByCreation) são
+      // independentes entre si — todas dependem só de startDate/endDate.
+      // Antes corriam em SÉRIE (cascata). Agora em paralelo via Promise.all.
+      // Só `history` continua em segundo passo, pois depende dos IDs do cards.
+      const baseBody = {
+        table: 'pipefy_cards_movements',
+        startDate: `${startDateStr}T00:00:00`,
+        endDate: `${endDateStr}T23:59:59`,
+        limit: 10000,
+      };
 
-      if (fetchError) {
-        console.error('Error fetching O2 TAX movements:', fetchError);
-        throw fetchError;
+      const [periodRes, sigRes, mqlCreationRes] = await Promise.all([
+        supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period' } }),
+        supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period_by_signature' } }),
+        supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period_by_creation' } }),
+      ]);
+
+      if (periodRes.error) {
+        console.error('Error fetching O2 TAX movements:', periodRes.error);
+        throw periodRes.error;
       }
 
-      if (!responseData?.data) {
-        return { cards: [], fullHistory: [] };
+      if (!periodRes.data?.data) {
+        return { cards: [], fullHistory: [], mqlByCreation: [] };
       }
 
-      console.log(`[O2 TAX Analytics] Period query returned ${responseData.data.length} movements`);
-      
-      const cards = responseData.data.map(parseRawCard);
+      console.log(`[O2 TAX Analytics] Period query returned ${periodRes.data.data.length} movements`);
+      const cards = periodRes.data.data.map(parseRawCard);
 
-      // Step 2: Fetch sales by signature date (cards signed in period but entered earlier)
+      // Signature cards (cards signed in period but entered earlier)
       let signatureCards: O2TaxCard[] = [];
-      const { data: sigData, error: sigError } = await supabase.functions.invoke('query-external-db', {
-        body: { 
-          table: 'pipefy_cards_movements', 
-          action: 'query_period_by_signature',
-          startDate: `${startDateStr}T00:00:00`,
-          endDate: `${endDateStr}T23:59:59`,
-          limit: 10000 
-        }
-      });
-      if (!sigError && sigData?.data) {
-        signatureCards = sigData.data.map(parseRawCard);
+      if (!sigRes.error && sigRes.data?.data) {
+        signatureCards = sigRes.data.data.map(parseRawCard);
         console.log(`[O2 TAX Analytics] Signature query returned ${signatureCards.length} movements`);
       }
 
@@ -216,46 +212,39 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
       }
       console.log(`[O2 TAX Analytics] After signature merge: ${cards.length} total movements`);
 
+      // MQL by creation date for the period
+      let mqlByCreation: O2TaxCard[] = [];
+      if (!mqlCreationRes.error && mqlCreationRes.data?.data) {
+        mqlByCreation = mqlCreationRes.data.data.map(parseRawCard);
+        console.log(`[O2 TAX Analytics] MQL by creation date: ${mqlByCreation.length} movements`);
+      }
+
       // Step 3: Get unique card IDs from period
       const uniqueCardIds = [...new Set(cards.map((c: O2TaxCard) => c.id))];
-      
-      // Step 4: Fetch full history for these cards (in batches of 500 to avoid truncation)
+
+      // Step 4: Fetch full history for these cards (depende de cards → fica sequencial).
+      // Batches paralelos pra reduzir tempo de espera.
       let fullHistory: O2TaxCard[] = [];
       if (uniqueCardIds.length > 0) {
         const BATCH_SIZE = 500;
+        const batches: string[][] = [];
         for (let i = 0; i < uniqueCardIds.length; i += BATCH_SIZE) {
-          const batch = uniqueCardIds.slice(i, i + BATCH_SIZE);
-          console.log(`[O2 TAX Analytics] Fetching history batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(uniqueCardIds.length / BATCH_SIZE)} (${batch.length} IDs)`);
-          const { data: historyData, error: historyError } = await supabase.functions.invoke('query-external-db', {
-            body: { 
-              table: 'pipefy_cards_movements', 
-              action: 'query_card_history',
-              cardIds: batch
-            }
-          });
-          
+          batches.push(uniqueCardIds.slice(i, i + BATCH_SIZE));
+        }
+        console.log(`[O2 TAX Analytics] Fetching history in ${batches.length} parallel batches`);
+        const historyResults = await Promise.all(
+          batches.map(batch =>
+            supabase.functions.invoke('query-external-db', {
+              body: { table: 'pipefy_cards_movements', action: 'query_card_history', cardIds: batch }
+            })
+          )
+        );
+        for (const { data: historyData, error: historyError } of historyResults) {
           if (!historyError && historyData?.data) {
             fullHistory.push(...historyData.data.map(parseRawCard));
           }
         }
         console.log(`[O2 TAX Analytics] Full history: ${fullHistory.length} movements for ${uniqueCardIds.length} cards`);
-      }
-
-      // Step 5: Fetch MQL by creation date for the period
-      let mqlByCreation: O2TaxCard[] = [];
-      const { data: mqlCreationData, error: mqlCreationError } = await supabase.functions.invoke('query-external-db', {
-        body: { 
-          table: 'pipefy_cards_movements', 
-          action: 'query_period_by_creation',
-          startDate: `${startDateStr}T00:00:00`,
-          endDate: `${endDateStr}T23:59:59`,
-          limit: 10000 
-        }
-      });
-      
-      if (!mqlCreationError && mqlCreationData?.data) {
-        mqlByCreation = mqlCreationData.data.map(parseRawCard);
-        console.log(`[O2 TAX Analytics] MQL by creation date: ${mqlByCreation.length} movements`);
       }
 
       return { cards, fullHistory, mqlByCreation };
