@@ -281,8 +281,10 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       }
 
       console.log(`[useModeloAtualAnalytics] Raw period data rows: ${periodResponse.data.data.length}`);
-      const cards = parseCards(periodResponse.data.data);
-      const allCardsUnfiltered = parseCards(periodResponse.data.data, true); // skipPhaseFilter for marketing attribution
+      // Perf: parsear UMA vez (unfiltered) e derivar `cards` filtrando o array
+      // — antes parseCards era chamado 2x sobre os mesmos rows.
+      const allCardsUnfiltered = parseCards(periodResponse.data.data, true);
+      const cards = allCardsUnfiltered.filter(c => PHASE_TO_INDICATOR[c.fase] !== undefined);
       console.log(`[useModeloAtualAnalytics] Parsed ${cards.length} card movements`);
       
       // Parse MQL-by-creation cards (skip phase filter - these can be in any phase including "Perdido")
@@ -295,11 +297,12 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       }
       
       // Parse signature-date cards (captures sales signed in period but moved later in Pipefy)
+      // Perf: idem — uma única passagem de parse, deriva filtered via filter.
       let signatureCards: ModeloAtualCard[] = [];
       let signatureCardsUnfiltered: ModeloAtualCard[] = [];
       if (signatureResponse.data?.data) {
-        signatureCards = parseCards(signatureResponse.data.data);
         signatureCardsUnfiltered = parseCards(signatureResponse.data.data, true);
+        signatureCards = signatureCardsUnfiltered.filter(c => PHASE_TO_INDICATOR[c.fase] !== undefined);
         console.log(`[useModeloAtualAnalytics] Cards signed in period: ${signatureCards.length}`);
       } else if (signatureResponse.error) {
         console.error('[useModeloAtualAnalytics] Error fetching signature data:', signatureResponse.error);
