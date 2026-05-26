@@ -11,6 +11,7 @@ import DebugReuniao from "./pages/DebugReuniao";
 import DebugCliente from "./pages/DebugCliente";
 import ComercialPreview from "./pages/ComercialPreview";
 import DebugOrigens from "./pages/DebugOrigens";
+import DebugFunnelMetas from "./pages/DebugFunnelMetas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +62,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DebugOrigens />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/debug-funnel-metas"
+              element={
+                <ProtectedRoute>
+                  <DebugFunnelMetas />
                 </ProtectedRoute>
               }
             />
