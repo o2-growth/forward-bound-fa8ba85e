@@ -226,89 +226,90 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
 
   const defaultTicket = produto === 'Franquia' ? 0 : 54000;
 
+  // Perf: query SHARED entre as duas instâncias do hook (Franquia + Oxy Hacker).
+  // Antes cada produto disparava 3 chamadas à mesma tabela, mesmo período,
+  // filtrando por produto APENAS no client → 100% duplicação.
+  // Agora: queryKey sem produto → React Query dedupe → 1 fetch só pros 2 consumidores.
+  // Os rows raw são retornados; cada instância filtra por produto via useMemo abaixo.
   const { data, isLoading, error } = useQuery({
-    queryKey: ['expansao-movements-analytics', produto, startDateStr, endDateStr],
+    queryKey: ['expansao-raw-rows', startDateStr, endDateStr],
     queryFn: async () => {
-      // Step 1: Fetch movements in the selected period
-      // Parallel queries: by entry date AND by signature date
+      // 3 endpoints da mesma tabela. Period+Signature em paralelo;
+      // history depende dos IDs vindos das duas primeiras (sequencial).
+      const baseBody = {
+        table: 'pipefy_cards_movements_expansao',
+        startDate: `${startDateStr}T00:00:00`,
+        endDate: `${endDateStr}T23:59:59`,
+        limit: 10000,
+      };
+
       const [periodRes, signatureRes] = await Promise.all([
-        supabase.functions.invoke('query-external-db', {
-          body: { 
-            table: 'pipefy_cards_movements_expansao', 
-            action: 'query_period',
-            startDate: `${startDateStr}T00:00:00`,
-            endDate: `${endDateStr}T23:59:59`,
-            limit: 10000 
-          }
-        }),
-        supabase.functions.invoke('query-external-db', {
-          body: { 
-            table: 'pipefy_cards_movements_expansao', 
-            action: 'query_period_by_signature',
-            startDate: `${startDateStr}T00:00:00`,
-            endDate: `${endDateStr}T23:59:59`,
-            limit: 10000 
-          }
-        }),
+        supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period' } }),
+        supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period_by_signature' } }),
       ]);
 
       if (periodRes.error) {
-        console.error(`Error fetching ${produto} analytics:`, periodRes.error);
+        console.error('Error fetching Expansao raw rows:', periodRes.error);
         throw periodRes.error;
       }
 
-      // Merge and deduplicate by ID + Fase
-      const allRows = [
+      const allRows: Record<string, any>[] = [
         ...(periodRes.data?.data || []),
         ...(signatureRes.data?.data || []),
       ];
-      const seen = new Set<string>();
-      const cards: ExpansaoCard[] = [];
-      for (const row of allRows) {
-        const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
-        if (seen.has(key)) continue;
-        const parsed = parseRawCard(row, defaultTicket);
-        // Filter by produto AFTER override (allows reclassified cards to show in correct view)
-        if (parsed.produto !== produto) continue;
-        seen.add(key);
-        cards.push(parsed);
-      }
 
-      console.log(`[${produto} Analytics] Period query returned ${cards.length} movements`);
+      // Coleta IDs únicos (TODOS os produtos — filter por produto é feito no useMemo abaixo)
+      const uniqueCardIds = [...new Set(allRows.map(r => String(r['ID'] || '')).filter(Boolean))];
 
-      // Step 2: Get unique card IDs from period
-      const uniqueCardIds = [...new Set(cards.map(c => c.id))];
-      
-      // Step 3: Fetch full history for these cards
-      let fullHistory: ExpansaoCard[] = [];
+      let historyRows: Record<string, any>[] = [];
       if (uniqueCardIds.length > 0) {
         const { data: historyData, error: historyError } = await supabase.functions.invoke('query-external-db', {
-          body: { 
-            table: 'pipefy_cards_movements_expansao', 
+          body: {
+            table: 'pipefy_cards_movements_expansao',
             action: 'query_card_history',
-            cardIds: uniqueCardIds
-          }
+            cardIds: uniqueCardIds,
+          },
         });
-        
         if (!historyError && historyData?.data) {
-          // Filter history by product too (post-override)
-          for (const row of historyData.data) {
-            const parsed = parseRawCard(row, defaultTicket);
-            if (parsed.produto !== produto) continue;
-            fullHistory.push(parsed);
-          }
-          console.log(`[${produto} Analytics] Full history: ${fullHistory.length} movements for ${uniqueCardIds.length} cards`);
+          historyRows = historyData.data;
         }
       }
 
-      return { cards, fullHistory };
+      console.log(`[Expansao Raw] period=${(periodRes.data?.data || []).length} sig=${(signatureRes.data?.data || []).length} hist=${historyRows.length} ids=${uniqueCardIds.length}`);
+      return { allRows, historyRows };
     },
     staleTime: 30 * 60 * 1000,
     retry: 1,
   });
 
-  const cards = data?.cards ?? [];
-  const fullHistory = data?.fullHistory ?? [];
+  // Filtra por produto via useMemo — cada instância (Franquia / Oxy Hacker) deriva
+  // do mesmo cache compartilhado. Aplicação do defaultTicket fica aqui pois varia por produto.
+  const cards = useMemo<ExpansaoCard[]>(() => {
+    const rows = data?.allRows || [];
+    const seen = new Set<string>();
+    const out: ExpansaoCard[] = [];
+    for (const row of rows) {
+      const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
+      if (seen.has(key)) continue;
+      const parsed = parseRawCard(row, defaultTicket);
+      if (parsed.produto !== produto) continue;
+      seen.add(key);
+      out.push(parsed);
+    }
+    console.log(`[${produto} Analytics] Filtered ${out.length}/${rows.length} cards (shared cache)`);
+    return out;
+  }, [data?.allRows, produto, defaultTicket]);
+
+  const fullHistory = useMemo<ExpansaoCard[]>(() => {
+    const rows = data?.historyRows || [];
+    const out: ExpansaoCard[] = [];
+    for (const row of rows) {
+      const parsed = parseRawCard(row, defaultTicket);
+      if (parsed.produto !== produto) continue;
+      out.push(parsed);
+    }
+    return out;
+  }, [data?.historyRows, produto, defaultTicket]);
 
   // Build a map of FIRST entry per card+indicator+calendar_month (monthly dedup)
   // Key: `cardId__indicator__YYYY-MM` → earliest ExpansaoCard in that month
