@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -20,7 +20,8 @@ import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useCloserMetas, BU_CLOSERS, BuType, CloserType } from "@/hooks/useCloserMetas";
 import { useSdrMetas } from "@/hooks/useSdrMetas";
 import { useFunnelMetas } from "@/hooks/useFunnelMetas";
-import { LossAnalysisSection } from "./indicators/LossAnalysisSection";
+// Componentes pesados (abaixo do fold) → lazy load com Suspense
+const LossAnalysisSection = lazy(() => import("./indicators/LossAnalysisSection").then(m => ({ default: m.LossAnalysisSection })));
 import { format, startOfYear, endOfYear, endOfDay, differenceInDays, eachMonthOfInterval, addDays, eachDayOfInterval, getMonth, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { FunnelDataItem } from "@/contexts/MediaMetasContext";
@@ -29,15 +30,15 @@ import { cn } from "@/lib/utils";
 import { LeadsMqlsStackedChart } from "./LeadsMqlsStackedChart";
 import { MeetingsScheduledChart } from "./MeetingsScheduledChart";
 import { ClickableFunnelChart } from "./ClickableFunnelChart";
-import { RevenueChartComparison } from "./RevenueChartComparison";
-import { FunnelConversionByTierWidget } from "./indicators/FunnelConversionByTierWidget";
+const RevenueChartComparison = lazy(() => import("./RevenueChartComparison").then(m => ({ default: m.RevenueChartComparison })));
+const FunnelConversionByTierWidget = lazy(() => import("./indicators/FunnelConversionByTierWidget").then(m => ({ default: m.FunnelConversionByTierWidget })));
 import { DetailSheet, DetailItem, columnFormatters, FilterCriteriaGroup } from "./indicators/DetailSheet";
 import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
 import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { classifyLeadSource, LeadSource, LEAD_SOURCE_LABELS } from "@/lib/leadSource";
-import { RevenuePaceChart } from "./indicators/RevenuePaceChart";
+const RevenuePaceChart = lazy(() => import("./indicators/RevenuePaceChart").then(m => ({ default: m.RevenuePaceChart })));
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
@@ -3091,7 +3092,8 @@ export function IndicatorsTab() {
 
       {/* Contratos por Faixa de Faturamento foi movido para dentro do RevenuePaceChart */}
 
-      {/* Loss Analysis Section */}
+      {/* Loss Analysis Section — lazy */}
+      <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-48 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <LossAnalysisSection
         selectedBUs={selectedBUs}
         modeloAtualAnalytics={modeloAtualAnalytics}
@@ -3099,6 +3101,7 @@ export function IndicatorsTab() {
         oxyHackerAnalytics={oxyHackerAnalytics}
         franquiaAnalytics={franquiaAnalytics}
       />
+      </Suspense>
 
       {/* Revenue Pace Chart */}
       {(() => {
@@ -3353,6 +3356,7 @@ export function IndicatorsTab() {
         const totalContratosValor = vendaItems.reduce((s, i) => s + (i.value || 0), 0);
 
         return (
+          <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-96 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
           <RevenuePaceChart
             realized={totalRealized}
             meta={totalMeta}
@@ -3364,6 +3368,7 @@ export function IndicatorsTab() {
             totalContratos={totalContratos}
             totalContratosValor={totalContratosValor}
           />
+          </Suspense>
         );
       })()}
 
@@ -3419,19 +3424,23 @@ export function IndicatorsTab() {
         ))}
       </div>
 
-      {/* Revenue Charts - Barras Agrupadas + Dashboard */}
+      {/* Revenue Charts - Barras Agrupadas + Dashboard — lazy */}
+      <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-72 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <RevenueChartComparison
         startDate={startDate}
         endDate={endDate}
         selectedBUs={selectedBUs}
         selectedClosers={selectedClosers}
       />
+      </Suspense>
 
-      {/* Funnel Conversion by Revenue Tier Analysis */}
+      {/* Funnel Conversion by Revenue Tier Analysis — lazy */}
+      <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-72 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <FunnelConversionByTierWidget
         getItemsForIndicator={getItemsForIndicator}
         getItemsWithFullHistory={getItemsWithFullHistory}
       />
+      </Suspense>
 
       {(isLoading || isLoadingExpansao || isLoadingO2Tax) && (
         <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">

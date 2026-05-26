@@ -35,7 +35,7 @@ export function useCloserAbsoluteMetas(year: number = 2026) {
       }
       return (data || []) as unknown as CloserAbsoluteMeta[];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 
   /** Retorna metas mensais (uma entrada por mês) de um closer (match por primeiro nome normalizado). */

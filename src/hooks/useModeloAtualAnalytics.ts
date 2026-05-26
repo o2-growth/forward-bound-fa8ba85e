@@ -353,7 +353,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
 
       return { cards, allCardsUnfiltered, fullHistory, mqlByCreation };
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
     retry: 1,
   });
 

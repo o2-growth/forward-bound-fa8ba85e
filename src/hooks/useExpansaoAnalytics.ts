@@ -303,7 +303,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
 
       return { cards, fullHistory };
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
     retry: 1,
   });
 

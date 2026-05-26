@@ -53,7 +53,7 @@ export function useSdrMetas(year: number = 2026) {
 
       return (data || []) as SdrMeta[];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
   });
 
   // Pega a meta (rm/rr) de um SDR/BU/mês
