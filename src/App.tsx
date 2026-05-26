@@ -14,7 +14,28 @@ import DebugOrigens from "./pages/DebugOrigens";
 import DebugFunnelMetas from "./pages/DebugFunnelMetas";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Defaults agressivos pra evitar refetch desnecessário ao trocar de aba do
+// navegador / reconectar / desmontar componentes. Cada hook ainda pode
+// sobrescrever via `staleTime` próprio (analytics hooks usam 30min).
+// - gcTime 1h: cache permanece em memória 1h após o último componente
+//   desmontar (em vez do default 5min que era apagado rápido).
+// - staleTime 30min: dados considerados "frescos" por 30min.
+// - refetchOnWindowFocus false: Alt+Tab voltando não dispara refetch.
+// - refetchOnReconnect false: reconectar à internet não dispara refetch.
+// - retry 1: só tenta de novo 1 vez em caso de erro (default 3 é lento).
+//
+// Botão "Atualizar" no dashboard continua funcionando pra forçar refetch.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
