@@ -3192,55 +3192,11 @@ export function IndicatorsTab() {
             periodEnd = index === months.length - 1 ? endDate : endOfMonth(periodStart);
           }
 
-          // For this period, calculate MRR base + setup/pontual for each month overlap
-          const periodMonths = eachMonthOfInterval({ start: periodStart, end: periodEnd });
-          let periodRealized = 0;
-          let periodMeta = 0;
-
-          for (const monthDate of periodMonths) {
-            const monthName = monthNames[getMonth(monthDate)];
-            const year = monthDate.getFullYear();
-            const monthStart = startOfMonth(monthDate);
-            const monthEnd = endOfMonth(monthDate);
-            const overlapStart = periodStart > monthStart ? periodStart : monthStart;
-            const overlapEnd = periodEnd < monthEnd ? periodEnd : monthEnd;
-            if (overlapStart > overlapEnd) continue;
-            const overlapDays = differenceInDays(overlapEnd, overlapStart) + 1;
-            const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
-            const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
-
-            const mrrBaseMonth = getMrrBaseForMonth(monthName, year);
-
-            // Pipefy cards for oxy_hacker/franquia — always added
-            const pStart = new Date(overlapStart.getFullYear(), overlapStart.getMonth(), overlapStart.getDate()).getTime();
-            const pEnd = new Date(overlapEnd.getFullYear(), overlapEnd.getMonth(), overlapEnd.getDate(), 23, 59, 59, 999).getTime();
-            const pipefyPeriodRealized = pipefyExpansaoCards
-              .filter(c => c.date.getTime() >= pStart && c.date.getTime() <= pEnd)
-              .reduce((sum, c) => sum + c.setup + c.pontual, 0);
-
-            // DRE for modelo_atual/o2_tax
-            if (hasDailyRevenueData && hasDreBUs) {
-              const overlapDaysList = eachDayOfInterval({ start: overlapStart, end: overlapEnd });
-              let dailyTotal = 0;
-              for (const day of overlapDaysList) {
-                const key = format(day, 'yyyy-MM-dd');
-                dailyTotal += getDailyRevenueForBUs(key);
-              }
-              periodRealized += dailyTotal + pipefyPeriodRealized;
-            } else if (isTotalOverride(monthName, year)) {
-              periodRealized += (mrrBaseMonth * fraction) + pipefyPeriodRealized;
-            } else {
-              // Fallback: all BUs via Pipefy cards
-              const spRealized = allSetupPontualCards
-                .filter(c => c.date.getTime() >= pStart && c.date.getTime() <= pEnd)
-                .reduce((sum, c) => sum + c.setup + c.pontual, 0);
-              periodRealized += (mrrBaseMonth * fraction) + spRealized;
-            }
-
-          }
+          // Realizado: cards de venda Pipefy no intervalo do período
+          const periodRealized = realizedForRange(periodStart, periodEnd);
 
           // Meta alinhada com o acelerômetro "Fat Incremento" (respeita BU/Closer/SDR)
-          periodMeta = metaForRange(periodStart, periodEnd);
+          const periodMeta = metaForRange(periodStart, periodEnd);
 
           cumulativeRealized += periodRealized;
           cumulativeMeta += periodMeta;
@@ -3252,21 +3208,6 @@ export function IndicatorsTab() {
           };
         });
 
-        // mrrBase for header = sum of MRR base values in the period
-        let mrrBaseTotal = 0;
-        for (const monthDate of paceMonths) {
-          const monthName = monthNames[getMonth(monthDate)];
-          const year = monthDate.getFullYear();
-          const monthStart = startOfMonth(monthDate);
-          const monthEnd = endOfMonth(monthDate);
-          const overlapStart = startDate > monthStart ? startDate : monthStart;
-          const overlapEnd = endDate < monthEnd ? endDate : monthEnd;
-          if (overlapStart > overlapEnd) continue;
-          const overlapDays = differenceInDays(overlapEnd, overlapStart) + 1;
-          const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
-          const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
-          mrrBaseTotal += getMrrBaseForMonth(monthName, year) * fraction;
-        }
 
         // === Contratos por Faixa de Faturamento (embutido no acelerômetro) ===
         const TIER_NORM: Record<string, string> = {
