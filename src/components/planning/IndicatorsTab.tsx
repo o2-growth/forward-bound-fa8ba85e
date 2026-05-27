@@ -3156,7 +3156,7 @@ export function IndicatorsTab() {
           let sum = 0;
           for (const it of vendaItemsForPace) {
             if (!it.date) continue;
-            const d: Date = it.date instanceof Date ? it.date : new Date(it.date as any);
+            const d = new Date(it.date as any);
             const t = d.getTime();
             if (t >= fromMs && t <= toMs) sum += (it.value || 0);
           }
