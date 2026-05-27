@@ -3302,14 +3302,10 @@ export function IndicatorsTab() {
               periodRealized += (mrrBaseMonth * fraction) + spRealized;
             }
 
-            // Meta: faturamentoMeta (total = MRR Base + A Vender) do Plan Growth via metasPorBU
-            let metaFaturamento = 0;
-            selectedBUs.forEach(bu => {
-              const buKey = bu as keyof typeof metasPorBU;
-              metaFaturamento += metasPorBU[buKey]?.[monthName] ?? 0;
-            });
-            periodMeta += metaFaturamento * fraction;
           }
+
+          // Meta alinhada com o acelerômetro "Fat Incremento" (respeita BU/Closer/SDR)
+          periodMeta = metaForRange(periodStart, periodEnd);
 
           cumulativeRealized += periodRealized;
           cumulativeMeta += periodMeta;
