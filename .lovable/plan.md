@@ -1,54 +1,52 @@
-## Causa raiz
+# Alinhar Meta do gráfico Faturamento com o acelerômetro Fat Incremento
 
-Confirmei via consulta direta ao Pipefy: o valor real de "Taxa de franquia" do Erenildo Jair de Oliveira é a string **`"104000.0"`** (formato US, ponto como decimal).
+## Problema
 
-Existem dois parsers diferentes lendo o mesmo campo:
+O card **Faturamento (Acumulado)** em `RevenuePaceChart` mostra hoje uma `Meta: R$ 1,5M` calculada de forma diferente do acelerômetro **Fat Incremento**:
 
-- **`useExpansaoAnalytics.ts`** (drill-down / tabela): `parseFloat("104000.0")` → **104000** ✓ → mostra **R$ 104k** corretamente.
-- **`useExpansaoMetas.ts`** (acelerômetro / gauge): função `readNum` faz `String(v).replace(/[R$\s.]/g, '').replace(',', '.')`. Isso **remove todos os pontos** (assumindo formato brasileiro "104.000") → vira `"1040000"` → **1.040.000** ✗ → o acelerômetro infla 10× para R$ 1,04M nesse card.
+- **Acelerômetro Fat Incremento** (`getMetaMonetaryForIndicator`) → usa `getMetaMonetaryForPeriod('faturamento', ...)` do hook consolidado, que respeita:
+  - BUs selecionadas
+  - Filtros de **Closer** (rateio via `closer_metas %`)
+  - Filtros de **SDR** (rateio via RM+RR meta por SDR)
+  - Lock de metas por mês, etc.
 
-Por isso o gauge mostra **R$ 1,4M** enquanto a tabela soma só **R$ 445k**: o card do Erenildo está sendo contado como R$ 1,04M no gauge e R$ 104k na tabela (diferença de ~R$ 936k, que bate com a discrepância). Isso também explica por que ao filtrar **só Franquia** o erro persiste, e por que MRR/Setup/Pontual ficam consistentes nas outras BUs — só taxaFranquia tem esse parser tóxico.
+- **Gráfico Faturamento Acumulado** (`IndicatorsTab.tsx` linhas ~3200 e ~3279) → soma direta de `metasPorBU[bu][monthName]` do Plan Growth, **ignorando** filtros de Closer/SDR e a lógica consolidada. Por isso o gráfico mostra meta inflada quando o usuário filtra um Closer/SDR específico, divergindo do acelerômetro.
 
-Os logs do console confirmam: `taxaFranquia=1040000 → valor=1040000` no `useExpansaoMetas`, mas a tabela renderiza R$ 104k.
+## Solução
 
-## O que mudar
-
-### `src/hooks/useExpansaoMetas.ts` — função `readNum` (linhas ~108-117)
-
-Trocar o parser ingênuo por um que detecta o formato do número:
-
-- Se a string contiver **vírgula** → formato BR ("1.040.000,50"): remove pontos, troca vírgula por ponto.
-- Caso contrário → formato US/numérico simples ("104000.0", "1040000"): apenas remove `R$` e espaços; **não toca nos pontos**.
-
-Pseudo-código:
+Substituir, em `src/components/planning/IndicatorsTab.tsx`, as duas somas locais de meta no bloco do `RevenuePaceChart` (~linhas 3157–3206 e 3236–3285) pelo mesmo helper usado pelo acelerômetro:
 
 ```ts
-const readNum = (...keys: string[]): number | null => {
-  for (const k of keys) {
-    const v = row[k];
-    if (v !== null && v !== undefined && v !== '') {
-      const s = String(v).replace(/[R$\s]/g, '');
-      const normalized = s.includes(',')
-        ? s.replace(/\./g, '').replace(',', '.')  // BR
-        : s;                                       // US / plain
-      const n = parseFloat(normalized);
-      if (!isNaN(n) && n > 0) return n;
-    }
-  }
-  return null;
-};
+const metaForRange = (from: Date, to: Date) =>
+  getMetaMonetaryForIndicator({
+    key: 'faturamento',
+    label: 'Fat Incremento',
+    shortLabel: 'Fat Inc.',
+    format: 'currency',
+  });
 ```
 
-Nenhuma outra mudança necessária. Não mexo em `useExpansaoAnalytics.ts` (já está correto), nem em lógica de funil, metas, MRR Base ou gráficos.
+Como `getMetaMonetaryForIndicator` é fixo no `startDate`/`endDate` globais, criar uma versão local que aceite `from`/`to` chamando diretamente `getMetaMonetaryForPeriod('faturamento', selectedBUs, from, to, closerFilter, getFilteredMeta, sdrRatio)` com o mesmo `closerFilter`/`sdrRatio` já montados no `getMetaMonetaryForIndicator`.
+
+Refatorar para extrair `closerFilter` e `sdrRatio` em um pequeno helper `buildMetaArgs()` reutilizável (evita duplicar a montagem do `sdrRatio` baseado em `BU_SDRS`/`sdrMetasList`).
+
+Usar esse helper para:
+
+1. **Header / totalMeta** (substitui o loop em 3200–3206):
+   ```ts
+   const totalMeta = metaForRange(startDate, endDate);
+   ```
+
+2. **Cada ponto do `paceChartData`** (substitui o loop em 3279–3285):
+   ```ts
+   periodMeta = metaForRange(periodStart, periodEnd);
+   ```
+   (acumulado continua via `cumulativeMeta += periodMeta`).
+
+Nada muda no `realizado`, no `mrrBase`, no `tierBreakdown` ou em outros gráficos — apenas a fonte da linha tracejada "Meta Acumulada".
 
 ## Resultado esperado
 
-- Acelerômetro "Fat Incremento" cai de R$ 1,4M para o valor correto (~R$ 445k consolidado / R$ 104k Franquia isolada), batendo com a tabela "De Onde Veio o Dinheiro?".
-- "Pontual" deixa de inflar pela mesma razão (taxaFranquia entra como pontual quando preenchida).
-- Outras BUs (Modelo Atual, O2 TAX, Oxy Hacker) seguem em 100% — não são afetadas porque os valores delas nunca passaram pelo `readNum` problemático com formato US.
-- Plan Growth e funil quantitativo não mudam.
-
-## Fora de escopo
-
-- Não altera o sub-produto exibido na tabela (já implementado na rodada anterior).
-- Não mexe em metas, redistribuição ou MRR Base.
+- A linha de **Meta Acumulada** do gráfico passa a bater exatamente com o número exibido no acelerômetro **Fat Incremento**.
+- Filtros de **BU, Closer, SDR e período** se refletem no gráfico igual ao acelerômetro.
+- Sem mudanças visuais no realizado nem em outros indicadores.
