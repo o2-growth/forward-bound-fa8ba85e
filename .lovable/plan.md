@@ -1,52 +1,40 @@
-# Alinhar Meta do gráfico Faturamento com o acelerômetro Fat Incremento
+## Objetivo
 
-## Problema
+Fazer o **Realizado** do gráfico "Faturamento Acumulado" puxar exatamente do mesmo lugar que o acelerômetro **Fat Incremento** — ou seja, dos cards de **venda do Pipefy** (`vendaItems`), respeitando os filtros de BU, Closer, SDR e Origem — em vez de buscar do Oxy Finance (DRE/daily_revenue). A meta continua vindo do `metaForRange` (já alinhado).
 
-O card **Faturamento (Acumulado)** em `RevenuePaceChart` mostra hoje uma `Meta: R$ 1,5M` calculada de forma diferente do acelerômetro **Fat Incremento**:
+## O que muda
 
-- **Acelerômetro Fat Incremento** (`getMetaMonetaryForIndicator`) → usa `getMetaMonetaryForPeriod('faturamento', ...)` do hook consolidado, que respeita:
-  - BUs selecionadas
-  - Filtros de **Closer** (rateio via `closer_metas %`)
-  - Filtros de **SDR** (rateio via RM+RR meta por SDR)
-  - Lock de metas por mês, etc.
+Em `src/components/planning/IndicatorsTab.tsx`, dentro do bloco que monta o `RevenuePaceChart` (linhas ~3140–3395):
 
-- **Gráfico Faturamento Acumulado** (`IndicatorsTab.tsx` linhas ~3200 e ~3279) → soma direta de `metasPorBU[bu][monthName]` do Plan Growth, **ignorando** filtros de Closer/SDR e a lógica consolidada. Por isso o gráfico mostra meta inflada quando o usuário filtra um Closer/SDR específico, divergindo do acelerômetro.
+1. **Remover** as fontes Oxy Finance / fallback Pipefy mistas usadas para `totalRealized` e `periodRealized`:
+   - `hasDailyRevenueData`, `getDailyRevenueForBUs`, `isTotalOverride`, `getMrrBaseForMonth`
+   - Os branches `pipefyExpansaoCards` + `allSetupPontualCards`
+   - O cálculo de `mrrBaseTotal`
 
-## Solução
+2. **Usar `vendaItems`** (já existe na linha 3359 via `getItemsForIndicator('venda')`) como única fonte do realizado. Esses items já respeitam BU/Closer/SDR/Origem, exatamente como o acelerômetro Fat Incremento (`getRealizedMonetaryForIndicator('faturamento')`).
 
-Substituir, em `src/components/planning/IndicatorsTab.tsx`, as duas somas locais de meta no bloco do `RevenuePaceChart` (~linhas 3157–3206 e 3236–3285) pelo mesmo helper usado pelo acelerômetro:
+3. **Novo cálculo do realizado**:
+   - `totalRealized = soma de vendaItems.value onde item.date ∈ [startDate, endDate]`
+   - Para cada bucket do `paceChartData` (daily/weekly/monthly):
+     - `periodRealized = soma de vendaItems.value onde item.date ∈ [periodStart, periodEnd]`
+   - Cumulativo período a período (mantém comportamento "acumulado")
 
-```ts
-const metaForRange = (from: Date, to: Date) =>
-  getMetaMonetaryForIndicator({
-    key: 'faturamento',
-    label: 'Fat Incremento',
-    shortLabel: 'Fat Inc.',
-    format: 'currency',
-  });
-```
+4. **Passar `mrrBase={0}`** ao componente (já é o caso) — o header do chart mostra `totalRealized + mrrBase`, então o número exibido baterá com o gauge.
 
-Como `getMetaMonetaryForIndicator` é fixo no `startDate`/`endDate` globais, criar uma versão local que aceite `from`/`to` chamando diretamente `getMetaMonetaryForPeriod('faturamento', selectedBUs, from, to, closerFilter, getFilteredMeta, sdrRatio)` com o mesmo `closerFilter`/`sdrRatio` já montados no `getMetaMonetaryForIndicator`.
+5. **Loading state**: remover `isLoadingDre` da condição `isLoading`; manter apenas analytics de BU + `isLoadingMrrBase` (ou tirar também já que mrrBase virou 0).
 
-Refatorar para extrair `closerFilter` e `sdrRatio` em um pequeno helper `buildMetaArgs()` reutilizável (evita duplicar a montagem do `sdrRatio` baseado em `BU_SDRS`/`sdrMetasList`).
+6. **Meta** (`totalMeta`, `periodMeta`, `metaForRange`): **sem alterações** — continua vindo de `getMetaMonetaryForPeriod('faturamento', ...)`.
 
-Usar esse helper para:
-
-1. **Header / totalMeta** (substitui o loop em 3200–3206):
-   ```ts
-   const totalMeta = metaForRange(startDate, endDate);
-   ```
-
-2. **Cada ponto do `paceChartData`** (substitui o loop em 3279–3285):
-   ```ts
-   periodMeta = metaForRange(periodStart, periodEnd);
-   ```
-   (acumulado continua via `cumulativeMeta += periodMeta`).
-
-Nada muda no `realizado`, no `mrrBase`, no `tierBreakdown` ou em outros gráficos — apenas a fonte da linha tracejada "Meta Acumulada".
+7. **Badge "DRE (Oxy Finance)"** no `RevenuePaceChart.tsx`: trocar o label para **"Pipefy (Vendas)"** para refletir a nova fonte. Ícone `Database` mantido.
 
 ## Resultado esperado
 
-- A linha de **Meta Acumulada** do gráfico passa a bater exatamente com o número exibido no acelerômetro **Fat Incremento**.
-- Filtros de **BU, Closer, SDR e período** se refletem no gráfico igual ao acelerômetro.
-- Sem mudanças visuais no realizado nem em outros indicadores.
+- O total de Realizado do gráfico = valor do acelerômetro Fat Incremento, para qualquer combinação de filtros (BU, Closer, SDR, Origem, período).
+- A linha "Realizado Acumulado" mostra o pace real das vendas Pipefy crescendo ao longo do período.
+- A linha "Meta Acumulada" continua alinhada com a meta do gauge (já estava).
+- Nenhuma mudança em outros gráficos, tier breakdown, ou na lógica de meta.
+
+## Arquivos afetados
+
+- `src/components/planning/IndicatorsTab.tsx` (bloco do RevenuePaceChart, ~linhas 3140–3395)
+- `src/components/planning/indicators/RevenuePaceChart.tsx` (texto do badge de fonte)
