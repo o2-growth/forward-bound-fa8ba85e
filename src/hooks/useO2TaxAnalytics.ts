@@ -220,7 +220,7 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
       }
 
       // Step 3: Get unique card IDs from period
-      const uniqueCardIds: string[] = [...new Set(cards.map((c: O2TaxCard) => String(c.id)))];
+      const uniqueCardIds: string[] = Array.from(new Set(cards.map((c: O2TaxCard) => String(c.id))));
 
       // Step 4: Fetch full history for these cards (depende de cards → fica sequencial).
       // Batches paralelos pra reduzir tempo de espera.
