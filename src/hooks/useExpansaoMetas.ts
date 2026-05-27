@@ -109,7 +109,13 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           for (const k of keys) {
             const v = row[k];
             if (v !== null && v !== undefined && v !== '') {
-              const n = parseFloat(String(v).replace(/[R$\s.]/g, '').replace(',', '.'));
+              const s = String(v).replace(/[R$\s]/g, '');
+              // BR format ("1.040.000,50"): strip dots (thousand sep), comma → dot.
+              // US/plain ("104000.0", "1040000"): keep dot as decimal.
+              const normalized = s.includes(',')
+                ? s.replace(/\./g, '').replace(',', '.')
+                : s;
+              const n = parseFloat(normalized);
               if (!isNaN(n) && n > 0) return n;
             }
           }
