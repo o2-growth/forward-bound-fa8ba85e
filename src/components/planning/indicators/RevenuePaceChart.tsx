@@ -74,7 +74,7 @@ export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData
             <div className="flex items-center gap-4 mt-2">
               <Badge variant="outline" className="text-xs gap-1 font-normal">
                 <Database className="h-3 w-3" />
-                DRE (Oxy Finance)
+                Pipefy (Vendas)
               </Badge>
               <div className="flex items-center gap-2"><div className="w-3 h-0.5 bg-chart-1 rounded" /><span className="text-xs text-muted-foreground">Meta Acumulada</span></div>
               <div className="flex items-center gap-2"><div className="w-3 h-0.5 bg-chart-2 rounded" /><span className="text-xs text-muted-foreground">Realizado Acumulado</span></div>
