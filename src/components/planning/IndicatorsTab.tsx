@@ -3153,9 +3153,43 @@ export function IndicatorsTab() {
         });
         const hasDreBUs = selectedBUs.some(bu => bu === 'modelo_atual' || bu === 'o2_tax');
 
+        // Helper: meta de Faturamento alinhada com o acelerômetro "Fat Incremento"
+        // — respeita filtros de BU, Closer e SDR via hook consolidado.
+        const closerFilterForMeta = effectiveSelectedClosers.length > 0 ? effectiveSelectedClosers : undefined;
+        let sdrRatioForMeta: ((bu: BuType, month: string) => number) | undefined;
+        if (effectiveSelectedSDRs.length > 0) {
+          sdrRatioForMeta = (bu: BuType, month: string) => {
+            const sdrsInBU = (BU_SDRS[bu] || []) as readonly string[];
+            if (sdrsInBU.length === 0) return 0;
+            const selectedInBU = effectiveSelectedSDRs.filter(s => sdrsInBU.includes(s));
+            if (selectedInBU.length === 0) return 0;
+            let selectedSum = 0;
+            let totalSum = 0;
+            for (const m of sdrMetasList) {
+              if (m.bu !== bu || m.month !== month) continue;
+              if (!sdrsInBU.includes(m.sdr)) continue;
+              const v = (m.rm_meta || 0) + (m.rr_meta || 0);
+              totalSum += v;
+              if (selectedInBU.includes(m.sdr)) selectedSum += v;
+            }
+            if (totalSum === 0) return selectedInBU.length / sdrsInBU.length;
+            return selectedSum / totalSum;
+          };
+        }
+        const metaForRange = (from: Date, to: Date): number =>
+          getMetaMonetaryForPeriod(
+            'faturamento',
+            selectedBUs as BuType[],
+            from,
+            to,
+            closerFilterForMeta,
+            getFilteredMeta,
+            sdrRatioForMeta as any
+          );
+
         // Calculate total realized and total meta for header
         let totalRealized = 0;
-        let totalMeta = 0;
+        const totalMeta = metaForRange(startDate, endDate);
 
         for (const monthDate of paceMonths) {
           const monthName = monthNames[getMonth(monthDate)];
@@ -3196,14 +3230,6 @@ export function IndicatorsTab() {
               .reduce((sum, c) => sum + c.setup + c.pontual, 0);
             totalRealized += (mrrBaseMonth * fraction) + allCardsRealized;
           }
-
-          // Meta: faturamentoMeta (total = MRR Base + A Vender) do Plan Growth via metasPorBU
-          let metaFaturamentoMonth = 0;
-          selectedBUs.forEach(bu => {
-            const buKey = bu as keyof typeof metasPorBU;
-            metaFaturamentoMonth += metasPorBU[buKey]?.[monthName] ?? 0;
-          });
-          totalMeta += metaFaturamentoMonth * fraction;
         }
 
         const paceFraction = daysInPeriod > 0 ? daysElapsed / daysInPeriod : 0;
