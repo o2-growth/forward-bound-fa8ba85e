@@ -3111,47 +3111,9 @@ export function IndicatorsTab() {
           daysInPeriod
         );
 
-        // === New logic: Faturamento = MRR Base (tabela) + Setup + Pontual ===
-        // Build per-month data for both realized and meta
-
-        const paceMonths = eachMonthOfInterval({ start: startDate, end: endDate });
-
-        // Get realized setup + pontual cards with dates
-        const getSetupPontualCardsForBU = (bu: BUType): { date: Date; setup: number; pontual: number }[] => {
-          if (bu === 'modelo_atual' && includesModeloAtual) {
-            const cards = modeloAtualAnalytics.getCardsForIndicator('venda');
-            const filtered = selectedClosers.length > 0
-              ? cards.filter(card => matchesCloserFilter((card.closer || '').trim()))
-              : cards;
-            return filtered.map(c => ({ date: c.dataEntrada, setup: c.valorSetup || 0, pontual: c.valorPontual || 0 }));
-          }
-          if (bu === 'o2_tax' && includesO2Tax) {
-            const cards = o2TaxAnalytics.getCardsForIndicator('venda');
-            return cards.map(c => ({ date: c.dataEntrada, setup: c.valorSetup || 0, pontual: c.valorPontual || 0 }));
-          }
-          if (bu === 'oxy_hacker' && includesOxyHacker) {
-            const items = oxyHackerAnalytics.getDetailItemsForIndicator('venda');
-            return items.map(i => ({ date: i.date ? new Date(i.date) : new Date(), setup: 0, pontual: i.pontual || i.value || 0 }));
-          }
-          if (bu === 'franquia' && includesFranquia) {
-            const items = franquiaAnalytics.getDetailItemsForIndicator('venda');
-            return items.map(i => ({ date: i.date ? new Date(i.date) : new Date(), setup: 0, pontual: i.pontual || i.value || 0 }));
-          }
-          return [];
-        };
-
-        const allSetupPontualCards: { date: Date; setup: number; pontual: number }[] = [];
-        selectedBUs.forEach(bu => {
-          allSetupPontualCards.push(...getSetupPontualCardsForBU(bu));
-        });
-
-        // Pipefy cards only for oxy_hacker/franquia (these BUs always use Pipefy, not DRE)
-        const pipefyExpansaoCards: { date: Date; setup: number; pontual: number }[] = [];
-        const pipefyBUs = selectedBUs.filter(bu => bu === 'oxy_hacker' || bu === 'franquia');
-        pipefyBUs.forEach(bu => {
-          pipefyExpansaoCards.push(...getSetupPontualCardsForBU(bu));
-        });
-        const hasDreBUs = selectedBUs.some(bu => bu === 'modelo_atual' || bu === 'o2_tax');
+        // === Realizado: agora vem dos cards de venda do Pipefy (mesma fonte do
+        // acelerômetro "Fat Incremento"), respeitando filtros BU/Closer/SDR/Origem. ===
+        const vendaItemsForPace = getItemsForIndicator('venda');
 
         // Helper: meta de Faturamento alinhada com o acelerômetro "Fat Incremento"
         // — respeita filtros de BU, Closer e SDR via hook consolidado.
@@ -3187,50 +3149,23 @@ export function IndicatorsTab() {
             sdrRatioForMeta as any
           );
 
-        // Calculate total realized and total meta for header
-        let totalRealized = 0;
-        const totalMeta = metaForRange(startDate, endDate);
-
-        for (const monthDate of paceMonths) {
-          const monthName = monthNames[getMonth(monthDate)];
-          const year = monthDate.getFullYear();
-          const monthStart = startOfMonth(monthDate);
-          const monthEnd = endOfMonth(monthDate);
-          const overlapStart = startDate > monthStart ? startDate : monthStart;
-          const overlapEnd = endDate < monthEnd ? endDate : monthEnd;
-          if (overlapStart > overlapEnd) continue;
-          const overlapDays = differenceInDays(overlapEnd, overlapStart) + 1;
-          const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
-          const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
-
-          const mrrBaseMonth = getMrrBaseForMonth(monthName, year);
-
-          // Pipefy cards for oxy_hacker/franquia — always added regardless of DRE
-          const mStart = new Date(overlapStart.getFullYear(), overlapStart.getMonth(), overlapStart.getDate()).getTime();
-          const mEnd = new Date(overlapEnd.getFullYear(), overlapEnd.getMonth(), overlapEnd.getDate(), 23, 59, 59, 999).getTime();
-          const pipefyRealized = pipefyExpansaoCards
-            .filter(c => c.date.getTime() >= mStart && c.date.getTime() <= mEnd)
-            .reduce((sum, c) => sum + c.setup + c.pontual, 0);
-
-          // DRE for modelo_atual/o2_tax
-          if (hasDailyRevenueData && hasDreBUs) {
-            const overlapDaysList = eachDayOfInterval({ start: overlapStart, end: overlapEnd });
-            let dailyTotal = 0;
-            for (const day of overlapDaysList) {
-              const key = format(day, 'yyyy-MM-dd');
-              dailyTotal += getDailyRevenueForBUs(key);
-            }
-            totalRealized += dailyTotal + pipefyRealized;
-          } else if (isTotalOverride(monthName, year)) {
-            totalRealized += (mrrBaseMonth * fraction) + pipefyRealized;
-          } else {
-            // Fallback: MRR base pro-rata + actual setup + actual pontual (all BUs)
-            const allCardsRealized = allSetupPontualCards
-              .filter(c => c.date.getTime() >= mStart && c.date.getTime() <= mEnd)
-              .reduce((sum, c) => sum + c.setup + c.pontual, 0);
-            totalRealized += (mrrBaseMonth * fraction) + allCardsRealized;
+        // Sum vendaItems whose date falls in [from, to]
+        const realizedForRange = (from: Date, to: Date): number => {
+          const fromMs = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+          const toMs = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59, 999).getTime();
+          let sum = 0;
+          for (const it of vendaItemsForPace) {
+            if (!it.date) continue;
+            const d = it.date instanceof Date ? it.date : new Date(it.date);
+            const t = d.getTime();
+            if (t >= fromMs && t <= toMs) sum += (it.value || 0);
           }
-        }
+          return sum;
+        };
+
+        // Header totals
+        const totalRealized = realizedForRange(startDate, endDate);
+        const totalMeta = metaForRange(startDate, endDate);
 
         const paceFraction = daysInPeriod > 0 ? daysElapsed / daysInPeriod : 0;
         const paceExpected = totalMeta * paceFraction;
