@@ -290,6 +290,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const seen = new Set<string>();
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
+      if (isTestCard(String(row['ID'] || ''))) continue;
       const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
       if (seen.has(key)) continue;
       const parsed = parseRawCard(row, defaultTicket);
