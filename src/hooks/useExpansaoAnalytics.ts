@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
+import { isTestCard } from "./useModeloAtualMetas";
 
 export interface ExpansaoCard {
   id: string;
