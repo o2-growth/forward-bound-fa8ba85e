@@ -12,6 +12,7 @@ import DebugCliente from "./pages/DebugCliente";
 import ComercialPreview from "./pages/ComercialPreview";
 import DebugOrigens from "./pages/DebugOrigens";
 import DebugFunnelMetas from "./pages/DebugFunnelMetas";
+import DebugOutbound from "./pages/DebugOutbound";
 import NotFound from "./pages/NotFound";
 
 // Defaults agressivos pra evitar refetch desnecessário ao trocar de aba do
@@ -91,6 +92,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DebugFunnelMetas />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/debug-outbound"
+              element={
+                <ProtectedRoute>
+                  <DebugOutbound />
                 </ProtectedRoute>
               }
             />
