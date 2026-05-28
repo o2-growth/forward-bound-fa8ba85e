@@ -1,34 +1,33 @@
-// leadSource.ts — Classificador heurístico de origem do lead (v2)
+// leadSource.ts — Classificador heurístico de origem do lead (v3)
 //
-// Regras em ORDEM de prioridade (primeiro match ganha):
-//   0) SDR-OVERRIDE — sdr = Matheus Starnick → OUTBOUND
-//      (Matheus só faz prospecção ativa; qualquer card dele é outbound,
-//      a menos que tenha sinal EXPLÍCITO de Evento — verificado antes.)
-//   1) EVENTO    — tipoOrigem/origemLead contém "evento", "talkshow", "summit",
-//                  "g4", "4am club"; campanha contém "EVENTO".
-//   2) INDICAÇÃO — tipoOrigem com "indicação"/"cross-sell"/"cliente"/"colaborador";
-//                  origemLead com "indicação"/"cross-sell"/"ex cliente"/"lead
-//                  captado pelo"/"cliente"; OU origemLead é nome de empresa
-//                  (contém sufixo tipo "advogados", "supermercados", "ltda" etc.);
-//                  OU origemLead é uma palavra só (assume empresa/marca indicada).
-//   3) OUTBOUND  — tipoOrigem com "prospecção"/"ativa"; OU origemLead é nome de
-//                  pessoa solta (2-4 palavras, sem keyword de canal nem sufixo
-//                  de empresa).
-//   4) INBOUND   — tipoOrigem "site"/"redes sociais"; origemLead com "whatsapp"/
-//                  "meta ads"/"instagram"/"site"/"google"/"facebook"; fonte
-//                  ig*/fb*/google/instagram/facebook/an/nex/chatgpt/site_source/
-//                  o2inc/audience; campanha começa com "Conversão"/"NX_" ou
-//                  contém "inbound" ou é ID numérico longo (>=8 dígitos = Meta/
-//                  Google Ads ID).
-//   5) SEM_ORIGEM — fallback (inclui fonte "direct,..." sem outro sinal).
+// Regra de ouro: OUTBOUND só com sinal EXPLÍCITO de prospecção ativa em
+// `tipoOrigem` (que o hook useOutboundAnalytics já injeta nos cards do pipe
+// Outbound). Sem SDR-override — nome de SDR não força outbound.
+//
+// Ordem de prioridade (primeiro match ganha):
+//   1) EVENTO     — tipoOrigem/origemLead contém evento/talkshow/summit/g4/4am
+//                   ou campanha contém "evento".
+//   2) OUTBOUND   — tipoOrigem contém "prospecção"/"ativa"/"outbound".
+//   3) INDICAÇÃO (explícita) — tipo/origem com indicação/cross-sell/ex cliente/
+//                   cliente/colaborador; OU origemLead é nome de empresa
+//                   (COMPANY_TOKENS); OU origemLead é palavra solta (marca).
+//   4) INBOUND    — tipo "site"/"redes sociais"; origemLead com whatsapp/meta
+//                   ads/instagram/site/google/facebook; fonte ig*/fb*/google/
+//                   instagram/facebook/an/nex/chatgpt/site_source/o2inc/
+//                   audience; campanha conversao*/nx_*/inbound/ID numérico
+//                   longo (>=8 dígitos = Meta/Google Ads).
+//   5) INDICAÇÃO (pessoa) — origemLead é nome de pessoa (2-4 palavras) sem
+//                   sinal de canal nem de inbound. Pessoa solta = indicação.
+//   6) SEM_ORIGEM — fallback.
 //
 // Exemplos:
 //   classifyLeadSource({ tipoOrigem: 'Evento', origemLead: 'G4 Summit' })       => 'evento'
+//   classifyLeadSource({ tipoOrigem: 'Prospecção Ativa' })                      => 'outbound'
 //   classifyLeadSource({ tipoOrigem: 'Indicação de cliente' })                  => 'indicacao'
-//   classifyLeadSource({ origemLead: 'Pedro Albite' })                          => 'outbound'
+//   classifyLeadSource({ origemLead: 'Pedro Albite' })                          => 'indicacao'
 //   classifyLeadSource({ origemLead: 'Galapos' })                               => 'indicacao'
 //   classifyLeadSource({ origemLead: 'Silveiro Advogados' })                    => 'indicacao'
-//   classifyLeadSource({ sdr: 'Matheus Starnick' })                             => 'outbound'
+//   classifyLeadSource({ sdr: 'Matheus Starnick' })                             => 'sem_origem'
 //   classifyLeadSource({ fonte: 'igNex' })                                      => 'inbound'
 //   classifyLeadSource({ campanha: '120238490879180418' })                      => 'inbound'
 //   classifyLeadSource({})                                                      => 'sem_origem'
