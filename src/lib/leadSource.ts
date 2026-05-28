@@ -65,14 +65,6 @@ const contains = (haystack: string, needle: string): boolean =>
 const containsAny = (haystack: string, needles: string[]): boolean =>
   haystack.length > 0 && needles.some((n) => haystack.includes(n));
 
-// SDRs que SÓ fazem outbound — qualquer card deles é classificado como
-// Outbound, salvo sinal explícito de Evento.
-const OUTBOUND_SDRS = ['matheus'];
-
-const isOutboundSdr = (sdr: string): boolean => {
-  if (!sdr) return false;
-  return OUTBOUND_SDRS.some(name => sdr.includes(name));
-};
 
 // Tokens de canal/mídia que indicam que `origemLead` NÃO é um nome de pessoa.
 const CHANNEL_TOKENS = [
