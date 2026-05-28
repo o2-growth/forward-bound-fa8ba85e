@@ -135,7 +135,7 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   const allEmpty = !tipo && !origem && !fonte && !campanha && !sdr;
   if (allEmpty) return 'sem_origem';
 
-  // 1) EVENTO — tem prioridade sobre tudo, inclusive SDR override
+  // 1) EVENTO — prioridade máxima
   if (
     containsAny(tipo, ['evento']) ||
     containsAny(origem, ['evento', 'talkshow', 'summit', 'g4', '4am']) ||
@@ -144,12 +144,14 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     return 'evento';
   }
 
-  // 0) SDR-OVERRIDE — Matheus Starnick (e outros sdrs marcados) só fazem outbound
-  if (isOutboundSdr(sdr)) {
+  // 2) OUTBOUND — apenas via sinal explícito em tipoOrigem
+  //    (useOutboundAnalytics injeta tipoOrigem="Prospecção Ativa" nos cards
+  //    do pipe Outbound, então cards desse pipe caem aqui.)
+  if (containsAny(tipo, ['prospeccao', 'ativa', 'outbound'])) {
     return 'outbound';
   }
 
-  // 2) INDICAÇÃO
+  // 3) INDICAÇÃO — sinais explícitos
   if (
     containsAny(tipo, ['indicacao', 'cross-sell', 'cross sell', 'cliente', 'colaborador']) ||
     containsAny(origem, ['indicacao', 'cross-sell', 'cross sell', 'ex cliente', 'lead captado pelo', 'cliente'])
@@ -165,14 +167,6 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     return 'indicacao';
   }
 
-  // 3) OUTBOUND
-  if (containsAny(tipo, ['prospeccao', 'ativa'])) {
-    return 'outbound';
-  }
-  if (origem && isLikelyPersonName(c.origemLead || '')) {
-    return 'outbound';
-  }
-
   // 4) INBOUND
   if (containsAny(tipo, ['site', 'redes sociais'])) {
     return 'inbound';
@@ -182,21 +176,27 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   }
   if (
     fonte === 'ig' || fonte === 'fb' || fonte === 'an' || fonte === 'nex' ||
-    fonte.startsWith('ig') || // captura igNex
-    fonte.startsWith('fb') || // captura fbNex
+    fonte.startsWith('ig') ||
+    fonte.startsWith('fb') ||
     containsAny(fonte, ['google', 'googleads', 'instagram', 'facebook', 'chatgpt', 'site_source', 'o2inc', 'audience'])
   ) {
     return 'inbound';
   }
   if (
     campanha.startsWith('conversao') ||
-    campanha.startsWith('nx_') ||           // captura NX_SEARCH, NX_CONVERSAO, NX_FORMS etc.
+    campanha.startsWith('nx_') ||
     contains(campanha, 'inbound') ||
-    isNumericAdCampaignId(campanha)         // IDs numéricos do Meta/Google → ads inbound
+    isNumericAdCampaignId(campanha)
   ) {
     return 'inbound';
   }
 
-  // 5) Fallback (inclui fonte "direct,..." sem outro sinal — Q1 user)
+  // 5) INDICAÇÃO (fallback) — origemLead é nome de pessoa solta sem sinal de
+  //    canal/inbound. Pessoa indicando = indicação, não outbound.
+  if (origem && isLikelyPersonName(c.origemLead || '')) {
+    return 'indicacao';
+  }
+
+  // 6) Fallback
   return 'sem_origem';
 }
