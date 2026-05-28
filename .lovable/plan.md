@@ -1,49 +1,31 @@
-
 ## Objetivo
 
-Corrigir o classificador de origem (`src/lib/leadSource.ts`) para parar de mandar leads inbound/indicação pro bucket Outbound. Nenhuma alteração em pipes, fases ou estrutura no Pipefy — só lógica de classificação no frontend.
+Remover o card "G4" (ID Pipefy `1342531906`) das vendas do mês passado — e, por consequência, de qualquer métrica que conte cards Pipefy (vendas, funil, MQL, monetários de Expansão).
+
+## Diagnóstico
+
+- O projeto já tem uma lista fixa de IDs em `src/hooks/useModeloAtualMetas.ts` (`TEST_CARD_IDS` + função `isTestCard`) — é o mecanismo padrão de exclusão (memory core: "Test cards are excluded from all metrics via fixed ID list in 'isTestCard'").
+- Hoje `isTestCard` é aplicado em **Modelo Atual** (MQL count). Não está sendo aplicado em **Expansão** (`useExpansaoAnalytics.ts`), que é onde um card G4 (canal eventos / Expansão) entra na contagem de vendas, MRR, Setup, Pontual e funil.
+- Modelo Atual e O2 TAX puxam **receita** do Oxy Finance API (não do card Pipefy), então excluir o ID lá não afeta MRR/Setup realizado. Mas afeta MQL/funil/contagem de vendas, que é o pedido.
+- Expansão puxa receita **diretamente dos campos do card** (`Valor MRR`, `Valor Setup`, `Valor Pontual`, `Taxa de franquia`) — adicionar exclusão no loop de `cards` zera a contribuição do G4 em todos os monetários e no funil Expansão.
 
 ## Mudanças
 
-### 1. `src/lib/leadSource.ts` — nova ordem de prioridade
+### 1. `src/hooks/useModeloAtualMetas.ts`
+Adicionar `'1342531906'` ao `TEST_CARD_IDS` (linha 57).
 
-Primeiro match ganha:
+### 2. `src/hooks/useExpansaoAnalytics.ts`
+- Importar `isTestCard` de `./useModeloAtualMetas`.
+- No loop de construção de `cards` (linha ~291) e `fullHistory` (linha ~306), pular `if (isTestCard(String(row['ID'])))`.
+- Isso garante que o G4 não entre em: vendas Expansão, funil Expansão, MRR/Setup/Pontual Expansão, drill-downs.
 
-1. **EVENTO** — `tipoOrigem`/`origemLead`/`campanha` contém `evento`, `talkshow`, `summit`, `g4`, `4am`.
-2. **OUTBOUND** — apenas 2 gatilhos:
-   - `tipoOrigem` contém `prospecção`/`ativa`/`outbound`, OU
-   - `tipoOrigem === "Prospecção Ativa"` (marca que `useOutboundAnalytics` já injeta nos cards do pipe Outbound).
-   - **Remover** o override "SDR Matheus → outbound". O pipe CFO Modelo Atual deixa de forçar Matheus como outbound; só o pipe Outbound (via marca explícita) classifica como outbound.
-3. **INDICAÇÃO**:
-   - `tipoOrigem`/`origemLead` com `indicacao`, `cross-sell`, `ex cliente`, `lead captado pelo`, `cliente`, `colaborador`; OU
-   - `origemLead` parece nome de empresa (sufixos atuais do `COMPANY_TOKENS`); OU
-   - `origemLead` é uma palavra só (marca/empresa); OU
-   - **NOVO**: `origemLead` é nome de pessoa (2-4 palavras, sem token de canal, sem sufixo empresa) e **não há nenhum sinal de inbound** (`fonte`/`campanha` vazios e `tipoOrigem` vazio ou genérico). Pessoa solta = indicação, não outbound.
-4. **INBOUND** — regras atuais (tipo `site`/`redes sociais`, origem `whatsapp`/`meta ads`/`google`/etc., `fonte` ig*/fb*/google/..., `campanha` `conversao*`/`NX_*`/ID numérico longo/`inbound`).
-5. **SEM_ORIGEM** — fallback.
+### Fora de escopo
+- Não mexer em Pipefy.
+- Não mexer em Oxy Finance / `sales_realized` (Modelo Atual e O2 TAX usam fontes externas; o card G4 é Expansão segundo padrão de naming).
+- Não criar UI de administração de exclusões (continua via lista fixa, como hoje).
 
-### 2. Manter intocado
+## Validação
 
-- `src/hooks/useOutboundAnalytics.ts` — continua marcando `tipoOrigem = "Prospecção Ativa"` nos cards do pipe Outbound. Esses cards entram pela regra 2 acima.
-- Pipefy: nenhuma alteração de pipe, fase, campo ou automação.
-- Demais hooks (`useModeloAtualAnalytics`, `useO2TaxAnalytics`, `useExpansaoAnalytics`) — sem mudança; o classificador é puro e roda no frontend.
-
-### 3. Comentários e docstring
-
-Atualizar o cabeçalho do arquivo explicando a nova regra de ouro: **outbound = prospecção ativa explícita OU vindo do pipe Outbound**. Remover menção ao SDR-override.
-
-## Impacto esperado (sobre amostra de 11.722 cards 2025+)
-
-| Bucket      | Antes  | Depois (estimado) |
-|-------------|--------|-------------------|
-| inbound     | 9.487  | ~9.512            |
-| evento      | 1.144  | 1.144             |
-| sem_origem  | 944    | 944               |
-| outbound    | 82     | ~2 (só prospecção ativa real + pipe Outbound) |
-| indicacao   | 65     | ~120 (parceiros + nomes de pessoa)            |
-
-## Validação após implementação
-
-1. Build passa.
-2. Abrir `/debug-origens` e `/debug-outbound` para conferir nova distribuição visualmente.
-3. Conferir aba Marketing → cards de atribuição (Inbound/Outbound/Indicação/Evento) com período cobrindo 2025+ — Outbound deve cair pra ~2-5 cards e refletir só prospecção ativa real.
+- Abrir Dashboard → Comercial → BU Expansão no mês passado: verificar que a venda do G4 sumiu (contagem -1, valores monetários reduzidos).
+- Funil Expansão do mês: G4 não aparece nas fases.
+- Build passa sem erro.
