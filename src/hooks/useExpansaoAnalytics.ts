@@ -306,6 +306,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const rows = data?.historyRows || [];
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
+      if (isTestCard(String(row['ID'] || ''))) continue;
       const parsed = parseRawCard(row, defaultTicket);
       if (parsed.produto !== produto) continue;
       out.push(parsed);
