@@ -1,34 +1,33 @@
-// leadSource.ts — Classificador heurístico de origem do lead (v2)
+// leadSource.ts — Classificador heurístico de origem do lead (v3)
 //
-// Regras em ORDEM de prioridade (primeiro match ganha):
-//   0) SDR-OVERRIDE — sdr = Matheus Starnick → OUTBOUND
-//      (Matheus só faz prospecção ativa; qualquer card dele é outbound,
-//      a menos que tenha sinal EXPLÍCITO de Evento — verificado antes.)
-//   1) EVENTO    — tipoOrigem/origemLead contém "evento", "talkshow", "summit",
-//                  "g4", "4am club"; campanha contém "EVENTO".
-//   2) INDICAÇÃO — tipoOrigem com "indicação"/"cross-sell"/"cliente"/"colaborador";
-//                  origemLead com "indicação"/"cross-sell"/"ex cliente"/"lead
-//                  captado pelo"/"cliente"; OU origemLead é nome de empresa
-//                  (contém sufixo tipo "advogados", "supermercados", "ltda" etc.);
-//                  OU origemLead é uma palavra só (assume empresa/marca indicada).
-//   3) OUTBOUND  — tipoOrigem com "prospecção"/"ativa"; OU origemLead é nome de
-//                  pessoa solta (2-4 palavras, sem keyword de canal nem sufixo
-//                  de empresa).
-//   4) INBOUND   — tipoOrigem "site"/"redes sociais"; origemLead com "whatsapp"/
-//                  "meta ads"/"instagram"/"site"/"google"/"facebook"; fonte
-//                  ig*/fb*/google/instagram/facebook/an/nex/chatgpt/site_source/
-//                  o2inc/audience; campanha começa com "Conversão"/"NX_" ou
-//                  contém "inbound" ou é ID numérico longo (>=8 dígitos = Meta/
-//                  Google Ads ID).
-//   5) SEM_ORIGEM — fallback (inclui fonte "direct,..." sem outro sinal).
+// Regra de ouro: OUTBOUND só com sinal EXPLÍCITO de prospecção ativa em
+// `tipoOrigem` (que o hook useOutboundAnalytics já injeta nos cards do pipe
+// Outbound). Sem SDR-override — nome de SDR não força outbound.
+//
+// Ordem de prioridade (primeiro match ganha):
+//   1) EVENTO     — tipoOrigem/origemLead contém evento/talkshow/summit/g4/4am
+//                   ou campanha contém "evento".
+//   2) OUTBOUND   — tipoOrigem contém "prospecção"/"ativa"/"outbound".
+//   3) INDICAÇÃO (explícita) — tipo/origem com indicação/cross-sell/ex cliente/
+//                   cliente/colaborador; OU origemLead é nome de empresa
+//                   (COMPANY_TOKENS); OU origemLead é palavra solta (marca).
+//   4) INBOUND    — tipo "site"/"redes sociais"; origemLead com whatsapp/meta
+//                   ads/instagram/site/google/facebook; fonte ig*/fb*/google/
+//                   instagram/facebook/an/nex/chatgpt/site_source/o2inc/
+//                   audience; campanha conversao*/nx_*/inbound/ID numérico
+//                   longo (>=8 dígitos = Meta/Google Ads).
+//   5) INDICAÇÃO (pessoa) — origemLead é nome de pessoa (2-4 palavras) sem
+//                   sinal de canal nem de inbound. Pessoa solta = indicação.
+//   6) SEM_ORIGEM — fallback.
 //
 // Exemplos:
 //   classifyLeadSource({ tipoOrigem: 'Evento', origemLead: 'G4 Summit' })       => 'evento'
+//   classifyLeadSource({ tipoOrigem: 'Prospecção Ativa' })                      => 'outbound'
 //   classifyLeadSource({ tipoOrigem: 'Indicação de cliente' })                  => 'indicacao'
-//   classifyLeadSource({ origemLead: 'Pedro Albite' })                          => 'outbound'
+//   classifyLeadSource({ origemLead: 'Pedro Albite' })                          => 'indicacao'
 //   classifyLeadSource({ origemLead: 'Galapos' })                               => 'indicacao'
 //   classifyLeadSource({ origemLead: 'Silveiro Advogados' })                    => 'indicacao'
-//   classifyLeadSource({ sdr: 'Matheus Starnick' })                             => 'outbound'
+//   classifyLeadSource({ sdr: 'Matheus Starnick' })                             => 'sem_origem'
 //   classifyLeadSource({ fonte: 'igNex' })                                      => 'inbound'
 //   classifyLeadSource({ campanha: '120238490879180418' })                      => 'inbound'
 //   classifyLeadSource({})                                                      => 'sem_origem'
@@ -66,14 +65,6 @@ const contains = (haystack: string, needle: string): boolean =>
 const containsAny = (haystack: string, needles: string[]): boolean =>
   haystack.length > 0 && needles.some((n) => haystack.includes(n));
 
-// SDRs que SÓ fazem outbound — qualquer card deles é classificado como
-// Outbound, salvo sinal explícito de Evento.
-const OUTBOUND_SDRS = ['matheus'];
-
-const isOutboundSdr = (sdr: string): boolean => {
-  if (!sdr) return false;
-  return OUTBOUND_SDRS.some(name => sdr.includes(name));
-};
 
 // Tokens de canal/mídia que indicam que `origemLead` NÃO é um nome de pessoa.
 const CHANNEL_TOKENS = [
@@ -136,7 +127,7 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   const allEmpty = !tipo && !origem && !fonte && !campanha && !sdr;
   if (allEmpty) return 'sem_origem';
 
-  // 1) EVENTO — tem prioridade sobre tudo, inclusive SDR override
+  // 1) EVENTO — prioridade máxima
   if (
     containsAny(tipo, ['evento']) ||
     containsAny(origem, ['evento', 'talkshow', 'summit', 'g4', '4am']) ||
@@ -145,12 +136,14 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     return 'evento';
   }
 
-  // 0) SDR-OVERRIDE — Matheus Starnick (e outros sdrs marcados) só fazem outbound
-  if (isOutboundSdr(sdr)) {
+  // 2) OUTBOUND — apenas via sinal explícito em tipoOrigem
+  //    (useOutboundAnalytics injeta tipoOrigem="Prospecção Ativa" nos cards
+  //    do pipe Outbound, então cards desse pipe caem aqui.)
+  if (containsAny(tipo, ['prospeccao', 'ativa', 'outbound'])) {
     return 'outbound';
   }
 
-  // 2) INDICAÇÃO
+  // 3) INDICAÇÃO — sinais explícitos
   if (
     containsAny(tipo, ['indicacao', 'cross-sell', 'cross sell', 'cliente', 'colaborador']) ||
     containsAny(origem, ['indicacao', 'cross-sell', 'cross sell', 'ex cliente', 'lead captado pelo', 'cliente'])
@@ -166,14 +159,6 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     return 'indicacao';
   }
 
-  // 3) OUTBOUND
-  if (containsAny(tipo, ['prospeccao', 'ativa'])) {
-    return 'outbound';
-  }
-  if (origem && isLikelyPersonName(c.origemLead || '')) {
-    return 'outbound';
-  }
-
   // 4) INBOUND
   if (containsAny(tipo, ['site', 'redes sociais'])) {
     return 'inbound';
@@ -183,21 +168,27 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   }
   if (
     fonte === 'ig' || fonte === 'fb' || fonte === 'an' || fonte === 'nex' ||
-    fonte.startsWith('ig') || // captura igNex
-    fonte.startsWith('fb') || // captura fbNex
+    fonte.startsWith('ig') ||
+    fonte.startsWith('fb') ||
     containsAny(fonte, ['google', 'googleads', 'instagram', 'facebook', 'chatgpt', 'site_source', 'o2inc', 'audience'])
   ) {
     return 'inbound';
   }
   if (
     campanha.startsWith('conversao') ||
-    campanha.startsWith('nx_') ||           // captura NX_SEARCH, NX_CONVERSAO, NX_FORMS etc.
+    campanha.startsWith('nx_') ||
     contains(campanha, 'inbound') ||
-    isNumericAdCampaignId(campanha)         // IDs numéricos do Meta/Google → ads inbound
+    isNumericAdCampaignId(campanha)
   ) {
     return 'inbound';
   }
 
-  // 5) Fallback (inclui fonte "direct,..." sem outro sinal — Q1 user)
+  // 5) INDICAÇÃO (fallback) — origemLead é nome de pessoa solta sem sinal de
+  //    canal/inbound. Pessoa indicando = indicação, não outbound.
+  if (origem && isLikelyPersonName(c.origemLead || '')) {
+    return 'indicacao';
+  }
+
+  // 6) Fallback
   return 'sem_origem';
 }
