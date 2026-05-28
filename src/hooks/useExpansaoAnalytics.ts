@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
+import { isTestCard } from "./useModeloAtualMetas";
 
 export interface ExpansaoCard {
   id: string;
@@ -289,6 +290,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const seen = new Set<string>();
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
+      if (isTestCard(String(row['ID'] || ''))) continue;
       const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
       if (seen.has(key)) continue;
       const parsed = parseRawCard(row, defaultTicket);
@@ -304,6 +306,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const rows = data?.historyRows || [];
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
+      if (isTestCard(String(row['ID'] || ''))) continue;
       const parsed = parseRawCard(row, defaultTicket);
       if (parsed.produto !== produto) continue;
       out.push(parsed);
