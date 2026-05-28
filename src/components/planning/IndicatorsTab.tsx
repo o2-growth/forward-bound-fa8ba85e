@@ -707,6 +707,7 @@ export function IndicatorsTab() {
       origemLead: card.origemLead,
       fonte: card.fonte,
       campanha: card.campanha,
+      sdr: card.responsavel || card.sdr,
     });
     return selectedOrigens.includes(source);
   };

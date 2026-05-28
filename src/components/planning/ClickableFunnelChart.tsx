@@ -62,6 +62,7 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
       origemLead: card.origemLead,
       fonte: card.fonte,
       campanha: card.campanha,
+      sdr: card.responsavel || card.sdr,
     });
     return selectedOrigens.includes(src);
   };
