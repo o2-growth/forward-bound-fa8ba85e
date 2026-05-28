@@ -14,6 +14,7 @@ import { useMediaMetas } from "@/contexts/MediaMetasContext";
 import { useConsolidatedMetas, ConsolidatedMetricType } from "@/hooks/useConsolidatedMetas";
 import { useMrrBase } from "@/hooks/useMrrBase";
 import { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
+import { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
@@ -441,10 +442,32 @@ export function IndicatorsTab() {
   const { getQtyForPeriod: getOxyHackerQty, getValueForPeriod: getOxyHackerValue, getGroupedData: getOxyHackerGroupedData, isLoading: isLoadingOxyHacker } = useOxyHackerMetas(startDate, endDate);
   
   // Analytics hooks for drill-down
-  const modeloAtualAnalytics = useModeloAtualAnalytics(startDate, endDate);
+  const modeloAtualAnalyticsRaw = useModeloAtualAnalytics(startDate, endDate);
+  const outboundAnalytics = useOutboundAnalytics(startDate, endDate);
   const o2TaxAnalytics = useO2TaxAnalytics(startDate, endDate);
   const franquiaAnalytics = useExpansaoAnalytics(startDate, endDate, 'Franquia');
   const oxyHackerAnalytics = useExpansaoAnalytics(startDate, endDate, 'Oxy Hacker');
+
+  // Combina Modelo Atual + Outbound: cards do pipe `pipefy_moviment_outbound`
+  // são tratados como extensão do Modelo Atual (mesma BU, origem = Outbound).
+  // Todos os call-sites que antes usavam modeloAtualAnalytics passam a usar
+  // este objeto combinado — gauges, funilzinho, comparativo semanal, rank, etc.
+  // Quando o filtro Origem = "Outbound", o classifier reconhece os cards pelo
+  // tipoOrigem="Prospecção Ativa" + SDR=Matheus injetados em parseOutboundRow.
+  const modeloAtualAnalytics = useMemo(() => ({
+    ...modeloAtualAnalyticsRaw,
+    cards: [...modeloAtualAnalyticsRaw.cards, ...outboundAnalytics.cards],
+    isLoading: modeloAtualAnalyticsRaw.isLoading || outboundAnalytics.isLoading,
+    getCardsForIndicator: (ind: IndicatorType) => [
+      ...modeloAtualAnalyticsRaw.getCardsForIndicator(ind),
+      ...outboundAnalytics.getCardsForIndicator(ind),
+    ],
+    getDetailItemsForIndicator: (ind: IndicatorType) => [
+      ...modeloAtualAnalyticsRaw.getDetailItemsForIndicator(ind),
+      ...outboundAnalytics.getDetailItemsForIndicator(ind),
+    ],
+    // getDetailItemsWithFullHistory permanece do hook original (outbound não tem fullHistory).
+  }), [modeloAtualAnalyticsRaw, outboundAnalytics]);
   
   // Get funnelData from MediaMetasContext for dynamic metas
   const { funnelData, metasPorBU } = useMediaMetas();
