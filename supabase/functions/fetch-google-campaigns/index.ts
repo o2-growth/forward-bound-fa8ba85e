@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const GOOGLE_ADS_API_VERSION = "v22";
+const CACHE_VERSION = "v2";
 const CACHE_TTL_MINUTES = 60;
 
 function getSupabaseClient() {
