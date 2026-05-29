@@ -40,6 +40,20 @@ function CustomerSuccessTabInner() {
   const { filters, setFilters, clearFilters } = useCustomerSuccessFilters();
   const [activeTab, setActiveTab] = useState('visao-geral');
 
+  // CFO lock-in: usuários com role 'cfo' são travados no seu próprio nome
+  const { user } = useAuth();
+  const { isCfo } = useUserPermissions(user?.id);
+  const { data: lockedCfoName, isLoading: cfoNameLoading } = useMyCfoName(!!isCfo);
+
+  useEffect(() => {
+    if (isCfo && lockedCfoName) {
+      // Garante que o filtro inicia (e permanece) travado no nome do CFO logado
+      if (filters.cfos.length !== 1 || filters.cfos[0] !== lockedCfoName) {
+        setFilters({ cfos: [lockedCfoName] });
+      }
+    }
+  }, [isCfo, lockedCfoName, filters.cfos, setFilters]);
+
   // Date range for CS filtering (same pattern as Indicadores Comercial)
   // `now` é estável (computado uma vez por instância de componente) — usado apenas
   // para inicializar o range default.
