@@ -42,9 +42,9 @@ export function CfoMappingTab() {
   const { data: mappings, isLoading: mappingsLoading } = useQuery({
     queryKey: ['cfo-user-mappings'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('cfo_user_mapping' as any).select('user_id, cfo_name');
+      const { data, error } = await (supabase as any).from('cfo_user_mapping').select('user_id, cfo_name');
       if (error) throw error;
-      return (data || []) as MappingRow[];
+      return ((data || []) as unknown) as MappingRow[];
     },
   });
 
