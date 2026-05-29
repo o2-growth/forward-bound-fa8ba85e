@@ -9,7 +9,7 @@ export function useMyCfoName(enabled: boolean) {
   return useQuery({
     queryKey: ['my-cfo-name'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_my_cfo_name');
+      const { data, error } = await (supabase as any).rpc('get_my_cfo_name');
       if (error) throw error;
       return (data as string | null) ?? null;
     },
