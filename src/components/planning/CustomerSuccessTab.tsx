@@ -396,7 +396,9 @@ function CustomerSuccessTabInner() {
                 {filters.cfos.map(c => (
                   <Badge key={c} variant="default" className="gap-1 text-xs">
                     {c}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => setFilters({ cfos: filters.cfos.filter(x => x !== c) })} />
+                    {!isCfo && (
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFilters({ cfos: filters.cfos.filter(x => x !== c) })} />
+                    )}
                   </Badge>
                 ))}
                 {filters.produtos.map(p => (
@@ -406,9 +408,11 @@ function CustomerSuccessTabInner() {
                   </Badge>
                 ))}
               </div>
-              <Button variant="ghost" size="sm" className="text-xs" onClick={handleClearFilters}>
-                Limpar
-              </Button>
+              {!isCfo && (
+                <Button variant="ghost" size="sm" className="text-xs" onClick={handleClearFilters}>
+                  Limpar
+                </Button>
+              )}
             </>
           )}
 
