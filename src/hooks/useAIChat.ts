@@ -102,19 +102,42 @@ export function useAIChat(opts: {
 
       const conversation = convInserted as AIConversation;
 
-      const seedMessages = [
+      // Extrai dossiê do metadata para injetar como contexto permanente da conversa.
+      const meta = initial.metadata ?? {};
+      const dossier =
+        (meta as any).cliente360 ?? (meta as any).dossie ?? (meta as any).dossier ?? null;
+
+      const seedMessages: Array<{
+        conversation_id: string;
+        role: "system" | "user" | "assistant";
+        content: string;
+        metadata?: Record<string, any> | null;
+      }> = [
         {
           conversation_id: conversation.id,
-          role: "system" as const,
+          role: "system",
           content: systemPromptFor(contextType),
         },
-        {
-          conversation_id: conversation.id,
-          role: "assistant" as const,
-          content: initial.analysis,
-          metadata: initial.metadata ?? null,
-        },
       ];
+
+      if (dossier) {
+        seedMessages.push({
+          conversation_id: conversation.id,
+          role: "user",
+          content:
+            "DOSSIÊ COMPLETO (referência permanente — use SEMPRE este JSON como fonte da verdade para responder qualquer pergunta sobre o cliente: nome, CNPJ, valores, datas, responsáveis, histórico, etc.):\n\n```json\n" +
+            JSON.stringify(dossier, null, 2) +
+            "\n```",
+          metadata: { hidden: true, kind: "dossier" },
+        });
+      }
+
+      seedMessages.push({
+        conversation_id: conversation.id,
+        role: "assistant",
+        content: initial.analysis,
+        metadata: initial.metadata ?? null,
+      });
 
       const { data: insertedMsgs, error: insMsgErr } = await supabase
         .from("ai_messages")
