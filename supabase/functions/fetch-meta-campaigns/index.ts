@@ -9,6 +9,9 @@ const corsHeaders = {
 const META_API_VERSION = "v21.0";
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 const CACHE_TTL_MINUTES = 60;
+const CACHE_VERSION = "v2";
+const CAMPAIGNS_PAGE_LIMIT = 500;
+const CAMPAIGNS_HARD_CAP = 5000;
 const BATCH_SIZE = 5;
 const BATCH_DELAY_MS = 300;
 
