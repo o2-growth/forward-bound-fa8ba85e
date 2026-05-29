@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 const GOOGLE_ADS_API_VERSION = "v22";
+const CACHE_VERSION = "v2";
 const CACHE_TTL_MINUTES = 60;
 
 function getSupabaseClient() {
@@ -107,7 +108,7 @@ serve(async (req) => {
     console.log("Fetching Google Ads campaigns:", { customerId, startDate, endDate });
 
     const supabase = getSupabaseClient();
-    const cacheKey = `google:campaigns:${customerId}:${startDate}:${endDate}`;
+    const cacheKey = `${CACHE_VERSION}:google:campaigns:${customerId}:${startDate}:${endDate}`;
     const cached = await getCachedData(supabase, cacheKey);
     if (cached) {
       console.log(`Cache HIT for ${cacheKey}`);
@@ -118,13 +119,14 @@ serve(async (req) => {
 
     const accessToken = await getAccessToken();
 
+    // Sem filtro de status: queremos TODAS as campanhas com spend no período (inclusive REMOVED/PAUSED arquivadas).
+    // O WHERE segments.date já garante que só vêm linhas com atividade no intervalo.
     const query = `
       SELECT campaign.id, campaign.name, campaign.status,
              metrics.cost_micros, metrics.impressions, metrics.clicks,
              metrics.conversions, metrics.ctr, metrics.average_cpc
       FROM campaign
       WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'
-        AND campaign.status IN ('ENABLED', 'PAUSED')
     `;
 
     const rows = await queryGoogleAds(accessToken, customerId, query);
