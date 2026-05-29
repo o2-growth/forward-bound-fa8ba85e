@@ -108,7 +108,7 @@ export function CfoMappingTab() {
   const removeMapping = useMutation({
     mutationFn: async (userId: string) => {
       // 1) Remove mapping
-      const { error: mapErr } = await supabase.from('cfo_user_mapping' as any).delete().eq('user_id', userId);
+      const { error: mapErr } = await (supabase as any).from('cfo_user_mapping').delete().eq('user_id', userId);
       if (mapErr) throw mapErr;
       // 2) Volta para role 'user'
       await supabase.from('user_roles').delete().eq('user_id', userId).eq('role', 'cfo');
