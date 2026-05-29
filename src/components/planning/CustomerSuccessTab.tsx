@@ -332,16 +332,18 @@ function CustomerSuccessTabInner() {
           <Select
             value={filters.cfos.length === 1 ? filters.cfos[0] : filters.cfos.length > 1 ? '__multi__' : 'all'}
             onValueChange={(v) => {
+              if (isCfo) return; // travado para CFOs
               if (v === 'all') setFilters({ cfos: [] });
               else setFilters({ cfos: [v] });
             }}
+            disabled={isCfo}
           >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="CFO" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os CFOs</SelectItem>
-              {allCfos.map(cfo => (
+              {!isCfo && <SelectItem value="all">Todos os CFOs</SelectItem>}
+              {(isCfo && lockedCfoName ? [lockedCfoName] : allCfos).map(cfo => (
                 <SelectItem key={cfo} value={cfo}>{cfo}</SelectItem>
               ))}
             </SelectContent>
