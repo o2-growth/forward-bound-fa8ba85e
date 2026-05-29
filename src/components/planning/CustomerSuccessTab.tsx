@@ -281,7 +281,7 @@ function CustomerSuccessTabInner() {
   const isLoading = jornadaLoading || npsLoading;
   const error = jornadaError || npsError;
 
-  if (isLoading) {
+  if (isLoading || (isCfo && cfoNameLoading)) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -294,6 +294,20 @@ function CustomerSuccessTabInner() {
     return (
       <div className="text-center py-20 text-destructive">
         Erro ao carregar dados: {(error as Error).message}
+      </div>
+    );
+  }
+
+  // CFO sem mapeamento: bloqueia acesso e orienta a falar com admin
+  if (isCfo && !lockedCfoName) {
+    return (
+      <div className="max-w-xl mx-auto py-16 text-center space-y-3">
+        <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
+        <h3 className="text-lg font-semibold">Usuário CFO sem vínculo</h3>
+        <p className="text-sm text-muted-foreground">
+          Sua conta está marcada como CFO mas ainda não foi vinculada a um nome de CFO no Pipefy.
+          Solicite ao administrador o vínculo na aba Admin → Acessos CFO.
+        </p>
       </div>
     );
   }
