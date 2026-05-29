@@ -41,7 +41,7 @@ const HIDDEN_TABS: TabKey[] = ['context', 'goals', 'financial', 'marketing', 'st
 
 export default function Planning2026() {
   const { user, signOut } = useAuth();
-  const { allowedTabs, isAdmin, loading } = useUserPermissions(user?.id);
+  const { allowedTabs, isAdmin, isCfo, loading } = useUserPermissions(user?.id);
   const [showHiddenTabs, setShowHiddenTabs] = useState(false);
 
   const handleSignOut = async () => {
@@ -82,25 +82,27 @@ export default function Planning2026() {
             <div className="flex items-center gap-2">
               <ThemeToggle />
               
-              {/* Hidden tabs toggle */}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowHiddenTabs(!showHiddenTabs)}
-                className="gap-2 text-muted-foreground"
-              >
-                {showHiddenTabs ? (
-                  <>
-                    <EyeOff className="h-4 w-4" />
-                    <span className="hidden sm:inline">Ocultar abas extras</span>
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4" />
-                    <span className="hidden sm:inline">Mostrar abas ocultas</span>
-                  </>
-                )}
-              </Button>
+              {/* Hidden tabs toggle — escondido para usuários CFO */}
+              {!isCfo && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowHiddenTabs(!showHiddenTabs)}
+                  className="gap-2 text-muted-foreground"
+                >
+                  {showHiddenTabs ? (
+                    <>
+                      <EyeOff className="h-4 w-4" />
+                      <span className="hidden sm:inline">Ocultar abas extras</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="h-4 w-4" />
+                      <span className="hidden sm:inline">Mostrar abas ocultas</span>
+                    </>
+                  )}
+                </Button>
+              )}
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
