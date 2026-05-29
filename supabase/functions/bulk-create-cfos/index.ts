@@ -6,13 +6,7 @@ const corsHeaders = {
 };
 
 const CFOS = [
-  { email: 'douglas.schossler@o2inc.com.br', name: 'Douglas Pinheiro Schossler' },
-  { email: 'rafael.marchioretto@o2inc.com.br', name: 'Rafael Marchioretto Bokorni' },
-  { email: 'oliveira@o2inc.com.br', name: 'Adivilso Souza de Oliveira Junior' },
-  { email: 'everton.bisinella@o2inc.com.br', name: 'Everton Bisinella' },
-  { email: 'gustavo.cochlar@o2inc.com.br', name: 'Gustavo Ferreira Cochlar' },
-  { email: 'mariana.luz@o2inc.com.br', name: 'Mariana Luz da Silva' },
-  { email: 'joseane.sartori@o2inc.com.br', name: 'Joseane Sartori' },
+  { email: 'eduardo.pedrolo@o2inc.com.br', name: 'Eduardo Milani Pedrolo' },
 ];
 
 function genPassword(): string {
