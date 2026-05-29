@@ -1989,7 +1989,11 @@ export function IndicatorsTab() {
         
         // Calculate TCV for each item and cycle
         const itemsWithTCV = items.map(item => {
-          const cicloVenda = item.duration ? Math.floor(item.duration / 86400) : 0;
+          const cicloVenda = (() => {
+            if (!item.dataAssinatura || !item.dataCriacao) return 0;
+            const ms = new Date(item.dataAssinatura).getTime() - new Date(item.dataCriacao).getTime();
+            return ms > 0 ? Math.floor(ms / 86_400_000) : 0;
+          })();
           const itemTCV = ((item.mrr || 0) * 12) + (item.setup || 0) + (item.pontual || 0);
           return { ...item, cicloVenda, value: itemTCV };
         });

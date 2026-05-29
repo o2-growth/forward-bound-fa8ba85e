@@ -646,6 +646,7 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
     mrr: card.valorMRR,
     setup: card.valorSetup,
     pontual: card.valorPontual,
+    dataCriacao: card.dataCriacao?.toISOString() || undefined,
   });
 
   // COHORT MODE: Get cards with full history for tier conversion analysis

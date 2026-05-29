@@ -490,6 +490,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
     closer: card.closer,
     sdr: card.sdr,
     dataAssinatura: card.dataAssinatura?.toISOString() || undefined,
+    dataCriacao: card.dataCriacao?.toISOString() || undefined,
     tipoOrigem: card.tipoOrigem,
     origemLead: card.origemLead,
     fonte: card.fonte,
