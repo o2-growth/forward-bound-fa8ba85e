@@ -41,6 +41,7 @@ export interface DetailItem {
   sla?: number; // SLA time in minutes (for SLA indicator drill-down)
   sdr?: string; // SDR responsável original (for display in sales drill-down)
   dataAssinatura?: string; // Data de assinatura do contrato (ISO string)
+  dataCriacao?: string; // Data de criação do card (ISO string)
   // Strategic drill-down calculated fields
   diasAteQualificar?: number;    // MQL: Data Entrada - Data Criação
   diasComoMQL?: number;          // RM: tempo antes de agendar

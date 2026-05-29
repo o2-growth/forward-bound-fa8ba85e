@@ -1,41 +1,54 @@
-# Conta CFO — Eduardo Dagostini
+# Corrigir Ciclo de Venda (Comercial)
 
-## Mapeamento descoberto
+## Problema
 
-Busquei no código e na base. O Eduardo aparece com 2 grafias no Pipefy/dados, **já normalizadas** para um único nome canônico:
+No drill-down "O Que Fechamos e Como?" (indicador **Venda** da aba Comercial), a coluna **Ciclo** e o KPI **Ciclo Médio** mostram o valor errado.
 
-- "Luis Eduardo Dagostini" → `useJornadaData.ts:43` remapeia para **"Eduardo D'Agostini"**
-- "Eduardo D'Agostini" → nome canônico usado em todos os filtros, NPS, Jornada e Operação
+Exemplo — card 1273063742 (Twist Plásticos, CaaS, assinado 28/02/2026): tela mostra **9d**, mas o card existe há muito mais tempo. O 9d é apenas o tempo na última fase ("Contrato em elaboração" → "Contrato assinado"), não o ciclo comercial completo.
 
-**Equipe dele (squad em `CfoView.tsx`):** Pamela Luiza dos Santos Quadros e Matheus da Silva Besnos — ambos Analistas FP&A. **Não são CFOs próprios** (não aparecem como "CFO Responsavel" no Pipefy), então não precisam ser mapeados separadamente. Os clientes do squad já são atribuídos ao Eduardo D'Agostini como CFO Responsavel — ou seja, ao filtrar pelo nome dele, o Eduardo automaticamente vê tudo que a equipe dele opera.
+### Causa raiz
 
-> Conclusão: **1 nome basta** — `Eduardo D'Agostini`. Não é preciso mexer no schema para múltiplos nomes.
+Em `IndicatorsTab.tsx:1992`:
+```ts
+const cicloVenda = item.duration ? Math.floor(item.duration / 86400) : 0;
+```
+`item.duration` vem de `card.duracao`, que nas hooks (`useModeloAtualAnalytics`, `useO2TaxAnalytics`, `useExpansaoAnalytics`) é `dataSaida − dataEntrada` da fase atual — ou seja, **tempo na última fase**, não Lead → Fechamento.
 
-## Passos
+## Definição correta
 
-### 1. Criar a conta de auth
-Chamar a edge function `manage-user` (action `create`):
-- email: `eduardo.dagostini@o2inc.com.br`
-- password: `Alterar@01`
-- fullName: `Eduardo Dagostini`
-- permissions: `[]` (CFO ignora permissions, vai cair na aba Operação automaticamente via `useUserPermissions`)
+**Ciclo Comercial = Data de Assinatura do Contrato − Data de Criação do Card** (em dias).
 
-Isso cria o auth user e, pelo trigger `handle_new_user`, gera profile + role `user`.
+Ou seja: desde o exato momento em que o lead entrou no CRM até a assinatura. Ambos os campos já existem nas hooks (`card.dataCriacao` + `card.dataAssinatura`), só não são expostos no `DetailItem`.
 
-### 2. Vincular ao CFO no Pipefy
-Via `supabase--insert`:
-- Trocar role `user` → `cfo` na tabela `user_roles` (delete + insert)
-- Inserir em `cfo_user_mapping`: `(user_id, cfo_name = "Eduardo D'Agostini")`
+## Mudanças
 
-A partir daí:
-- `useUserPermissions` detecta role=cfo → `allowedTabs=['cs']` (só Operação)
-- `useMyCfoName` retorna `"Eduardo D'Agostini"` via RPC `get_my_cfo_name()`
-- `CustomerSuccessTab` força `filters.cfos = ["Eduardo D'Agostini"]` em todas as sub-abas (Clientes, Reuniões, NPS, Alertas, CFOs, Churn), filtro fica desabilitado, botão "Limpar" oculto
+1. **`src/components/planning/indicators/DetailSheet.tsx`** — adicionar `dataCriacao?: string` na interface `DetailItem` (após `dataAssinatura`).
 
-### 3. Verificação
-- Confirmar que a conta foi criada (`SELECT FROM profiles WHERE email='eduardo.dagostini@o2inc.com.br'`)
-- Confirmar role=cfo e mapeamento inseridos
-- Eduardo loga com `Alterar@01` → cai direto na aba Operação, só com clientes/NPS/rotinas dele
+2. **`src/hooks/useModeloAtualAnalytics.ts`** (toDetailItem, ~linha 474) — adicionar:
+   ```ts
+   dataCriacao: card.dataCriacao?.toISOString() ?? undefined,
+   ```
 
-## Sem mudanças de schema ou código
-Toda a infraestrutura ("CFO Access Lock") já está pronta da implementação anterior. Esta é uma operação puramente de dados.
+3. **`src/hooks/useO2TaxAnalytics.ts`** (toDetailItem, ~linha 632) — mesma adição.
+
+4. **`src/hooks/useExpansaoAnalytics.ts`** (toDetailItem, ~linha 423) — mesma adição.
+
+5. **`src/components/planning/IndicatorsTab.tsx`** (case `'venda'`, linhas 1990-2001) — trocar o cálculo:
+   ```ts
+   const cicloVenda = (() => {
+     if (!item.dataAssinatura || !item.dataCriacao) return 0;
+     const ms = new Date(item.dataAssinatura).getTime() - new Date(item.dataCriacao).getTime();
+     return ms > 0 ? Math.floor(ms / 86_400_000) : 0;
+   })();
+   ```
+   Manter o filtro `> 0` no cálculo do **Ciclo Médio** para excluir cards sem datas válidas.
+
+## Escopo
+
+- Vale para **todas as BUs** (Modelo Atual, O2 TAX, Expansão) — todas passam pelo mesmo case `'venda'`.
+- Só afeta o drill-down de Venda; nenhum outro indicador usa `cicloVenda`.
+- Puramente cálculo de UI — nada muda no banco.
+
+## Verificação
+
+Após o ajuste, abrir Venda de fev/26 e conferir o Twist Plásticos: ciclo deve refletir os dias entre a criação do card e 28/02/2026 (semanas/meses, não 9d).
