@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Pencil, Save, Shield, Trash2, User, Target, History, Users } from 'lucide-react';
+import { Loader2, Pencil, Save, Shield, Trash2, User, Target, History, Users, UserCog } from 'lucide-react';
 import { CreateUserForm } from './CreateUserForm';
 import { EditUserDialog } from './EditUserDialog';
 import { DeleteUserDialog } from './DeleteUserDialog';
@@ -18,6 +18,7 @@ import { CloserMetasTab } from './CloserMetasTab';
 import { SdrMetasTab } from './SdrMetasTab';
 import { CloserAbsoluteMetasTab } from './CloserAbsoluteMetasTab';
 import { AdminLogsTab } from './AdminLogsTab';
+import { CfoMappingTab } from './CfoMappingTab';
 
 const TAB_OPTIONS: { key: TabKey; label: string }[] = [
   { key: 'context', label: 'Macro 2025' },
@@ -147,6 +148,10 @@ export function AdminTab() {
         <TabsTrigger value="closer-abs-metas" className="gap-2">
           <Target className="h-4 w-4" />
           Metas Closer (Indicadores)
+        </TabsTrigger>
+        <TabsTrigger value="cfo-mapping" className="gap-2">
+          <UserCog className="h-4 w-4" />
+          Acessos CFO
         </TabsTrigger>
         <TabsTrigger value="logs" className="gap-2">
           <History className="h-4 w-4" />
@@ -331,6 +336,10 @@ export function AdminTab() {
 
       <TabsContent value="closer-abs-metas">
         <CloserAbsoluteMetasTab />
+      </TabsContent>
+
+      <TabsContent value="cfo-mapping">
+        <CfoMappingTab />
       </TabsContent>
 
       <TabsContent value="logs">

@@ -1,4 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useMyCfoName } from '@/hooks/useMyCfoName';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,6 +39,20 @@ import { AlertCircle } from 'lucide-react';
 function CustomerSuccessTabInner() {
   const { filters, setFilters, clearFilters } = useCustomerSuccessFilters();
   const [activeTab, setActiveTab] = useState('visao-geral');
+
+  // CFO lock-in: usuários com role 'cfo' são travados no seu próprio nome
+  const { user } = useAuth();
+  const { isCfo } = useUserPermissions(user?.id);
+  const { data: lockedCfoName, isLoading: cfoNameLoading } = useMyCfoName(!!isCfo);
+
+  useEffect(() => {
+    if (isCfo && lockedCfoName) {
+      // Garante que o filtro inicia (e permanece) travado no nome do CFO logado
+      if (filters.cfos.length !== 1 || filters.cfos[0] !== lockedCfoName) {
+        setFilters({ cfos: [lockedCfoName] });
+      }
+    }
+  }, [isCfo, lockedCfoName, filters.cfos, setFilters]);
 
   // Date range for CS filtering (same pattern as Indicadores Comercial)
   // `now` é estável (computado uma vez por instância de componente) — usado apenas
@@ -264,7 +281,7 @@ function CustomerSuccessTabInner() {
   const isLoading = jornadaLoading || npsLoading;
   const error = jornadaError || npsError;
 
-  if (isLoading) {
+  if (isLoading || (isCfo && cfoNameLoading)) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -277,6 +294,20 @@ function CustomerSuccessTabInner() {
     return (
       <div className="text-center py-20 text-destructive">
         Erro ao carregar dados: {(error as Error).message}
+      </div>
+    );
+  }
+
+  // CFO sem mapeamento: bloqueia acesso e orienta a falar com admin
+  if (isCfo && !lockedCfoName) {
+    return (
+      <div className="max-w-xl mx-auto py-16 text-center space-y-3">
+        <AlertCircle className="h-10 w-10 text-destructive mx-auto" />
+        <h3 className="text-lg font-semibold">Usuário CFO sem vínculo</h3>
+        <p className="text-sm text-muted-foreground">
+          Sua conta está marcada como CFO mas ainda não foi vinculada a um nome de CFO no Pipefy.
+          Solicite ao administrador o vínculo na aba Admin → Acessos CFO.
+        </p>
       </div>
     );
   }
@@ -301,16 +332,18 @@ function CustomerSuccessTabInner() {
           <Select
             value={filters.cfos.length === 1 ? filters.cfos[0] : filters.cfos.length > 1 ? '__multi__' : 'all'}
             onValueChange={(v) => {
+              if (isCfo) return; // travado para CFOs
               if (v === 'all') setFilters({ cfos: [] });
               else setFilters({ cfos: [v] });
             }}
+            disabled={isCfo}
           >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="CFO" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos os CFOs</SelectItem>
-              {allCfos.map(cfo => (
+              {!isCfo && <SelectItem value="all">Todos os CFOs</SelectItem>}
+              {(isCfo && lockedCfoName ? [lockedCfoName] : allCfos).map(cfo => (
                 <SelectItem key={cfo} value={cfo}>{cfo}</SelectItem>
               ))}
             </SelectContent>
@@ -363,7 +396,9 @@ function CustomerSuccessTabInner() {
                 {filters.cfos.map(c => (
                   <Badge key={c} variant="default" className="gap-1 text-xs">
                     {c}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => setFilters({ cfos: filters.cfos.filter(x => x !== c) })} />
+                    {!isCfo && (
+                      <X className="h-3 w-3 cursor-pointer" onClick={() => setFilters({ cfos: filters.cfos.filter(x => x !== c) })} />
+                    )}
                   </Badge>
                 ))}
                 {filters.produtos.map(p => (
@@ -373,9 +408,11 @@ function CustomerSuccessTabInner() {
                   </Badge>
                 ))}
               </div>
-              <Button variant="ghost" size="sm" className="text-xs" onClick={handleClearFilters}>
-                Limpar
-              </Button>
+              {!isCfo && (
+                <Button variant="ghost" size="sm" className="text-xs" onClick={handleClearFilters}>
+                  Limpar
+                </Button>
+              )}
             </>
           )}
 

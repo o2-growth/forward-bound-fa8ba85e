@@ -20,27 +20,42 @@ export function useUserPermissions(userId: string | undefined) {
     enabled: !!userId,
   });
 
-  const { data: isAdmin, isLoading: roleLoading } = useQuery({
+  const { data: roleInfo, isLoading: roleLoading } = useQuery({
     queryKey: ['user-role', userId],
     queryFn: async () => {
-      if (!userId) return false;
+      if (!userId) return { isAdmin: false, isCfo: false };
       
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
+        .eq('user_id', userId);
       
       if (error) throw error;
-      return !!data;
+      const roles = (data || []).map(r => r.role as string);
+      return {
+        isAdmin: roles.includes('admin'),
+        isCfo: roles.includes('cfo'),
+      };
     },
     enabled: !!userId,
   });
 
+  const isAdmin = roleInfo?.isAdmin ?? false;
+  const isCfo = roleInfo?.isCfo ?? false;
+
   // Admins have access to all tabs
   const allAdminTabs: TabKey[] = ['context', 'goals', 'monthly', 'media', 'indicators', 'cs', 'financial', 'marketing', 'structure', 'admin'];
   
+  // CFOs only see the Operação (cs) tab — fully locked
+  if (isCfo && !isAdmin) {
+    return {
+      allowedTabs: ['cs'] as TabKey[],
+      isAdmin: false,
+      isCfo: true,
+      loading: permissionsLoading || roleLoading,
+    };
+  }
+
   // Map marketing_indicators and nps permissions to indicators tab access
   // Map jornada and nps permissions to cs (Customer Success) tab access
   const rawPermissions = permissions || [];
@@ -58,7 +73,8 @@ export function useUserPermissions(userId: string | undefined) {
 
   return {
     allowedTabs,
-    isAdmin: isAdmin || false,
+    isAdmin,
+    isCfo: false,
     loading: permissionsLoading || roleLoading,
   };
 }
