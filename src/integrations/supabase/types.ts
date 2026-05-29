@@ -331,6 +331,30 @@ export type Database = {
         }
         Relationships: []
       }
+      cfo_user_mapping: {
+        Row: {
+          cfo_name: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cfo_name: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cfo_name?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       closer_absolute_metas: {
         Row: {
           closer: string
@@ -1112,6 +1136,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_my_cfo_name: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1135,7 +1160,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "cfo"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1263,7 +1288,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "cfo"],
     },
   },
 } as const
