@@ -52,6 +52,7 @@ function MessageBubble({ msg, isFirstAssistant, dossie, dossieSummary }: {
   dossieSummary?: React.ReactNode;
 }) {
   if (msg.role === "system") return null;
+  if ((msg.metadata as any)?.hidden) return null;
   const isUser = msg.role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
