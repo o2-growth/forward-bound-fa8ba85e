@@ -248,11 +248,11 @@ serve(async (req) => {
       });
     }
 
-    // ── DEFAULT ACTION: fetch campaigns with enrichment (ACTIVE+PAUSED) ──
+    // ── DEFAULT ACTION: fetch ALL campaigns with spend in period (incl. archived/removed) ──
     console.log("Fetching Meta campaigns:", { startDate, endDate, adAccountId });
 
     // Check cache first
-    const cacheKey = `campaigns:${formattedAccountId}:${startDate}:${endDate}`;
+    const cacheKey = `${CACHE_VERSION}:campaigns:${formattedAccountId}:${startDate}:${endDate}`;
     const cachedData = await getCachedData(supabase, cacheKey);
 
     if (cachedData) {
@@ -270,44 +270,56 @@ serve(async (req) => {
 
     console.log(`Cache MISS for ${cacheKey}, fetching from Meta API`);
 
-    // Fetch campaigns with filtering for active/paused
+    // Sem filtro de status: queremos TODAS as campanhas, incluindo ARCHIVED/DELETED,
+    // porque o que importa é o spend histórico no período, não o status atual.
+    // Filtramos depois localmente pelas que tiveram insights com spend > 0.
     const campaignFields = [
       "id", "name", "status", "objective", "daily_budget", "lifetime_budget"
     ].join(",");
-    
-    const filterJson = JSON.stringify([{
-      field: "effective_status",
-      operator: "IN",
-      value: ["ACTIVE", "PAUSED"]
-    }]);
-    
-    const campaignsUrl = `${META_BASE_URL}/${formattedAccountId}/campaigns?fields=${campaignFields}&filtering=${encodeURIComponent(filterJson)}&access_token=${accessToken}`;
-    
-    console.log("Fetching campaigns from Meta API");
-    
-    const campaignsResponse = await fetch(campaignsUrl);
-    const campaignsData = await campaignsResponse.json();
-    
-    if (campaignsData.error) {
-      console.error("Meta API error:", campaignsData.error);
-      throw new Error(campaignsData.error.message || "Erro na API do Meta");
+
+    let nextUrl: string | null = `${META_BASE_URL}/${formattedAccountId}/campaigns?fields=${campaignFields}&limit=${CAMPAIGNS_PAGE_LIMIT}&access_token=${accessToken}`;
+    const allCampaigns: MetaCampaign[] = [];
+    let pageCount = 0;
+
+    while (nextUrl && allCampaigns.length < CAMPAIGNS_HARD_CAP) {
+      pageCount++;
+      const resp = await fetch(nextUrl);
+      const body = await resp.json();
+      if (body.error) {
+        console.error("Meta API error (campaigns page):", body.error);
+        throw new Error(body.error.message || "Erro na API do Meta");
+      }
+      const pageData: MetaCampaign[] = body.data || [];
+      allCampaigns.push(...pageData);
+      nextUrl = body.paging?.next || null;
     }
 
-    console.log(`Found ${campaignsData.data?.length || 0} campaigns`);
+    if (allCampaigns.length >= CAMPAIGNS_HARD_CAP) {
+      console.warn(`Hit CAMPAIGNS_HARD_CAP (${CAMPAIGNS_HARD_CAP}), stopping pagination`);
+    }
+    console.log(`Fetched ${allCampaigns.length} campaigns across ${pageCount} page(s)`);
 
     // Enrich campaigns with insights using batch API
     const enrichedCampaigns = await enrichCampaignsWithBatchAPI(
-      campaignsData.data || [],
+      allCampaigns,
       startDate,
       endDate,
       accessToken,
       formattedAccountId
     );
 
-    // Save to cache
-    await setCachedData(supabase, cacheKey, enrichedCampaigns);
+    // Filtrar localmente: só mantém campanhas que tiveram spend > 0 no período.
+    // Sem isso, contas com 1000+ campanhas históricas inflariam a resposta com lixo zerado.
+    const campaignsWithSpend = enrichedCampaigns.filter((c: any) => {
+      const spend = parseFloat(c.insights?.spend ?? "0");
+      return spend > 0;
+    });
+    console.log(`Campaigns after spend>0 filter: ${campaignsWithSpend.length}/${enrichedCampaigns.length}`);
 
-    console.log(`Successfully fetched and cached ${enrichedCampaigns.length} campaigns`);
+    // Save to cache
+    await setCachedData(supabase, cacheKey, campaignsWithSpend);
+
+    console.log(`Successfully fetched and cached ${campaignsWithSpend.length} campaigns`);
 
     return new Response(JSON.stringify({ 
       success: true, 
