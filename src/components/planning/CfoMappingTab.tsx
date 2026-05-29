@@ -89,8 +89,8 @@ export function CfoMappingTab() {
         .insert({ user_id: userId, role: 'cfo' as any });
       if (roleErr) throw roleErr;
       // 2) Cria o mapping
-      const { error: mapErr } = await supabase
-        .from('cfo_user_mapping' as any)
+      const { error: mapErr } = await (supabase as any)
+        .from('cfo_user_mapping')
         .insert({ user_id: userId, cfo_name: cfoName });
       if (mapErr) throw mapErr;
     },
