@@ -323,9 +323,9 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      campaigns: enrichedCampaigns,
+      campaigns: campaignsWithSpend,
       dateRange: { startDate, endDate },
-      totalCampaigns: enrichedCampaigns.length,
+      totalCampaigns: campaignsWithSpend.length,
       fromCache: false,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
