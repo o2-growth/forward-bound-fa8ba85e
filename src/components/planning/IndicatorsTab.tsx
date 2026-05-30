@@ -3282,19 +3282,21 @@ export function IndicatorsTab() {
         const totalContratosValor = vendaItems.reduce((s, i) => s + (i.value || 0), 0);
 
         return (
-          <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-96 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
-          <RevenuePaceChart
-            realized={totalRealized}
-            meta={totalMeta}
-            mrrBase={0}
-            paceExpected={paceExpected}
-            isLoading={o2TaxAnalytics.isLoading || modeloAtualAnalytics.isLoading || isLoadingMrrBase || isLoadingDre}
-            chartData={paceChartData}
-            tierBreakdown={tierBreakdown}
-            totalContratos={totalContratos}
-            totalContratosValor={totalContratosValor}
-          />
-          </Suspense>
+          <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen px-4 sm:px-6 lg:px-8">
+            <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-96 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
+            <RevenuePaceChart
+              realized={totalRealized}
+              meta={totalMeta}
+              mrrBase={0}
+              paceExpected={paceExpected}
+              isLoading={o2TaxAnalytics.isLoading || modeloAtualAnalytics.isLoading || isLoadingMrrBase || isLoadingDre}
+              chartData={paceChartData}
+              tierBreakdown={tierBreakdown}
+              totalContratos={totalContratos}
+              totalContratosValor={totalContratosValor}
+            />
+            </Suspense>
+          </div>
         );
       })()}
 
