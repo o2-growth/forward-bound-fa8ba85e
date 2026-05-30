@@ -113,7 +113,7 @@ export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-            {tierBreakdown && tierBreakdown.length > 0 && (
+            {!hideTierBreakdown && tierBreakdown && tierBreakdown.length > 0 && (
               <div className="mt-6 pt-5 border-t border-border">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
