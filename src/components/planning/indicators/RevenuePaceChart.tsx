@@ -23,7 +23,7 @@ interface RevenuePaceChartProps {
   tierBreakdown?: TierBreakdownItem[];
   totalContratos?: number;
   totalContratosValor?: number;
-  hideTierBreakdown?: boolean;
+  fullViewport?: boolean;
 }
 
 const formatCompactCurrency = (value: number): string => {
@@ -32,7 +32,7 @@ const formatCompactCurrency = (value: number): string => {
   return `R$ ${Math.round(value)}`;
 };
 
-export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData, tierBreakdown, totalContratos, totalContratosValor, hideTierBreakdown }: RevenuePaceChartProps) {
+export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData, tierBreakdown, totalContratos, totalContratosValor, fullViewport }: RevenuePaceChartProps) {
   const [isOpen, setIsOpen] = useState(true);
 
   const totalRealized = mrrBase + realized;
@@ -84,7 +84,7 @@ export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0">
-            <div className="h-96">
+            <div className={fullViewport ? "h-[calc(100vh-200px)]" : "h-96"}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
@@ -113,7 +113,7 @@ export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-            {!hideTierBreakdown && tierBreakdown && tierBreakdown.length > 0 && (
+            {tierBreakdown && tierBreakdown.length > 0 && (
               <div className="mt-6 pt-5 border-t border-border">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
