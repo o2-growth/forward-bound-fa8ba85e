@@ -1,11 +1,33 @@
-Fazer o card "Faturamento (em pace)" ocupar a altura total da viewport (full-screen). O bloco "Contratos por Faixa de Faturamento" continua existindo, mas só aparece ao rolar a página para baixo.
+## Problema
 
-**Arquivos**
-- `src/components/planning/indicators/RevenuePaceChart.tsx`:
-  - Remover prop `hideTierBreakdown`.
-  - Adicionar prop opcional `fullViewport?: boolean`.
-  - Quando `fullViewport=true`: aplicar `min-h-screen` no Card e trocar a altura fixa do container do chart (`h-96`) por `h-[calc(100vh-200px)]` para o gráfico encher a tela. O bloco de tier breakdown continua renderizando logo abaixo no fluxo, aparecendo só com scroll.
-- `src/components/planning/IndicatorsTab.tsx`:
-  - Trocar a prop `hideTierBreakdown` por `fullViewport` no `<RevenuePaceChart />`. Mantém o wrapper full-bleed existente.
+Os 5 acelerômetros monetários no final do dashboard (SLA, Faturamento, MRR, Setup, Pontual) ignoram o filtro de **Origem** (Outbound, Inbound, etc.). Quando o usuário seleciona somente uma origem (sem filtrar Closer ou SDR), os cards mostram o valor total da BU.
 
-**Fora do escopo:** nenhuma mudança em dados, cálculos ou outros componentes.
+## Causa
+
+Em `src/components/planning/IndicatorsTab.tsx`, dentro de `getRealizedMonetaryForIndicator` (linha ~2332), o flag `filtersActive` considera apenas Closer e SDR:
+
+```ts
+const filtersActive = closerFilterActive || sdrFilterActive;
+```
+
+Quando `filtersActive` é `false`, a função cai no caminho otimizado (`getModeloAtualValue`, `getMrrForPeriod`, `getSetupForPeriod`, `getPontualForPeriod`, `getOxyHackerValue`, `getExpansaoValue`) — esses helpers vêm do hook de realized agregado e não aplicam `matchesOrigemFilter`.
+
+A função `filteredVendasForBU` (que aplica `matchesOrigemFilter` por card) só é executada quando o filtro de pessoas está ativo.
+
+## Correção
+
+Em `src/components/planning/IndicatorsTab.tsx`:
+
+1. Adicionar `origemFilterActive` no escopo de `getRealizedMonetaryForIndicator`:
+   ```ts
+   const origemFilterActive = selectedOrigens.length > 0;
+   const filtersActive = closerFilterActive || sdrFilterActive || origemFilterActive;
+   ```
+2. Manter `filteredVendasForBU` igual (já chama `matchesOrigemFilter`).
+3. Resultado: quando só Origem estiver selecionada, o caminho `filtered === null` deixa de ser usado, e todas as 4 BUs (Modelo Atual, O2 TAX, Oxy Hacker, Franquia) somam apenas os cards de venda cuja origem classificada está no filtro — para Faturamento, MRR, Setup e Pontual.
+
+## Observações
+
+- **SLA** continua sem aplicar origem (é uma métrica de fase/tempo de leads em "Tentativas de contato", não venda); manter como está.
+- **Meta** dos acelerômetros (`getMetaMonetaryForIndicator`) não muda: meta é absoluta do período/BU e não tem origem.
+- Nenhuma mudança em outros componentes, hooks, schema ou cálculos. Apenas um ajuste de 2 linhas dentro de uma função.
