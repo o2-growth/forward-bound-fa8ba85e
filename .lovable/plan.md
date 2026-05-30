@@ -1,53 +1,26 @@
+## Objetivo
 
-## Problema
-
-Dashboard subestima gasto histórico porque filtra Meta/Google por status atual (`ACTIVE/PAUSED` / `ENABLED/PAUSED`). Campanhas arquivadas depois de rodar somem, mas seu spend continua no painel oficial → divergência ao comparar meses passados.
-
-Regra correta: se gerou spend no período, entra no dashboard. Status atual é irrelevante.
+Fazer o card **Faturamento (em pace)** no `IndicatorsTab` ocupar toda a largura da viewport (edge-to-edge), mantendo o scroll vertical normal da página.
 
 ## Mudanças
 
-### 1. `supabase/functions/fetch-meta-campaigns/index.ts`
+**Arquivo:** `src/components/IndicatorsTab.tsx` (linhas ~3284-3297, onde `<RevenuePaceChart />` é renderizado dentro do `<Suspense>`)
 
-- Remover filtro `effective_status` na URL de campanhas.
-- Adicionar paginação seguindo `paging.next` até esgotar, com cap defensivo de 5000 campanhas para evitar loop infinito.
-- Usar `limit=500` por página.
-- Após enriquecer com insights via batch API, **filtrar localmente** as que tiveram `spend > 0` no período — assim só entram campanhas relevantes ao mês filtrado, evitando inflar a UI com lixo histórico zerado.
-- Bump da cache key: prefixar com `CACHE_VERSION = "v2"` para invalidar cache antigo automaticamente sem mexer na tabela.
-- Manter os `console.log` existentes; adicionar log de "campanhas após filtro spend>0" para observabilidade.
+Envolver o bloco em um wrapper que faz "full-bleed" — escapa do container pai (que tem padding/max-width) usando a técnica padrão Tailwind:
 
-### 2. `supabase/functions/fetch-google-campaigns/index.ts`
-
-- Remover a linha `AND campaign.status IN ('ENABLED', 'PAUSED')` da query GAQL. O `WHERE segments.date BETWEEN` já garante que só vem campanha com atividade no período.
-- Bump da cache key com `CACHE_VERSION = "v2"`.
-- Manter logs existentes.
-
-### 3. Timezone (fase 2, opcional)
-
-Não incluso neste plano. Pode entrar em commit separado depois — sem evidência clara de divergência hoje.
-
-## Detalhes técnicos
-
-**Paginação Meta (pseudo):**
-```text
-url = first page (limit=500)
-campaigns = []
-while url and campaigns.length < 5000:
-  resp = fetch(url)
-  campaigns.push(...resp.data)
-  url = resp.paging?.next
+```tsx
+<div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen px-4 sm:px-6 lg:px-8">
+  <Suspense fallback={...}>
+    <RevenuePaceChart ... />
+  </Suspense>
+</div>
 ```
 
-**Filtro local de spend (Meta):** após `enrichCampaignsWithBatchAPI`, manter apenas itens com `parseFloat(c.insights?.spend ?? 0) > 0`. Google já vem filtrado pelo `segments.date`.
+- `w-screen` + `-mx-[50vw]` + `left-1/2 right-1/2`: estoura o container e ocupa 100% da viewport.
+- `px-4 sm:px-6 lg:px-8`: mantém respiro lateral leve para não colar nas bordas.
+- Nenhuma alteração em scroll/overflow → a rolagem da página continua idêntica.
 
-**Cache invalidation:** mudar apenas a string da `cacheKey`. Linhas antigas em `meta_ads_cache` expiram por TTL natural; não há migração de dados.
+## Fora do escopo
 
-## Entrega
-
-Commits sequenciais (Meta primeiro, depois Google). Sem mudanças no front. Typecheck automático do harness valida cada um.
-
-## Validação pós-deploy
-
-1. Mês corrente: deve continuar batendo.
-2. Mês anterior com campanha arquivada: agora deve bater.
-3. Mês de 3 meses atrás: divergência <1%.
+- Nenhuma mudança no `RevenuePaceChart.tsx` (componente interno permanece igual; já é responsivo via `ResponsiveContainer`).
+- Nenhuma mudança em lógica de dados, filtros ou outros gráficos.
