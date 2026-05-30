@@ -32,7 +32,7 @@ const formatCompactCurrency = (value: number): string => {
   return `R$ ${Math.round(value)}`;
 };
 
-export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData, tierBreakdown, totalContratos, totalContratosValor }: RevenuePaceChartProps) {
+export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData, tierBreakdown, totalContratos, totalContratosValor, hideTierBreakdown }: RevenuePaceChartProps) {
   const [isOpen, setIsOpen] = useState(true);
 
   const totalRealized = mrrBase + realized;
