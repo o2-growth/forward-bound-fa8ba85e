@@ -2332,7 +2332,8 @@ export function IndicatorsTab() {
   const getRealizedMonetaryForIndicator = (indicator: MonetaryIndicatorConfig): number => {
     const closerFilterActive = effectiveSelectedClosers.length > 0;
     const sdrFilterActive = effectiveSelectedSDRs.length > 0;
-    const filtersActive = closerFilterActive || sdrFilterActive;
+    const origemFilterActive = selectedOrigens.length > 0;
+    const filtersActive = closerFilterActive || sdrFilterActive || origemFilterActive;
 
     // Helper: aplica filtros de Closer e SDR aos cards de venda de uma BU.
     // Retorna null quando não há filtros (caller usa o caminho padrão otimizado).
