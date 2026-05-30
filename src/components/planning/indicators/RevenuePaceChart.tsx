@@ -23,6 +23,7 @@ interface RevenuePaceChartProps {
   tierBreakdown?: TierBreakdownItem[];
   totalContratos?: number;
   totalContratosValor?: number;
+  hideTierBreakdown?: boolean;
 }
 
 const formatCompactCurrency = (value: number): string => {
@@ -31,7 +32,7 @@ const formatCompactCurrency = (value: number): string => {
   return `R$ ${Math.round(value)}`;
 };
 
-export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData, tierBreakdown, totalContratos, totalContratosValor }: RevenuePaceChartProps) {
+export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData, tierBreakdown, totalContratos, totalContratosValor, hideTierBreakdown }: RevenuePaceChartProps) {
   const [isOpen, setIsOpen] = useState(true);
 
   const totalRealized = mrrBase + realized;
@@ -112,7 +113,7 @@ export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData
                 </ComposedChart>
               </ResponsiveContainer>
             </div>
-            {tierBreakdown && tierBreakdown.length > 0 && (
+            {!hideTierBreakdown && tierBreakdown && tierBreakdown.length > 0 && (
               <div className="mt-6 pt-5 border-t border-border">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
