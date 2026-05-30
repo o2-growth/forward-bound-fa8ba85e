@@ -3294,7 +3294,7 @@ export function IndicatorsTab() {
               tierBreakdown={tierBreakdown}
               totalContratos={totalContratos}
               totalContratosValor={totalContratosValor}
-              hideTierBreakdown
+              fullViewport
             />
             </Suspense>
           </div>
