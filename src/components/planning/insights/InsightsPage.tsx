@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { startOfMonth, endOfDay } from "date-fns";
+import { startOfMonth, endOfDay, endOfMonth, subMonths } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sparkles, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,11 @@ import { InsightsTab } from "@/components/planning/indicators/InsightsTab";
 export function InsightsPage() {
   const queryClient = useQueryClient();
   const today = new Date();
-  const [startDate, setStartDate] = useState<Date>(startOfMonth(today));
-  const [endDate, setEndDate] = useState<Date>(endOfDay(today));
+  // Nos primeiros 7 dias do mês ainda não há volume suficiente — cai no mês anterior completo.
+  const useLastMonth = today.getDate() <= 7;
+  const baseRef = useLastMonth ? subMonths(today, 1) : today;
+  const [startDate, setStartDate] = useState<Date>(startOfMonth(baseRef));
+  const [endDate, setEndDate] = useState<Date>(useLastMonth ? endOfMonth(baseRef) : endOfDay(today));
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["modelo-atual-analytics"] });
