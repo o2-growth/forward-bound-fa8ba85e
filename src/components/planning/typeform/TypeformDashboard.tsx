@@ -76,13 +76,30 @@ export function TypeformDashboard() {
   const pctSub1h =
     vel && vel.total_bookings > 0 ? (vel.sub_1h / vel.total_bookings) * 100 : null;
 
-  const faturamentoSorted = useMemo(
-    () =>
-      (faturamento.data ?? [])
-        .slice()
-        .sort((a, b) => (b.total ?? 0) - (a.total ?? 0)),
-    [faturamento.data]
-  );
+  const faturamentoSorted = useMemo(() => {
+    const excluded = [
+      "ainda nao faturamos",
+      "ainda não faturamos",
+      "menos de r$ 100 mil",
+      "entre r$ 100 mil e r$ 200 mil",
+      "",
+      "sem dado",
+      "sem dados",
+      "nao informado",
+      "não informado",
+    ];
+    const norm = (s: string) =>
+      (s ?? "")
+        .toString()
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    return (faturamento.data ?? [])
+      .filter((r) => r.faturamento && !excluded.includes(norm(r.faturamento)))
+      .slice()
+      .sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
+  }, [faturamento.data]);
   const sourceSorted = useMemo(
     () =>
       (source.data ?? [])
@@ -358,30 +375,27 @@ export function TypeformDashboard() {
         onBarClick={openDay}
       />
 
-      {/* Linha 3 — SDR + (resumo agendamentos futuros) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SdrBarChart data={sdr.data} loading={sdr.isLoading} onBarClick={openSdr} />
-        <FunnelTable
-          title="Próximas reuniões (top 12)"
-          data={(pipeline.data ?? []).filter((d) => new Date(d.booking_date) >= new Date(new Date().toDateString()))}
-          loading={pipeline.isLoading}
-          maxRows={12}
-          onRowClick={openDay}
-          columns={[
-            {
-              key: "booking_date",
-              label: "Data",
-              render: (r) =>
-                new Date(r.booking_date).toLocaleDateString("pt-BR", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "2-digit",
-                }),
-            },
-            { key: "reunioes", label: "Reuniões", align: "right", render: (r) => fmtInt(r.reunioes) },
-          ]}
-        />
-      </div>
+      {/* Linha 3 — Próximas reuniões */}
+      <FunnelTable
+        title="Próximas reuniões (top 12)"
+        data={(pipeline.data ?? []).filter((d) => new Date(d.booking_date) >= new Date(new Date().toDateString()))}
+        loading={pipeline.isLoading}
+        maxRows={12}
+        onRowClick={openDay}
+        columns={[
+          {
+            key: "booking_date",
+            label: "Data",
+            render: (r) =>
+              new Date(r.booking_date).toLocaleDateString("pt-BR", {
+                weekday: "short",
+                day: "2-digit",
+                month: "2-digit",
+              }),
+          },
+          { key: "reunioes", label: "Reuniões", align: "right", render: (r) => fmtInt(r.reunioes) },
+        ]}
+      />
 
       {/* Linha 4 — Faturamento + Setor */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -412,35 +426,20 @@ export function TypeformDashboard() {
         />
       </div>
 
-      {/* Linha 5 — Caminho + UF */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <FunnelTable
-          title="Funil por caminho (A/B/C/D)"
-          data={caminho.data}
-          loading={caminho.isLoading}
-          onRowClick={openCaminho}
-          columns={[
-            { key: "caminho", label: "Caminho" },
-            { key: "total", label: "Total", align: "right", render: (r) => fmtInt(r.total) },
-            { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
-            { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
-            { key: "taxa_agenda_pct", label: "% Ag.", align: "right", render: (r) => fmtPct(r.taxa_agenda_pct) },
-          ]}
-        />
-        <FunnelTable
-          title="Funil por UF"
-          data={ufSorted}
-          loading={uf.isLoading}
-          maxRows={15}
-          onRowClick={openUf}
-          columns={[
-            { key: "uf", label: "UF" },
-            { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
-            { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
-            { key: "conv_pct", label: "% Conv", align: "right", render: (r) => fmtPct(r.conv_pct) },
-          ]}
-        />
-      </div>
+      {/* Linha 5 — UF */}
+      <FunnelTable
+        title="Funil por UF"
+        data={ufSorted}
+        loading={uf.isLoading}
+        maxRows={15}
+        onRowClick={openUf}
+        columns={[
+          { key: "uf", label: "UF" },
+          { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
+          { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
+          { key: "conv_pct", label: "% Conv", align: "right", render: (r) => fmtPct(r.conv_pct) },
+        ]}
+      />
 
 
       {/* Linha 7 — Velocidade + cobertura */}
