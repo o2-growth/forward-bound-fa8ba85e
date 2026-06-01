@@ -34,15 +34,32 @@ export interface BreakdownBlock {
   rows: BreakdownRow[];
 }
 
+/**
+ * Returns true if the faturamento value should be hidden from charts/tables/breakdowns.
+ * Uses keyword matching (after normalization) to be tolerant to label variations.
+ */
+export function isExcludedFaturamento(value: any): boolean {
+  const n = normalize(value);
+  if (!n || n === "-" || n === "—") return true;
+  if (["sem dado", "sem dados", "nao informado", "n/a", "na", "null", "none"].includes(n)) return true;
+  if (n.includes("nao faturamos") || n.includes("ainda nao")) return true;
+  if (n.includes("menos de") && n.includes("100")) return true;
+  // faixa "entre R$ 100 mil e R$ 200 mil"
+  if (n.includes("100") && n.includes("200")) return true;
+  return false;
+}
+
 export function buildBreakdown(
   leads: DiagLeadFull[],
   key: keyof DiagLeadFull,
   title: string,
-  topN = 5
+  topN = 5,
+  filterFn?: (raw: any) => boolean
 ): BreakdownBlock {
   const map = new Map<string, { total: number; mqls: number; agend: number }>();
   for (const l of leads) {
-    const raw = (l[key] ?? "—") as any;
+    const raw = l[key];
+    if (filterFn && !filterFn(raw)) continue;
     const k = String(raw || "—");
     const cur = map.get(k) ?? { total: 0, mqls: 0, agend: 0 };
     cur.total += 1;

@@ -1,84 +1,81 @@
-## Objetivo
-Tornar os drawers da sub-aba **Typeform** muito mais informativos: ao clicar num KPI, SDR, dia, faixa de faturamento, setor, UF, source, caminho ou janela temporal, abrir um drawer com **duas abas**:
-1. **Resumo** — KPIs + breakdowns cruzados do recorte clicado.
-2. **Leads** — lista individual dos leads daquele recorte, com busca e export CSV.
+## Plano — Aba Typeform: fix do filtro + redesign UI/UX
 
-Fonte nova: `v_o2_diag_leads_full` (1 linha por lead, deduplicada por email, já liberada para anon).
+### 1. Por que ainda aparece "até 100k / não faturamos / 100–200k / sem dado"
 
----
+O filtro atual usa `includes` com strings exatas normalizadas. Se a view trouxer rótulos com pontuação, espaços extras, "Não" sem acento, ou variantes ("Faturamento de R$ 100 a 200 mil"), nenhum casa.
 
-## 1. Camada de dados
+**Fix:** trocar para *match por palavras-chave* (após normalização):
+- contém `"nao faturamos"` ou `"ainda nao"`
+- contém `"menos de"` **e** `"100"`
+- contém `"100"` **e** `"200"`
+- string vazia / contém `"sem dado"`, `"sem dados"`, `"nao informado"`, `"n/a"`, `"null"`, `"-"`
 
-**`src/components/planning/typeform/useTypeformData.ts`**
-- Adicionar interface `DiagLeadFull` com todas as colunas da view (response_id, nome, email, telefone, empresa, cargo, setor, faturamento, uf, erp, caminho, is_mql, completo, agendado, sdr_nome, source, medium, campaign, booking_date, created_at, updated_at, completed_at, etc.).
-- Adicionar hook `useDiagLeadsFull()` que busca `v_o2_diag_leads_full?select=*` uma única vez (staleTime 5min). A filtragem por recorte é feita no cliente — a view não é grande.
+Aplicar essa lista também em `openMainKpi`, `openSdr`, etc. quando montar `breakdowns: buildBreakdown(filtered, "faturamento", ...)` — caso contrário os Drawers continuam mostrando essas faixas.
 
----
+Confirmar que `SdrBarChart` e o bloco `Funil por caminho (A/B/C/D)` continuam fora do render (já removidos no turno anterior, mantém).
 
-## 2. Drawer com abas
+### 2. Redesign UI/UX da aba (usando o design system do projeto)
 
-**`src/components/planning/typeform/TypeformDetailDrawer.tsx`** (refatorar)
-- Aumentar largura para `sm:max-w-2xl`.
-- Adicionar `Tabs` ("Resumo" / "Leads (N)") usando shadcn.
-- Nova prop:
-  ```ts
-  interface Props {
-    open, onOpenChange, title, description,
-    fields: DetailField[],          // Resumo (já existe)
-    breakdowns?: BreakdownBlock[],  // novo: blocos cruzados no Resumo
-    leads?: DiagLeadFull[],         // novo: leads filtrados
-    leadsLoading?: boolean,
-  }
-  interface BreakdownBlock { title: string; rows: { label: string; value: string }[] }
-  ```
-- **Aba Resumo**: grid de KPIs (`fields`) + lista compacta de blocos `breakdowns` (ex.: "Por faturamento", "Por setor", "Por SDR") com top 5 cada.
-- **Aba Leads**:
-  - Input de busca (filtra por nome/email/empresa, case-insensitive + sem acento).
-  - Tabela compacta com colunas: Nome · Empresa · Faturamento · Setor · SDR · Status (badges Compl/Ag/MQL) · Data.
-  - Botão "Exportar CSV" — gera CSV no cliente com todas as colunas da view.
-  - Linha clicável abre um popover/dialog com **todas** as colunas da view daquele lead.
+Não vou trocar paleta/tipografia — uso o que já está em `index.css` / `tailwind.config.ts` (tokens semânticos `--background`, `--card`, `--muted`, `--primary`, `--chart-*`). O foco é hierarquia, densidade e consistência visual com o resto do app.
 
----
+**Estrutura redesenhada (top → bottom):**
 
-## 3. Filtragem por recorte (no `TypeformDashboard.tsx`)
+```text
+┌─ Header da aba ──────────────────────────────────────────────┐
+│ Diagnóstico O2 TAX · Typeform                                │
+│ subtítulo curto · última atualização                         │
+└──────────────────────────────────────────────────────────────┘
 
-Para cada handler de clique, calcular:
-- `leadsFiltrados = allLeads.filter(<predicado do recorte>)`
-- `breakdowns` cruzados relevantes ao recorte
+┌─ Janela temporal (segmented control, não 4 cards soltos) ────┐
+│ [Hoje] [7d] [30d] [Mais antigo]    — pill com count ao lado  │
+└──────────────────────────────────────────────────────────────┘
 
-| Clique em | Predicado | Breakdowns cruzados |
-|---|---|---|
-| KPI Leads/MQLs/Agendados/Conv | (todos) ou `is_mql` / `agendado` | Por SDR, Por faturamento, Por setor |
-| SDR (barra) | `sdr_nome === row.sdr_nome` | Por faturamento, Por setor, Por caminho |
-| Dia (barra pipeline) | `booking_date === row.booking_date` | Por SDR, Por faturamento |
-| Faixa faturamento | `faturamento === row.faturamento` | Por SDR, Por setor, Por UF |
-| Setor | `setor === row.setor` | Por SDR, Por faturamento, Por UF |
-| Caminho | `caminho === row.caminho` | Por SDR, Por faturamento |
-| UF | `uf === row.uf` | Por SDR, Por setor |
-| Source | `source === row.source` | Por caminho, Por faturamento |
-| Janela temporal | `created_at` na janela (hoje / 7d / 30d / mais antigo) | Por SDR, Por faturamento, Por setor |
+┌─ 4 KPIs principais (cards uniformes, mesma altura) ──────────┐
+│ Leads · MQLs · Agendados · Conv MQL                          │
+│ valor grande + sparkline/delta sutil opcional                │
+└──────────────────────────────────────────────────────────────┘
 
-Helper `buildBreakdown(leads, key, topN=5)` que agrupa, conta MQLs/Agendados e ordena.
+┌─ Reuniões por dia (chart full-width, com header e legenda) ──┐
+└──────────────────────────────────────────────────────────────┘
 
-Comparações de string normalizadas (trim + lowercase + NFD sem acento) — regra global do projeto.
+┌─ Próximas reuniões (tabela, header sticky, hover row) ───────┐
+└──────────────────────────────────────────────────────────────┘
 
----
+┌─ 2 col: Funil por faturamento │ Funil por setor ─────────────┐
+└──────────────────────────────────────────────────────────────┘
 
-## 4. Detalhes técnicos
+┌─ Funil por UF (full-width OU 2 col com mapa simples) ────────┐
+└──────────────────────────────────────────────────────────────┘
 
-- **Sem alterar APIs/views existentes** — apenas adicionar consumo de `v_o2_diag_leads_full`.
-- **Performance**: 1 fetch único da view, filtragem em memória; React Query cacheia.
-- **Empty state**: "Nenhum lead neste recorte" quando filtro retorna 0.
-- **CSV**: nome do arquivo `typeform-leads-{recorte}-{YYYYMMDD}.csv`, separador `;`, encoding UTF-8 com BOM (para Excel BR).
-- **Acessibilidade**: linhas da tabela com `role="button"` e `tabIndex={0}`.
+┌─ 4 KPIs secundários (Velocidade · sub-10 · sub-1h · Cobertura)
+└──────────────────────────────────────────────────────────────┘
+```
 
----
+**Tratamento visual aplicado em todos os blocos:**
 
-## Arquivos afetados
+- Envelopar cada bloco em `<Card>` (`bg-card`, `border-border`, `rounded-lg`) com `<CardHeader>` (title + descrição curta) e `<CardContent>` — hoje vários estão "soltos" sem card.
+- Espaçamento consistente: `space-y-6` no container, `gap-4` nos grids.
+- Tabelas: usar `<Table>` do shadcn com `<TableHeader>` em `bg-muted/50`, linhas com `hover:bg-muted/30 cursor-pointer`, números alinhados à direita em `font-mono tabular-nums`, badges de status com `variant` semântico.
+- KPIs: tipografia `text-3xl font-semibold tracking-tight`, label em `text-xs uppercase text-muted-foreground`, hint em `text-xs text-muted-foreground/70`. Estado clicável: borda fica `border-primary/40` e `shadow-sm` no hover.
+- Skeletons em todos os loadings (`<Skeleton>` do shadcn), removendo placeholders "—" piscando.
+- Empty states: ícone + frase curta em `text-muted-foreground` ao invés de linha em branco.
+- Cores de chart vindas só de `hsl(var(--chart-1..5))` e `hsl(var(--primary))` — nada hardcoded.
+- "Janela temporal" vira **segmented control** (`ToggleGroup` ou Tabs) horizontal compacto, em vez de 4 cards.
+- "Cobertura SDR + Velocidade" agrupados numa faixa final menor (`KpiBig size="sm"` já existe — só padronizar visual).
 
-- `src/components/planning/typeform/useTypeformData.ts` — +interface +hook
-- `src/components/planning/typeform/TypeformDetailDrawer.tsx` — refatorar para 2 abas + breakdowns + tabela leads + export
-- `src/components/planning/typeform/TypeformDashboard.tsx` — passar `leads` + `breakdowns` filtrados em cada `openDrawer(...)`
-- (novo) `src/components/planning/typeform/leadsFilters.ts` — helpers `buildBreakdown`, `normalize`, `inWindow`, `exportCsv`
+### Detalhes técnicos
 
-Nenhuma mudança em backend/edge functions.
+**Arquivos a editar:**
+- `src/components/planning/typeform/TypeformDashboard.tsx` — novo layout, header, cards em volta dos blocos, fix do filtro `excluded`, propagar filtro para os `breakdowns`.
+- `src/components/planning/typeform/leadsFilters.ts` — nova função `isFaturamentoExcluded(value)` exportada e reaproveitada em `buildBreakdown` (parâmetro opcional `excludeKeys`).
+- `src/components/planning/typeform/KpiBig.tsx` — padronizar tipografia/hover/estado clicável.
+- `src/components/planning/typeform/FunnelTable.tsx` — header sticky, hover row, alinhamento numérico, skeleton.
+- `src/components/planning/typeform/TemporalKpisRow.tsx` — virar segmented control horizontal.
+- `src/components/planning/typeform/BookingsByDayChart.tsx` — envelopar em Card, tooltip estilizado, eixos com `text-muted-foreground`.
+
+**Sem mudança em:**
+- `useTypeformData.ts` (hooks/queries iguais)
+- `TypeformDetailDrawer.tsx` (drawer já bom)
+- views do Supabase / edge functions
+
+**Sem novas dependências.** Tudo com componentes shadcn já presentes (`Card`, `Table`, `Skeleton`, `ToggleGroup`, `Badge`).

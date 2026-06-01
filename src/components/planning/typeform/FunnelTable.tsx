@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ interface Column<T> {
 
 interface Props<T> {
   title: string;
+  description?: string;
   data?: T[];
   loading?: boolean;
   columns: Column<T>[];
@@ -22,6 +23,7 @@ interface Props<T> {
 
 export function FunnelTable<T extends Record<string, any>>({
   title,
+  description,
   data,
   loading,
   columns,
@@ -32,8 +34,9 @@ export function FunnelTable<T extends Record<string, any>>({
   const rows = maxRows && data ? data.slice(0, maxRows) : data;
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <CardTitle className="text-base">{title}</CardTitle>
+        {description && <CardDescription className="text-xs">{description}</CardDescription>}
       </CardHeader>
       <CardContent>
         {loading ? (
