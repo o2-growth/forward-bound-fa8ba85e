@@ -252,6 +252,7 @@ export function runInsightsForBu(input: BuInsightInput): Insight[] {
   const buMeta = ruleBuMeta(input);
   if (buMeta) out.push(buMeta);
   out.push(...ruleVendedorZerado(input));
+  out.push(...ruleSdrSubperformando(input));
   const motivo = ruleConcentracaoMotivoPerda(input);
   if (motivo) out.push(motivo);
   const sla = ruleSla(input);
