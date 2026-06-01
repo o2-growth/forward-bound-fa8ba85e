@@ -364,6 +364,17 @@ export function TypeformDashboard() {
         onBarClick={openDay}
       />
 
+      {/* Futuras reuniões — geradas pelo Typeform nos últimos 15 dias */}
+      <BookingsByDayChart
+        title="Futuras reuniões"
+        data={generatedByDay}
+        loading={leadsLoading}
+        onBarClick={openGeneratedDay}
+        totalLabel={(t) => `${t} reuniões geradas nos últimos 15 dias`}
+        emptyMessage="Sem reuniões geradas nos últimos 15 dias"
+      />
+
+
       {/* Próximas reuniões */}
       <FunnelTable
         title="Próximas reuniões"
