@@ -18,7 +18,16 @@ import {
   useDiagByCaminho,
   useDiagByUf,
   useDiagBySource,
+  useDiagLeadsFull,
+  type DiagLeadFull,
 } from "./useTypeformData";
+import {
+  buildBreakdown,
+  eqNorm,
+  inWindow,
+  type BreakdownBlock,
+  type TemporalWindow,
+} from "./leadsFilters";
 
 const fmtInt = (v: number | undefined | null) =>
   v == null ? "—" : new Intl.NumberFormat("pt-BR").format(v);
