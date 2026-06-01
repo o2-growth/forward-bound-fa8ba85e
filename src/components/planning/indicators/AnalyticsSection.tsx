@@ -15,7 +15,7 @@ interface AnalyticsSectionProps {
 }
 
 export function AnalyticsSection({ buKey, startDate, endDate }: AnalyticsSectionProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
