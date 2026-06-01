@@ -17,15 +17,21 @@ const KPIS: Array<{
 ];
 
 const COMPARISON: Array<{ metric: string; ia: string; typeform: string; winner: Winner }> = [
-  { metric: "Leads tocados / únicos", ia: "184", typeform: "185", winner: "—" },
+  { metric: "MQLs", ia: "184", typeform: "60", winner: "—" },
   { metric: "Engajamento (resp/compl)", ia: "69 (37,5%)", typeform: "141 (76,2%)", winner: "typeform" },
   { metric: "Qualificados (MQL ≥200k)", ia: "n/d (IA fala c/ todos)", typeform: "60 (32,4%)", winner: "typeform" },
   { metric: "Agendamentos", ia: "28", typeform: "54", winner: "typeform" },
   { metric: "Conv. Lead → Agendamento", ia: "15,2%", typeform: "29,2%", winner: "typeform" },
   { metric: "Conv. MQL → Agendamento", ia: "15,2%", typeform: "61,7%", winner: "typeform" },
-  { metric: "% resposta sub-10min", ia: "~100% (auto)", typeform: "98,1%", winner: "ia" },
-  { metric: "Show-rate", ia: "47,9% (60d)", typeform: "n/d no painel", winner: "—" },
+  { metric: "Show-rate", ia: "47,9% (60d)", typeform: "18,9% (7 de 37 MQLs)", winner: "ia" },
   { metric: "Vendas fechadas (60d)", ia: "3 (R$ 72k)", typeform: "0", winner: "ia" },
+];
+
+const SHOW_RATE_BREAKDOWN: Array<{ label: string; emoji: string; qty: number; pct: string }> = [
+  { label: "Realizadas", emoji: "✅", qty: 7, pct: "18,9%" },
+  { label: "Agendadas no futuro", emoji: "⏳", qty: 17, pct: "45,9%" },
+  { label: "Perdidas pré-reunião", emoji: "❌", qty: 10, pct: "27,0%" },
+  { label: "No-show / remarcar", emoji: "⚠️", qty: 3, pct: "8,1%" },
 ];
 
 const IA_SALES = [
@@ -127,8 +133,8 @@ export function TypeformVsIATab() {
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase text-muted-foreground">
                 <th className="py-2 pr-4 font-medium">Métrica</th>
-                <th className="py-2 pr-4 font-medium">Jéssica IA (cold WhatsApp)</th>
-                <th className="py-2 pr-4 font-medium">Typeform O2 (inbound qualificado)</th>
+                <th className="py-2 pr-4 font-medium">Jéssica IA</th>
+                <th className="py-2 pr-4 font-medium">Typeform O2</th>
                 <th className="py-2 font-medium">Vencedor</th>
               </tr>
             </thead>
@@ -145,6 +151,27 @@ export function TypeformVsIATab() {
               ))}
             </tbody>
           </table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Detalhamento show-rate Typeform O2 (37 MQLs agendados)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {SHOW_RATE_BREAKDOWN.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-lg border border-border bg-card p-4"
+              >
+                <div className="mb-2 text-2xl">{item.emoji}</div>
+                <div className="text-2xl font-bold text-foreground">{item.qty}</div>
+                <div className="text-xs text-muted-foreground">{item.label}</div>
+                <div className="mt-1 text-sm font-semibold text-primary">{item.pct}</div>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
