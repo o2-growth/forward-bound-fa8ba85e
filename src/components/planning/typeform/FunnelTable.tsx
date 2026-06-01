@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface Column<T> {
   key: keyof T | string;
@@ -15,6 +16,8 @@ interface Props<T> {
   loading?: boolean;
   columns: Column<T>[];
   emptyMessage?: string;
+  onRowClick?: (row: T) => void;
+  maxRows?: number;
 }
 
 export function FunnelTable<T extends Record<string, any>>({
@@ -23,7 +26,10 @@ export function FunnelTable<T extends Record<string, any>>({
   loading,
   columns,
   emptyMessage = "Sem dados",
+  onRowClick,
+  maxRows,
 }: Props<T>) {
+  const rows = maxRows && data ? data.slice(0, maxRows) : data;
   return (
     <Card>
       <CardHeader>
@@ -32,7 +38,7 @@ export function FunnelTable<T extends Record<string, any>>({
       <CardContent>
         {loading ? (
           <Skeleton className="h-48 w-full" />
-        ) : !data || data.length === 0 ? (
+        ) : !rows || rows.length === 0 ? (
           <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
             {emptyMessage}
           </div>
@@ -52,8 +58,12 @@ export function FunnelTable<T extends Record<string, any>>({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.map((row, i) => (
-                  <TableRow key={i}>
+                {rows.map((row, i) => (
+                  <TableRow
+                    key={i}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={cn(onRowClick && "cursor-pointer hover:bg-muted/50")}
+                  >
                     {columns.map((col) => (
                       <TableCell
                         key={String(col.key)}

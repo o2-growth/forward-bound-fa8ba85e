@@ -1,84 +1,69 @@
-
 ## Objetivo
 
-Criar uma nova sub-aba **Typeform** dentro de **Indicadores › Comercial**, exibindo um painel de métricas do diagnóstico O2 a partir do Supabase externo `uqkuwbbfvuarupfsioak`.
+Expandir a sub-aba **Typeform** com mais métricas, incluindo **reuniões agendadas por dia** (histórico e futuro), e tornar os principais blocos **clicáveis** abrindo drawer com detalhamento.
 
-## Onde encaixa
+## Novas métricas / blocos
 
-Hoje `IndicatorsTab.tsx` é renderizado direto em `IndicatorsWrapper` na aba Comercial. Vou envolvê-lo em uma sub-`Tabs` interno com duas abas:
+1. **Reuniões agendadas por dia** (novo gráfico de barras, full-width acima dos demais)
+   - Fonte: `v_o2_diag_pipeline` (já traz `booking_date` × `reunioes`, futuras). Para histórico completo, vou também buscar via `?select=*&order=booking_date.asc` sem filtro de data — se a view só retornar futuras, adiciono fallback exibindo apenas o que vier.
+   - Eixo X: data (dia/mês), Eixo Y: nº de reuniões. Linha vertical marcando "hoje".
 
-- **Funil & Metas** (componente atual `IndicatorsTab`)
-- **Typeform** (novo `TypeformDashboard`)
+2. **Janela temporal** (4 mini-KPIs em linha) — `v_o2_diag_kpis_temporal`
+   - Cards: Hoje · Últimos 7d · Últimos 30d · Mais antigo
+   - Cada card: total, MQLs, agendados, % conv MQL
 
-Arquivo alterado: `src/components/planning/IndicatorsWrapper.tsx` (ou um wrapper novo `ComercialSubTabs.tsx`).
+3. **Caminhos A/B/C/D** (tabela) — `v_o2_diag_by_caminho`
+   - Colunas: caminho, total, MQLs, completos, agendados, % agenda
 
-## Conexão com Supabase externo
+4. **Funil por UF** (tabela) — `v_o2_diag_by_uf`
+   - Colunas: UF, MQLs, agendados, % conv
 
-A URL e a anon key são públicas (só leem views agregadas). Vou criar um client REST dedicado em `src/integrations/typeform/client.ts`:
+5. **Funil por utm_source** (tabela) — `v_o2_diag_by_source`
+   - Colunas: source, MQLs, agendados, % conv
 
-```ts
-const TYPEFORM_URL = "https://uqkuwbbfvuarupfsioak.supabase.co/rest/v1";
-const TYPEFORM_KEY = "<anon key fornecida>";
+6. **Card de velocidade expandido** — `v_o2_diag_velocidade`
+   - Já existe; adicionar 2 KPIs irmãos: % sub-10 min e % sub-1h (calculado a partir de sub_10min/total_bookings, sub_1h/total_bookings).
 
-export async function fetchView<T>(view: string, query = ""): Promise<T[]> {
-  const res = await fetch(`${TYPEFORM_URL}/${view}${query}`, {
-    headers: {
-      apikey: TYPEFORM_KEY,
-      Authorization: `Bearer ${TYPEFORM_KEY}`,
-    },
-  });
-  if (!res.ok) throw new Error(`Typeform view ${view}: ${res.status}`);
-  return res.json();
-}
+## Interatividade (clicáveis)
+
+Criar um `TypeformDetailDrawer` (usa `Sheet` do shadcn) que abre ao clicar em:
+
+- **KPI "Leads únicos / MQLs / Agendados / Conv MQL"** → mostra a janela temporal completa (`v_o2_diag_kpis_temporal`) + breakdown por SDR e por source para aquela métrica.
+- **Linha do gráfico SDR** → drawer com os MQLs daquele SDR, mostrando funil completos→agendados e velocidade (se disponível por SDR via mesma view).
+- **Barra do gráfico "Reuniões por dia"** → drawer listando a quantidade e, se a API expuser, datas/SDRs daquele dia (v1 mostra resumo do dia + link para `v_o2_diag_pipeline` filtrado).
+- **Linha das tabelas (faturamento, setor, caminho, UF, source)** → drawer com os KPIs filtrados (texto resumido + barras de proporção). Como as views já vêm agregadas, o drawer mostra os campos brutos da linha de forma mais rica, sem nova requisição.
+
+Todas as áreas clicáveis ganham `cursor-pointer`, `hover:bg-muted/40` e role/aria adequados.
+
+## Novo layout
+
+```
+Linha 0: 4 cards Janela Temporal (hoje / 7d / 30d / antigo)
+Linha 1: 4 KPI cards atuais (clicáveis)
+Linha 2: Reuniões agendadas por dia (gráfico full-width, barras clicáveis)
+Linha 3: SDR bar chart (clicável) | Reuniões futuras (linha do tempo)
+Linha 4: Funil por faturamento | Funil por setor   (linhas clicáveis)
+Linha 5: Funil por caminho     | Funil por UF      (linhas clicáveis)
+Linha 6: Funil por source (full-width, top 15)     (linhas clicáveis)
+Linha 7: Velocidade mediana | % sub-10min | % sub-1h | Cobertura SDR
 ```
 
-Como é um Supabase diferente do projeto, **não** uso o client existente — fica isolado. A chave anon vai no código (é pública e a própria mensagem do usuário confirma que é seguro).
+## Arquivos
 
-## Estrutura de arquivos novos
+Novos:
+- `src/components/planning/typeform/TemporalKpisRow.tsx`
+- `src/components/planning/typeform/BookingsByDayChart.tsx`
+- `src/components/planning/typeform/TypeformDetailDrawer.tsx`
 
-```
-src/components/planning/typeform/
-  TypeformDashboard.tsx        // monta as 4 linhas do layout
-  useTypeformData.ts           // hooks (react-query) para cada view
-  KpiBig.tsx                   // card grande de KPI
-  SdrBarChart.tsx              // barra horizontal (recharts)
-  PipelineTimeline.tsx         // linha do tempo de reuniões
-  FunnelTable.tsx              // tabela genérica (faturamento/setor)
-src/integrations/typeform/client.ts
-```
-
-## Layout (conforme especificação do usuário)
-
-**Linha 1 — 4 KPI cards** (view `v_o2_diag_kpis`, 1 linha):
-- Leads únicos = `total_leads`
-- MQLs = `total_mqls`
-- MQLs agendaram = `mql_agendados`
-- Conv. MQL = `mql_taxa_agenda_pct` + "%"
-
-**Linha 2 — 2 gráficos**:
-- Barra horizontal SDRs (`v_o2_diag_by_sdr` ordenada por `agendados` DESC) — Recharts `BarChart` layout="vertical"
-- Linha do tempo de reuniões futuras (`v_o2_diag_pipeline`) — Recharts `LineChart` em `booking_date` × `reunioes`
-
-**Linha 3 — 2 tabelas lado a lado**:
-- Funil por faturamento (`v_o2_diag_by_faturamento` ordenada por `total` DESC) — colunas: faixa, total, completos, agendados, % completo, % agenda
-- Funil por setor (`v_o2_diag_by_setor`) — colunas: setor, mqls, agendados, % conv
-
-**Linha 4 — 2 cards finais**:
-- Velocidade mediana = `mediana_min` + " min" (de `v_o2_diag_velocidade`)
-- Cobertura SDR = `(qtd SDRs com MQLs > 0 / total_mqls) × 100%` (derivado de `v_o2_diag_by_sdr` + `v_o2_diag_kpis`)
-
-## Carregamento de dados
-
-Usar `@tanstack/react-query` (já no projeto) com `staleTime: 5min`. Um hook por view, todos chamados em paralelo no `TypeformDashboard`. Estados de loading via `Skeleton`, erros via `Alert`.
-
-## Estilo
-
-Reaproveitar `Card`/`CardHeader`/`CardContent` e tokens semânticos do design system (sem cores hardcoded). Grid responsivo (`grid-cols-1 md:grid-cols-2 lg:grid-cols-4` para Linha 1, `md:grid-cols-2` para Linhas 2–4).
+Atualizações:
+- `useTypeformData.ts` — adicionar hooks `useDiagTemporal`, `useDiagByCaminho`, `useDiagByUf`, `useDiagBySource` e tipos correspondentes.
+- `TypeformDashboard.tsx` — montar novo layout, conectar handlers de clique no drawer.
+- `FunnelTable.tsx` — aceitar prop `onRowClick?: (row) => void` e aplicar estilos hover/cursor quando presente.
+- `SdrBarChart.tsx` — aceitar `onBarClick?: (row) => void` via `onClick` do Recharts.
+- `KpiBig.tsx` — aceitar `onClick?` opcional com hover.
 
 ## Fora do escopo
 
-- Filtros interativos (período, SDR, faixa) — versão 1 apenas exibe os agregados como retornados pelas views
-- Persistência/cache em Supabase do projeto
-- Auth no Supabase externo (anon key inline é suficiente)
-
-Confirma que posso seguir?
+- Filtros globais (período/SDR) — vistas já vêm agregadas; manter v1 sem filtros.
+- Refresh manual / botão de atualizar.
+- Persistência de seleção no URL.
