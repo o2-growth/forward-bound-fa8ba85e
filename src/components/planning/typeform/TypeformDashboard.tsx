@@ -426,35 +426,20 @@ export function TypeformDashboard() {
         />
       </div>
 
-      {/* Linha 5 — Caminho + UF */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <FunnelTable
-          title="Funil por caminho (A/B/C/D)"
-          data={caminho.data}
-          loading={caminho.isLoading}
-          onRowClick={openCaminho}
-          columns={[
-            { key: "caminho", label: "Caminho" },
-            { key: "total", label: "Total", align: "right", render: (r) => fmtInt(r.total) },
-            { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
-            { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
-            { key: "taxa_agenda_pct", label: "% Ag.", align: "right", render: (r) => fmtPct(r.taxa_agenda_pct) },
-          ]}
-        />
-        <FunnelTable
-          title="Funil por UF"
-          data={ufSorted}
-          loading={uf.isLoading}
-          maxRows={15}
-          onRowClick={openUf}
-          columns={[
-            { key: "uf", label: "UF" },
-            { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
-            { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
-            { key: "conv_pct", label: "% Conv", align: "right", render: (r) => fmtPct(r.conv_pct) },
-          ]}
-        />
-      </div>
+      {/* Linha 5 — UF */}
+      <FunnelTable
+        title="Funil por UF"
+        data={ufSorted}
+        loading={uf.isLoading}
+        maxRows={15}
+        onRowClick={openUf}
+        columns={[
+          { key: "uf", label: "UF" },
+          { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
+          { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
+          { key: "conv_pct", label: "% Conv", align: "right", render: (r) => fmtPct(r.conv_pct) },
+        ]}
+      />
 
 
       {/* Linha 7 — Velocidade + cobertura */}
