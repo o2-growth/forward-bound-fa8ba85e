@@ -12,14 +12,13 @@ const KPIS: Array<{
 }> = [
   { label: "Agendamentos", typeform: "54", ia: "28", delta: "+92,9%", winner: "typeform" },
   { label: "Conv. Lead → Agendamento", typeform: "29,2%", ia: "15,2%", delta: "+14,0 p.p.", winner: "typeform" },
-  { label: "Engajamento", typeform: "76,2%", ia: "37,5%", delta: "+38,7 p.p.", winner: "typeform" },
+  { label: "Engajamento", typeform: "75,5%", ia: "37,5%", delta: "+38,0 p.p.", winner: "typeform" },
   { label: "Conv. MQL → Agendamento", typeform: "61,7%", ia: "n/d", delta: "—", winner: "typeform" },
 ];
 
 const COMPARISON: Array<{ metric: string; ia: string; typeform: string; winner: Winner }> = [
   { metric: "MQLs", ia: "184", typeform: "60", winner: "—" },
-  { metric: "Engajamento (resp/compl)", ia: "69 (37,5%)", typeform: "141 (76,2%)", winner: "typeform" },
-  { metric: "Qualificados (MQL ≥200k)", ia: "n/d (IA fala c/ todos)", typeform: "60 (32,4%)", winner: "typeform" },
+  { metric: "Engajamento (resp/compl)", ia: "69 (37,5%)", typeform: "75,5% dos 60 MQLs", winner: "typeform" },
   { metric: "Agendamentos", ia: "28", typeform: "54", winner: "typeform" },
   { metric: "Conv. Lead → Agendamento", ia: "15,2%", typeform: "29,2%", winner: "typeform" },
   { metric: "Conv. MQL → Agendamento", ia: "15,2%", typeform: "61,7%", winner: "typeform" },
