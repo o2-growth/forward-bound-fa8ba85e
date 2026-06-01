@@ -75,15 +75,19 @@ export function BookingsByDayChart({
               <XAxis dataKey="label" stroke="hsl(var(--muted-foreground))" fontSize={11} />
               <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} allowDecimals={false} />
               <Tooltip
+                cursor={{ fill: "hsl(var(--muted) / 0.4)" }}
                 contentStyle={{
                   background: "hsl(var(--popover))",
                   border: "1px solid hsl(var(--border))",
                   borderRadius: 8,
                   color: "hsl(var(--popover-foreground))",
                 }}
+                labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
+                itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                 formatter={(v: any) => [v, "Reuniões"]}
                 labelFormatter={(l) => `Dia ${l}`}
               />
+
               {hasToday && (
                 <ReferenceLine
                   x={todayLabel}
