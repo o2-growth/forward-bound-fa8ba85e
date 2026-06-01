@@ -128,7 +128,7 @@ export function TypeformVsIATab() {
               <tr className="border-b border-border text-left text-xs uppercase text-muted-foreground">
                 <th className="py-2 pr-4 font-medium">Métrica</th>
                 <th className="py-2 pr-4 font-medium">Jéssica IA (cold WhatsApp)</th>
-                <th className="py-2 pr-4 font-medium">Typeform O2 TAX (inbound qualificado)</th>
+                <th className="py-2 pr-4 font-medium">Typeform O2 (inbound qualificado)</th>
                 <th className="py-2 font-medium">Vencedor</th>
               </tr>
             </thead>
@@ -192,7 +192,7 @@ export function TypeformVsIATab() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Dados consolidados em 01/06/2026 — Typeform: painel O2 TAX. Jéssica IA: relatório operacional manual.
+        Dados consolidados em 01/06/2026 — Typeform: painel O2. Jéssica IA: relatório operacional manual.
       </p>
     </div>
   );
