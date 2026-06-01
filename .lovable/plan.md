@@ -1,34 +1,57 @@
 ## Objetivo
+Adicionar uma nova sub-aba **"Typeform vs IA"** dentro do bloco "Comercial" (ao lado de Funil & Metas e Typeform), exibindo um comparativo **estático** dos dois canais de aquisição com base nos números fornecidos pelo usuário. Sem opiniões — só números, badges e diferenças calculadas.
 
-Duplicar o gráfico atual **"Reuniões por dia"** (que mostra `booking_date` — a data em que a reunião está marcada) e criar uma versão chamada **"Futuras reuniões"** que, em vez de agrupar pela data agendada, mostre **quantas reuniões foram geradas (agendadas) pelo Typeform por dia**, considerando os **últimos 15 dias** com base na data de criação do lead.
+## Estrutura da tela
 
-## O que muda
+### 1. Header
+- Título: "Typeform vs Jéssica IA"
+- Subtítulo: "Comparativo de canais de aquisição — janela de teste recente"
+- Badge da janela: "Período: últimos 60 dias"
 
-### 1. Novo dataset no `TypeformDashboard.tsx`
-Derivar uma série diária a partir de `allLeads` (`useDiagLeadsFull`):
+### 2. KPIs de destaque (4 cards, grid 2x2 / lg:grid-cols-4)
+Usar `KpiBig` já existente para manter consistência:
+- **Agendamentos**: Typeform `54` vs IA `28` → delta `+92,9%` a favor do Typeform
+- **Conv. Lead → Agendamento**: Typeform `29,2%` vs IA `15,2%` → delta `+14,0 p.p.`
+- **Engajamento**: Typeform `76,2%` vs IA `37,5%` → delta `+38,7 p.p.`
+- **Conv. MQL → Agendamento**: Typeform `61,7%` vs IA `n/d`
 
-- Filtrar leads com `agendado === true` e `created_at` válido.
-- Agrupar por dia (`created_at.slice(0,10)`).
-- Considerar somente os **últimos 15 dias** (incluindo hoje), preenchendo dias sem reuniões com `0` para o eixo X ficar contínuo.
-- Formato igual ao consumido pelo `BookingsByDayChart`: `{ booking_date: string, reunioes: number }` — assim reaproveitamos o mesmo componente.
+### 3. Tabela comparativa completa (card)
+Reproduz a tabela do screenshot. Colunas: Métrica | Jéssica IA (cold WhatsApp) | Typeform O2 TAX (inbound qualificado) | Vencedor (badge).
+Linhas:
+| Métrica | IA | Typeform |
+|---|---|---|
+| Leads tocados / únicos | 184 | 185 |
+| Engajamento (resp/compl) | 69 (37,5%) | 141 (76,2%) |
+| Qualificados (MQL ≥200k) | n/d (IA fala c/ todos) | 60 (32,4%) |
+| Agendamentos | 28 | 54 |
+| Conv. Lead → Agendamento | 15,2% | 29,2% |
+| Conv. MQL → Agendamento | n/d | 61,7% |
+| Velocidade mediana resposta | <segundos (auto) | 2,8 min |
+| % resposta sub-10min | ~100% (auto) | 98,1% |
+| Cobertura | 24/7 IA, sem humano | 7 SDRs humanos |
+| Show-rate | 47,9% (60d) | n/d no painel |
+| Vendas fechadas (60d) | 3 (R$ 72k) | n/d no painel |
 
-### 2. Render no dashboard
-Logo abaixo do gráfico atual `Reuniões por dia`, renderizar um segundo `BookingsByDayChart` com:
+Coluna "Vencedor" mostra badge `Typeform`, `IA` ou `—` conforme o número maior; quando IA tem vantagem natural (velocidade, cobertura 24/7) marcar como IA; quando Typeform não tem dado, deixar "—".
 
-- `title="Futuras reuniões"`
-- `description="Reuniões geradas pelo Typeform por dia — últimos 15 dias"`
-- `data` = a nova série derivada.
-- `onBarClick` = handler que abre o drawer filtrando `allLeads` por `created_at` no mesmo dia (e `agendado === true`), mostrando breakdown por SDR e faturamento (reaproveitando `keepFaturamento`).
+### 4. Vendas fechadas pela IA (tabela detalhada)
+Card separado com a tabela das 3 vendas que o usuário forneceu:
+Colunas: Empresa | Setor | Faturamento | Setup | Produto | SDR + Closer | IA agendou | Fechou.
+Linhas:
+- Imperador Burger | Comércio | 1-5M | R$ 32k | Assessoria+Gênio+Oxy | Érica + Thiago Zanoni | 17/05 | 26/05
+- Firme Empreendimentos | Indústria | 350-500k | R$ 30k | CaaS Corp+Gênio+Oxy | Carlos + Thiago Zanoni | 20/05 | 25/05
+- MARCIO ANDRADE | Serviço | 500k-1M | R$ 10k | Gênio+Oxy | Daniel Trindade + Amanda Serafim | 05/04 | 30/04
 
-### 3. Suporte no `BookingsByDayChart`
-Se hoje o título/descrição estão hard-coded dentro do componente, adicionar props `title` e `description` (com defaults atuais) para permitir customização sem duplicar o componente. Caso já recebam por prop, nenhuma mudança necessária.
+Footer do card com o total: **3 vendas · R$ 72k em Setup**.
 
-## Arquivos afetados
+### 5. Nota de rodapé pequena
+"Dados consolidados em 01/06/2026 — Typeform: painel O2 TAX (Supabase). Jéssica IA: relatório operacional manual."
 
-- `src/components/planning/typeform/TypeformDashboard.tsx` — novo `useMemo` para a série de 15 dias, novo handler de clique, novo `<BookingsByDayChart>`.
-- `src/components/planning/typeform/BookingsByDayChart.tsx` — apenas se precisar expor `title`/`description` como props.
+## Arquivos
+- **Novo**: `src/components/planning/typeform/TypeformVsIATab.tsx` — componente estático com KPIs, tabelas e badges.
+- **Editar**: `src/components/planning/IndicatorsWrapper.tsx` — mudar o sub-grid `grid-cols-2` para `grid-cols-3`, adicionar `TabsTrigger value="vs-ia"` e `TabsContent` correspondente.
 
 ## Fora de escopo
-
-- Nenhuma alteração em views Supabase, hooks de dados, ou no drawer.
-- Sem mudanças no gráfico original "Reuniões por dia".
+- Sem consulta de dados em tempo real — todos os números do screenshot/mensagem ficam hard-coded no componente (constantes no topo do arquivo) para fácil edição futura.
+- Nenhuma mudança na aba Typeform existente.
+- Sem migrations, edge functions ou alteração de schema.
