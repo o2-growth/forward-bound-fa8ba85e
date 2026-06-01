@@ -67,15 +67,8 @@ export function TypeformDashboard() {
   const kpi = kpis.data?.[0];
   const vel = velocidade.data?.[0];
 
-  const sdrsComMqls = (sdr.data ?? []).filter((s) => (s.mqls ?? 0) > 0).length;
   const totalMqls = kpi?.total_mqls ?? 0;
-  const cobertura =
-    totalMqls > 0 ? ((sdrsComMqls / totalMqls) * 100).toFixed(1) + "%" : "—";
 
-  const pctSub10 =
-    vel && vel.total_bookings > 0 ? (vel.sub_10min / vel.total_bookings) * 100 : null;
-  const pctSub1h =
-    vel && vel.total_bookings > 0 ? (vel.sub_1h / vel.total_bookings) * 100 : null;
 
   const faturamentoSorted = useMemo(
     () =>
@@ -447,19 +440,19 @@ export function TypeformDashboard() {
         ]}
       />
 
-      {/* Velocidade + cobertura — bloco final dentro de Card */}
+      {/* Velocidade — bloco final dentro de Card */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Gauge className="h-4 w-4 text-primary" />
-            Velocidade & cobertura
+            Velocidade
           </CardTitle>
           <CardDescription>
-            Tempo de resposta dos SDRs (do formulário ao booking) e cobertura de MQLs por SDR.
+            Tempo mediano de resposta dos SDRs (do formulário ao booking).
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             <KpiBig
               size="sm"
               label="Velocidade mediana"
@@ -467,34 +460,10 @@ export function TypeformDashboard() {
               loading={velocidade.isLoading}
               hint={vel ? `${fmtInt(vel.total_bookings)} bookings` : undefined}
             />
-            <KpiBig
-              size="sm"
-              label="% sub-10 min"
-              value={fmtPct(pctSub10)}
-              loading={velocidade.isLoading}
-              hint={vel ? `${fmtInt(vel.sub_10min)} bookings` : undefined}
-            />
-            <KpiBig
-              size="sm"
-              label="% sub-1h"
-              value={fmtPct(pctSub1h)}
-              loading={velocidade.isLoading}
-              hint={vel ? `${fmtInt(vel.sub_1h)} bookings` : undefined}
-            />
-            <KpiBig
-              size="sm"
-              label="Cobertura SDR"
-              value={cobertura}
-              loading={kpis.isLoading || sdr.isLoading}
-              hint={
-                sdrsComMqls > 0
-                  ? `${sdrsComMqls} SDRs ativos / ${fmtInt(totalMqls)} MQLs`
-                  : undefined
-              }
-            />
           </div>
         </CardContent>
       </Card>
+
 
       {/* Rodapé compacto com timestamp */}
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-2">
