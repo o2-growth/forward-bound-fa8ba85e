@@ -66,7 +66,7 @@ export function BookingsByDayChart({
           <Skeleton className="h-72 w-full" />
         ) : enriched.length === 0 ? (
           <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">
-            Sem reuniões registradas
+            {emptyMessage}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={320}>
