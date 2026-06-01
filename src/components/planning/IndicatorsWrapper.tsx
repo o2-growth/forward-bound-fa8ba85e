@@ -2,7 +2,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IndicatorsTab } from "@/components/planning/IndicatorsTab";
 import { MarketingIndicatorsTab } from "@/components/planning/MarketingIndicatorsTab";
 import { GrowthTab } from "@/components/planning/GrowthTab";
-import { BarChart3, TrendingUp, Rocket } from "lucide-react";
+import { TypeformDashboard } from "@/components/planning/typeform/TypeformDashboard";
+import { BarChart3, TrendingUp, Rocket, GitBranch, FileText } from "lucide-react";
 
 export function IndicatorsWrapper() {
   return (
@@ -23,7 +24,24 @@ export function IndicatorsWrapper() {
       </TabsList>
 
       <TabsContent value="comercial" className="mt-0">
-        <IndicatorsTab />
+        <Tabs defaultValue="funil" className="w-full">
+          <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+            <TabsTrigger value="funil" className="gap-2">
+              <GitBranch className="h-4 w-4" />
+              <span>Funil & Metas</span>
+            </TabsTrigger>
+            <TabsTrigger value="typeform" className="gap-2">
+              <FileText className="h-4 w-4" />
+              <span>Typeform</span>
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="funil" className="mt-0">
+            <IndicatorsTab />
+          </TabsContent>
+          <TabsContent value="typeform" className="mt-0">
+            <TypeformDashboard />
+          </TabsContent>
+        </Tabs>
       </TabsContent>
 
       <TabsContent value="marketing" className="mt-0">

@@ -1,33 +1,84 @@
-## Problema
 
-Os 5 acelerômetros monetários no final do dashboard (SLA, Faturamento, MRR, Setup, Pontual) ignoram o filtro de **Origem** (Outbound, Inbound, etc.). Quando o usuário seleciona somente uma origem (sem filtrar Closer ou SDR), os cards mostram o valor total da BU.
+## Objetivo
 
-## Causa
+Criar uma nova sub-aba **Typeform** dentro de **Indicadores › Comercial**, exibindo um painel de métricas do diagnóstico O2 a partir do Supabase externo `uqkuwbbfvuarupfsioak`.
 
-Em `src/components/planning/IndicatorsTab.tsx`, dentro de `getRealizedMonetaryForIndicator` (linha ~2332), o flag `filtersActive` considera apenas Closer e SDR:
+## Onde encaixa
+
+Hoje `IndicatorsTab.tsx` é renderizado direto em `IndicatorsWrapper` na aba Comercial. Vou envolvê-lo em uma sub-`Tabs` interno com duas abas:
+
+- **Funil & Metas** (componente atual `IndicatorsTab`)
+- **Typeform** (novo `TypeformDashboard`)
+
+Arquivo alterado: `src/components/planning/IndicatorsWrapper.tsx` (ou um wrapper novo `ComercialSubTabs.tsx`).
+
+## Conexão com Supabase externo
+
+A URL e a anon key são públicas (só leem views agregadas). Vou criar um client REST dedicado em `src/integrations/typeform/client.ts`:
 
 ```ts
-const filtersActive = closerFilterActive || sdrFilterActive;
+const TYPEFORM_URL = "https://uqkuwbbfvuarupfsioak.supabase.co/rest/v1";
+const TYPEFORM_KEY = "<anon key fornecida>";
+
+export async function fetchView<T>(view: string, query = ""): Promise<T[]> {
+  const res = await fetch(`${TYPEFORM_URL}/${view}${query}`, {
+    headers: {
+      apikey: TYPEFORM_KEY,
+      Authorization: `Bearer ${TYPEFORM_KEY}`,
+    },
+  });
+  if (!res.ok) throw new Error(`Typeform view ${view}: ${res.status}`);
+  return res.json();
+}
 ```
 
-Quando `filtersActive` é `false`, a função cai no caminho otimizado (`getModeloAtualValue`, `getMrrForPeriod`, `getSetupForPeriod`, `getPontualForPeriod`, `getOxyHackerValue`, `getExpansaoValue`) — esses helpers vêm do hook de realized agregado e não aplicam `matchesOrigemFilter`.
+Como é um Supabase diferente do projeto, **não** uso o client existente — fica isolado. A chave anon vai no código (é pública e a própria mensagem do usuário confirma que é seguro).
 
-A função `filteredVendasForBU` (que aplica `matchesOrigemFilter` por card) só é executada quando o filtro de pessoas está ativo.
+## Estrutura de arquivos novos
 
-## Correção
+```
+src/components/planning/typeform/
+  TypeformDashboard.tsx        // monta as 4 linhas do layout
+  useTypeformData.ts           // hooks (react-query) para cada view
+  KpiBig.tsx                   // card grande de KPI
+  SdrBarChart.tsx              // barra horizontal (recharts)
+  PipelineTimeline.tsx         // linha do tempo de reuniões
+  FunnelTable.tsx              // tabela genérica (faturamento/setor)
+src/integrations/typeform/client.ts
+```
 
-Em `src/components/planning/IndicatorsTab.tsx`:
+## Layout (conforme especificação do usuário)
 
-1. Adicionar `origemFilterActive` no escopo de `getRealizedMonetaryForIndicator`:
-   ```ts
-   const origemFilterActive = selectedOrigens.length > 0;
-   const filtersActive = closerFilterActive || sdrFilterActive || origemFilterActive;
-   ```
-2. Manter `filteredVendasForBU` igual (já chama `matchesOrigemFilter`).
-3. Resultado: quando só Origem estiver selecionada, o caminho `filtered === null` deixa de ser usado, e todas as 4 BUs (Modelo Atual, O2 TAX, Oxy Hacker, Franquia) somam apenas os cards de venda cuja origem classificada está no filtro — para Faturamento, MRR, Setup e Pontual.
+**Linha 1 — 4 KPI cards** (view `v_o2_diag_kpis`, 1 linha):
+- Leads únicos = `total_leads`
+- MQLs = `total_mqls`
+- MQLs agendaram = `mql_agendados`
+- Conv. MQL = `mql_taxa_agenda_pct` + "%"
 
-## Observações
+**Linha 2 — 2 gráficos**:
+- Barra horizontal SDRs (`v_o2_diag_by_sdr` ordenada por `agendados` DESC) — Recharts `BarChart` layout="vertical"
+- Linha do tempo de reuniões futuras (`v_o2_diag_pipeline`) — Recharts `LineChart` em `booking_date` × `reunioes`
 
-- **SLA** continua sem aplicar origem (é uma métrica de fase/tempo de leads em "Tentativas de contato", não venda); manter como está.
-- **Meta** dos acelerômetros (`getMetaMonetaryForIndicator`) não muda: meta é absoluta do período/BU e não tem origem.
-- Nenhuma mudança em outros componentes, hooks, schema ou cálculos. Apenas um ajuste de 2 linhas dentro de uma função.
+**Linha 3 — 2 tabelas lado a lado**:
+- Funil por faturamento (`v_o2_diag_by_faturamento` ordenada por `total` DESC) — colunas: faixa, total, completos, agendados, % completo, % agenda
+- Funil por setor (`v_o2_diag_by_setor`) — colunas: setor, mqls, agendados, % conv
+
+**Linha 4 — 2 cards finais**:
+- Velocidade mediana = `mediana_min` + " min" (de `v_o2_diag_velocidade`)
+- Cobertura SDR = `(qtd SDRs com MQLs > 0 / total_mqls) × 100%` (derivado de `v_o2_diag_by_sdr` + `v_o2_diag_kpis`)
+
+## Carregamento de dados
+
+Usar `@tanstack/react-query` (já no projeto) com `staleTime: 5min`. Um hook por view, todos chamados em paralelo no `TypeformDashboard`. Estados de loading via `Skeleton`, erros via `Alert`.
+
+## Estilo
+
+Reaproveitar `Card`/`CardHeader`/`CardContent` e tokens semânticos do design system (sem cores hardcoded). Grid responsivo (`grid-cols-1 md:grid-cols-2 lg:grid-cols-4` para Linha 1, `md:grid-cols-2` para Linhas 2–4).
+
+## Fora do escopo
+
+- Filtros interativos (período, SDR, faixa) — versão 1 apenas exibe os agregados como retornados pelas views
+- Persistência/cache em Supabase do projeto
+- Auth no Supabase externo (anon key inline é suficiente)
+
+Confirma que posso seguir?
