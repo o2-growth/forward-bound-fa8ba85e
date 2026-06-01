@@ -430,6 +430,36 @@ export type Database = {
         }
         Relationships: []
       }
+      commercial_insights_snapshots: {
+        Row: {
+          generated_at: string
+          id: string
+          insights: Json
+          label: string | null
+          period_end: string
+          period_start: string
+          user_id: string
+        }
+        Insert: {
+          generated_at?: string
+          id?: string
+          insights?: Json
+          label?: string | null
+          period_end: string
+          period_start: string
+          user_id: string
+        }
+        Update: {
+          generated_at?: string
+          id?: string
+          insights?: Json
+          label?: string | null
+          period_end?: string
+          period_start?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cost_stage_metas: {
         Row: {
           cpl: number
