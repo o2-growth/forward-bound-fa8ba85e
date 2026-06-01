@@ -11,7 +11,6 @@ const KPIS: Array<{
   winner: Winner;
 }> = [
   { label: "Agendamentos", typeform: "54", ia: "28", delta: "+92,9%", winner: "typeform" },
-  { label: "Conv. Lead → Agendamento", typeform: "29,2%", ia: "15,2%", delta: "+14,0 p.p.", winner: "typeform" },
   { label: "Engajamento", typeform: "75,5%", ia: "37,5%", delta: "+38,0 p.p.", winner: "typeform" },
   { label: "Conv. MQL → Agendamento", typeform: "61,7%", ia: "n/d", delta: "—", winner: "typeform" },
 ];
@@ -20,18 +19,28 @@ const COMPARISON: Array<{ metric: string; ia: string; typeform: string; winner: 
   { metric: "MQLs", ia: "184", typeform: "60", winner: "—" },
   { metric: "Engajamento (resp/compl)", ia: "69 (37,5%)", typeform: "75,5% dos 60 MQLs", winner: "typeform" },
   { metric: "Agendamentos", ia: "28", typeform: "54", winner: "typeform" },
-  { metric: "Conv. Lead → Agendamento", ia: "15,2%", typeform: "29,2%", winner: "typeform" },
   { metric: "Conv. MQL → Agendamento", ia: "15,2%", typeform: "61,7%", winner: "typeform" },
-  { metric: "Show-rate", ia: "47,9% (60d)", typeform: "18,9% (7 de 37 MQLs)", winner: "ia" },
+  { metric: "Show-rate", ia: "42,9% (12 de 28)", typeform: "18,9% (7 de 37 MQLs)", winner: "ia" },
   { metric: "Vendas fechadas (60d)", ia: "3 (R$ 72k)", typeform: "0", winner: "ia" },
 ];
 
-const SHOW_RATE_BREAKDOWN: Array<{ label: string; emoji: string; qty: number; pct: string }> = [
+type BreakdownItem = { label: string; emoji: string; qty: number; pct: string };
+
+const SHOW_RATE_BREAKDOWN_TYPEFORM: BreakdownItem[] = [
   { label: "Realizadas", emoji: "✅", qty: 7, pct: "18,9%" },
   { label: "Agendadas no futuro", emoji: "⏳", qty: 17, pct: "45,9%" },
   { label: "Perdidas pré-reunião", emoji: "❌", qty: 10, pct: "27,0%" },
   { label: "No-show / remarcar", emoji: "⚠️", qty: 3, pct: "8,1%" },
 ];
+
+const SHOW_RATE_BREAKDOWN_IA: BreakdownItem[] = [
+  { label: "Realizadas", emoji: "✅", qty: 12, pct: "42,9%" },
+  { label: "Agendadas no futuro", emoji: "⏳", qty: 1, pct: "3,6%" },
+  { label: "No-show / remarcar", emoji: "⚠️", qty: 8, pct: "28,6%" },
+  { label: "Perdidas pré-reunião", emoji: "❌", qty: 7, pct: "25,0%" },
+];
+
+
 
 const IA_SALES = [
   {
