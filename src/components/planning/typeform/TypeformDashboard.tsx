@@ -1,9 +1,12 @@
+import { useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { KpiBig } from "./KpiBig";
 import { SdrBarChart } from "./SdrBarChart";
-import { PipelineTimeline } from "./PipelineTimeline";
+import { BookingsByDayChart } from "./BookingsByDayChart";
 import { FunnelTable } from "./FunnelTable";
+import { TemporalKpisRow } from "./TemporalKpisRow";
+import { TypeformDetailDrawer, type DetailField } from "./TypeformDetailDrawer";
 import {
   useDiagKpis,
   useDiagBySdr,
@@ -11,6 +14,10 @@ import {
   useDiagBySetor,
   useDiagPipeline,
   useDiagVelocidade,
+  useDiagTemporal,
+  useDiagByCaminho,
+  useDiagByUf,
+  useDiagBySource,
 } from "./useTypeformData";
 
 const fmtInt = (v: number | undefined | null) =>
@@ -18,13 +25,28 @@ const fmtInt = (v: number | undefined | null) =>
 const fmtPct = (v: number | undefined | null) =>
   v == null ? "—" : `${Number(v).toFixed(1)}%`;
 
+interface DrawerState {
+  open: boolean;
+  title: string;
+  description?: string;
+  fields: DetailField[];
+}
+
 export function TypeformDashboard() {
   const kpis = useDiagKpis();
+  const temporal = useDiagTemporal();
   const sdr = useDiagBySdr();
   const faturamento = useDiagByFaturamento();
   const setor = useDiagBySetor();
+  const uf = useDiagByUf();
+  const source = useDiagBySource();
+  const caminho = useDiagByCaminho();
   const pipeline = useDiagPipeline();
   const velocidade = useDiagVelocidade();
+
+  const [drawer, setDrawer] = useState<DrawerState>({ open: false, title: "", fields: [] });
+  const openDrawer = (s: Omit<DrawerState, "open">) => setDrawer({ open: true, ...s });
+  const closeDrawer = () => setDrawer((d) => ({ ...d, open: false }));
 
   const kpi = kpis.data?.[0];
   const vel = velocidade.data?.[0];
@@ -34,12 +56,163 @@ export function TypeformDashboard() {
   const cobertura =
     totalMqls > 0 ? ((sdrsComMqls / totalMqls) * 100).toFixed(1) + "%" : "—";
 
-  const anyError =
-    kpis.error || sdr.error || faturamento.error || setor.error || pipeline.error || velocidade.error;
+  const pctSub10 =
+    vel && vel.total_bookings > 0 ? (vel.sub_10min / vel.total_bookings) * 100 : null;
+  const pctSub1h =
+    vel && vel.total_bookings > 0 ? (vel.sub_1h / vel.total_bookings) * 100 : null;
 
-  const faturamentoSorted = (faturamento.data ?? [])
-    .slice()
-    .sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
+  const faturamentoSorted = useMemo(
+    () =>
+      (faturamento.data ?? [])
+        .slice()
+        .sort((a, b) => (b.total ?? 0) - (a.total ?? 0)),
+    [faturamento.data]
+  );
+  const sourceSorted = useMemo(
+    () =>
+      (source.data ?? [])
+        .slice()
+        .sort((a, b) => (b.mqls ?? 0) - (a.mqls ?? 0)),
+    [source.data]
+  );
+  const ufSorted = useMemo(
+    () => (uf.data ?? []).slice().sort((a, b) => (b.mqls ?? 0) - (a.mqls ?? 0)),
+    [uf.data]
+  );
+
+  const anyError =
+    kpis.error ||
+    sdr.error ||
+    faturamento.error ||
+    setor.error ||
+    pipeline.error ||
+    velocidade.error ||
+    temporal.error ||
+    caminho.error ||
+    uf.error ||
+    source.error;
+
+  // ---- Click handlers ----
+  const openMainKpi = (which: "leads" | "mqls" | "agendados" | "conv") => {
+    if (!kpi) return;
+    const titleMap = {
+      leads: "Leads únicos",
+      mqls: "MQLs",
+      agendados: "MQLs agendados",
+      conv: "Conversão MQL",
+    };
+    const fields: DetailField[] = [
+      { label: "Total leads", value: fmtInt(kpi.total_leads) },
+      { label: "Total MQLs", value: fmtInt(kpi.total_mqls) },
+      { label: "Completos", value: fmtInt(kpi.completos) },
+      { label: "Agendados", value: fmtInt(kpi.agendados) },
+      { label: "MQL completos", value: fmtInt(kpi.mql_completos) },
+      { label: "MQL agendados", value: fmtInt(kpi.mql_agendados) },
+      { label: "% Completo", value: fmtPct(kpi.taxa_completo_pct) },
+      { label: "% Agenda", value: fmtPct(kpi.taxa_agenda_pct) },
+      { label: "% MQL Compl.", value: fmtPct(kpi.mql_taxa_completo_pct) },
+      { label: "% MQL Ag.", value: fmtPct(kpi.mql_taxa_agenda_pct) },
+      { label: "Compl. → Ag.", value: fmtPct(kpi.mql_completo_to_agenda_pct) },
+    ];
+    openDrawer({ title: titleMap[which], description: "KPIs gerais do diagnóstico", fields });
+  };
+
+  const openSdr = (row: any) => {
+    if (!row) return;
+    openDrawer({
+      title: row.sdr_nome,
+      description: "Performance do SDR (MQLs)",
+      fields: [
+        { label: "MQLs", value: fmtInt(row.mqls) },
+        { label: "Completos", value: fmtInt(row.completos) },
+        { label: "Agendados", value: fmtInt(row.agendados) },
+        { label: "Conversão", value: fmtPct(row.conv_pct) },
+      ],
+    });
+  };
+
+  const openDay = (row: any) => {
+    if (!row) return;
+    const dt = new Date(row.booking_date);
+    openDrawer({
+      title: dt.toLocaleDateString("pt-BR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }),
+      description: "Reuniões agendadas neste dia",
+      fields: [{ label: "Reuniões", value: fmtInt(row.reunioes) }],
+    });
+  };
+
+  const openFaturamento = (row: any) =>
+    openDrawer({
+      title: row.faturamento,
+      description: row.is_mql ? "Faixa MQL" : "Faixa não-MQL",
+      fields: [
+        { label: "Total", value: fmtInt(row.total) },
+        { label: "Completos", value: fmtInt(row.completos) },
+        { label: "Agendados", value: fmtInt(row.agendados) },
+        { label: "% Completo", value: fmtPct(row.taxa_completo_pct) },
+        { label: "% Agenda", value: fmtPct(row.taxa_agenda_pct) },
+      ],
+    });
+
+  const openSetor = (row: any) =>
+    openDrawer({
+      title: row.setor,
+      fields: [
+        { label: "MQLs", value: fmtInt(row.mqls) },
+        { label: "Agendados", value: fmtInt(row.agendados) },
+        { label: "Conversão", value: fmtPct(row.conv_pct) },
+      ],
+    });
+
+  const openCaminho = (row: any) =>
+    openDrawer({
+      title: `Caminho ${row.caminho}`,
+      fields: [
+        { label: "Total", value: fmtInt(row.total) },
+        { label: "MQLs", value: fmtInt(row.mqls) },
+        { label: "Completos", value: fmtInt(row.completos) },
+        { label: "Agendados", value: fmtInt(row.agendados) },
+        { label: "% Agenda", value: fmtPct(row.taxa_agenda_pct) },
+      ],
+    });
+
+  const openUf = (row: any) =>
+    openDrawer({
+      title: row.uf,
+      fields: [
+        { label: "MQLs", value: fmtInt(row.mqls) },
+        { label: "Agendados", value: fmtInt(row.agendados) },
+        { label: "Conversão", value: fmtPct(row.conv_pct) },
+      ],
+    });
+
+  const openSource = (row: any) =>
+    openDrawer({
+      title: row.source || "(sem source)",
+      fields: [
+        { label: "MQLs", value: fmtInt(row.mqls) },
+        { label: "Agendados", value: fmtInt(row.agendados) },
+        { label: "Conversão", value: fmtPct(row.conv_pct) },
+      ],
+    });
+
+  const openTemporal = (row: any) =>
+    openDrawer({
+      title: `Janela: ${row.janela}`,
+      fields: [
+        { label: "Total", value: fmtInt(row.total) },
+        { label: "MQLs", value: fmtInt(row.mqls) },
+        { label: "Completos", value: fmtInt(row.completos) },
+        { label: "Agendados", value: fmtInt(row.agendados) },
+        { label: "MQL agendados", value: fmtInt(row.mql_agendados) },
+        { label: "% Conv MQL", value: fmtPct(row.mql_conv_pct) },
+      ],
+    });
 
   return (
     <div className="space-y-6">
@@ -52,73 +225,186 @@ export function TypeformDashboard() {
         </Alert>
       )}
 
-      {/* Linha 1 — KPIs */}
+      {/* Linha 0 — Janela temporal */}
+      <TemporalKpisRow data={temporal.data} loading={temporal.isLoading} onSelect={openTemporal} />
+
+      {/* Linha 1 — KPIs principais (clicáveis) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiBig label="Leads únicos" value={fmtInt(kpi?.total_leads)} loading={kpis.isLoading} />
-        <KpiBig label="MQLs" value={fmtInt(kpi?.total_mqls)} loading={kpis.isLoading} />
-        <KpiBig label="MQLs agendaram" value={fmtInt(kpi?.mql_agendados)} loading={kpis.isLoading} />
+        <KpiBig
+          label="Leads únicos"
+          value={fmtInt(kpi?.total_leads)}
+          loading={kpis.isLoading}
+          onClick={() => openMainKpi("leads")}
+        />
+        <KpiBig
+          label="MQLs"
+          value={fmtInt(kpi?.total_mqls)}
+          loading={kpis.isLoading}
+          onClick={() => openMainKpi("mqls")}
+        />
+        <KpiBig
+          label="MQLs agendaram"
+          value={fmtInt(kpi?.mql_agendados)}
+          loading={kpis.isLoading}
+          onClick={() => openMainKpi("agendados")}
+        />
         <KpiBig
           label="Conv. MQL"
           value={fmtPct(kpi?.mql_taxa_agenda_pct)}
           loading={kpis.isLoading}
+          onClick={() => openMainKpi("conv")}
         />
       </div>
 
-      {/* Linha 2 — Gráficos */}
+      {/* Linha 2 — Reuniões por dia (full width) */}
+      <BookingsByDayChart
+        data={pipeline.data}
+        loading={pipeline.isLoading}
+        onBarClick={openDay}
+      />
+
+      {/* Linha 3 — SDR + (resumo agendamentos futuros) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SdrBarChart data={sdr.data} loading={sdr.isLoading} />
-        <PipelineTimeline data={pipeline.data} loading={pipeline.isLoading} />
+        <SdrBarChart data={sdr.data} loading={sdr.isLoading} onBarClick={openSdr} />
+        <FunnelTable
+          title="Próximas reuniões (top 12)"
+          data={(pipeline.data ?? []).filter((d) => new Date(d.booking_date) >= new Date(new Date().toDateString()))}
+          loading={pipeline.isLoading}
+          maxRows={12}
+          onRowClick={openDay}
+          columns={[
+            {
+              key: "booking_date",
+              label: "Data",
+              render: (r) =>
+                new Date(r.booking_date).toLocaleDateString("pt-BR", {
+                  weekday: "short",
+                  day: "2-digit",
+                  month: "2-digit",
+                }),
+            },
+            { key: "reunioes", label: "Reuniões", align: "right", render: (r) => fmtInt(r.reunioes) },
+          ]}
+        />
       </div>
 
-      {/* Linha 3 — Tabelas */}
+      {/* Linha 4 — Faturamento + Setor */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <FunnelTable
           title="Funil por faturamento"
           data={faturamentoSorted}
           loading={faturamento.isLoading}
+          onRowClick={openFaturamento}
           columns={[
             { key: "faturamento", label: "Faixa" },
             { key: "total", label: "Total", align: "right", render: (r) => fmtInt(r.total) },
-            { key: "completos", label: "Completos", align: "right", render: (r) => fmtInt(r.completos) },
-            { key: "agendados", label: "Agendados", align: "right", render: (r) => fmtInt(r.agendados) },
-            { key: "taxa_completo_pct", label: "% Compl.", align: "right", render: (r) => fmtPct(r.taxa_completo_pct) },
-            { key: "taxa_agenda_pct", label: "% Agenda", align: "right", render: (r) => fmtPct(r.taxa_agenda_pct) },
+            { key: "completos", label: "Compl.", align: "right", render: (r) => fmtInt(r.completos) },
+            { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
+            { key: "taxa_agenda_pct", label: "% Ag.", align: "right", render: (r) => fmtPct(r.taxa_agenda_pct) },
           ]}
         />
         <FunnelTable
           title="Funil por setor"
           data={setor.data}
           loading={setor.isLoading}
+          onRowClick={openSetor}
           columns={[
             { key: "setor", label: "Setor" },
             { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
-            { key: "agendados", label: "Agendados", align: "right", render: (r) => fmtInt(r.agendados) },
+            { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
             { key: "conv_pct", label: "% Conv", align: "right", render: (r) => fmtPct(r.conv_pct) },
           ]}
         />
       </div>
 
-      {/* Linha 4 — Cards finais */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Linha 5 — Caminho + UF */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <FunnelTable
+          title="Funil por caminho (A/B/C/D)"
+          data={caminho.data}
+          loading={caminho.isLoading}
+          onRowClick={openCaminho}
+          columns={[
+            { key: "caminho", label: "Caminho" },
+            { key: "total", label: "Total", align: "right", render: (r) => fmtInt(r.total) },
+            { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
+            { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
+            { key: "taxa_agenda_pct", label: "% Ag.", align: "right", render: (r) => fmtPct(r.taxa_agenda_pct) },
+          ]}
+        />
+        <FunnelTable
+          title="Funil por UF"
+          data={ufSorted}
+          loading={uf.isLoading}
+          maxRows={15}
+          onRowClick={openUf}
+          columns={[
+            { key: "uf", label: "UF" },
+            { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
+            { key: "agendados", label: "Ag.", align: "right", render: (r) => fmtInt(r.agendados) },
+            { key: "conv_pct", label: "% Conv", align: "right", render: (r) => fmtPct(r.conv_pct) },
+          ]}
+        />
+      </div>
+
+      {/* Linha 6 — Source full-width */}
+      <FunnelTable
+        title="Funil por utm_source (top 15)"
+        data={sourceSorted}
+        loading={source.isLoading}
+        maxRows={15}
+        onRowClick={openSource}
+        columns={[
+          { key: "source", label: "Source" },
+          { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
+          { key: "agendados", label: "Agendados", align: "right", render: (r) => fmtInt(r.agendados) },
+          { key: "conv_pct", label: "% Conv", align: "right", render: (r) => fmtPct(r.conv_pct) },
+        ]}
+      />
+
+      {/* Linha 7 — Velocidade + cobertura */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiBig
+          size="sm"
           label="Velocidade mediana"
           value={vel?.mediana_min != null ? `${vel.mediana_min} min` : "—"}
           loading={velocidade.isLoading}
-          hint={
-            vel
-              ? `${fmtInt(vel.sub_10min)} sub-10min · ${fmtInt(vel.sub_1h)} sub-1h · ${fmtInt(vel.total_bookings)} bookings`
-              : undefined
-          }
+          hint={vel ? `${fmtInt(vel.total_bookings)} bookings` : undefined}
         />
         <KpiBig
+          size="sm"
+          label="% sub-10 min"
+          value={fmtPct(pctSub10)}
+          loading={velocidade.isLoading}
+          hint={vel ? `${fmtInt(vel.sub_10min)} bookings` : undefined}
+        />
+        <KpiBig
+          size="sm"
+          label="% sub-1h"
+          value={fmtPct(pctSub1h)}
+          loading={velocidade.isLoading}
+          hint={vel ? `${fmtInt(vel.sub_1h)} bookings` : undefined}
+        />
+        <KpiBig
+          size="sm"
           label="Cobertura SDR"
           value={cobertura}
           loading={kpis.isLoading || sdr.isLoading}
           hint={
-            sdrsComMqls > 0 ? `${sdrsComMqls} SDRs com MQLs / ${fmtInt(totalMqls)} MQLs` : undefined
+            sdrsComMqls > 0
+              ? `${sdrsComMqls} SDRs com MQLs / ${fmtInt(totalMqls)} MQLs`
+              : undefined
           }
         />
       </div>
+
+      <TypeformDetailDrawer
+        open={drawer.open}
+        onOpenChange={(o) => (o ? null : closeDrawer())}
+        title={drawer.title}
+        description={drawer.description}
+        fields={drawer.fields}
+      />
     </div>
   );
 }

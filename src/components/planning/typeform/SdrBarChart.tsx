@@ -6,9 +6,10 @@ import type { DiagBySdr } from "./useTypeformData";
 interface Props {
   data?: DiagBySdr[];
   loading?: boolean;
+  onBarClick?: (row: DiagBySdr) => void;
 }
 
-export function SdrBarChart({ data, loading }: Props) {
+export function SdrBarChart({ data, loading, onBarClick }: Props) {
   const sorted = (data ?? [])
     .slice()
     .sort((a, b) => (b.agendados ?? 0) - (a.agendados ?? 0))
@@ -46,7 +47,13 @@ export function SdrBarChart({ data, loading }: Props) {
                   color: "hsl(var(--popover-foreground))",
                 }}
               />
-              <Bar dataKey="agendados" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+              <Bar
+                dataKey="agendados"
+                fill="hsl(var(--primary))"
+                radius={[0, 4, 4, 0]}
+                cursor={onBarClick ? "pointer" : undefined}
+                onClick={(d: any) => onBarClick?.(d?.payload as DiagBySdr)}
+              />
             </BarChart>
           </ResponsiveContainer>
         )}
