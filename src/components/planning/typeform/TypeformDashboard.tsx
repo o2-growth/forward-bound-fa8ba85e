@@ -39,6 +39,8 @@ interface DrawerState {
   title: string;
   description?: string;
   fields: DetailField[];
+  breakdowns?: BreakdownBlock[];
+  leads?: DiagLeadFull[];
 }
 
 export function TypeformDashboard() {
