@@ -23,14 +23,14 @@ interface AnalyticsLike {
 }
 
 function buildInput(bu: string, a: AnalyticsLike, faturamentoMeta: number, faturamentoRealizado: number): BuInsightInput {
-  const vendas = a.getDetailItemsForIndicator("vendas") || [];
+  const vendas = a.getDetailItemsForIndicator("venda") || [];
   return {
     bu,
     vendas,
-    propostas: a.getDetailItemsForIndicator("propostas") || [],
-    rrs: a.getDetailItemsForIndicator("rrs") || [],
-    rms: a.getDetailItemsForIndicator("rms") || [],
-    mqls: a.getDetailItemsForIndicator("mqls") || [],
+    propostas: a.getDetailItemsForIndicator("proposta") || [],
+    rrs: a.getDetailItemsForIndicator("rr") || [],
+    rms: a.getDetailItemsForIndicator("rm") || [],
+    mqls: a.getDetailItemsForIndicator("mql") || [],
     perdas: (a.getLostDeals?.cards || []).map((c: any) => ({
       id: c.id,
       name: c.name || "—",
@@ -107,14 +107,15 @@ export function InsightsTab({ startDate, endDate }: InsightsTabProps) {
   const insights = useMemo<Insight[]>(() => {
     if (modelo.isLoading || o2.isLoading || expansao.isLoading) return [];
 
-    const monthKey = startDate.toLocaleString("pt-BR", { month: "short" }).replace(".", "");
+    const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"] as const;
+    const monthKey = MONTHS[startDate.getMonth()];
 
     const sumRealizado = (items: DetailItem[]) =>
       items.reduce((acc, it) => acc + ((it.mrr || 0) + (it.setup || 0) + (it.pontual || 0) || (it.value || 0)), 0);
 
     const buildMeta = (bu: any) => {
       try {
-        return metas.getMetaForBu?.(bu, "faturamento", monthKey)?.value || 0;
+        return metas.getConsolidatedMeta?.(bu, monthKey as any, "faturamento")?.value || 0;
       } catch {
         return 0;
       }
@@ -124,26 +125,26 @@ export function InsightsTab({ startDate, endDate }: InsightsTabProps) {
       buildInput(
         "Modelo Atual",
         modelo as AnalyticsLike,
-        buildMeta("Modelo Atual"),
-        sumRealizado(modelo.getDetailItemsForIndicator("vendas") || []),
+        buildMeta("modelo_atual"),
+        sumRealizado(modelo.getDetailItemsForIndicator("venda") || []),
       ),
       buildInput(
         "O2 TAX",
         o2 as AnalyticsLike,
-        buildMeta("O2 TAX"),
-        sumRealizado(o2.getDetailItemsForIndicator("vendas") || []),
+        buildMeta("o2_tax"),
+        sumRealizado(o2.getDetailItemsForIndicator("venda") || []),
       ),
       buildInput(
         "Expansão",
         expansao as AnalyticsLike,
-        buildMeta("Expansão"),
-        sumRealizado(expansao.getDetailItemsForIndicator("vendas") || []),
+        buildMeta("oxy_hacker") + buildMeta("franquia"),
+        sumRealizado(expansao.getDetailItemsForIndicator("venda") || []),
       ),
       buildInput(
         "Outbound",
         outbound as AnalyticsLike,
         0,
-        sumRealizado(outbound.getDetailItemsForIndicator("vendas") || []),
+        sumRealizado(outbound.getDetailItemsForIndicator("venda") || []),
       ),
     ];
 
