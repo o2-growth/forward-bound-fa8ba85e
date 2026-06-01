@@ -76,13 +76,30 @@ export function TypeformDashboard() {
   const pctSub1h =
     vel && vel.total_bookings > 0 ? (vel.sub_1h / vel.total_bookings) * 100 : null;
 
-  const faturamentoSorted = useMemo(
-    () =>
-      (faturamento.data ?? [])
-        .slice()
-        .sort((a, b) => (b.total ?? 0) - (a.total ?? 0)),
-    [faturamento.data]
-  );
+  const faturamentoSorted = useMemo(() => {
+    const excluded = [
+      "ainda nao faturamos",
+      "ainda não faturamos",
+      "menos de r$ 100 mil",
+      "entre r$ 100 mil e r$ 200 mil",
+      "",
+      "sem dado",
+      "sem dados",
+      "nao informado",
+      "não informado",
+    ];
+    const norm = (s: string) =>
+      (s ?? "")
+        .toString()
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    return (faturamento.data ?? [])
+      .filter((r) => r.faturamento && !excluded.includes(norm(r.faturamento)))
+      .slice()
+      .sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
+  }, [faturamento.data]);
   const sourceSorted = useMemo(
     () =>
       (source.data ?? [])
