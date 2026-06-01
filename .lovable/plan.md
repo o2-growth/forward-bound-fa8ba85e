@@ -1,69 +1,84 @@
 ## Objetivo
+Tornar os drawers da sub-aba **Typeform** muito mais informativos: ao clicar num KPI, SDR, dia, faixa de faturamento, setor, UF, source, caminho ou janela temporal, abrir um drawer com **duas abas**:
+1. **Resumo** — KPIs + breakdowns cruzados do recorte clicado.
+2. **Leads** — lista individual dos leads daquele recorte, com busca e export CSV.
 
-Expandir a sub-aba **Typeform** com mais métricas, incluindo **reuniões agendadas por dia** (histórico e futuro), e tornar os principais blocos **clicáveis** abrindo drawer com detalhamento.
+Fonte nova: `v_o2_diag_leads_full` (1 linha por lead, deduplicada por email, já liberada para anon).
 
-## Novas métricas / blocos
+---
 
-1. **Reuniões agendadas por dia** (novo gráfico de barras, full-width acima dos demais)
-   - Fonte: `v_o2_diag_pipeline` (já traz `booking_date` × `reunioes`, futuras). Para histórico completo, vou também buscar via `?select=*&order=booking_date.asc` sem filtro de data — se a view só retornar futuras, adiciono fallback exibindo apenas o que vier.
-   - Eixo X: data (dia/mês), Eixo Y: nº de reuniões. Linha vertical marcando "hoje".
+## 1. Camada de dados
 
-2. **Janela temporal** (4 mini-KPIs em linha) — `v_o2_diag_kpis_temporal`
-   - Cards: Hoje · Últimos 7d · Últimos 30d · Mais antigo
-   - Cada card: total, MQLs, agendados, % conv MQL
+**`src/components/planning/typeform/useTypeformData.ts`**
+- Adicionar interface `DiagLeadFull` com todas as colunas da view (response_id, nome, email, telefone, empresa, cargo, setor, faturamento, uf, erp, caminho, is_mql, completo, agendado, sdr_nome, source, medium, campaign, booking_date, created_at, updated_at, completed_at, etc.).
+- Adicionar hook `useDiagLeadsFull()` que busca `v_o2_diag_leads_full?select=*` uma única vez (staleTime 5min). A filtragem por recorte é feita no cliente — a view não é grande.
 
-3. **Caminhos A/B/C/D** (tabela) — `v_o2_diag_by_caminho`
-   - Colunas: caminho, total, MQLs, completos, agendados, % agenda
+---
 
-4. **Funil por UF** (tabela) — `v_o2_diag_by_uf`
-   - Colunas: UF, MQLs, agendados, % conv
+## 2. Drawer com abas
 
-5. **Funil por utm_source** (tabela) — `v_o2_diag_by_source`
-   - Colunas: source, MQLs, agendados, % conv
+**`src/components/planning/typeform/TypeformDetailDrawer.tsx`** (refatorar)
+- Aumentar largura para `sm:max-w-2xl`.
+- Adicionar `Tabs` ("Resumo" / "Leads (N)") usando shadcn.
+- Nova prop:
+  ```ts
+  interface Props {
+    open, onOpenChange, title, description,
+    fields: DetailField[],          // Resumo (já existe)
+    breakdowns?: BreakdownBlock[],  // novo: blocos cruzados no Resumo
+    leads?: DiagLeadFull[],         // novo: leads filtrados
+    leadsLoading?: boolean,
+  }
+  interface BreakdownBlock { title: string; rows: { label: string; value: string }[] }
+  ```
+- **Aba Resumo**: grid de KPIs (`fields`) + lista compacta de blocos `breakdowns` (ex.: "Por faturamento", "Por setor", "Por SDR") com top 5 cada.
+- **Aba Leads**:
+  - Input de busca (filtra por nome/email/empresa, case-insensitive + sem acento).
+  - Tabela compacta com colunas: Nome · Empresa · Faturamento · Setor · SDR · Status (badges Compl/Ag/MQL) · Data.
+  - Botão "Exportar CSV" — gera CSV no cliente com todas as colunas da view.
+  - Linha clicável abre um popover/dialog com **todas** as colunas da view daquele lead.
 
-6. **Card de velocidade expandido** — `v_o2_diag_velocidade`
-   - Já existe; adicionar 2 KPIs irmãos: % sub-10 min e % sub-1h (calculado a partir de sub_10min/total_bookings, sub_1h/total_bookings).
+---
 
-## Interatividade (clicáveis)
+## 3. Filtragem por recorte (no `TypeformDashboard.tsx`)
 
-Criar um `TypeformDetailDrawer` (usa `Sheet` do shadcn) que abre ao clicar em:
+Para cada handler de clique, calcular:
+- `leadsFiltrados = allLeads.filter(<predicado do recorte>)`
+- `breakdowns` cruzados relevantes ao recorte
 
-- **KPI "Leads únicos / MQLs / Agendados / Conv MQL"** → mostra a janela temporal completa (`v_o2_diag_kpis_temporal`) + breakdown por SDR e por source para aquela métrica.
-- **Linha do gráfico SDR** → drawer com os MQLs daquele SDR, mostrando funil completos→agendados e velocidade (se disponível por SDR via mesma view).
-- **Barra do gráfico "Reuniões por dia"** → drawer listando a quantidade e, se a API expuser, datas/SDRs daquele dia (v1 mostra resumo do dia + link para `v_o2_diag_pipeline` filtrado).
-- **Linha das tabelas (faturamento, setor, caminho, UF, source)** → drawer com os KPIs filtrados (texto resumido + barras de proporção). Como as views já vêm agregadas, o drawer mostra os campos brutos da linha de forma mais rica, sem nova requisição.
+| Clique em | Predicado | Breakdowns cruzados |
+|---|---|---|
+| KPI Leads/MQLs/Agendados/Conv | (todos) ou `is_mql` / `agendado` | Por SDR, Por faturamento, Por setor |
+| SDR (barra) | `sdr_nome === row.sdr_nome` | Por faturamento, Por setor, Por caminho |
+| Dia (barra pipeline) | `booking_date === row.booking_date` | Por SDR, Por faturamento |
+| Faixa faturamento | `faturamento === row.faturamento` | Por SDR, Por setor, Por UF |
+| Setor | `setor === row.setor` | Por SDR, Por faturamento, Por UF |
+| Caminho | `caminho === row.caminho` | Por SDR, Por faturamento |
+| UF | `uf === row.uf` | Por SDR, Por setor |
+| Source | `source === row.source` | Por caminho, Por faturamento |
+| Janela temporal | `created_at` na janela (hoje / 7d / 30d / mais antigo) | Por SDR, Por faturamento, Por setor |
 
-Todas as áreas clicáveis ganham `cursor-pointer`, `hover:bg-muted/40` e role/aria adequados.
+Helper `buildBreakdown(leads, key, topN=5)` que agrupa, conta MQLs/Agendados e ordena.
 
-## Novo layout
+Comparações de string normalizadas (trim + lowercase + NFD sem acento) — regra global do projeto.
 
-```
-Linha 0: 4 cards Janela Temporal (hoje / 7d / 30d / antigo)
-Linha 1: 4 KPI cards atuais (clicáveis)
-Linha 2: Reuniões agendadas por dia (gráfico full-width, barras clicáveis)
-Linha 3: SDR bar chart (clicável) | Reuniões futuras (linha do tempo)
-Linha 4: Funil por faturamento | Funil por setor   (linhas clicáveis)
-Linha 5: Funil por caminho     | Funil por UF      (linhas clicáveis)
-Linha 6: Funil por source (full-width, top 15)     (linhas clicáveis)
-Linha 7: Velocidade mediana | % sub-10min | % sub-1h | Cobertura SDR
-```
+---
 
-## Arquivos
+## 4. Detalhes técnicos
 
-Novos:
-- `src/components/planning/typeform/TemporalKpisRow.tsx`
-- `src/components/planning/typeform/BookingsByDayChart.tsx`
-- `src/components/planning/typeform/TypeformDetailDrawer.tsx`
+- **Sem alterar APIs/views existentes** — apenas adicionar consumo de `v_o2_diag_leads_full`.
+- **Performance**: 1 fetch único da view, filtragem em memória; React Query cacheia.
+- **Empty state**: "Nenhum lead neste recorte" quando filtro retorna 0.
+- **CSV**: nome do arquivo `typeform-leads-{recorte}-{YYYYMMDD}.csv`, separador `;`, encoding UTF-8 com BOM (para Excel BR).
+- **Acessibilidade**: linhas da tabela com `role="button"` e `tabIndex={0}`.
 
-Atualizações:
-- `useTypeformData.ts` — adicionar hooks `useDiagTemporal`, `useDiagByCaminho`, `useDiagByUf`, `useDiagBySource` e tipos correspondentes.
-- `TypeformDashboard.tsx` — montar novo layout, conectar handlers de clique no drawer.
-- `FunnelTable.tsx` — aceitar prop `onRowClick?: (row) => void` e aplicar estilos hover/cursor quando presente.
-- `SdrBarChart.tsx` — aceitar `onBarClick?: (row) => void` via `onClick` do Recharts.
-- `KpiBig.tsx` — aceitar `onClick?` opcional com hover.
+---
 
-## Fora do escopo
+## Arquivos afetados
 
-- Filtros globais (período/SDR) — vistas já vêm agregadas; manter v1 sem filtros.
-- Refresh manual / botão de atualizar.
-- Persistência de seleção no URL.
+- `src/components/planning/typeform/useTypeformData.ts` — +interface +hook
+- `src/components/planning/typeform/TypeformDetailDrawer.tsx` — refatorar para 2 abas + breakdowns + tabela leads + export
+- `src/components/planning/typeform/TypeformDashboard.tsx` — passar `leads` + `breakdowns` filtrados em cada `openDrawer(...)`
+- (novo) `src/components/planning/typeform/leadsFilters.ts` — helpers `buildBreakdown`, `normalize`, `inWindow`, `exportCsv`
+
+Nenhuma mudança em backend/edge functions.

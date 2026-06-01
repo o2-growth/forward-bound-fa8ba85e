@@ -157,3 +157,36 @@ export const useDiagVelocidade = () =>
     queryFn: () => fetchTypeformView<DiagVelocidade>("v_o2_diag_velocidade"),
     staleTime: STALE,
   });
+
+export interface DiagLeadFull {
+  response_id?: string;
+  nome?: string | null;
+  email?: string | null;
+  telefone?: string | null;
+  empresa?: string | null;
+  cargo?: string | null;
+  setor?: string | null;
+  faturamento?: string | null;
+  uf?: string | null;
+  erp?: string | null;
+  caminho?: string | null;
+  is_mql?: boolean | null;
+  completo?: boolean | null;
+  agendado?: boolean | null;
+  sdr_nome?: string | null;
+  source?: string | null;
+  medium?: string | null;
+  campaign?: string | null;
+  booking_date?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+  [key: string]: any;
+}
+
+export const useDiagLeadsFull = () =>
+  useQuery({
+    queryKey: ["typeform", "v_o2_diag_leads_full"],
+    queryFn: () => fetchTypeformView<DiagLeadFull>("v_o2_diag_leads_full", "?select=*"),
+    staleTime: STALE,
+  });

@@ -18,7 +18,16 @@ import {
   useDiagByCaminho,
   useDiagByUf,
   useDiagBySource,
+  useDiagLeadsFull,
+  type DiagLeadFull,
 } from "./useTypeformData";
+import {
+  buildBreakdown,
+  eqNorm,
+  inWindow,
+  type BreakdownBlock,
+  type TemporalWindow,
+} from "./leadsFilters";
 
 const fmtInt = (v: number | undefined | null) =>
   v == null ? "—" : new Intl.NumberFormat("pt-BR").format(v);
@@ -30,6 +39,8 @@ interface DrawerState {
   title: string;
   description?: string;
   fields: DetailField[];
+  breakdowns?: BreakdownBlock[];
+  leads?: DiagLeadFull[];
 }
 
 export function TypeformDashboard() {
@@ -43,10 +54,14 @@ export function TypeformDashboard() {
   const caminho = useDiagByCaminho();
   const pipeline = useDiagPipeline();
   const velocidade = useDiagVelocidade();
+  const leadsFull = useDiagLeadsFull();
 
   const [drawer, setDrawer] = useState<DrawerState>({ open: false, title: "", fields: [] });
   const openDrawer = (s: Omit<DrawerState, "open">) => setDrawer({ open: true, ...s });
   const closeDrawer = () => setDrawer((d) => ({ ...d, open: false }));
+
+  const allLeads = leadsFull.data ?? [];
+  const leadsLoading = leadsFull.isLoading;
 
   const kpi = kpis.data?.[0];
   const vel = velocidade.data?.[0];
@@ -90,7 +105,8 @@ export function TypeformDashboard() {
     temporal.error ||
     caminho.error ||
     uf.error ||
-    source.error;
+    source.error ||
+    leadsFull.error;
 
   // ---- Click handlers ----
   const openMainKpi = (which: "leads" | "mqls" | "agendados" | "conv") => {
@@ -101,6 +117,14 @@ export function TypeformDashboard() {
       agendados: "MQLs agendados",
       conv: "Conversão MQL",
     };
+    const filtered =
+      which === "leads"
+        ? allLeads
+        : which === "mqls"
+        ? allLeads.filter((l) => l.is_mql)
+        : which === "agendados"
+        ? allLeads.filter((l) => l.is_mql && l.agendado)
+        : allLeads.filter((l) => l.is_mql);
     const fields: DetailField[] = [
       { label: "Total leads", value: fmtInt(kpi.total_leads) },
       { label: "Total MQLs", value: fmtInt(kpi.total_mqls) },
@@ -114,11 +138,22 @@ export function TypeformDashboard() {
       { label: "% MQL Ag.", value: fmtPct(kpi.mql_taxa_agenda_pct) },
       { label: "Compl. → Ag.", value: fmtPct(kpi.mql_completo_to_agenda_pct) },
     ];
-    openDrawer({ title: titleMap[which], description: "KPIs gerais do diagnóstico", fields });
+    openDrawer({
+      title: titleMap[which],
+      description: "KPIs gerais do diagnóstico",
+      fields,
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+        buildBreakdown(filtered, "setor", "Por setor"),
+      ],
+    });
   };
 
   const openSdr = (row: any) => {
     if (!row) return;
+    const filtered = allLeads.filter((l) => eqNorm(l.sdr_nome, row.sdr_nome));
     openDrawer({
       title: row.sdr_nome,
       description: "Performance do SDR (MQLs)",
@@ -128,12 +163,20 @@ export function TypeformDashboard() {
         { label: "Agendados", value: fmtInt(row.agendados) },
         { label: "Conversão", value: fmtPct(row.conv_pct) },
       ],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+        buildBreakdown(filtered, "setor", "Por setor"),
+        buildBreakdown(filtered, "caminho", "Por caminho"),
+      ],
     });
   };
 
   const openDay = (row: any) => {
     if (!row) return;
     const dt = new Date(row.booking_date);
+    const dayKey = row.booking_date?.slice(0, 10);
+    const filtered = allLeads.filter((l) => (l.booking_date ?? "").slice(0, 10) === dayKey);
     openDrawer({
       title: dt.toLocaleDateString("pt-BR", {
         weekday: "long",
@@ -143,10 +186,16 @@ export function TypeformDashboard() {
       }),
       description: "Reuniões agendadas neste dia",
       fields: [{ label: "Reuniões", value: fmtInt(row.reunioes) }],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+      ],
     });
   };
 
-  const openFaturamento = (row: any) =>
+  const openFaturamento = (row: any) => {
+    const filtered = allLeads.filter((l) => eqNorm(l.faturamento, row.faturamento));
     openDrawer({
       title: row.faturamento,
       description: row.is_mql ? "Faixa MQL" : "Faixa não-MQL",
@@ -157,9 +206,17 @@ export function TypeformDashboard() {
         { label: "% Completo", value: fmtPct(row.taxa_completo_pct) },
         { label: "% Agenda", value: fmtPct(row.taxa_agenda_pct) },
       ],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
+        buildBreakdown(filtered, "setor", "Por setor"),
+        buildBreakdown(filtered, "uf", "Por UF"),
+      ],
     });
+  };
 
-  const openSetor = (row: any) =>
+  const openSetor = (row: any) => {
+    const filtered = allLeads.filter((l) => eqNorm(l.setor, row.setor));
     openDrawer({
       title: row.setor,
       fields: [
@@ -167,9 +224,17 @@ export function TypeformDashboard() {
         { label: "Agendados", value: fmtInt(row.agendados) },
         { label: "Conversão", value: fmtPct(row.conv_pct) },
       ],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+        buildBreakdown(filtered, "uf", "Por UF"),
+      ],
     });
+  };
 
-  const openCaminho = (row: any) =>
+  const openCaminho = (row: any) => {
+    const filtered = allLeads.filter((l) => eqNorm(l.caminho, row.caminho));
     openDrawer({
       title: `Caminho ${row.caminho}`,
       fields: [
@@ -179,9 +244,16 @@ export function TypeformDashboard() {
         { label: "Agendados", value: fmtInt(row.agendados) },
         { label: "% Agenda", value: fmtPct(row.taxa_agenda_pct) },
       ],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+      ],
     });
+  };
 
-  const openUf = (row: any) =>
+  const openUf = (row: any) => {
+    const filtered = allLeads.filter((l) => eqNorm(l.uf, row.uf));
     openDrawer({
       title: row.uf,
       fields: [
@@ -189,9 +261,16 @@ export function TypeformDashboard() {
         { label: "Agendados", value: fmtInt(row.agendados) },
         { label: "Conversão", value: fmtPct(row.conv_pct) },
       ],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
+        buildBreakdown(filtered, "setor", "Por setor"),
+      ],
     });
+  };
 
-  const openSource = (row: any) =>
+  const openSource = (row: any) => {
+    const filtered = allLeads.filter((l) => eqNorm(l.source, row.source));
     openDrawer({
       title: row.source || "(sem source)",
       fields: [
@@ -199,9 +278,17 @@ export function TypeformDashboard() {
         { label: "Agendados", value: fmtInt(row.agendados) },
         { label: "Conversão", value: fmtPct(row.conv_pct) },
       ],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "caminho", "Por caminho"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+      ],
     });
+  };
 
-  const openTemporal = (row: any) =>
+  const openTemporal = (row: any) => {
+    const win = row.janela as TemporalWindow;
+    const filtered = allLeads.filter((l) => inWindow(l.created_at, win));
     openDrawer({
       title: `Janela: ${row.janela}`,
       fields: [
@@ -212,7 +299,15 @@ export function TypeformDashboard() {
         { label: "MQL agendados", value: fmtInt(row.mql_agendados) },
         { label: "% Conv MQL", value: fmtPct(row.mql_conv_pct) },
       ],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+        buildBreakdown(filtered, "setor", "Por setor"),
+      ],
     });
+  };
+
 
   return (
     <div className="space-y-6">
@@ -404,6 +499,9 @@ export function TypeformDashboard() {
         title={drawer.title}
         description={drawer.description}
         fields={drawer.fields}
+        breakdowns={drawer.breakdowns}
+        leads={drawer.leads}
+        leadsLoading={leadsLoading}
       />
     </div>
   );
