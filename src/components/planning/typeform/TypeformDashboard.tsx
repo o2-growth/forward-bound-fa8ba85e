@@ -442,20 +442,6 @@ export function TypeformDashboard() {
         />
       </div>
 
-      {/* Linha 6 — Source full-width */}
-      <FunnelTable
-        title="Funil por utm_source (top 15)"
-        data={sourceSorted}
-        loading={source.isLoading}
-        maxRows={15}
-        onRowClick={openSource}
-        columns={[
-          { key: "source", label: "Source" },
-          { key: "mqls", label: "MQLs", align: "right", render: (r) => fmtInt(r.mqls) },
-          { key: "agendados", label: "Agendados", align: "right", render: (r) => fmtInt(r.agendados) },
-          { key: "conv_pct", label: "% Conv", align: "right", render: (r) => fmtPct(r.conv_pct) },
-        ]}
-      />
 
       {/* Linha 7 — Velocidade + cobertura */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
