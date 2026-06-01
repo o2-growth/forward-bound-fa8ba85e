@@ -113,7 +113,7 @@ export function TypeformVsIATab() {
           </p>
         </div>
         <Badge variant="outline" className="text-xs">
-          Período: últimos 60 dias
+          Período: 30 dias ativos da IA · Typeform ainda não completou 30 dias
         </Badge>
       </div>
 
