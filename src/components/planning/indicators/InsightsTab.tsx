@@ -110,12 +110,22 @@ export function InsightsTab({ startDate, endDate }: InsightsTabProps) {
     const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"] as const;
     const monthKey = MONTHS[startDate.getMonth()];
 
+    // Fração do mês coberta pelo período (ex.: 1/30 = 0.033). Usado pra pró-ratear meta.
+    const daysInMonth = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0).getDate();
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysInPeriod = Math.max(
+      1,
+      Math.min(daysInMonth, Math.ceil((endDate.getTime() - startDate.getTime()) / msPerDay) + 1),
+    );
+    const metaRatio = daysInPeriod / daysInMonth;
+
     const sumRealizado = (items: DetailItem[]) =>
       items.reduce((acc, it) => acc + ((it.mrr || 0) + (it.setup || 0) + (it.pontual || 0) || (it.value || 0)), 0);
 
     const buildMeta = (bu: any) => {
       try {
-        return metas.getConsolidatedMeta?.(bu, monthKey as any, "faturamento")?.value || 0;
+        const full = metas.getConsolidatedMeta?.(bu, monthKey as any, "faturamento")?.value || 0;
+        return full * metaRatio;
       } catch {
         return 0;
       }
@@ -149,7 +159,7 @@ export function InsightsTab({ startDate, endDate }: InsightsTabProps) {
     ];
 
     return runInsights(inputs);
-  }, [modelo, o2, expansao, outbound, metas, startDate]);
+  }, [modelo, o2, expansao, outbound, metas, startDate, endDate]);
 
   const isLoading = modelo.isLoading || o2.isLoading || expansao.isLoading;
 
