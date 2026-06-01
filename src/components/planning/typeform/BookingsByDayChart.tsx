@@ -17,9 +17,19 @@ interface Props {
   data?: DiagPipeline[];
   loading?: boolean;
   onBarClick?: (row: DiagPipeline) => void;
+  title?: string;
+  totalLabel?: (total: number) => string;
+  emptyMessage?: string;
 }
 
-export function BookingsByDayChart({ data, loading, onBarClick }: Props) {
+export function BookingsByDayChart({
+  data,
+  loading,
+  onBarClick,
+  title = "Reuniões agendadas por dia",
+  totalLabel = (t) => `${t} reuniões no total`,
+  emptyMessage = "Sem reuniões registradas",
+}: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -45,9 +55,9 @@ export function BookingsByDayChart({ data, loading, onBarClick }: Props) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center justify-between">
-          <span>Reuniões agendadas por dia</span>
+          <span>{title}</span>
           <span className="text-xs font-normal text-muted-foreground">
-            {total} reuniões no total
+            {totalLabel(total)}
           </span>
         </CardTitle>
       </CardHeader>
