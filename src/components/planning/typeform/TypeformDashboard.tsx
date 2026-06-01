@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AlertCircle, Activity, CalendarClock, Gauge } from "lucide-react";
 import { KpiBig } from "./KpiBig";
-import { SdrBarChart } from "./SdrBarChart";
 import { BookingsByDayChart } from "./BookingsByDayChart";
 import { FunnelTable } from "./FunnelTable";
 import { TemporalKpisRow } from "./TemporalKpisRow";
@@ -15,9 +15,7 @@ import {
   useDiagPipeline,
   useDiagVelocidade,
   useDiagTemporal,
-  useDiagByCaminho,
   useDiagByUf,
-  useDiagBySource,
   useDiagLeadsFull,
   type DiagLeadFull,
 } from "./useTypeformData";
@@ -25,6 +23,7 @@ import {
   buildBreakdown,
   eqNorm,
   inWindow,
+  isExcludedFaturamento,
   type BreakdownBlock,
   type TemporalWindow,
 } from "./leadsFilters";
@@ -43,6 +42,10 @@ interface DrawerState {
   leads?: DiagLeadFull[];
 }
 
+// Predicate reused on every "Por faturamento" breakdown so excluded faixas
+// (Ainda não fatura, < 100k, 100-200k, sem dado) never appear in the drawers either.
+const keepFaturamento = (raw: any) => !isExcludedFaturamento(raw);
+
 export function TypeformDashboard() {
   const kpis = useDiagKpis();
   const temporal = useDiagTemporal();
@@ -50,8 +53,6 @@ export function TypeformDashboard() {
   const faturamento = useDiagByFaturamento();
   const setor = useDiagBySetor();
   const uf = useDiagByUf();
-  const source = useDiagBySource();
-  const caminho = useDiagByCaminho();
   const pipeline = useDiagPipeline();
   const velocidade = useDiagVelocidade();
   const leadsFull = useDiagLeadsFull();
@@ -76,37 +77,15 @@ export function TypeformDashboard() {
   const pctSub1h =
     vel && vel.total_bookings > 0 ? (vel.sub_1h / vel.total_bookings) * 100 : null;
 
-  const faturamentoSorted = useMemo(() => {
-    const excluded = [
-      "ainda nao faturamos",
-      "ainda não faturamos",
-      "menos de r$ 100 mil",
-      "entre r$ 100 mil e r$ 200 mil",
-      "",
-      "sem dado",
-      "sem dados",
-      "nao informado",
-      "não informado",
-    ];
-    const norm = (s: string) =>
-      (s ?? "")
-        .toString()
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-    return (faturamento.data ?? [])
-      .filter((r) => r.faturamento && !excluded.includes(norm(r.faturamento)))
-      .slice()
-      .sort((a, b) => (b.total ?? 0) - (a.total ?? 0));
-  }, [faturamento.data]);
-  const sourceSorted = useMemo(
+  const faturamentoSorted = useMemo(
     () =>
-      (source.data ?? [])
+      (faturamento.data ?? [])
+        .filter((r) => !isExcludedFaturamento(r.faturamento))
         .slice()
-        .sort((a, b) => (b.mqls ?? 0) - (a.mqls ?? 0)),
-    [source.data]
+        .sort((a, b) => (b.total ?? 0) - (a.total ?? 0)),
+    [faturamento.data]
   );
+
   const ufSorted = useMemo(
     () => (uf.data ?? []).slice().sort((a, b) => (b.mqls ?? 0) - (a.mqls ?? 0)),
     [uf.data]
@@ -120,9 +99,7 @@ export function TypeformDashboard() {
     pipeline.error ||
     velocidade.error ||
     temporal.error ||
-    caminho.error ||
     uf.error ||
-    source.error ||
     leadsFull.error;
 
   // ---- Click handlers ----
@@ -162,29 +139,8 @@ export function TypeformDashboard() {
       leads: filtered,
       breakdowns: [
         buildBreakdown(filtered, "sdr_nome", "Por SDR"),
-        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento", 5, keepFaturamento),
         buildBreakdown(filtered, "setor", "Por setor"),
-      ],
-    });
-  };
-
-  const openSdr = (row: any) => {
-    if (!row) return;
-    const filtered = allLeads.filter((l) => eqNorm(l.sdr_nome, row.sdr_nome));
-    openDrawer({
-      title: row.sdr_nome,
-      description: "Performance do SDR (MQLs)",
-      fields: [
-        { label: "MQLs", value: fmtInt(row.mqls) },
-        { label: "Completos", value: fmtInt(row.completos) },
-        { label: "Agendados", value: fmtInt(row.agendados) },
-        { label: "Conversão", value: fmtPct(row.conv_pct) },
-      ],
-      leads: filtered,
-      breakdowns: [
-        buildBreakdown(filtered, "faturamento", "Por faturamento"),
-        buildBreakdown(filtered, "setor", "Por setor"),
-        buildBreakdown(filtered, "caminho", "Por caminho"),
       ],
     });
   };
@@ -206,7 +162,7 @@ export function TypeformDashboard() {
       leads: filtered,
       breakdowns: [
         buildBreakdown(filtered, "sdr_nome", "Por SDR"),
-        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento", 5, keepFaturamento),
       ],
     });
   };
@@ -244,27 +200,8 @@ export function TypeformDashboard() {
       leads: filtered,
       breakdowns: [
         buildBreakdown(filtered, "sdr_nome", "Por SDR"),
-        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento", 5, keepFaturamento),
         buildBreakdown(filtered, "uf", "Por UF"),
-      ],
-    });
-  };
-
-  const openCaminho = (row: any) => {
-    const filtered = allLeads.filter((l) => eqNorm(l.caminho, row.caminho));
-    openDrawer({
-      title: `Caminho ${row.caminho}`,
-      fields: [
-        { label: "Total", value: fmtInt(row.total) },
-        { label: "MQLs", value: fmtInt(row.mqls) },
-        { label: "Completos", value: fmtInt(row.completos) },
-        { label: "Agendados", value: fmtInt(row.agendados) },
-        { label: "% Agenda", value: fmtPct(row.taxa_agenda_pct) },
-      ],
-      leads: filtered,
-      breakdowns: [
-        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
-        buildBreakdown(filtered, "faturamento", "Por faturamento"),
       ],
     });
   };
@@ -286,23 +223,6 @@ export function TypeformDashboard() {
     });
   };
 
-  const openSource = (row: any) => {
-    const filtered = allLeads.filter((l) => eqNorm(l.source, row.source));
-    openDrawer({
-      title: row.source || "(sem source)",
-      fields: [
-        { label: "MQLs", value: fmtInt(row.mqls) },
-        { label: "Agendados", value: fmtInt(row.agendados) },
-        { label: "Conversão", value: fmtPct(row.conv_pct) },
-      ],
-      leads: filtered,
-      breakdowns: [
-        buildBreakdown(filtered, "caminho", "Por caminho"),
-        buildBreakdown(filtered, "faturamento", "Por faturamento"),
-      ],
-    });
-  };
-
   const openTemporal = (row: any) => {
     const win = row.janela as TemporalWindow;
     const filtered = allLeads.filter((l) => inWindow(l.created_at, win));
@@ -319,15 +239,36 @@ export function TypeformDashboard() {
       leads: filtered,
       breakdowns: [
         buildBreakdown(filtered, "sdr_nome", "Por SDR"),
-        buildBreakdown(filtered, "faturamento", "Por faturamento"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento", 5, keepFaturamento),
         buildBreakdown(filtered, "setor", "Por setor"),
       ],
     });
   };
 
+  const totalLeads = kpi?.total_leads ?? 0;
 
   return (
     <div className="space-y-6">
+      {/* Header da aba */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <Activity className="h-5 w-5 text-primary" />
+            Diagnóstico O2 TAX · Typeform
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Funil de leads do formulário público — clique em qualquer card ou linha para abrir o detalhamento.
+          </p>
+        </div>
+        {!kpis.isLoading && kpi && (
+          <div className="text-xs text-muted-foreground bg-muted/40 border border-border/60 rounded-md px-3 py-2 tabular-nums">
+            <span className="font-semibold text-foreground">{fmtInt(totalLeads)}</span> leads ·{" "}
+            <span className="font-semibold text-foreground">{fmtInt(kpi.total_mqls)}</span> MQLs ·{" "}
+            <span className="font-semibold text-foreground">{fmtInt(kpi.mql_agendados)}</span> agendados
+          </div>
+        )}
+      </div>
+
       {anyError && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -337,48 +278,55 @@ export function TypeformDashboard() {
         </Alert>
       )}
 
-      {/* Linha 0 — Janela temporal */}
+      {/* Janela temporal — segmented control */}
       <TemporalKpisRow data={temporal.data} loading={temporal.isLoading} onSelect={openTemporal} />
 
-      {/* Linha 1 — KPIs principais (clicáveis) */}
+      {/* KPIs principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiBig
           label="Leads únicos"
           value={fmtInt(kpi?.total_leads)}
           loading={kpis.isLoading}
           onClick={() => openMainKpi("leads")}
+          hint={kpi ? `${fmtPct(kpi.taxa_completo_pct)} completos` : undefined}
         />
         <KpiBig
           label="MQLs"
           value={fmtInt(kpi?.total_mqls)}
           loading={kpis.isLoading}
           onClick={() => openMainKpi("mqls")}
+          hint={kpi && totalLeads > 0 ? `${fmtPct((kpi.total_mqls / totalLeads) * 100)} dos leads` : undefined}
         />
         <KpiBig
           label="MQLs agendaram"
           value={fmtInt(kpi?.mql_agendados)}
           loading={kpis.isLoading}
           onClick={() => openMainKpi("agendados")}
+          hint={kpi ? `${fmtInt(kpi.agendados)} agendamentos totais` : undefined}
         />
         <KpiBig
           label="Conv. MQL"
           value={fmtPct(kpi?.mql_taxa_agenda_pct)}
           loading={kpis.isLoading}
           onClick={() => openMainKpi("conv")}
+          hint={kpi ? `${fmtPct(kpi.mql_completo_to_agenda_pct)} compl → ag.` : undefined}
         />
       </div>
 
-      {/* Linha 2 — Reuniões por dia (full width) */}
+      {/* Reuniões por dia (full width) */}
       <BookingsByDayChart
         data={pipeline.data}
         loading={pipeline.isLoading}
         onBarClick={openDay}
       />
 
-      {/* Linha 3 — Próximas reuniões */}
+      {/* Próximas reuniões */}
       <FunnelTable
-        title="Próximas reuniões (top 12)"
-        data={(pipeline.data ?? []).filter((d) => new Date(d.booking_date) >= new Date(new Date().toDateString()))}
+        title="Próximas reuniões"
+        description="Top 12 próximos dias com agendamentos confirmados"
+        data={(pipeline.data ?? []).filter(
+          (d) => new Date(d.booking_date) >= new Date(new Date().toDateString())
+        )}
         loading={pipeline.isLoading}
         maxRows={12}
         onRowClick={openDay}
@@ -397,10 +345,11 @@ export function TypeformDashboard() {
         ]}
       />
 
-      {/* Linha 4 — Faturamento + Setor */}
+      {/* Faturamento + Setor */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <FunnelTable
           title="Funil por faturamento"
+          description="Faixas qualificadas (≥ R$ 200 mil)"
           data={faturamentoSorted}
           loading={faturamento.isLoading}
           onRowClick={openFaturamento}
@@ -414,6 +363,7 @@ export function TypeformDashboard() {
         />
         <FunnelTable
           title="Funil por setor"
+          description="Conversão MQL → agendamento por segmento"
           data={setor.data}
           loading={setor.isLoading}
           onRowClick={openSetor}
@@ -426,9 +376,10 @@ export function TypeformDashboard() {
         />
       </div>
 
-      {/* Linha 5 — UF */}
+      {/* UF (full width) */}
       <FunnelTable
         title="Funil por UF"
+        description="Top 15 estados com mais MQLs"
         data={ufSorted}
         loading={uf.isLoading}
         maxRows={15}
@@ -441,41 +392,59 @@ export function TypeformDashboard() {
         ]}
       />
 
+      {/* Velocidade + cobertura — bloco final dentro de Card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Gauge className="h-4 w-4 text-primary" />
+            Velocidade & cobertura
+          </CardTitle>
+          <CardDescription>
+            Tempo de resposta dos SDRs (do formulário ao booking) e cobertura de MQLs por SDR.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <KpiBig
+              size="sm"
+              label="Velocidade mediana"
+              value={vel?.mediana_min != null ? `${vel.mediana_min} min` : "—"}
+              loading={velocidade.isLoading}
+              hint={vel ? `${fmtInt(vel.total_bookings)} bookings` : undefined}
+            />
+            <KpiBig
+              size="sm"
+              label="% sub-10 min"
+              value={fmtPct(pctSub10)}
+              loading={velocidade.isLoading}
+              hint={vel ? `${fmtInt(vel.sub_10min)} bookings` : undefined}
+            />
+            <KpiBig
+              size="sm"
+              label="% sub-1h"
+              value={fmtPct(pctSub1h)}
+              loading={velocidade.isLoading}
+              hint={vel ? `${fmtInt(vel.sub_1h)} bookings` : undefined}
+            />
+            <KpiBig
+              size="sm"
+              label="Cobertura SDR"
+              value={cobertura}
+              loading={kpis.isLoading || sdr.isLoading}
+              hint={
+                sdrsComMqls > 0
+                  ? `${sdrsComMqls} SDRs ativos / ${fmtInt(totalMqls)} MQLs`
+                  : undefined
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Linha 7 — Velocidade + cobertura */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiBig
-          size="sm"
-          label="Velocidade mediana"
-          value={vel?.mediana_min != null ? `${vel.mediana_min} min` : "—"}
-          loading={velocidade.isLoading}
-          hint={vel ? `${fmtInt(vel.total_bookings)} bookings` : undefined}
-        />
-        <KpiBig
-          size="sm"
-          label="% sub-10 min"
-          value={fmtPct(pctSub10)}
-          loading={velocidade.isLoading}
-          hint={vel ? `${fmtInt(vel.sub_10min)} bookings` : undefined}
-        />
-        <KpiBig
-          size="sm"
-          label="% sub-1h"
-          value={fmtPct(pctSub1h)}
-          loading={velocidade.isLoading}
-          hint={vel ? `${fmtInt(vel.sub_1h)} bookings` : undefined}
-        />
-        <KpiBig
-          size="sm"
-          label="Cobertura SDR"
-          value={cobertura}
-          loading={kpis.isLoading || sdr.isLoading}
-          hint={
-            sdrsComMqls > 0
-              ? `${sdrsComMqls} SDRs com MQLs / ${fmtInt(totalMqls)} MQLs`
-              : undefined
-          }
-        />
+      {/* Rodapé compacto com timestamp */}
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-2">
+        <CalendarClock className="h-3 w-3" />
+        Atualizado em {new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
       </div>
 
       <TypeformDetailDrawer
