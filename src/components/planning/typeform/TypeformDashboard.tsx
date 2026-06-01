@@ -499,6 +499,9 @@ export function TypeformDashboard() {
         title={drawer.title}
         description={drawer.description}
         fields={drawer.fields}
+        breakdowns={drawer.breakdowns}
+        leads={drawer.leads}
+        leadsLoading={leadsLoading}
       />
     </div>
   );
