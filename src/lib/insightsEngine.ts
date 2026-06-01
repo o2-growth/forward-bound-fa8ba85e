@@ -81,28 +81,29 @@ function ruleBuMeta(input: BuInsightInput): Insight | null {
   return null;
 }
 
-/** R1: Closer sem nenhuma venda no período (com >= 3 reuniões). */
+/** R1: Closer sem nenhuma venda no período (com >= 3 RRs realizadas).
+ *  Usa SOMENTE it.closer — SDR não é responsabilizado por fechamento. */
 function ruleVendedorZerado(input: BuInsightInput): Insight[] {
   const { bu, vendas, rrs, rms } = input;
   const out: Insight[] = [];
-  const closers = new Map<string, { name: string; vendas: number; reunioes: number }>();
-  const bump = (items: DetailItem[], field: "vendas" | "reunioes") => {
+  const closers = new Map<string, { name: string; vendas: number; rrs: number; rms: number }>();
+  const bump = (items: DetailItem[], field: "vendas" | "rrs" | "rms") => {
     for (const it of items) {
-      const raw = (it.closer || it.responsible || "").trim();
-      if (!raw) continue;
+      const raw = (it.closer || "").trim();
+      if (!raw) continue; // sem closer atribuído → ignora (não responsabilizar SDR)
       const key = firstName(raw);
-      const ex = closers.get(key) || { name: raw, vendas: 0, reunioes: 0 };
+      const ex = closers.get(key) || { name: raw, vendas: 0, rrs: 0, rms: 0 };
       ex[field] += 1;
       if (raw.length > ex.name.length) ex.name = raw;
       closers.set(key, ex);
     }
   };
   bump(vendas, "vendas");
-  bump(rrs, "reunioes");
-  bump(rms, "reunioes");
+  bump(rrs, "rrs");
+  bump(rms, "rms");
 
   for (const [key, c] of closers) {
-    if (c.vendas === 0 && c.reunioes >= 3) {
+    if (c.vendas === 0 && c.rrs >= 3) {
       out.push({
         id: `vend-zero-${bu}-${key}`,
         severity: "critical",
@@ -110,9 +111,62 @@ function ruleVendedorZerado(input: BuInsightInput): Insight[] {
         bu,
         person: c.name,
         title: `${c.name} sem vendas em ${bu}`,
-        description: `Realizou ${c.reunioes} reuniões no período e fechou 0. Investigar conversão.`,
+        description: `Realizou ${c.rrs} reuniões de resultado (RR) e fechou 0 no período${c.rms ? ` — também ${c.rms} RMs` : ""}. Investigar conversão.`,
         metric: { label: "Vendas", value: 0, target: "≥ 1" },
       });
+    }
+  }
+  return out;
+}
+
+/** R1b: SDR sub-performando — agrupa por it.sdr (fallback p/ responsible em MQL/RM,
+ *  onde o responsável tipicamente é o próprio SDR). Closers não entram aqui. */
+function ruleSdrSubperformando(input: BuInsightInput): Insight[] {
+  const { bu, mqls, rms } = input;
+  const out: Insight[] = [];
+  const sdrs = new Map<string, { name: string; mqls: number; rms: number }>();
+  const bump = (items: DetailItem[], field: "mqls" | "rms") => {
+    for (const it of items) {
+      const raw = ((it as any).sdr || it.responsible || "").trim();
+      if (!raw) continue;
+      const key = firstName(raw);
+      const ex = sdrs.get(key) || { name: raw, mqls: 0, rms: 0 };
+      ex[field] += 1;
+      if (raw.length > ex.name.length) ex.name = raw;
+      sdrs.set(key, ex);
+    }
+  };
+  bump(mqls, "mqls");
+  bump(rms, "rms");
+
+  for (const [key, s] of sdrs) {
+    if (s.mqls >= 10 && s.rms === 0) {
+      out.push({
+        id: `sdr-zero-${bu}-${key}`,
+        severity: "critical",
+        category: "sdr",
+        bu,
+        person: s.name,
+        title: `${s.name} (SDR) sem RMs em ${bu}`,
+        description: `${s.mqls} MQLs trabalhados e 0 reuniões marcadas no período.`,
+        metric: { label: "RMs", value: 0, target: "≥ 1" },
+      });
+      continue;
+    }
+    if (s.mqls >= 10) {
+      const taxa = s.rms / s.mqls;
+      if (taxa < 0.15) {
+        out.push({
+          id: `sdr-low-${bu}-${key}`,
+          severity: "warning",
+          category: "sdr",
+          bu,
+          person: s.name,
+          title: `${s.name} (SDR): MQL→RM em ${(taxa * 100).toFixed(0)}%`,
+          description: `${s.rms} RMs em ${s.mqls} MQLs trabalhados. Conversão abaixo do esperado.`,
+          metric: { label: "MQL→RM", value: `${(taxa * 100).toFixed(0)}%`, target: "≥ 20%" },
+        });
+      }
     }
   }
   return out;
