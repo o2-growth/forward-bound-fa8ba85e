@@ -162,26 +162,44 @@ export function TypeformVsIATab() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Detalhamento show-rate Typeform O2 (37 MQLs agendados)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {SHOW_RATE_BREAKDOWN.map((item) => (
-              <div
-                key={item.label}
-                className="rounded-lg border border-border bg-card p-4"
-              >
-                <div className="mb-2 text-2xl">{item.emoji}</div>
-                <div className="text-2xl font-bold text-foreground">{item.qty}</div>
-                <div className="text-xs text-muted-foreground">{item.label}</div>
-                <div className="mt-1 text-sm font-semibold text-primary">{item.pct}</div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Show-rate Typeform O2 (37 MQLs agendados)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {SHOW_RATE_BREAKDOWN_TYPEFORM.map((item) => (
+                <div key={item.label} className="rounded-lg border border-border bg-card p-4">
+                  <div className="mb-2 text-2xl">{item.emoji}</div>
+                  <div className="text-2xl font-bold text-foreground">{item.qty}</div>
+                  <div className="text-xs text-muted-foreground">{item.label}</div>
+                  <div className="mt-1 text-sm font-semibold text-primary">{item.pct}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Show-rate Jéssica IA (28 agendados)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3">
+              {SHOW_RATE_BREAKDOWN_IA.map((item) => (
+                <div key={item.label} className="rounded-lg border border-border bg-card p-4">
+                  <div className="mb-2 text-2xl">{item.emoji}</div>
+                  <div className="text-2xl font-bold text-foreground">{item.qty}</div>
+                  <div className="text-xs text-muted-foreground">{item.label}</div>
+                  <div className="mt-1 text-sm font-semibold text-primary">{item.pct}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
 
       <Card>
         <CardHeader>
