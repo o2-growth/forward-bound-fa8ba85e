@@ -4,7 +4,7 @@
 import type { DetailItem } from "@/components/planning/indicators/DetailSheet";
 
 export type InsightSeverity = "critical" | "warning" | "ok";
-export type InsightCategory = "vendedor" | "bu" | "funil" | "perdas" | "sla" | "produto";
+export type InsightCategory = "vendedor" | "sdr" | "bu" | "funil" | "perdas" | "sla" | "produto";
 
 export interface Insight {
   id: string;
