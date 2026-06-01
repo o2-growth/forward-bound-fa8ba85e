@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronUp, GitBranch, TrendingUp, XCircle, PieChart } from "lucide-react";
+import { ChevronDown, ChevronUp, GitBranch, TrendingUp, XCircle, PieChart, Sparkles } from "lucide-react";
 import { PipelineTab } from "./PipelineTab";
 import { ConversionsTab } from "./ConversionsTab";
 import { LossesTab } from "./LossesTab";
 import { SegmentationTab } from "./SegmentationTab";
+import { InsightsTab } from "./InsightsTab";
 
 interface AnalyticsSectionProps {
   buKey: string;
@@ -38,8 +39,12 @@ export function AnalyticsSection({ buKey, startDate, endDate }: AnalyticsSection
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-4">
         <div className="bg-card border border-border rounded-lg p-4">
-          <Tabs defaultValue="pipeline" className="w-full">
-            <TabsList className="grid w-full grid-cols-4 mb-6">
+          <Tabs defaultValue="insights" className="w-full">
+            <TabsList className="grid w-full grid-cols-5 mb-6">
+              <TabsTrigger value="insights" className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden sm:inline">Insights</span>
+              </TabsTrigger>
               <TabsTrigger value="pipeline" className="flex items-center gap-2">
                 <GitBranch className="h-4 w-4" />
                 <span className="hidden sm:inline">Pipeline</span>
@@ -57,6 +62,9 @@ export function AnalyticsSection({ buKey, startDate, endDate }: AnalyticsSection
                 <span className="hidden sm:inline">Segmentação</span>
               </TabsTrigger>
             </TabsList>
+            <TabsContent value="insights">
+              <InsightsTab buKey={buKey} startDate={startDate} endDate={endDate} />
+            </TabsContent>
             <TabsContent value="pipeline">
               <PipelineTab buKey={buKey} startDate={startDate} endDate={endDate} />
             </TabsContent>
