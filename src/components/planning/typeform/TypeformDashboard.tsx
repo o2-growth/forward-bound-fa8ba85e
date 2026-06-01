@@ -375,30 +375,27 @@ export function TypeformDashboard() {
         onBarClick={openDay}
       />
 
-      {/* Linha 3 — SDR + (resumo agendamentos futuros) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SdrBarChart data={sdr.data} loading={sdr.isLoading} onBarClick={openSdr} />
-        <FunnelTable
-          title="Próximas reuniões (top 12)"
-          data={(pipeline.data ?? []).filter((d) => new Date(d.booking_date) >= new Date(new Date().toDateString()))}
-          loading={pipeline.isLoading}
-          maxRows={12}
-          onRowClick={openDay}
-          columns={[
-            {
-              key: "booking_date",
-              label: "Data",
-              render: (r) =>
-                new Date(r.booking_date).toLocaleDateString("pt-BR", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "2-digit",
-                }),
-            },
-            { key: "reunioes", label: "Reuniões", align: "right", render: (r) => fmtInt(r.reunioes) },
-          ]}
-        />
-      </div>
+      {/* Linha 3 — Próximas reuniões */}
+      <FunnelTable
+        title="Próximas reuniões (top 12)"
+        data={(pipeline.data ?? []).filter((d) => new Date(d.booking_date) >= new Date(new Date().toDateString()))}
+        loading={pipeline.isLoading}
+        maxRows={12}
+        onRowClick={openDay}
+        columns={[
+          {
+            key: "booking_date",
+            label: "Data",
+            render: (r) =>
+              new Date(r.booking_date).toLocaleDateString("pt-BR", {
+                weekday: "short",
+                day: "2-digit",
+                month: "2-digit",
+              }),
+          },
+          { key: "reunioes", label: "Reuniões", align: "right", render: (r) => fmtInt(r.reunioes) },
+        ]}
+      />
 
       {/* Linha 4 — Faturamento + Setor */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
