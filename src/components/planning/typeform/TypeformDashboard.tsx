@@ -67,15 +67,8 @@ export function TypeformDashboard() {
   const kpi = kpis.data?.[0];
   const vel = velocidade.data?.[0];
 
-  const sdrsComMqls = (sdr.data ?? []).filter((s) => (s.mqls ?? 0) > 0).length;
   const totalMqls = kpi?.total_mqls ?? 0;
-  const cobertura =
-    totalMqls > 0 ? ((sdrsComMqls / totalMqls) * 100).toFixed(1) + "%" : "—";
 
-  const pctSub10 =
-    vel && vel.total_bookings > 0 ? (vel.sub_10min / vel.total_bookings) * 100 : null;
-  const pctSub1h =
-    vel && vel.total_bookings > 0 ? (vel.sub_1h / vel.total_bookings) * 100 : null;
 
   const faturamentoSorted = useMemo(
     () =>
