@@ -22,12 +22,10 @@ const COMPARISON: Array<{ metric: string; ia: string; typeform: string; winner: 
   { metric: "Qualificados (MQL ≥200k)", ia: "n/d (IA fala c/ todos)", typeform: "60 (32,4%)", winner: "typeform" },
   { metric: "Agendamentos", ia: "28", typeform: "54", winner: "typeform" },
   { metric: "Conv. Lead → Agendamento", ia: "15,2%", typeform: "29,2%", winner: "typeform" },
-  { metric: "Conv. MQL → Agendamento", ia: "n/d", typeform: "61,7%", winner: "typeform" },
-  { metric: "Velocidade mediana resposta", ia: "<segundos (auto)", typeform: "2,8 min", winner: "ia" },
+  { metric: "Conv. MQL → Agendamento", ia: "15,2%", typeform: "61,7%", winner: "typeform" },
   { metric: "% resposta sub-10min", ia: "~100% (auto)", typeform: "98,1%", winner: "ia" },
-  { metric: "Cobertura", ia: "24/7 IA, sem humano", typeform: "7 SDRs humanos", winner: "ia" },
   { metric: "Show-rate", ia: "47,9% (60d)", typeform: "n/d no painel", winner: "—" },
-  { metric: "Vendas fechadas (60d)", ia: "3 (R$ 72k)", typeform: "n/d no painel", winner: "—" },
+  { metric: "Vendas fechadas (60d)", ia: "3 (R$ 72k)", typeform: "0", winner: "ia" },
 ];
 
 const IA_SALES = [
@@ -130,7 +128,7 @@ export function TypeformVsIATab() {
               <tr className="border-b border-border text-left text-xs uppercase text-muted-foreground">
                 <th className="py-2 pr-4 font-medium">Métrica</th>
                 <th className="py-2 pr-4 font-medium">Jéssica IA (cold WhatsApp)</th>
-                <th className="py-2 pr-4 font-medium">Typeform O2 TAX (inbound qualificado)</th>
+                <th className="py-2 pr-4 font-medium">Typeform O2 (inbound qualificado)</th>
                 <th className="py-2 font-medium">Vencedor</th>
               </tr>
             </thead>
@@ -194,7 +192,7 @@ export function TypeformVsIATab() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Dados consolidados em 01/06/2026 — Typeform: painel O2 TAX. Jéssica IA: relatório operacional manual.
+        Dados consolidados em 01/06/2026 — Typeform: painel O2. Jéssica IA: relatório operacional manual.
       </p>
     </div>
   );
