@@ -91,6 +91,50 @@ export function TypeformDashboard() {
     [uf.data]
   );
 
+  // Reuniões geradas pelo Typeform por dia (created_at) — últimos 15 dias
+  const generatedByDay = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days: { booking_date: string; reunioes: number }[] = [];
+    const counts = new Map<string, number>();
+    for (const l of allLeads) {
+      if (!l.agendado || !l.created_at) continue;
+      const key = l.created_at.slice(0, 10);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    for (let i = 14; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      days.push({ booking_date: key, reunioes: counts.get(key) ?? 0 });
+    }
+    return days;
+  }, [allLeads]);
+
+  const openGeneratedDay = (row: any) => {
+    if (!row) return;
+    const dayKey = row.booking_date?.slice(0, 10);
+    const dt = new Date(row.booking_date);
+    const filtered = allLeads.filter(
+      (l) => l.agendado && (l.created_at ?? "").slice(0, 10) === dayKey
+    );
+    openDrawer({
+      title: dt.toLocaleDateString("pt-BR", {
+        weekday: "long",
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }),
+      description: "Reuniões geradas pelo Typeform neste dia",
+      fields: [{ label: "Reuniões geradas", value: fmtInt(row.reunioes) }],
+      leads: filtered,
+      breakdowns: [
+        buildBreakdown(filtered, "sdr_nome", "Por SDR"),
+        buildBreakdown(filtered, "faturamento", "Por faturamento", 5, keepFaturamento),
+      ],
+    });
+  };
+
   const anyError =
     kpis.error ||
     sdr.error ||
