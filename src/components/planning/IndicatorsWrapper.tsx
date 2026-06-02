@@ -26,12 +26,8 @@ export function IndicatorsWrapper() {
       </TabsList>
 
       <TabsContent value="comercial" className="mt-0">
-        <Tabs defaultValue="insights" className="w-full">
+        <Tabs defaultValue="funil" className="w-full">
           <TabsList className="grid w-full max-w-2xl grid-cols-4 mb-6">
-            <TabsTrigger value="insights" className="gap-2">
-              <Sparkles className="h-4 w-4" />
-              <span>Insights</span>
-            </TabsTrigger>
             <TabsTrigger value="funil" className="gap-2">
               <GitBranch className="h-4 w-4" />
               <span>Funil & Metas</span>
@@ -44,10 +40,11 @@ export function IndicatorsWrapper() {
               <Swords className="h-4 w-4" />
               <span>Typeform vs IA</span>
             </TabsTrigger>
+            <TabsTrigger value="insights" className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              <span>Insights</span>
+            </TabsTrigger>
           </TabsList>
-          <TabsContent value="insights" className="mt-0">
-            <InsightsPage />
-          </TabsContent>
           <TabsContent value="funil" className="mt-0">
             <IndicatorsTab />
           </TabsContent>
@@ -56,6 +53,9 @@ export function IndicatorsWrapper() {
           </TabsContent>
           <TabsContent value="vs-ia" className="mt-0">
             <TypeformVsIATab />
+          </TabsContent>
+          <TabsContent value="insights" className="mt-0">
+            <InsightsPage />
           </TabsContent>
         </Tabs>
       </TabsContent>
