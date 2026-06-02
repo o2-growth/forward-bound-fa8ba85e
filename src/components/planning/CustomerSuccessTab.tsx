@@ -509,7 +509,7 @@ function CustomerSuccessTabInner() {
               cfos={filteredCfos}
               clientes={filteredClientesPeriodo}
               dateRange={{ from: csStartDate, to: csEndDate }}
-              churnDossier={opsData?.churnDossier || []}
+              churnDossier={filteredChurnDossier}
             />
           </TabsContent>
 
