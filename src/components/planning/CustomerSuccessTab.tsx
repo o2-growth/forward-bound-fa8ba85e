@@ -569,10 +569,10 @@ function CustomerSuccessTabInner() {
 
           <TabsContent value="churn" className="mt-4">
             <div className="space-y-8">
-              <OperacaoKpisStrip operacao={operacao} dateRange={{ from: csStartDate, to: csEndDate }} />
+              <OperacaoKpisStrip operacao={filteredOperacao} dateRange={{ from: csStartDate, to: csEndDate }} />
               {(() => {
                 // Mesma regra do strip: contar resolvidas dentro do período
-                const resolvidasNoPeriodo = (operacao?.tratativasResolvidas || []).filter((t: any) => {
+                const resolvidasNoPeriodo = (filteredOperacao?.tratativasResolvidas || []).filter((t: any) => {
                   const d = t?.data;
                   if (!d) return false;
                   return d >= csStartDate && d <= csEndDate;
@@ -593,7 +593,7 @@ function CustomerSuccessTabInner() {
                       produto: c.produto,
                       faseAtual: c.faseAtual,
                     }))}
-                    tratativasResolvidas={(operacao?.tratativasResolvidas || [])
+                    tratativasResolvidas={(filteredOperacao?.tratativasResolvidas || [])
                       .filter((t: any) => {
                         const d = t?.data;
                         return d && d >= csStartDate && d <= csEndDate;
