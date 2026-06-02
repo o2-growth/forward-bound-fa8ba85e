@@ -1,29 +1,45 @@
-# Adicionar Bruna como closer de Oxy Hacker
+# Bug: MRR/Setup aparecem em Oxy Hacker (e Franquia) ao filtrar por closer/SDR
 
-## Problema
-Na aba **Admin → Metas por Closer**, ao selecionar a BU **Oxy Hacker**, só aparecem Pedro e Daniel. A Bruna não está na lista, então não dá pra configurar a meta dela nem ela é considerada nos rateios e filtros do dashboard.
+## Causa raiz
 
-## Causa
-Em `src/hooks/useCloserMetas.ts`, o mapa `CLOSERS_BY_BU` lista apenas Pedro e Daniel para `oxy_hacker`:
+`src/hooks/useConsolidatedMetas.ts` → função `getMetaMonetaryForPeriod` (linhas 247–274).
 
+Fluxo sem filtro (correto):
+- Chama `getMetaForPeriod` → `getConsolidatedMeta` → `getPlanGrowthMeta`, que respeita `PONTUAL_ONLY_BUS = ['oxy_hacker', 'franquia']` e retorna **MRR=0, Setup=0, Pontual=100%** para essas BUs.
+
+Fluxo com filtro de closer/SDR ativo (bug — linhas 262–270):
 ```ts
-oxy_hacker: ['Pedro Albite', 'Daniel Trindade'],
+const filteredFaturamento = getFilteredFaturamentoMeta(...); // soma de todas BUs
+switch (indicatorKey) {
+  case 'mrr':     return Math.round(filteredFaturamento * 0.25);
+  case 'setup':   return Math.round(filteredFaturamento * 0.60);
+  case 'pontual': return Math.round(filteredFaturamento * 0.15);
+}
 ```
+Isso aplica o split 25/60/15 **uniformemente** sobre o faturamento total rateado, **ignorando** que `oxy_hacker`/`franquia` deveriam contribuir com 100% em Pontual e 0% em MRR/Setup. Resultado: ao selecionar Bruna + Oxy Hacker, aparece MRR e Setup que não existem nessa BU.
 
-A Bruna já existe no array global `CLOSERS` e já é closer das BUs Modelo Atual e Franquia — falta só liberá-la em Oxy Hacker.
+Observação: o lado realizado (`IndicatorsTab.tsx` linhas 2469–2503) já está correto — só soma `modelo_atual` e `o2_tax` para MRR/Setup. O problema é só na meta.
 
-## Mudança
-1. **`src/hooks/useCloserMetas.ts`** — adicionar `'Bruna'` na lista `oxy_hacker`:
-   ```ts
-   oxy_hacker: ['Pedro Albite', 'Daniel Trindade', 'Bruna'],
-   ```
+## Correção
 
-Não é preciso migration: a tabela `closer_metas` é (`bu`, `month`, `closer`, `pct`) e linhas novas para Bruna são criadas no primeiro `Salvar`. Defaults vêm como 0%, mantendo a soma 100% atual (Pedro 100 + Daniel 0 + Bruna 0).
+Em `getMetaMonetaryForPeriod`, no ramo `closerActive || sdrActive`, calcular a meta **por BU**, aplicando o split correto conforme a BU seja pontual-only ou não, e somar — usando a mesma lógica de rateio (closer% × SDR ratio × pro-rata por dias) que `getFilteredFaturamentoMeta` já implementa.
 
-## Garantia de que "puxa certinho"
-- A atribuição real de vendas/cards a Bruna em Oxy Hacker é feita pelo nome do **Closer** vindo do Pipefy (match por primeiro nome normalizado — ver memória `closers-consolidated-logic` e `Monetary Gauges Closer Filter`). Como Bruna já é reconhecida nas outras BUs com o mesmo matching, o mesmo pipeline funciona em Oxy Hacker assim que ela aparecer na lista.
-- O rateio das metas monetárias e de funil para Bruna em Oxy Hacker passa a respeitar o % configurado em `closer_metas` (mesma lógica das outras BUs), inclusive quando o filtro de Closer = Bruna é aplicado no dashboard.
-- Após o ajuste, validar no preview: abrir Admin → Metas por Closer → Oxy Hacker, conferir que Bruna aparece com 0%, ajustar % de teste, salvar, e no Dashboard Comercial filtrar Closer = Bruna em Oxy Hacker para confirmar que meta e realizado respondem ao filtro.
+Plano de implementação:
+1. Extrair de `getFilteredFaturamentoMeta` uma versão que retorne **faturamento rateado por BU** (`Map<BuType, number>`), reaproveitando a iteração mensal, rateio de closer (`getFilteredMeta`), SDR (`sdrRatio`) e fração de dias.
+2. No `getMetaMonetaryForPeriod`, quando `closerActive || sdrActive`:
+   - Obter o faturamento rateado por BU.
+   - Para cada BU:
+     - Se `PONTUAL_ONLY_BUS.includes(bu)` → `pontual = faturamento`, `mrr = 0`, `setup = 0`.
+     - Caso contrário → `mrr = fat × 0.25`, `setup = fat × 0.60`, `pontual = fat × 0.15`.
+   - Somar conforme `indicatorKey` e retornar arredondado.
+3. Manter `getFilteredFaturamentoMeta` retornando o total (continua usado para `faturamento`), implementado em cima do helper por-BU para não duplicar lógica.
 
-## Escopo
-Mudança de 1 linha, sem migration, sem alteração de UI/UX.
+## Validação
+
+- Filtro: Bruna + apenas Oxy Hacker → cards MRR e Setup devem zerar (meta e realizado), Pontual deve refletir % da Bruna em `closer_metas` × faturamento de Oxy Hacker.
+- Filtro: Bruna + Modelo Atual + Oxy Hacker → MRR/Setup respondem só à parcela do Modelo Atual; Pontual soma parcela de Modelo Atual (15%) + 100% de Oxy Hacker.
+- Sem filtro de closer/SDR (regressão): comportamento idêntico ao atual (já passa pelo `getMetaForPeriod`, que respeita pontual-only).
+
+## Arquivos afetados
+
+- `src/hooks/useConsolidatedMetas.ts` — única alteração necessária.
