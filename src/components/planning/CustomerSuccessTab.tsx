@@ -273,6 +273,44 @@ function CustomerSuccessTabInner() {
     return reunioes.filter(r => filters.cfos.includes(r.cfo));
   }, [reunioes, filters.cfos]);
 
+  // Filtra operacao (tratativas, isentamentos, churns Oxy, tempo de tratativa)
+  // pelo CFO selecionado — crítico para usuários com role 'cfo' que devem
+  // ver apenas os próprios churns/tratativas.
+  const filteredOperacao = useMemo(() => {
+    if (!operacao) return operacao;
+    if (filters.cfos.length === 0) return operacao;
+    const set = new Set(filters.cfos);
+    const tratativasResolvidas = (operacao.tratativasResolvidas || []).filter((t: any) => t?.cfo && set.has(t.cfo));
+    const isentamentos = (operacao.isentamentos || []).filter((i: any) => i?.cfo && set.has(i.cfo));
+    const churnsOxy = (operacao.churnsOxy || []).filter((c: any) => c?.cfo && set.has(c.cfo));
+    const tempoTratativaChurn = (operacao.tempoTratativaChurn || []).filter((t: any) => t?.cfo && set.has(t.cfo));
+    const churnsList = tempoTratativaChurn.filter((t: any) => t.status !== 'ongoing');
+    const tempoMedioTratativaChurn = churnsList.length > 0
+      ? Math.round(churnsList.reduce((s: number, t: any) => s + (t.diasAteChurn || 0), 0) / churnsList.length)
+      : 0;
+    const tempoMedianoTratativaChurn = churnsList.length > 0
+      ? (() => {
+          const sorted = [...churnsList].sort((a: any, b: any) => a.diasAteChurn - b.diasAteChurn);
+          const mid = Math.floor(sorted.length / 2);
+          return sorted.length % 2 === 0
+            ? Math.round((sorted[mid - 1].diasAteChurn + sorted[mid].diasAteChurn) / 2)
+            : sorted[mid].diasAteChurn;
+        })()
+      : 0;
+    return {
+      ...operacao,
+      tratativasResolvidas,
+      tratativasResolvidasCount: tratativasResolvidas.length,
+      isentamentos,
+      valorIsentadoTotal: isentamentos.reduce((s: number, i: any) => s + (i.valor || 0), 0),
+      churnsOxy,
+      churnsOxyCount: churnsOxy.length,
+      tempoTratativaChurn,
+      tempoMedioTratativaChurn,
+      tempoMedianoTratativaChurn,
+    };
+  }, [operacao, filters.cfos]);
+
   // Compute MRR base from active clients (respects CFO + Produto + Data)
   const mrrBase = useMemo(() => {
     return filteredClientesPeriodo.reduce((s, c) => s + c.mrr, 0);
@@ -445,7 +483,7 @@ function CustomerSuccessTabInner() {
               npsScore={displayNpsData?.metrics?.nps?.score ?? null}
               mrrBase={mrrBase}
               onNavigateToAlertas={() => setActiveTab('alertas')}
-              operacao={operacao}
+              operacao={filteredOperacao}
             />
           </TabsContent>
 
@@ -531,10 +569,10 @@ function CustomerSuccessTabInner() {
 
           <TabsContent value="churn" className="mt-4">
             <div className="space-y-8">
-              <OperacaoKpisStrip operacao={operacao} dateRange={{ from: csStartDate, to: csEndDate }} />
+              <OperacaoKpisStrip operacao={filteredOperacao} dateRange={{ from: csStartDate, to: csEndDate }} />
               {(() => {
                 // Mesma regra do strip: contar resolvidas dentro do período
-                const resolvidasNoPeriodo = (operacao?.tratativasResolvidas || []).filter((t: any) => {
+                const resolvidasNoPeriodo = (filteredOperacao?.tratativasResolvidas || []).filter((t: any) => {
                   const d = t?.data;
                   if (!d) return false;
                   return d >= csStartDate && d <= csEndDate;
@@ -555,7 +593,7 @@ function CustomerSuccessTabInner() {
                       produto: c.produto,
                       faseAtual: c.faseAtual,
                     }))}
-                    tratativasResolvidas={(operacao?.tratativasResolvidas || [])
+                    tratativasResolvidas={(filteredOperacao?.tratativasResolvidas || [])
                       .filter((t: any) => {
                         const d = t?.data;
                         return d && d >= csStartDate && d <= csEndDate;
