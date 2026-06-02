@@ -190,19 +190,20 @@ export function useConsolidatedMetas() {
   };
 
   /**
-   * Obtém meta de faturamento com suporte a filtro de closers (para Modelo Atual)
-   * e rateio por SDR (via callback sdrRatio).
+   * Calcula faturamento rateado por BU para o período, aplicando filtro de
+   * closer (closer_metas %), rateio por SDR e pro-rata por dias.
    */
-  const getFilteredFaturamentoMeta = (
+  const getFilteredFaturamentoByBU = (
     bus: BuType[],
     startDate: Date,
     endDate: Date,
     closerFilter?: string[],
     getFilteredMeta?: (value: number, bu: string, month: string, closers: string[]) => number,
     sdrRatio?: (bu: BuType, month: MonthType) => number
-  ): number => {
+  ): Map<BuType, number> => {
     const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
-    let total = 0;
+    const perBU = new Map<BuType, number>();
+    bus.forEach(bu => perBU.set(bu, 0));
 
     for (const monthDate of monthsInPeriod) {
       const monthName = MONTH_NAMES[getMonth(monthDate)];
@@ -220,7 +221,7 @@ export function useConsolidatedMetas() {
       bus.forEach(bu => {
         let faturamento = getConsolidatedMeta(bu, monthName, 'faturamento').value;
 
-        // Aplicar rateio de % por closer (closer_metas) para TODAS as BUs quando filtro estiver ativo
+        // Rateio de % por closer (closer_metas) para TODAS as BUs quando filtro ativo
         if (closerFilter && closerFilter.length > 0 && getFilteredMeta) {
           const ticket = BU_TICKETS[bu] || 1;
           const vendas = faturamento / ticket;
@@ -228,16 +229,34 @@ export function useConsolidatedMetas() {
           faturamento = filteredVendas * ticket;
         }
 
-        // Aplicar rateio por SDR (multiplicativo, aplicado após o filtro de closer)
+        // Rateio por SDR (multiplicativo, após o filtro de closer)
         if (sdrRatio) {
           const ratio = sdrRatio(bu, monthName);
           faturamento = faturamento * ratio;
         }
 
-        total += faturamento * fraction;
+        perBU.set(bu, (perBU.get(bu) || 0) + faturamento * fraction);
       });
     }
 
+    return perBU;
+  };
+
+  /**
+   * Obtém meta de faturamento com suporte a filtro de closers (para Modelo Atual)
+   * e rateio por SDR (via callback sdrRatio).
+   */
+  const getFilteredFaturamentoMeta = (
+    bus: BuType[],
+    startDate: Date,
+    endDate: Date,
+    closerFilter?: string[],
+    getFilteredMeta?: (value: number, bu: string, month: string, closers: string[]) => number,
+    sdrRatio?: (bu: BuType, month: MonthType) => number
+  ): number => {
+    const perBU = getFilteredFaturamentoByBU(bus, startDate, endDate, closerFilter, getFilteredMeta, sdrRatio);
+    let total = 0;
+    perBU.forEach(v => { total += v; });
     return Math.round(total);
   };
 
@@ -258,16 +277,31 @@ export function useConsolidatedMetas() {
     const closerActive = !!(closerFilter && closerFilter.length > 0 && getFilteredMeta);
     const sdrActive = !!sdrRatio;
 
-    // Com filtro de closer e/ou SDR ativo, ajustar TODAS as métricas monetárias via faturamento rateado
+    // Com filtro de closer e/ou SDR ativo, ratear por BU e aplicar o split correto
+    // por BU — respeitando PONTUAL_ONLY_BUS (oxy_hacker, franquia), que não contribuem
+    // para MRR/Setup, apenas Pontual. Sem isso, BUs pontual-only inflavam MRR/Setup
+    // quando havia closer compartilhado (ex.: Bruna + Oxy Hacker).
     if (closerActive || sdrActive) {
-      const filteredFaturamento = getFilteredFaturamentoMeta(bus, startDate, endDate, closerFilter, getFilteredMeta, sdrRatio);
-
-      switch (indicatorKey) {
-        case 'faturamento': return filteredFaturamento;
-        case 'mrr': return Math.round(filteredFaturamento * 0.25);
-        case 'setup': return Math.round(filteredFaturamento * 0.60);
-        case 'pontual': return Math.round(filteredFaturamento * 0.15);
-      }
+      const perBU = getFilteredFaturamentoByBU(bus, startDate, endDate, closerFilter, getFilteredMeta, sdrRatio);
+      let total = 0;
+      perBU.forEach((fat, bu) => {
+        const isPontualOnly = PONTUAL_ONLY_BUS.includes(bu);
+        switch (indicatorKey) {
+          case 'faturamento':
+            total += fat;
+            break;
+          case 'mrr':
+            total += isPontualOnly ? 0 : fat * 0.25;
+            break;
+          case 'setup':
+            total += isPontualOnly ? 0 : fat * 0.60;
+            break;
+          case 'pontual':
+            total += isPontualOnly ? fat : fat * 0.15;
+            break;
+        }
+      });
+      return Math.round(total);
     }
 
     return getMetaForPeriod(bus, startDate, endDate, indicatorKey);
