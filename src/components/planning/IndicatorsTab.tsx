@@ -3020,18 +3020,25 @@ export function IndicatorsTab() {
 
             <MultiSelect
               options={[
-                { value: 'inbound', label: LEAD_SOURCE_LABELS.inbound },
-                { value: 'outbound', label: LEAD_SOURCE_LABELS.outbound },
-                { value: 'evento', label: LEAD_SOURCE_LABELS.evento },
-                { value: 'indicacao', label: LEAD_SOURCE_LABELS.indicacao },
-                { value: 'sem_origem', label: LEAD_SOURCE_LABELS.sem_origem },
+                { value: 'inbound', label: LEAD_SOURCE_LABELS.inbound, hint: ORIGEM_HINTS.inbound },
+                { value: 'outbound', label: LEAD_SOURCE_LABELS.outbound, hint: ORIGEM_HINTS.outbound },
+                { value: 'evento', label: LEAD_SOURCE_LABELS.evento, hint: ORIGEM_HINTS.evento },
+                { value: 'indicacao', label: LEAD_SOURCE_LABELS.indicacao, hint: ORIGEM_HINTS.indicacao },
+                { value: 'sem_origem', label: LEAD_SOURCE_LABELS.sem_origem, hint: ORIGEM_HINTS.sem_origem },
               ]}
               selected={selectedOrigens}
               onSelectionChange={(v) => setSelectedOrigens(v as LeadSource[])}
               placeholder="Todas Origens"
               allLabel="Todas Origens"
               className="w-44"
+              clearable
+              optionIcon={(o) => ORIGEM_ICONS[o.value as LeadSource]}
+              renderOptionExtra={(o) => {
+                const n = origemCounts[o.value as LeadSource] ?? 0;
+                return n > 0 ? n.toLocaleString('pt-BR') : '—';
+              }}
             />
+
 
             <DateRangePickerGA
               startDate={startDate}
