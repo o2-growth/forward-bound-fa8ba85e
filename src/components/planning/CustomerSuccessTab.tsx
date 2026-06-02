@@ -213,6 +213,10 @@ function CustomerSuccessTabInner() {
     setSelectedPeriod('all');
     setSelectedYear('all');
     setDateRange(undefined);
+    // CFOs logados não podem destravar o próprio filtro
+    if (isCfo && lockedCfoName) {
+      setFilters({ cfos: [lockedCfoName] });
+    }
   };
 
   const displayNpsData = filteredNpsData ?? npsData;
@@ -310,6 +314,15 @@ function CustomerSuccessTabInner() {
       tempoMedianoTratativaChurn,
     };
   }, [operacao, filters.cfos]);
+
+  // Filtra o dossiê de churn pelo CFO selecionado — evita que usuários com
+  // role 'cfo' recebam (mesmo via bundle/devtools) churns de outros CFOs.
+  const filteredChurnDossier = useMemo(() => {
+    const raw = opsData?.churnDossier || [];
+    if (filters.cfos.length === 0) return raw;
+    const set = new Set(filters.cfos);
+    return raw.filter((d: any) => d?.cfo && set.has(d.cfo));
+  }, [opsData?.churnDossier, filters.cfos]);
 
   // Compute MRR base from active clients (respects CFO + Produto + Data)
   const mrrBase = useMemo(() => {
@@ -496,7 +509,7 @@ function CustomerSuccessTabInner() {
               cfos={filteredCfos}
               clientes={filteredClientesPeriodo}
               dateRange={{ from: csStartDate, to: csEndDate }}
-              churnDossier={opsData?.churnDossier || []}
+              churnDossier={filteredChurnDossier}
             />
           </TabsContent>
 
@@ -517,10 +530,14 @@ function CustomerSuccessTabInner() {
                   selectedYear={selectedYear}
                   dateRange={dateRange}
                   onProdutosChange={(v) => setFilters({ produtos: v })}
-                  onCfosChange={(v) => setFilters({ cfos: v })}
+                  onCfosChange={(v) => {
+                    if (isCfo && lockedCfoName) return; // travado
+                    setFilters({ cfos: v });
+                  }}
                   onPeriodChange={handlePeriodChange}
                   onYearChange={setSelectedYear}
                   onClear={handleClearFilters}
+                  lockedCfo={isCfo && lockedCfoName ? lockedCfoName : null}
                 />
               )}
 
@@ -579,7 +596,7 @@ function CustomerSuccessTabInner() {
                 }).length;
                 return (
                   <ChurnDossierSection
-                    data={opsData?.churnDossier || []}
+                    data={filteredChurnDossier}
                     selectedProdutos={filters.produtos}
                     globalCfos={filters.cfos}
                     activeClientesCount={filteredClientesPeriodo.length}

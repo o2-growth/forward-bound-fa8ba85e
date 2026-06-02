@@ -24,6 +24,8 @@ interface NpsFiltersProps {
   onPeriodChange: (period: string, range?: DateRange) => void;
   onYearChange: (year: string) => void;
   onClear: () => void;
+  /** Quando setado, trava o filtro CFO no nome informado (usuários role 'cfo'). */
+  lockedCfo?: string | null;
 }
 
 const PERIOD_PRESETS = [
@@ -49,6 +51,7 @@ export function NpsFilters({
   onPeriodChange,
   onYearChange,
   onClear,
+  lockedCfo = null,
 }: NpsFiltersProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -134,13 +137,21 @@ export function NpsFilters({
 
       {/* CFO filter */}
       <div className="min-w-[180px]">
-        <MultiSelect
-          options={cfoOptions}
-          onSelectionChange={onCfosChange}
-          selected={selectedCfos}
-          placeholder="CFO"
-        />
+        {lockedCfo ? (
+          <div className="h-9 flex items-center px-3 rounded-md border border-border bg-muted/50 text-xs text-muted-foreground">
+            <span className="opacity-60 mr-1">CFO:</span>
+            <span className="font-medium text-foreground">{lockedCfo}</span>
+          </div>
+        ) : (
+          <MultiSelect
+            options={cfoOptions}
+            onSelectionChange={onCfosChange}
+            selected={selectedCfos}
+            placeholder="CFO"
+          />
+        )}
       </div>
+
 
       {/* Period presets */}
       <div className="flex items-center gap-1">
