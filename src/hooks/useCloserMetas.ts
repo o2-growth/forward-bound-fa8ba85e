@@ -22,7 +22,7 @@ export type CloserType = typeof CLOSERS[number];
 export const BU_CLOSERS: Record<BuType, readonly CloserType[]> = {
   modelo_atual: ['Pedro Albite', 'Daniel Trindade', 'Thiago', 'Amanda Serafim', 'Bruna'],
   o2_tax: ['Lucas Ilha'],
-  oxy_hacker: ['Pedro Albite', 'Daniel Trindade'],
+  oxy_hacker: ['Pedro Albite', 'Daniel Trindade', 'Bruna'],
   franquia: ['Pedro Albite', 'Daniel Trindade', 'Bruna'],
 } as const;
 
