@@ -315,6 +315,15 @@ function CustomerSuccessTabInner() {
     };
   }, [operacao, filters.cfos]);
 
+  // Filtra o dossiê de churn pelo CFO selecionado — evita que usuários com
+  // role 'cfo' recebam (mesmo via bundle/devtools) churns de outros CFOs.
+  const filteredChurnDossier = useMemo(() => {
+    const raw = opsData?.churnDossier || [];
+    if (filters.cfos.length === 0) return raw;
+    const set = new Set(filters.cfos);
+    return raw.filter((d: any) => d?.cfo && set.has(d.cfo));
+  }, [opsData?.churnDossier, filters.cfos]);
+
   // Compute MRR base from active clients (respects CFO + Produto + Data)
   const mrrBase = useMemo(() => {
     return filteredClientesPeriodo.reduce((s, c) => s + c.mrr, 0);
