@@ -735,6 +735,52 @@ export function IndicatorsTab() {
     return selectedOrigens.includes(source);
   };
 
+  // Contagem por origem usando o universo de cards Modelo Atual + O2 TAX
+  // (não aplica o próprio filtro de origem para que o usuário sempre veja
+  // quantos cards caem em cada bucket no período selecionado).
+  const origemCounts = useMemo(() => {
+    const counts: Record<LeadSource, number> = {
+      inbound: 0,
+      outbound: 0,
+      evento: 0,
+      indicacao: 0,
+      sem_origem: 0,
+    };
+    const all = [
+      ...(modeloAtualAnalytics.cards || []),
+      ...(o2TaxAnalytics.cards || []),
+    ];
+    for (const card of all) {
+      const src = classifyLeadSource({
+        tipoOrigem: (card as any).tipoOrigem,
+        origemLead: (card as any).origemLead,
+        fonte: (card as any).fonte,
+        campanha: (card as any).campanha,
+        sdr: (card as any).responsavel || (card as any).sdr,
+      });
+      counts[src] = (counts[src] || 0) + 1;
+    }
+    return counts;
+  }, [modeloAtualAnalytics.cards, o2TaxAnalytics.cards]);
+
+  const ORIGEM_ICONS: Record<LeadSource, React.ReactNode> = {
+    inbound: <ArrowDownToLine className="h-3.5 w-3.5" />,
+    outbound: <Send className="h-3.5 w-3.5" />,
+    evento: <Calendar className="h-3.5 w-3.5" />,
+    indicacao: <Users2 className="h-3.5 w-3.5" />,
+    sem_origem: <HelpCircle className="h-3.5 w-3.5" />,
+  };
+
+  const ORIGEM_HINTS: Record<LeadSource, string> = {
+    inbound: 'Leads inbound — preenchimento de formulários, conteúdo, orgânico',
+    outbound: 'Prospecção ativa (Outbound) — SDR Matheus / Tipo de Origem = Prospecção Ativa',
+    evento: 'Cards originados de eventos / feiras',
+    indicacao: 'Indicação direta de cliente, parceiro ou rede',
+    sem_origem: 'Cards sem Tipo de Origem nem Origem do Lead preenchidos no Pipefy',
+  };
+
+
+
   // Month name mapping for funnelData lookup
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   
