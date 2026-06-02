@@ -13,7 +13,7 @@ export interface SdrMeta {
 
 const BUS = ['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia'] as const;
 const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'] as const;
-const SDRS = ['Amanda', 'Carlos', 'Matheus', 'Erica', 'Ana'] as const;
+const SDRS = ['Amanda', 'Carlos', 'Matheus', 'Erica', 'Ana', 'Kethlin'] as const;
 
 export type SdrBuType = typeof BUS[number];
 export type SdrMonthType = typeof MONTHS[number];
@@ -24,7 +24,7 @@ export const BU_SDRS: Record<SdrBuType, readonly SdrType[]> = {
   modelo_atual: ['Amanda', 'Matheus', 'Carlos', 'Erica', 'Ana'],
   o2_tax: ['Carlos'],
   oxy_hacker: ['Amanda', 'Carlos'],
-  franquia: ['Amanda', 'Carlos'],
+  franquia: ['Amanda', 'Carlos', 'Kethlin'],
 } as const;
 
 export const getSdrsForBU = (bu: SdrBuType): readonly SdrType[] => {
