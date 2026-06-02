@@ -596,7 +596,7 @@ function CustomerSuccessTabInner() {
                 }).length;
                 return (
                   <ChurnDossierSection
-                    data={opsData?.churnDossier || []}
+                    data={filteredChurnDossier}
                     selectedProdutos={filters.produtos}
                     globalCfos={filters.cfos}
                     activeClientesCount={filteredClientesPeriodo.length}
