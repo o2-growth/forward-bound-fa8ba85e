@@ -530,10 +530,14 @@ function CustomerSuccessTabInner() {
                   selectedYear={selectedYear}
                   dateRange={dateRange}
                   onProdutosChange={(v) => setFilters({ produtos: v })}
-                  onCfosChange={(v) => setFilters({ cfos: v })}
+                  onCfosChange={(v) => {
+                    if (isCfo && lockedCfoName) return; // travado
+                    setFilters({ cfos: v });
+                  }}
                   onPeriodChange={handlePeriodChange}
                   onYearChange={setSelectedYear}
                   onClear={handleClearFilters}
+                  lockedCfo={isCfo && lockedCfoName ? lockedCfoName : null}
                 />
               )}
 
