@@ -47,7 +47,7 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   outbound: 'Outbound',
   evento: 'Eventos',
   indicacao: 'Indicação',
-  sem_origem: 'Sem origem',
+  sem_origem: 'Sem Origem',
 };
 
 const norm = (s?: string | null): string => {

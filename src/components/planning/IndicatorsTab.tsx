@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Line, ComposedChart, RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
-import { RefreshCw, Loader2, BarChart3, TrendingUp, ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Search } from "lucide-react";
+import { RefreshCw, Loader2, BarChart3, TrendingUp, ExternalLink, ChevronDown, ChevronUp, AlertTriangle, Search, ArrowDownToLine, Send, Calendar, Users2, HelpCircle } from "lucide-react";
 import { useFunnelRealized, IndicatorType, BUType } from "@/hooks/useFunnelRealized";
 import { useModeloAtualMetas, ChartGrouping, ModeloAtualIndicator } from "@/hooks/useModeloAtualMetas";
 import { useExpansaoMetas, ExpansaoIndicator } from "@/hooks/useExpansaoMetas";
@@ -734,6 +734,52 @@ export function IndicatorsTab() {
     });
     return selectedOrigens.includes(source);
   };
+
+  // Contagem por origem usando o universo de cards Modelo Atual + O2 TAX
+  // (não aplica o próprio filtro de origem para que o usuário sempre veja
+  // quantos cards caem em cada bucket no período selecionado).
+  const origemCounts = useMemo(() => {
+    const counts: Record<LeadSource, number> = {
+      inbound: 0,
+      outbound: 0,
+      evento: 0,
+      indicacao: 0,
+      sem_origem: 0,
+    };
+    const all = [
+      ...(modeloAtualAnalytics.cards || []),
+      ...(o2TaxAnalytics.cards || []),
+    ];
+    for (const card of all) {
+      const src = classifyLeadSource({
+        tipoOrigem: (card as any).tipoOrigem,
+        origemLead: (card as any).origemLead,
+        fonte: (card as any).fonte,
+        campanha: (card as any).campanha,
+        sdr: (card as any).responsavel || (card as any).sdr,
+      });
+      counts[src] = (counts[src] || 0) + 1;
+    }
+    return counts;
+  }, [modeloAtualAnalytics.cards, o2TaxAnalytics.cards]);
+
+  const ORIGEM_ICONS: Record<LeadSource, React.ReactNode> = {
+    inbound: <ArrowDownToLine className="h-3.5 w-3.5" />,
+    outbound: <Send className="h-3.5 w-3.5" />,
+    evento: <Calendar className="h-3.5 w-3.5" />,
+    indicacao: <Users2 className="h-3.5 w-3.5" />,
+    sem_origem: <HelpCircle className="h-3.5 w-3.5" />,
+  };
+
+  const ORIGEM_HINTS: Record<LeadSource, string> = {
+    inbound: 'Leads inbound — preenchimento de formulários, conteúdo, orgânico',
+    outbound: 'Prospecção ativa (Outbound) — SDR Matheus / Tipo de Origem = Prospecção Ativa',
+    evento: 'Cards originados de eventos / feiras',
+    indicacao: 'Indicação direta de cliente, parceiro ou rede',
+    sem_origem: 'Cards sem Tipo de Origem nem Origem do Lead preenchidos no Pipefy',
+  };
+
+
 
   // Month name mapping for funnelData lookup
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -2974,18 +3020,25 @@ export function IndicatorsTab() {
 
             <MultiSelect
               options={[
-                { value: 'inbound', label: LEAD_SOURCE_LABELS.inbound },
-                { value: 'outbound', label: LEAD_SOURCE_LABELS.outbound },
-                { value: 'evento', label: LEAD_SOURCE_LABELS.evento },
-                { value: 'indicacao', label: LEAD_SOURCE_LABELS.indicacao },
-                { value: 'sem_origem', label: LEAD_SOURCE_LABELS.sem_origem },
+                { value: 'inbound', label: LEAD_SOURCE_LABELS.inbound, hint: ORIGEM_HINTS.inbound },
+                { value: 'outbound', label: LEAD_SOURCE_LABELS.outbound, hint: ORIGEM_HINTS.outbound },
+                { value: 'evento', label: LEAD_SOURCE_LABELS.evento, hint: ORIGEM_HINTS.evento },
+                { value: 'indicacao', label: LEAD_SOURCE_LABELS.indicacao, hint: ORIGEM_HINTS.indicacao },
+                { value: 'sem_origem', label: LEAD_SOURCE_LABELS.sem_origem, hint: ORIGEM_HINTS.sem_origem },
               ]}
               selected={selectedOrigens}
               onSelectionChange={(v) => setSelectedOrigens(v as LeadSource[])}
               placeholder="Todas Origens"
               allLabel="Todas Origens"
               className="w-44"
+              clearable
+              optionIcon={(o) => ORIGEM_ICONS[o.value as LeadSource]}
+              renderOptionExtra={(o) => {
+                const n = origemCounts[o.value as LeadSource] ?? 0;
+                return n > 0 ? n.toLocaleString('pt-BR') : '—';
+              }}
             />
+
 
             <DateRangePickerGA
               startDate={startDate}
