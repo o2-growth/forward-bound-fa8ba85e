@@ -51,6 +51,7 @@ export function NpsFilters({
   onPeriodChange,
   onYearChange,
   onClear,
+  lockedCfo = null,
 }: NpsFiltersProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
 
