@@ -483,7 +483,7 @@ function CustomerSuccessTabInner() {
               npsScore={displayNpsData?.metrics?.nps?.score ?? null}
               mrrBase={mrrBase}
               onNavigateToAlertas={() => setActiveTab('alertas')}
-              operacao={operacao}
+              operacao={filteredOperacao}
             />
           </TabsContent>
 
