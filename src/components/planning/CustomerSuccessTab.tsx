@@ -213,6 +213,10 @@ function CustomerSuccessTabInner() {
     setSelectedPeriod('all');
     setSelectedYear('all');
     setDateRange(undefined);
+    // CFOs logados não podem destravar o próprio filtro
+    if (isCfo && lockedCfoName) {
+      setFilters({ cfos: [lockedCfoName] });
+    }
   };
 
   const displayNpsData = filteredNpsData ?? npsData;
