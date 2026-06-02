@@ -24,6 +24,8 @@ interface NpsFiltersProps {
   onPeriodChange: (period: string, range?: DateRange) => void;
   onYearChange: (year: string) => void;
   onClear: () => void;
+  /** Quando setado, trava o filtro CFO no nome informado (usuários role 'cfo'). */
+  lockedCfo?: string | null;
 }
 
 const PERIOD_PRESETS = [
