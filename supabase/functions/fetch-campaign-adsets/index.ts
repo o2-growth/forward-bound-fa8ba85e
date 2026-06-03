@@ -275,9 +275,10 @@ serve(async (req) => {
       });
     } catch (fetchError) {
       const errorMsg = fetchError instanceof Error ? fetchError.message : 'Unknown error';
+      const normalizedErrorMsg = errorMsg.toLowerCase().replace(/_/g, ' ');
       
       // If rate limited and we have stale cache, return it
-      if (errorMsg.includes('request limit') || errorMsg.includes('rate limit')) {
+      if (normalizedErrorMsg.includes('request limit') || normalizedErrorMsg.includes('rate limit')) {
         if (cachedResult?.data) {
           console.log(`Rate limited, returning stale cache for ${cacheKey}`);
           return new Response(JSON.stringify({ 
