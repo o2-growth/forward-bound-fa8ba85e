@@ -86,7 +86,17 @@ async function fetchAdSetsWithBatchAPI(
   
   if (adSetsData.error) {
     console.error("Meta API error fetching ad sets:", adSetsData.error);
-    throw new Error(adSetsData.error.message || "Erro ao buscar ad sets");
+    const msg = adSetsData.error.message || "";
+    // Archived/deleted/invalid campaign IDs → return empty instead of 500
+    if (
+      adSetsData.error.code === 100 ||
+      adSetsData.error.type === "GraphMethodException" ||
+      /invalid parameter|does not exist|unsupported/i.test(msg)
+    ) {
+      console.warn(`Treating as empty for campaign ${campaignId}: ${msg}`);
+      return [];
+    }
+    throw new Error(msg || "Erro ao buscar ad sets");
   }
 
   const adSets = adSetsData.data || [];
