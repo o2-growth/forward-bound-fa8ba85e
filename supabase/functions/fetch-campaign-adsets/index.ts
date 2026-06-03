@@ -22,6 +22,35 @@ interface BatchResponse {
   body: string;
 }
 
+function getMetaErrorText(error: any): string {
+  return [
+    error?.message,
+    error?.error_user_title,
+    error?.error_user_msg,
+    error?.type,
+  ].filter(Boolean).join(' ');
+}
+
+function isMetaRateLimitError(error: any): boolean {
+  const text = getMetaErrorText(error);
+  return (
+    [4, 17, 32, 613].includes(Number(error?.code)) ||
+    Number(error?.error_subcode) === 2446079 ||
+    /rate limit|request limit|too many calls|excessive calls|quantidade excessiva|número excessivo|numero excessivo/i.test(text)
+  );
+}
+
+function isInvalidMetaCampaignError(error: any): boolean {
+  if (isMetaRateLimitError(error)) return false;
+
+  const text = getMetaErrorText(error);
+  return (
+    Number(error?.code) === 100 ||
+    error?.type === "GraphMethodException" ||
+    /invalid parameter|does not exist|unsupported/i.test(text)
+  );
+}
+
 // Initialize Supabase client with service role for cache operations
 function getSupabaseClient() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -86,17 +115,19 @@ async function fetchAdSetsWithBatchAPI(
   
   if (adSetsData.error) {
     console.error("Meta API error fetching ad sets:", adSetsData.error);
-    const msg = adSetsData.error.message || "";
+    const msg = getMetaErrorText(adSetsData.error) || "Erro ao buscar ad sets";
+
+    if (isMetaRateLimitError(adSetsData.error)) {
+      throw new Error(`RATE_LIMIT: ${msg}`);
+    }
+
     // Archived/deleted/invalid campaign IDs → return empty instead of 500
-    if (
-      adSetsData.error.code === 100 ||
-      adSetsData.error.type === "GraphMethodException" ||
-      /invalid parameter|does not exist|unsupported/i.test(msg)
-    ) {
+    if (isInvalidMetaCampaignError(adSetsData.error)) {
       console.warn(`Treating as empty for campaign ${campaignId}: ${msg}`);
       return [];
     }
-    throw new Error(msg || "Erro ao buscar ad sets");
+
+    throw new Error(msg);
   }
 
   const adSets = adSetsData.data || [];
