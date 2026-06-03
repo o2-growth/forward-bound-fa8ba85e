@@ -979,6 +979,14 @@ export function IndicatorsTab() {
       );
     }
 
+    // Quando há filtro de Closer/SDR/Origem ativo, respeitar o total calculado
+    // (inclusive 0), sem cair no fallback de meta anual padrão. Isso evita exibir
+    // meta padrão para um closer sem rateio em closer_metas.
+    const hasActiveFilter =
+      effectiveSelectedClosers.length > 0 ||
+      effectiveSelectedSDRs.length > 0 ||
+      selectedOrigens.length > 0;
+    if (hasActiveFilter) return total;
     return total > 0 ? total : Math.round(indicator.annualMeta * periodFraction);
   };
 
