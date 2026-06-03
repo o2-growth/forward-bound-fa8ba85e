@@ -14,6 +14,7 @@ import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawe
 import { ChurnKpiDrawer, type KpiDrawerData, type DrawerRow } from '@/components/planning/cs/ChurnKpiDrawer';
 import { DataSourceInfo } from '@/components/planning/cs/DataSourceInfo';
 import { DS } from '@/components/planning/cs/dataSources';
+import { ChurnExplainerDialog } from '@/components/planning/cs/ChurnExplainerDialog';
 
 /* ─── helpers ─── */
 function formatDate(dateStr: string | null | undefined): string {
