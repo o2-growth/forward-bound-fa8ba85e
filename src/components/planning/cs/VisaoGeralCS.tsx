@@ -272,8 +272,9 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                   <Info className="h-3 w-3 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-xs">
-                  <p><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
-                  <p className="mt-1"><strong>Por Tipo</strong>: MRR = cliente com receita recorrente (CFOaaS, Oxy, Gênio etc.). Pontual = cliente sem MRR, apenas com receita pontual (Setup, Diagnóstico, Turnaround, Valuation, Educação).</p>
+                  <p><strong>Por tipo</strong>: MRR = cliente com receita recorrente. Pontual = cliente sem MRR, só receita pontual.</p>
+                  <p className="mt-1"><strong>Por produto</strong>: agrupa pelo campo "Produto" do card na Central de Projetos (CFOaaS, OXY, BPO, Assessoria, Coordenador, Setup, Diagnóstico etc.). Cada cliente conta 1 vez pelo produto principal.</p>
+                  <p className="mt-1"><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
