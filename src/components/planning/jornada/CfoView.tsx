@@ -85,7 +85,7 @@ const CFO_SQUADS: Record<string, {
   },
   'Gustavo Cochlar': {
     nome: 'Gustavo Ferreira Cochlar',
-    fee: 20000,
+    fee: 29051.56,
     beneficios: 740,
     membros: [
       { nome: 'Humberto de Azevedo Behs', cargo: 'Analista FP&A', fee: 7000, beneficios: 987.60 },
