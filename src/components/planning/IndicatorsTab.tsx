@@ -2456,18 +2456,30 @@ export function IndicatorsTab() {
 
       case 'sla': {
         // SLA: Average time from card creation to first contact attempt
+        // Respeita período (dataEntrada) + filtros de Closer/SDR/Origem.
+        const startTs = startDate.getTime();
+        const endTs = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999).getTime();
+        const inRange = (d: Date) => {
+          const t = d.getTime();
+          return t >= startTs && t <= endTs;
+        };
+        const passesPeopleFilter = (card: any) => {
+          const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer);
+          const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsavel || card.responsible);
+          return matchCloser && matchSdr && matchesOrigemFilter(card);
+        };
         let totalMinutes = 0;
         let totalCount = 0;
         if (includesModeloAtual) {
           const maCards = modeloAtualAnalytics.cards.filter(card =>
-            card.fase.toLowerCase() === 'tentativas de contato' && card.dataCriacao
+            card.fase.toLowerCase() === 'tentativas de contato' && card.dataCriacao && inRange(card.dataEntrada) && passesPeopleFilter(card)
           );
           totalMinutes += maCards.reduce((s, c) => s + (c.dataEntrada.getTime() - c.dataCriacao!.getTime()) / 1000 / 60, 0);
           totalCount += maCards.length;
         }
         if (includesO2Tax) {
           const o2Cards = o2TaxAnalytics.cards.filter(card =>
-            card.fase.toLowerCase() === 'tentativas de contato' && card.dataCriacao
+            card.fase.toLowerCase() === 'tentativas de contato' && card.dataCriacao && inRange(card.dataEntrada) && passesPeopleFilter(card)
           );
           totalMinutes += o2Cards.reduce((s, c) => s + (c.dataEntrada.getTime() - c.dataCriacao!.getTime()) / 1000 / 60, 0);
           totalCount += o2Cards.length;
