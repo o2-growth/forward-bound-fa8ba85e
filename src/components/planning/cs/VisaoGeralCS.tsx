@@ -134,15 +134,22 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
   }, [activeClientes]);
 
   // Distribuição por Produto (campo Pipefy · Central de Projetos)
+  // Um cliente pode ter múltiplos produtos (ex: "CFOaaS, Setup" ou "OXY + Gênio").
+  // Quebramos por vírgula e "+" para contar cada produto individualmente.
   const clientesByProduto = useMemo(() => {
     const map: Record<string, { count: number; mrr: number; clientes: JornadaCliente[] }> = {};
     activeClientes.forEach(c => {
       const raw = (c.produto || '').toString().trim();
-      const produto = raw || 'Sem produto';
-      if (!map[produto]) map[produto] = { count: 0, mrr: 0, clientes: [] };
-      map[produto].count++;
-      map[produto].mrr += c.mrr;
-      map[produto].clientes.push(c);
+      const parts = raw
+        ? raw.split(/[,+]/).map(p => p.trim()).filter(Boolean)
+        : ['Sem produto'];
+      const unique = Array.from(new Set(parts));
+      unique.forEach(produto => {
+        if (!map[produto]) map[produto] = { count: 0, mrr: 0, clientes: [] };
+        map[produto].count++;
+        map[produto].mrr += c.mrr;
+        map[produto].clientes.push(c);
+      });
     });
     return Object.entries(map).sort((a, b) => b[1].count - a[1].count);
   }, [activeClientes]);
@@ -273,7 +280,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-xs">
                   <p><strong>Por tipo</strong>: MRR = cliente com receita recorrente. Pontual = cliente sem MRR, só receita pontual.</p>
-                  <p className="mt-1"><strong>Por produto</strong>: agrupa pelo campo "Produto" do card na Central de Projetos (CFOaaS, OXY, BPO, Assessoria, Coordenador, Setup, Diagnóstico etc.). Cada cliente conta 1 vez pelo produto principal.</p>
+                  <p className="mt-1"><strong>Por produto</strong>: agrupa pelo campo "Produto" do card na Central de Projetos. Clientes com múltiplos produtos (ex: "CFOaaS, Setup" ou "OXY + Gênio") são contados 1 vez em cada produto individual — por isso a soma pode ser maior que {activeClientes.length}.</p>
                   <p className="mt-1"><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
                 </TooltipContent>
               </Tooltip>
@@ -356,7 +363,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 </Table>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                Cada cliente conta 1 vez pelo produto principal
+                Clientes com múltiplos produtos contam em cada um (separados por vírgula ou "+")
               </p>
             </div>
 
