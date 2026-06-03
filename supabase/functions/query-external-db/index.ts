@@ -189,6 +189,83 @@ Deno.serve(async (req) => {
         byPhase: byPhase.rows,
       };
       console.log(`count_active_in_pipe ${table}: ${result.total}`);
+    } else if (action === "pipes_active_aggregated") {
+      // Aggregated values for active cards (Saída IS NULL) across BPO / Assessoria / Coordenador pipes.
+      // For each pipe, keep latest movement row per ID (DISTINCT ON ID ORDER BY Entrada DESC)
+      // and compute MRR + Pontual + Setup based on the recurring column of that pipe.
+      const sql = `
+        WITH bpo AS (
+          SELECT DISTINCT ON ("ID")
+            "ID"::text                              AS id,
+            "Título"                                AS titulo,
+            "Fase Atual"                            AS fase,
+            empresa,
+            cnpj,
+            'BPO'                                   AS produto_origem,
+            COALESCE(valor_bpo, 0)                  AS mrr,
+            COALESCE(valor_diagnostico, 0)
+              + COALESCE(valor_turnaround, 0)
+              + COALESCE(valor_valuation, 0)        AS pontual,
+            COALESCE(valor_setup, 0)                AS setup
+          FROM pipefy_moviment_bpo
+          WHERE "Saída" IS NULL
+          ORDER BY "ID", "Entrada" DESC
+        ),
+        assessoria AS (
+          SELECT DISTINCT ON ("ID")
+            "ID"::text                              AS id,
+            "Título"                                AS titulo,
+            "Fase Atual"                            AS fase,
+            empresa,
+            cnpj,
+            'Assessoria Financeira'                 AS produto_origem,
+            COALESCE(valor_assessoria, 0)           AS mrr,
+            COALESCE(valor_diagnostico, 0)
+              + COALESCE(valor_turnaround, 0)
+              + COALESCE(valor_valuation, 0)        AS pontual,
+            COALESCE(valor_setup, 0)                AS setup
+          FROM pipefy_moviment_assessoria_financeira
+          WHERE "Saída" IS NULL
+          ORDER BY "ID", "Entrada" DESC
+        ),
+        coordenador AS (
+          SELECT DISTINCT ON ("ID")
+            "ID"::text                              AS id,
+            "Título"                                AS titulo,
+            "Fase Atual"                            AS fase,
+            empresa,
+            cnpj,
+            'Coordenador Financeiro'                AS produto_origem,
+            COALESCE(valor_coordenador_financeiro, 0) AS mrr,
+            COALESCE(valor_diagnostico, 0)
+              + COALESCE(valor_turnaround, 0)
+              + COALESCE(valor_valuation, 0)        AS pontual,
+            COALESCE(valor_setup, 0)                AS setup
+          FROM pipefy_moviment_coordenador_financeiro
+          WHERE "Saída" IS NULL
+          ORDER BY "ID", "Entrada" DESC
+        )
+        SELECT * FROM bpo
+        UNION ALL SELECT * FROM assessoria
+        UNION ALL SELECT * FROM coordenador
+      `;
+      const r = await client.query(sql);
+      result = {
+        action: "pipes_active_aggregated",
+        total: r.rows.length,
+        rows: r.rows.map((row: any) => ({
+          id: String(row.id ?? ''),
+          titulo: row.titulo ?? '',
+          fase: row.fase ?? '',
+          empresa: row.empresa ?? '',
+          cnpj: row.cnpj ?? '',
+          produto_origem: row.produto_origem,
+          mrr: Number(row.mrr) || 0,
+          pontual: Number(row.pontual) || 0,
+          setup: Number(row.setup) || 0,
+        })),
+      };
+      console.log(`pipes_active_aggregated: ${result.total} rows`);
     } else if (action === "query_period") {
       const { startDate, endDate } = body;
       const invalid = await validateTable(table);
