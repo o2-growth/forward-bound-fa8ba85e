@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Filter, X, Info, RefreshCw } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/useAuth";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useJornadaData } from "@/hooks/useJornadaData";
 import { PipelineView } from "./jornada/PipelineView";
 import { ClientesView } from "./jornada/ClientesView";
@@ -14,6 +16,8 @@ import { ReunioesView } from "./jornada/ReunioesView";
 import type { JornadaFilter, JornadaCliente, JornadaCfo, PipelineFase } from "./jornada/types";
 
 export function JornadaTab() {
+  const { user } = useAuth();
+  const { isCfo } = useUserPermissions(user?.id);
   const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading, error, refetch, isFetching, dataUpdatedAt } = useJornadaData();
 
   const lastUpdatedLabel = dataUpdatedAt
@@ -211,11 +215,11 @@ export function JornadaTab() {
 
       {/* Sub-tabs */}
       <Tabs defaultValue="pipeline" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-5">
+        <TabsList className={`grid w-full max-w-2xl ${isCfo ? 'grid-cols-4' : 'grid-cols-5'}`}>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="reunioes">Reuniões</TabsTrigger>
-          <TabsTrigger value="cfos">CFOs</TabsTrigger>
+          {!isCfo && <TabsTrigger value="cfos">CFOs</TabsTrigger>}
           <TabsTrigger value="alertas">
             Alertas
             {filteredAlertas.length > 0 && (
@@ -238,9 +242,11 @@ export function JornadaTab() {
           <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} />
         </TabsContent>
 
-        <TabsContent value="cfos" className="mt-4">
-          <CfoView cfos={filteredCfos} clientes={filteredClientes} />
-        </TabsContent>
+        {!isCfo && (
+          <TabsContent value="cfos" className="mt-4">
+            <CfoView cfos={filteredCfos} clientes={filteredClientes} />
+          </TabsContent>
+        )}
 
         <TabsContent value="alertas" className="mt-4">
           <AlertasView alertas={filteredAlertas} />

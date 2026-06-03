@@ -471,10 +471,10 @@ function CustomerSuccessTabInner() {
 
         {/* Sub-tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-4xl grid-cols-7">
+          <TabsList className={`grid w-full max-w-4xl ${isCfo ? 'grid-cols-6' : 'grid-cols-7'}`}>
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
             <TabsTrigger value="clientes">Clientes</TabsTrigger>
-            <TabsTrigger value="cfos">CFOs</TabsTrigger>
+            {!isCfo && <TabsTrigger value="cfos">CFOs</TabsTrigger>}
             <TabsTrigger value="reunioes">Reuniões</TabsTrigger>
             <TabsTrigger value="nps">NPS</TabsTrigger>
             <TabsTrigger value="churn">Churn</TabsTrigger>
@@ -504,14 +504,16 @@ function CustomerSuccessTabInner() {
             <ClientesView clientes={filteredClientes} />
           </TabsContent>
 
-          <TabsContent value="cfos" className="mt-4">
-            <CfoView
-              cfos={filteredCfos}
-              clientes={filteredClientesPeriodo}
-              dateRange={{ from: csStartDate, to: csEndDate }}
-              churnDossier={filteredChurnDossier}
-            />
-          </TabsContent>
+          {!isCfo && (
+            <TabsContent value="cfos" className="mt-4">
+              <CfoView
+                cfos={filteredCfos}
+                clientes={filteredClientesPeriodo}
+                dateRange={{ from: csStartDate, to: csEndDate }}
+                churnDossier={filteredChurnDossier}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="reunioes" className="mt-4">
             <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} />

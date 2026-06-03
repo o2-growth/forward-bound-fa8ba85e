@@ -1,45 +1,60 @@
-# Bug: MRR/Setup aparecem em Oxy Hacker (e Franquia) ao filtrar por closer/SDR
+## Escopo
 
-## Causa raiz
+3 mudanças:
 
-`src/hooks/useConsolidatedMetas.ts` → função `getMetaMonetaryForPeriod` (linhas 247–274).
+1. **Criar acessos dos 9 analistas** com a mesma visão "trancada" do CFO do squad deles
+2. **Ocultar a aba "CFOs"** e **os badges de ranking** para usuários com role `cfo` (CFOs e analistas)
+3. **Atualizar meta de margem** de 65% → **54%**
 
-Fluxo sem filtro (correto):
-- Chama `getMetaForPeriod` → `getConsolidatedMeta` → `getPlanGrowthMeta`, que respeita `PONTUAL_ONLY_BUS = ['oxy_hacker', 'franquia']` e retorna **MRR=0, Setup=0, Pontual=100%** para essas BUs.
+---
 
-Fluxo com filtro de closer/SDR ativo (bug — linhas 262–270):
+### 1. Criar contas dos analistas
+
+Reutilizar a arquitetura existente do "CFO Access Lock" (role `cfo` + `cfo_user_mapping` → `get_my_cfo_name()` força filtro no CS). Cada analista vira um usuário `cfo` mapeado para o **mesmo `cfo_name`** do seu líder de squad → herda automaticamente toda a visão do CFO.
+
+**Senha padrão:** `Alterar@01` (mesmo padrão da Kethlin/Amanda/Carlos).
+
+| Analista | Email | Mapear para CFO |
+|---|---|---|
+| Pedro Fuzer Garcia | pedro.fuzer@o2inc.com.br | Adivilso Souza de Oliveira Junior |
+| Tainara Sofia Konzen | tainara.konzen@o2inc.com.br | Douglas Pinheiro Schossler |
+| Sergio Pereira Piva Junior | sergio.piva@o2inc.com.br | Eduardo Milani Pedrolo |
+| Felipe Vargas Brenner | felipe.brenner@o2inc.com.br | Eduardo Milani Pedrolo |
+| Anderson Felizardo Mendes | anderson.mendes@o2inc.com.br | Everton Bisinella |
+| Humberto de Azevedo Behs | humberto.behs@o2inc.com.br | Gustavo Ferreira Cochlar |
+| Pamela Luiza dos Santos Quadros | pamela.quadros@o2inc.com.br | Luis Eduardo Dagostini |
+| Matheus da Silva Besnos | matheus.besnos@o2inc.com.br | Luis Eduardo Dagostini |
+| Roberta Costa Curta Lirio | roberta.costa@o2inc.com.br | Mariana Luz da Silva |
+
+> Faltaram e-mails de: Eric Silveira, Pedro Michelucci, Maria Eduarda Reckziegel e Raissa Daros — vou pular esses 4. Me passa depois se quiser que eu crie.
+
+Para cada um:
+- Criar usuário no auth com a senha `Alterar@01` (email confirmado)
+- Inserir role `cfo` em `user_roles`
+- Inserir mapeamento em `cfo_user_mapping` com o `cfo_name` exato do líder de squad
+- Sem permissões em `user_tab_permissions` (a lógica de CFO já força só a aba Operação)
+
+---
+
+### 2. Esconder aba "CFOs" e rankings para role `cfo`
+
+- **`JornadaTab.tsx` / `CustomerSuccessTab.tsx`**: usar `useUserPermissions().isAdmin` para condicionalmente renderizar o `TabsTrigger value="cfos"` e o `TabsContent value="cfos"` (só admin vê).
+- **`CfoView.tsx`**: aceitar prop `showRankings` (default `true`). Em todos os ~9 pontos com `rankBadge(...)` (linhas 1029, 1035, 1041, 1049, 1057, 1066, 1083, 1085), só renderizar quando `showRankings === true`. Quando admin abre a aba CFOs ela já passa `true` por padrão; nos pontos onde `CfoView` é montado fora da aba (se houver), passar `isAdmin`.
+
+---
+
+### 3. Meta de margem 65% → 54%
+
+Em `src/components/planning/jornada/CfoView.tsx`, linha 124:
 ```ts
-const filteredFaturamento = getFilteredFaturamentoMeta(...); // soma de todas BUs
-switch (indicatorKey) {
-  case 'mrr':     return Math.round(filteredFaturamento * 0.25);
-  case 'setup':   return Math.round(filteredFaturamento * 0.60);
-  case 'pontual': return Math.round(filteredFaturamento * 0.15);
-}
+margemTarget: 65,  →  margemTarget: 54,
 ```
-Isso aplica o split 25/60/15 **uniformemente** sobre o faturamento total rateado, **ignorando** que `oxy_hacker`/`franquia` deveriam contribuir com 100% em Pontual e 0% em MRR/Setup. Resultado: ao selecionar Bruna + Oxy Hacker, aparece MRR e Setup que não existem nessa BU.
+Isso atualiza automaticamente o label "Meta: 54%" e a coloração das margens.
 
-Observação: o lado realizado (`IndicatorsTab.tsx` linhas 2469–2503) já está correto — só soma `modelo_atual` e `o2_tax` para MRR/Setup. O problema é só na meta.
+---
 
-## Correção
+### Resumo técnico
 
-Em `getMetaMonetaryForPeriod`, no ramo `closerActive || sdrActive`, calcular a meta **por BU**, aplicando o split correto conforme a BU seja pontual-only ou não, e somar — usando a mesma lógica de rateio (closer% × SDR ratio × pro-rata por dias) que `getFilteredFaturamentoMeta` já implementa.
-
-Plano de implementação:
-1. Extrair de `getFilteredFaturamentoMeta` uma versão que retorne **faturamento rateado por BU** (`Map<BuType, number>`), reaproveitando a iteração mensal, rateio de closer (`getFilteredMeta`), SDR (`sdrRatio`) e fração de dias.
-2. No `getMetaMonetaryForPeriod`, quando `closerActive || sdrActive`:
-   - Obter o faturamento rateado por BU.
-   - Para cada BU:
-     - Se `PONTUAL_ONLY_BUS.includes(bu)` → `pontual = faturamento`, `mrr = 0`, `setup = 0`.
-     - Caso contrário → `mrr = fat × 0.25`, `setup = fat × 0.60`, `pontual = fat × 0.15`.
-   - Somar conforme `indicatorKey` e retornar arredondado.
-3. Manter `getFilteredFaturamentoMeta` retornando o total (continua usado para `faturamento`), implementado em cima do helper por-BU para não duplicar lógica.
-
-## Validação
-
-- Filtro: Bruna + apenas Oxy Hacker → cards MRR e Setup devem zerar (meta e realizado), Pontual deve refletir % da Bruna em `closer_metas` × faturamento de Oxy Hacker.
-- Filtro: Bruna + Modelo Atual + Oxy Hacker → MRR/Setup respondem só à parcela do Modelo Atual; Pontual soma parcela de Modelo Atual (15%) + 100% de Oxy Hacker.
-- Sem filtro de closer/SDR (regressão): comportamento idêntico ao atual (já passa pelo `getMetaForPeriod`, que respeita pontual-only).
-
-## Arquivos afetados
-
-- `src/hooks/useConsolidatedMetas.ts` — única alteração necessária.
+- **DB (migration desnecessária)** — só inserts: 9 usuários no `auth.users`, 9 linhas em `user_roles` (role=`cfo`), 9 linhas em `cfo_user_mapping`.
+- **Código** — 3 arquivos: `CfoView.tsx` (target 54 + prop `showRankings`), `JornadaTab.tsx` e `CustomerSuccessTab.tsx` (gate da aba CFOs por `isAdmin`).
+- **Sem mudanças** em RLS, edge functions ou hooks — a engrenagem `cfo` + `get_my_cfo_name()` já existe e cobre os analistas automaticamente.
