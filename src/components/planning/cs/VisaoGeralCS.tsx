@@ -133,6 +133,20 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
     return { saas, pontual };
   }, [activeClientes]);
 
+  // Distribuição por Produto (campo Pipefy · Central de Projetos)
+  const clientesByProduto = useMemo(() => {
+    const map: Record<string, { count: number; mrr: number; clientes: JornadaCliente[] }> = {};
+    activeClientes.forEach(c => {
+      const raw = (c.produto || '').toString().trim();
+      const produto = raw || 'Sem produto';
+      if (!map[produto]) map[produto] = { count: 0, mrr: 0, clientes: [] };
+      map[produto].count++;
+      map[produto].mrr += c.mrr;
+      map[produto].clientes.push(c);
+    });
+    return Object.entries(map).sort((a, b) => b[1].count - a[1].count);
+  }, [activeClientes]);
+
   const clientesByFase = useMemo(() => {
     let onboarding = 0;
     let emOperacao = 0;
