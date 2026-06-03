@@ -59,8 +59,9 @@ export function ChurnExplainerDialog() {
                 Quando o churn é contado (data de reconhecimento)
               </div>
               <ul className="space-y-1.5 text-muted-foreground pl-6 list-disc marker:text-muted-foreground/50">
-                <li>Prioriza <span className="text-foreground font-medium">Data oficial de encerramento</span> (Central de Projetos).</li>
-                <li>Fallback: <span className="text-foreground font-medium">Data de assinatura do contrato</span> ou <code className="text-[11px] bg-muted px-1 py-0.5 rounded">mesChurn</code> (aproxima dia 15 do mês informado).</li>
+                <li>Prioriza <span className="text-foreground font-medium">Data oficial de encerramento</span> (Central de Projetos / overrides do Banco Lovable).</li>
+                <li>Fallback: <code className="text-[11px] bg-muted px-1 py-0.5 rounded">mesChurn</code> — campo "Mês do Churn" do card (ex.: "Abr/2026"), aproximado para o dia 15 do mês informado, quando não há data exata.</li>
+                <li className="text-[11px] italic opacity-80">Obs.: a <span className="font-medium">Data de assinatura do contrato</span> NÃO entra no reconhecimento — ela só é usada no cálculo do LT (tempo de vida do cliente).</li>
                 <li>O churn aparece no período cujo intervalo (filtro de datas global) contém essa data.</li>
               </ul>
             </section>
