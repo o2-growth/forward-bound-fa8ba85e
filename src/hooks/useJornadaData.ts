@@ -71,11 +71,30 @@ async function fetchTable(table: string, limit = 2000) {
   return data?.data || [];
 }
 
+// Aggregated active rows from the 3 dedicated pipes (BPO / Assessoria / Coordenador).
+// Each row: { id, titulo, fase, empresa, cnpj, produto_origem, mrr, pontual, setup }
+async function fetchPipesActiveAggregated(): Promise<Array<{
+  id: string; titulo: string; fase: string; empresa: string; cnpj: string;
+  produto_origem: 'BPO' | 'Assessoria Financeira' | 'Coordenador Financeiro';
+  mrr: number; pontual: number; setup: number;
+}>> {
+  const { data, error } = await supabase.functions.invoke('query-external-db', {
+    body: { action: 'pipes_active_aggregated' },
+  });
+  if (error) { console.error('pipes_active_aggregated failed', error); return []; }
+  return (data?.rows || []) as any[];
+}
+
+// Normalize a string for matching (trim, lowercase, NFD strip accents)
+function normMatch(s: string): string {
+  return (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 export function useJornadaData() {
   const { data, isLoading, error, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ['jornada-data'],
     queryFn: async () => {
-      const [projetos, setup, tratativas, nps, rotinas, clientes, connections] = await Promise.all([
+      const [projetos, setup, tratativas, nps, rotinas, clientes, connections, pipesValues] = await Promise.all([
         fetchTable('pipefy_central_projetos', 2000),
         fetchTable('pipefy_moviment_setup', 2000),
         fetchTable('pipefy_moviment_tratativas', 1000),
@@ -83,8 +102,9 @@ export function useJornadaData() {
         fetchTable('pipefy_moviment_rotinas', 2000),
         fetchTable('pipefy_db_clientes', 1000),
         fetchTable('pipefy_card_connections', 2000),
+        fetchPipesActiveAggregated(),
       ]);
-      return { projetos, setup, tratativas, nps, rotinas, clientes, connections };
+      return { projetos, setup, tratativas, nps, rotinas, clientes, connections, pipesValues };
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
