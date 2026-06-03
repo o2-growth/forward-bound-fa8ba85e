@@ -282,7 +282,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Por Tipo */}
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por tipo de produto</p>
@@ -315,6 +315,50 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               </p>
             </div>
 
+            {/* Por Produto — tabela compacta clicável */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por produto</p>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider">Produto</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">Clientes</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">%</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientesByProduto.map(([produto, data]) => {
+                      const pct = activeClientes.length > 0 ? (data.count / activeClientes.length) * 100 : 0;
+                      return (
+                        <TableRow
+                          key={produto}
+                          className="hover:bg-muted/30 cursor-pointer"
+                          onClick={() => setProdutoDialog(produto)}
+                        >
+                          <TableCell className="py-1.5 font-medium text-xs truncate max-w-[140px]" title={produto}>{produto}</TableCell>
+                          <TableCell className="py-1.5 text-right tabular-nums text-xs">{data.count}</TableCell>
+                          <TableCell className="py-1.5 text-right">
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <div className="w-8 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">{pct.toFixed(0)}%</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {clientesByProduto.length === 0 && (
+                      <TableRow><TableCell colSpan={3} className="text-center py-4 text-xs text-muted-foreground">Sem dados.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">
+                Cada cliente conta 1 vez pelo produto principal
+              </p>
+            </div>
 
             {/* Por CFO — tabela compacta */}
             <div className="md:col-span-2 space-y-2">
