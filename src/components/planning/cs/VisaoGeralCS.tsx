@@ -805,6 +805,51 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
           </Table>
         </DialogContent>
       </Dialog>
+
+      {/* Produto Dialog */}
+      <Dialog open={produtoDialog !== null} onOpenChange={(open) => !open && setProdutoDialog(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Produto: {produtoDialog} — {clientesByProduto.find(([p]) => p === produtoDialog)?.[1].count ?? 0} clientes
+            </DialogTitle>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Cliente</TableHead>
+                <TableHead className="text-xs">CFO</TableHead>
+                <TableHead className="text-xs text-right">MRR</TableHead>
+                <TableHead className="text-xs text-right">Pontual</TableHead>
+                <TableHead className="text-xs">Fase</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(clientesByProduto.find(([p]) => p === produtoDialog)?.[1].clientes ?? [])
+                .slice()
+                .sort((a, b) => b.mrr - a.mrr)
+                .map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-xs font-medium">
+                      <a
+                        href={`https://app.pipefy.com/open-cards/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        {c.titulo}
+                      </a>
+                    </TableCell>
+                    <TableCell className="text-xs">{c.cfo || '—'}</TableCell>
+                    <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.mrr)}</TableCell>
+                    <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.pontual)}</TableCell>
+                    <TableCell className="text-xs">{c.faseAtual}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
     </div>
     </TooltipProvider>
   );
