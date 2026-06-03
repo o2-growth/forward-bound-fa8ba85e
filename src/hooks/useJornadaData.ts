@@ -71,11 +71,30 @@ async function fetchTable(table: string, limit = 2000) {
   return data?.data || [];
 }
 
+// Aggregated active rows from the 3 dedicated pipes (BPO / Assessoria / Coordenador).
+// Each row: { id, titulo, fase, empresa, cnpj, produto_origem, mrr, pontual, setup }
+async function fetchPipesActiveAggregated(): Promise<Array<{
+  id: string; titulo: string; fase: string; empresa: string; cnpj: string;
+  produto_origem: 'BPO' | 'Assessoria Financeira' | 'Coordenador Financeiro';
+  mrr: number; pontual: number; setup: number;
+}>> {
+  const { data, error } = await supabase.functions.invoke('query-external-db', {
+    body: { action: 'pipes_active_aggregated' },
+  });
+  if (error) { console.error('pipes_active_aggregated failed', error); return []; }
+  return (data?.rows || []) as any[];
+}
+
+// Normalize a string for matching (trim, lowercase, NFD strip accents)
+function normMatch(s: string): string {
+  return (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 export function useJornadaData() {
   const { data, isLoading, error, refetch, isFetching, dataUpdatedAt } = useQuery({
     queryKey: ['jornada-data'],
     queryFn: async () => {
-      const [projetos, setup, tratativas, nps, rotinas, clientes, connections] = await Promise.all([
+      const [projetos, setup, tratativas, nps, rotinas, clientes, connections, pipesValues] = await Promise.all([
         fetchTable('pipefy_central_projetos', 2000),
         fetchTable('pipefy_moviment_setup', 2000),
         fetchTable('pipefy_moviment_tratativas', 1000),
@@ -83,8 +102,9 @@ export function useJornadaData() {
         fetchTable('pipefy_moviment_rotinas', 2000),
         fetchTable('pipefy_db_clientes', 1000),
         fetchTable('pipefy_card_connections', 2000),
+        fetchPipesActiveAggregated(),
       ]);
-      return { projetos, setup, tratativas, nps, rotinas, clientes, connections };
+      return { projetos, setup, tratativas, nps, rotinas, clientes, connections, pipesValues };
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
@@ -96,10 +116,10 @@ export function useJornadaData() {
   const { oxyProductsByMonth } = useOxyFinance(oxyYear);
 
   const result = useMemo(() => {
-    if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '' };
+    if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '', pipesUnmatched: [] as any[] };
 
 
-    const { projetos, setup, tratativas, nps, rotinas, clientes, connections } = data;
+    const { projetos, setup, tratativas, nps, rotinas, clientes, connections, pipesValues = [] } = data as any;
     const now = new Date();
 
     // === 1. Build lookup maps ===
@@ -521,6 +541,39 @@ export function useJornadaData() {
 
     const allClientes = Array.from(clienteMap.values());
 
+    // === 2.1 Enriquecimento BPO / Assessoria Financeira / Coordenador Financeiro ===
+    // Os valores (MRR recorrente + Pontual + Setup) desses 3 produtos vivem em pipes
+    // dedicados (não na Central de Projetos). Casamos por título normalizado (já que
+    // não temos CNPJ no Central) e somamos no cliente correspondente.
+    const pipesUnmatched: typeof pipesValues = [];
+    if (Array.isArray(pipesValues) && pipesValues.length > 0) {
+      const byTitulo = new Map<string, JornadaCliente>();
+      for (const c of allClientes) {
+        const key = normMatch(c.titulo);
+        if (key && !byTitulo.has(key)) byTitulo.set(key, c);
+      }
+      for (const p of pipesValues) {
+        const key = normMatch(p.titulo || p.empresa);
+        const target = key ? byTitulo.get(key) : undefined;
+        if (!target) {
+          pipesUnmatched.push(p);
+          continue;
+        }
+        target.mrr = (target.mrr || 0) + (Number(p.mrr) || 0);
+        target.pontual = (target.pontual || 0) + (Number(p.pontual) || 0);
+        target.valorSetup = (target.valorSetup || 0) + (Number(p.setup) || 0);
+        if (!target.produtos.includes(p.produto_origem)) {
+          target.produtos = [...target.produtos, p.produto_origem];
+          target.produto = target.produtos.join(', ');
+        }
+      }
+      if (pipesUnmatched.length > 0) {
+        console.warn(`[jornada] ${pipesUnmatched.length} cards BPO/Assessoria/Coordenador sem match na Central de Projetos:`,
+          pipesUnmatched.map((p: any) => `${p.produto_origem}: ${p.titulo}`));
+      }
+    }
+
+
     // === 2.5 Clones virtuais para o squad Pedrolo ===
     // Clientes Pipefy que possuem produtos OXY / OXY + Gênio / OXY + Gênio + Especialista
     // são duplicados (com cfo forçado p/ Pedrolo e id sufixado) para aparecerem na carteira
@@ -914,7 +967,7 @@ export function useJornadaData() {
       churnsOxyCount: churnsOxy.length,
     };
 
-    return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, operacao };
+    return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, operacao, pipesUnmatched };
   }, [data, oxyProductsByMonth]);
 
   return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };
