@@ -240,6 +240,11 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
 
       {/* Operação KPIs movidos para a aba Churns (OperacaoKpisStrip) */}
 
+      {/* Clientes ativos por pipe operacional (BPO, Assessoria, Coordenador) */}
+      <PipeActiveCountsRow />
+
+
+
       {/* Distribuição de Clientes Ativos — Por CFO + Por Tipo (SaaS/Pontual) */}
       <Card>
         <CardHeader className="pb-3">
