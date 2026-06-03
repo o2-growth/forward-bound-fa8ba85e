@@ -115,6 +115,12 @@ const CFO_SQUADS: Record<string, {
     beneficios: 1321.61,
     membros: [],
   },
+  'Joseane Lima': {
+    nome: 'Joseane Lima',
+    fee: 7213.56,
+    beneficios: 0,
+    membros: [],
+  },
 };
 
 /* ── Targets from Structure tab ── */
