@@ -363,7 +363,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                 </Table>
               </div>
               <p className="text-[10px] text-muted-foreground italic">
-                Cada cliente conta 1 vez pelo produto principal
+                Clientes com múltiplos produtos contam em cada um (separados por vírgula ou "+")
               </p>
             </div>
 
