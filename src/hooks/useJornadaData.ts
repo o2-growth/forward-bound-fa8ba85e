@@ -119,7 +119,7 @@ export function useJornadaData() {
     if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '' };
 
 
-    const { projetos, setup, tratativas, nps, rotinas, clientes, connections } = data;
+    const { projetos, setup, tratativas, nps, rotinas, clientes, connections, pipesValues = [] } = data as any;
     const now = new Date();
 
     // === 1. Build lookup maps ===
