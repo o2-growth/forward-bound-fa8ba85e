@@ -290,6 +290,17 @@ serve(async (req) => {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+
+        console.warn(`Rate limited with no stale cache for ${cacheKey}, returning empty ad sets`);
+        return new Response(JSON.stringify({ 
+          success: true, 
+          adSets: [],
+          campaignId,
+          fromCache: false,
+          rateLimited: true,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
       
       throw fetchError;
