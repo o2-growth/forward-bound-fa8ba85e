@@ -14,6 +14,7 @@ import { ChurnAnalysisDrawer } from '@/components/planning/cs/ChurnAnalysisDrawe
 import { ChurnKpiDrawer, type KpiDrawerData, type DrawerRow } from '@/components/planning/cs/ChurnKpiDrawer';
 import { DataSourceInfo } from '@/components/planning/cs/DataSourceInfo';
 import { DS } from '@/components/planning/cs/dataSources';
+import { ChurnExplainerDialog } from '@/components/planning/cs/ChurnExplainerDialog';
 
 /* ─── helpers ─── */
 function formatDate(dateStr: string | null | undefined): string {
@@ -382,6 +383,9 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
               </span>
             )}
           </h3>
+          <div className="ml-auto">
+            <ChurnExplainerDialog />
+          </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <Card className={`border-destructive/30 bg-destructive/5 ${clickableCardCls} hover:border-destructive/60`} role="button" tabIndex={0} onClick={openRevenueChurnR} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRevenueChurnR(); } }}>
