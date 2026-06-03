@@ -1,57 +1,36 @@
-## Objetivo
+## Mudança
 
-Adicionar, no topo da seção de **Churn** (dentro da aba **Operação**), um botão clicável "Como funciona" que abre um modal explicando, em linguagem clara, como a plataforma identifica/conta um churn, de onde puxa os dados e como cada KPI é calculado.
+Mover o card autônomo de pipes operacionais para **dentro** do card "Distribuição de Clientes Ativos" e generalizar para **todos os produtos**, usando apenas o campo `produto` da Central de Projetos (mesma fonte do resto da Visão Geral).
 
 ## Onde
 
-`src/components/planning/nps/ChurnDossierSection.tsx` — adicionar o botão no cabeçalho do bloco "Churn no período" (perto do título, linha ~377).
+`src/components/planning/cs/VisaoGeralCS.tsx`
 
-## O que será adicionado
+## O que muda
 
-Um novo componente `ChurnExplainerDialog` (arquivo novo em `src/components/planning/cs/ChurnExplainerDialog.tsx`) que renderiza um `Dialog` (shadcn) acionado por um `Button variant="ghost" size="sm"` com ícone `HelpCircle` + texto "Como funciona".
+1. **Remover** o componente autônomo `<PipeActiveCountsRow />` (e a função `PipeActiveCountsRow`).
+2. **Remover** o hook `usePipeActiveCounts` do import (não é mais usado nesse card). O arquivo `src/hooks/usePipeActiveCounts.ts` pode permanecer (não quebra nada), mas marca como não utilizado.
+3. **Reestruturar** o grid interno de "Distribuição de Clientes Ativos":
+   - Hoje: `md:grid-cols-3` → Por tipo (1 col) + Por CFO (2 cols)
+   - Novo: `md:grid-cols-4` → Por tipo (1 col) · **Por produto (1 col)** · Por CFO (2 cols)
+4. **Nova subseção "Por produto"**:
+   - Título: `POR PRODUTO` (mesmo estilo das outras subseções)
+   - Agrupa `activeClientes` pelo campo `produto` (normalizado: trim + fallback "Sem produto")
+   - Lista ordenada por contagem desc, em mini-tabela compacta (cabeçalho `Produto | Clientes | %`)
+   - Mesmo visual da subseção "Por CFO" (barra de progresso fininha + número à direita)
+   - Cada linha clicável → abre um `Dialog` com a lista de clientes daquele produto (cliente, CFO, fase, MRR, pontual) — reaproveita estilo do dialog "Por tipo".
+5. **Tooltip explicativo** no título da seção: fonte `Pipefy · Central de Projetos · campo Produto`; conta cada cliente ativo exatamente 1 vez pelo produto principal do card; ignora produtos vazios.
+6. **Rodapé**: linha italic pequena "Total ativos = N · cada cliente conta 1 vez pelo produto principal".
 
-### Conteúdo do modal (seções)
+## Comportamento
 
-1. **O que é considerado churn na plataforma**
-   - Card na Central de Projetos que entrou na fase **"Churn"** (Pipefy · pipe 305887184).
-   - Cards de teste excluídos via `isTestCard` (lista fixa de IDs).
-   - Comparações de fase normalizadas (trim, lowercase, sem acento).
-
-2. **Data de reconhecimento (quando o churn é contado)**
-   - Prioriza **Data oficial de encerramento** (Central de Projetos).
-   - Fallback: **Data de assinatura do contrato** / `mesChurn` (aprox. dia 15).
-   - O churn aparece no período cujo intervalo contém essa data.
-
-3. **De onde vêm os dados**
-   - **Pipefy · Central de Projetos** (fase Churn, MRR CFOaaS + OXY, datas, motivo).
-   - **Banco Lovable** · overrides oficiais (8 ajustes manuais em Abr/26 para corrigir atribuição de CFO).
-   - **Pipe de Tratativas** para Taxa de Salvamento.
-   - Sincronização via Edge Function `sync-pipefy-funnel` (tempo real / cache curto).
-
-4. **Como cada KPI é calculado**
-   - **Revenue Churn (R$)** = soma do MRR (CFOaaS + OXY) dos churns do período.
-   - **Revenue Churn (%)** = MRR perdido / (MRR ativo + MRR perdido) × 100.
-   - **Logo Churn (Qtd.)** = nº de cards em Churn no período.
-   - **Logo Churn (%)** = churns / (ativos + churns) × 100.
-   - **LT Médio** = média, em meses, entre `Data de assinatura do contrato` e data de encerramento.
-   - **Taxa de Salvamento** = tratativas salvas / (tratativas salvas + churns) × 100.
-   - **MRR ativo** = soma de MRR de cards em Onboarding + Em Operação Recorrente.
-
-5. **Filtros que afetam a contagem**
-   - Período global (date range), CFO, Produto, Tipo de churn (operacional/comercial — comercial = motivo "Desistência"), e exclusões de motivo.
-
-6. **Notas e cuidados**
-   - Mesmo cliente conta uma vez por período (dedup por card).
-   - Educação não entra no MRR (segue regra global).
-   - Link direto ao pipe para auditoria.
-
-### Estilo
-
-- Usa `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription`, `Badge` e `Separator` do design system (tokens semânticos: `text-foreground`, `text-muted-foreground`, `border-border`, `bg-muted/30`). Sem cores hardcoded.
-- Ícones: `HelpCircle`, `Database`, `Calendar`, `Calculator`, `Filter` (lucide-react).
-- Link "Abrir Central de Projetos no Pipefy" no rodapé.
+- 100% client-side, em cima do array `clientes` que já chega no componente — zero novas chamadas de API/edge function.
+- Loading: nenhum (dados já hidratados).
+- Filtros globais (CFO, Produto, Data range) continuam afetando `clientes` upstream, então a contagem reflete o filtro corrente — comportamento esperado.
 
 ## Fora de escopo
 
-- Não altera nenhuma lógica de cálculo ou hook (`useOperationsData`, filtros, agregações). Apenas UI explicativa.
-- Não mexe no `DataSourceInfo` existente (continua nos cards individuais).
+- Não toca em "Por tipo" ou "Por CFO".
+- Não muda a edge function `query-external-db`.
+- Não altera o card de Churn nem o `OperacaoKpisStrip`.
+- Hook `usePipeActiveCounts` e action `count_active_in_pipe` ficam no projeto mas deixam de ser usados aqui (limpeza opcional em PR futuro).
