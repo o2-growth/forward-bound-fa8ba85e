@@ -56,6 +56,8 @@ type TipoDialogType = 'mrr' | 'pontual' | null;
 export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNavigateToAlertas, operacao }: VisaoGeralCSProps) {
   const [openDialog, setOpenDialog] = useState<KpiDialogType>(null);
   const [tipoDialog, setTipoDialog] = useState<TipoDialogType>(null);
+  const [produtoDialog, setProdutoDialog] = useState<string | null>(null);
+  
   
 
   const activeClientes = useMemo(() => {
