@@ -240,8 +240,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
 
       {/* Operação KPIs movidos para a aba Churns (OperacaoKpisStrip) */}
 
-      {/* Clientes ativos por pipe operacional (BPO, Assessoria, Coordenador) */}
-      <PipeActiveCountsRow />
+
 
 
 
