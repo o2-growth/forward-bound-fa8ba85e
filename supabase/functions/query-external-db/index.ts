@@ -189,6 +189,7 @@ Deno.serve(async (req) => {
         byPhase: byPhase.rows,
       };
       console.log(`count_active_in_pipe ${table}: ${result.total}`);
+    } else if (action === "query_period") {
       const { startDate, endDate } = body;
       const invalid = await validateTable(table);
       if (invalid) return invalid;
