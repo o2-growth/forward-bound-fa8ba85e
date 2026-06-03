@@ -9,6 +9,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import type { JornadaCliente, JornadaCfo, JornadaAlerta } from '@/components/planning/jornada/types';
 import { DataSourceInfo } from './DataSourceInfo';
 import { DS } from './dataSources';
+import { usePipeActiveCounts } from '@/hooks/usePipeActiveCounts';
+import { Briefcase, ExternalLink } from 'lucide-react';
 
 interface VisaoGeralCSProps {
   clientes: JornadaCliente[];
@@ -239,6 +241,11 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
       </div>
 
       {/* Operação KPIs movidos para a aba Churns (OperacaoKpisStrip) */}
+
+      {/* Clientes ativos por pipe operacional (BPO, Assessoria, Coordenador) */}
+      <PipeActiveCountsRow />
+
+
 
       {/* Distribuição de Clientes Ativos — Por CFO + Por Tipo (SaaS/Pontual) */}
       <Card>
@@ -742,5 +749,103 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
       </Dialog>
     </div>
     </TooltipProvider>
+  );
+}
+
+function PipeActiveCountsRow() {
+  const { data, isLoading } = usePipeActiveCounts();
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const list = data ?? [];
+  const opened = list.find((p) => p.key === openKey) || null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Briefcase className="h-4 w-4 text-indigo-600" />
+          Clientes ativos por pipe operacional
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs text-xs">
+              <p className="font-semibold mb-1">De onde vem:</p>
+              <p>
+                Pipefy → tabelas de movimento dos pipes <code>pipefy_moviment_bpo</code>, <code>pipefy_moviment_assessoria_financeira</code> e <code>pipefy_moviment_coordenador_financeiro</code>.
+              </p>
+              <p className="mt-2 font-semibold">Como conta:</p>
+              <p>
+                Contagem de cards <strong>distintos</strong> que estão atualmente em alguma fase do pipe (linha de movimento com <code>Saída IS NULL</code>). Não soma rotações antigas: cada cliente conta uma vez por pipe.
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {(list.length ? list : [
+            { key: 'assessoria_financeira', label: 'Assessoria Financeira', table: '', total: 0, byPhase: [] },
+            { key: 'bpo', label: 'BPO', table: '', total: 0, byPhase: [] },
+            { key: 'coordenador_financeiro', label: 'Coordenador Financeiro', table: '', total: 0, byPhase: [] },
+          ]).map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => p.byPhase.length > 0 && setOpenKey(p.key)}
+              className="text-left rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3 hover:bg-indigo-500/10 hover:border-indigo-500/50 transition-colors disabled:opacity-60"
+              disabled={isLoading}
+            >
+              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{p.label}</p>
+              <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                {isLoading ? '—' : p.total}
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                clientes ativos no pipe
+              </p>
+            </button>
+          ))}
+        </div>
+      </CardContent>
+
+      <Dialog open={!!opened} onOpenChange={(o) => !o && setOpenKey(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {opened?.label}
+              <Badge variant="outline" className="text-[10px]">{opened?.total} ativos</Badge>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              Distribuição dos clientes ativos pela fase atual no pipe.
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="h-8 text-[10px] uppercase tracking-wider">Fase atual</TableHead>
+                  <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">Clientes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {opened?.byPhase.map((b) => (
+                  <TableRow key={b.fase}>
+                    <TableCell className="py-1.5 text-xs">{b.fase}</TableCell>
+                    <TableCell className="py-1.5 text-right tabular-nums text-xs">{b.count}</TableCell>
+                  </TableRow>
+                ))}
+                {opened && opened.byPhase.length === 0 && (
+                  <TableRow><TableCell colSpan={2} className="text-center text-xs text-muted-foreground py-4">Sem cards ativos.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+            {opened?.table && (
+              <p className="text-[10px] text-muted-foreground italic pt-2">
+                Fonte: <code>{opened.table}</code> · filtro: <code>"Saída" IS NULL</code>
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
   );
 }

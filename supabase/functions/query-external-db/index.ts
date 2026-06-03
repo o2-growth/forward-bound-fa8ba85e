@@ -99,6 +99,9 @@ Deno.serve(async (req) => {
       "pipefy_moviment_rotinas",
       "pipefy_card_connections",
       "pipefy_moviment_outbound",
+      "pipefy_moviment_bpo",
+      "pipefy_moviment_assessoria_financeira",
+      "pipefy_moviment_coordenador_financeiro",
     ];
 
     const validateTable = async (tbl: string) => {
@@ -157,6 +160,35 @@ Deno.serve(async (req) => {
         totalRows: countResult.rows[0]?.total,
       };
       console.log(`Count for ${table}: ${result.totalRows}`);
+    } else if (action === "count_active_in_pipe") {
+      // Count of distinct cards currently active in the pipe = movement rows with no Saída.
+      const invalid = await validateTable(table);
+      if (invalid) return invalid;
+
+      const q = `
+        SELECT COUNT(DISTINCT "ID")::int AS total
+        FROM ${table}
+        WHERE "Saída" IS NULL
+      `;
+      const r = await client.query(q);
+
+      // Also expose breakdown by current phase for the explainer/tooltip
+      const byPhaseQ = `
+        SELECT "Fase" AS fase, COUNT(DISTINCT "ID")::int AS count
+        FROM ${table}
+        WHERE "Saída" IS NULL
+        GROUP BY "Fase"
+        ORDER BY count DESC
+      `;
+      const byPhase = await client.query(byPhaseQ);
+
+      result = {
+        action: "count_active_in_pipe",
+        table,
+        total: r.rows[0]?.total ?? 0,
+        byPhase: byPhase.rows,
+      };
+      console.log(`count_active_in_pipe ${table}: ${result.total}`);
     } else if (action === "query_period") {
       const { startDate, endDate } = body;
       const invalid = await validateTable(table);
