@@ -541,6 +541,39 @@ export function useJornadaData() {
 
     const allClientes = Array.from(clienteMap.values());
 
+    // === 2.1 Enriquecimento BPO / Assessoria Financeira / Coordenador Financeiro ===
+    // Os valores (MRR recorrente + Pontual + Setup) desses 3 produtos vivem em pipes
+    // dedicados (não na Central de Projetos). Casamos por título normalizado (já que
+    // não temos CNPJ no Central) e somamos no cliente correspondente.
+    const pipesUnmatched: typeof pipesValues = [];
+    if (Array.isArray(pipesValues) && pipesValues.length > 0) {
+      const byTitulo = new Map<string, JornadaCliente>();
+      for (const c of allClientes) {
+        const key = normMatch(c.titulo);
+        if (key && !byTitulo.has(key)) byTitulo.set(key, c);
+      }
+      for (const p of pipesValues) {
+        const key = normMatch(p.titulo || p.empresa);
+        const target = key ? byTitulo.get(key) : undefined;
+        if (!target) {
+          pipesUnmatched.push(p);
+          continue;
+        }
+        target.mrr = (target.mrr || 0) + (Number(p.mrr) || 0);
+        target.pontual = (target.pontual || 0) + (Number(p.pontual) || 0);
+        target.valorSetup = (target.valorSetup || 0) + (Number(p.setup) || 0);
+        if (!target.produtos.includes(p.produto_origem)) {
+          target.produtos = [...target.produtos, p.produto_origem];
+          target.produto = target.produtos.join(', ');
+        }
+      }
+      if (pipesUnmatched.length > 0) {
+        console.warn(`[jornada] ${pipesUnmatched.length} cards BPO/Assessoria/Coordenador sem match na Central de Projetos:`,
+          pipesUnmatched.map((p: any) => `${p.produto_origem}: ${p.titulo}`));
+      }
+    }
+
+
     // === 2.5 Clones virtuais para o squad Pedrolo ===
     // Clientes Pipefy que possuem produtos OXY / OXY + Gênio / OXY + Gênio + Especialista
     // são duplicados (com cfo forçado p/ Pedrolo e id sufixado) para aparecerem na carteira
