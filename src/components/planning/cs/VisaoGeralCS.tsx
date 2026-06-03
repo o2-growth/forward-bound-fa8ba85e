@@ -9,8 +9,6 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import type { JornadaCliente, JornadaCfo, JornadaAlerta } from '@/components/planning/jornada/types';
 import { DataSourceInfo } from './DataSourceInfo';
 import { DS } from './dataSources';
-import { usePipeActiveCounts } from '@/hooks/usePipeActiveCounts';
-import { Briefcase, ExternalLink } from 'lucide-react';
 
 interface VisaoGeralCSProps {
   clientes: JornadaCliente[];
