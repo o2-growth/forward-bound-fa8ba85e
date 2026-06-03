@@ -121,7 +121,7 @@ const CFO_SQUADS: Record<string, {
 const TARGETS = {
   clientesPerSquad: 15,
   ticketMedio: 7915,
-  margemTarget: 65,
+  margemTarget: 54,
 };
 
 /* ── Tax rate used in P&L (alíquota de impostos sobre receita) ── */
