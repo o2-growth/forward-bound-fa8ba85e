@@ -9,8 +9,6 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import type { JornadaCliente, JornadaCfo, JornadaAlerta } from '@/components/planning/jornada/types';
 import { DataSourceInfo } from './DataSourceInfo';
 import { DS } from './dataSources';
-import { usePipeActiveCounts } from '@/hooks/usePipeActiveCounts';
-import { Briefcase, ExternalLink } from 'lucide-react';
 
 interface VisaoGeralCSProps {
   clientes: JornadaCliente[];
@@ -58,6 +56,8 @@ type TipoDialogType = 'mrr' | 'pontual' | null;
 export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNavigateToAlertas, operacao }: VisaoGeralCSProps) {
   const [openDialog, setOpenDialog] = useState<KpiDialogType>(null);
   const [tipoDialog, setTipoDialog] = useState<TipoDialogType>(null);
+  const [produtoDialog, setProdutoDialog] = useState<string | null>(null);
+  
   
 
   const activeClientes = useMemo(() => {
@@ -131,6 +131,20 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
       else saas++;
     });
     return { saas, pontual };
+  }, [activeClientes]);
+
+  // Distribuição por Produto (campo Pipefy · Central de Projetos)
+  const clientesByProduto = useMemo(() => {
+    const map: Record<string, { count: number; mrr: number; clientes: JornadaCliente[] }> = {};
+    activeClientes.forEach(c => {
+      const raw = (c.produto || '').toString().trim();
+      const produto = raw || 'Sem produto';
+      if (!map[produto]) map[produto] = { count: 0, mrr: 0, clientes: [] };
+      map[produto].count++;
+      map[produto].mrr += c.mrr;
+      map[produto].clientes.push(c);
+    });
+    return Object.entries(map).sort((a, b) => b[1].count - a[1].count);
   }, [activeClientes]);
 
   const clientesByFase = useMemo(() => {
@@ -242,8 +256,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
 
       {/* Operação KPIs movidos para a aba Churns (OperacaoKpisStrip) */}
 
-      {/* Clientes ativos por pipe operacional (BPO, Assessoria, Coordenador) */}
-      <PipeActiveCountsRow />
+
 
 
 
@@ -259,8 +272,9 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                   <Info className="h-3 w-3 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs text-xs">
-                  <p><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
-                  <p className="mt-1"><strong>Por Tipo</strong>: MRR = cliente com receita recorrente (CFOaaS, Oxy, Gênio etc.). Pontual = cliente sem MRR, apenas com receita pontual (Setup, Diagnóstico, Turnaround, Valuation, Educação).</p>
+                  <p><strong>Por tipo</strong>: MRR = cliente com receita recorrente. Pontual = cliente sem MRR, só receita pontual.</p>
+                  <p className="mt-1"><strong>Por produto</strong>: agrupa pelo campo "Produto" do card na Central de Projetos (CFOaaS, OXY, BPO, Assessoria, Coordenador, Setup, Diagnóstico etc.). Cada cliente conta 1 vez pelo produto principal.</p>
+                  <p className="mt-1"><strong>Por CFO</strong>: contagem e MRR de cada CFO entre os {activeClientes.length} clientes ativos.</p>
                 </TooltipContent>
               </Tooltip>
             </CardTitle>
@@ -268,7 +282,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Por Tipo */}
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por tipo de produto</p>
@@ -301,6 +315,50 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               </p>
             </div>
 
+            {/* Por Produto — tabela compacta clicável */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por produto</p>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider">Produto</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">Clientes</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">%</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientesByProduto.map(([produto, data]) => {
+                      const pct = activeClientes.length > 0 ? (data.count / activeClientes.length) * 100 : 0;
+                      return (
+                        <TableRow
+                          key={produto}
+                          className="hover:bg-muted/30 cursor-pointer"
+                          onClick={() => setProdutoDialog(produto)}
+                        >
+                          <TableCell className="py-1.5 font-medium text-xs truncate max-w-[140px]" title={produto}>{produto}</TableCell>
+                          <TableCell className="py-1.5 text-right tabular-nums text-xs">{data.count}</TableCell>
+                          <TableCell className="py-1.5 text-right">
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <div className="w-8 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">{pct.toFixed(0)}%</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {clientesByProduto.length === 0 && (
+                      <TableRow><TableCell colSpan={3} className="text-center py-4 text-xs text-muted-foreground">Sem dados.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">
+                Cada cliente conta 1 vez pelo produto principal
+              </p>
+            </div>
 
             {/* Por CFO — tabela compacta */}
             <div className="md:col-span-2 space-y-2">
@@ -747,105 +805,53 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
           </Table>
         </DialogContent>
       </Dialog>
+
+      {/* Produto Dialog */}
+      <Dialog open={produtoDialog !== null} onOpenChange={(open) => !open && setProdutoDialog(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Produto: {produtoDialog} — {clientesByProduto.find(([p]) => p === produtoDialog)?.[1].count ?? 0} clientes
+            </DialogTitle>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Cliente</TableHead>
+                <TableHead className="text-xs">CFO</TableHead>
+                <TableHead className="text-xs text-right">MRR</TableHead>
+                <TableHead className="text-xs text-right">Pontual</TableHead>
+                <TableHead className="text-xs">Fase</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(clientesByProduto.find(([p]) => p === produtoDialog)?.[1].clientes ?? [])
+                .slice()
+                .sort((a, b) => b.mrr - a.mrr)
+                .map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-xs font-medium">
+                      <a
+                        href={`https://app.pipefy.com/open-cards/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        {c.titulo}
+                      </a>
+                    </TableCell>
+                    <TableCell className="text-xs">{c.cfo || '—'}</TableCell>
+                    <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.mrr)}</TableCell>
+                    <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.pontual)}</TableCell>
+                    <TableCell className="text-xs">{c.faseAtual}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
     </div>
     </TooltipProvider>
   );
 }
 
-function PipeActiveCountsRow() {
-  const { data, isLoading } = usePipeActiveCounts();
-  const [openKey, setOpenKey] = useState<string | null>(null);
-  const list = data ?? [];
-  const opened = list.find((p) => p.key === openKey) || null;
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold flex items-center gap-2">
-          <Briefcase className="h-4 w-4 text-indigo-600" />
-          Clientes ativos por pipe operacional
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs text-xs">
-              <p className="font-semibold mb-1">De onde vem:</p>
-              <p>
-                Pipefy → tabelas de movimento dos pipes <code>pipefy_moviment_bpo</code>, <code>pipefy_moviment_assessoria_financeira</code> e <code>pipefy_moviment_coordenador_financeiro</code>.
-              </p>
-              <p className="mt-2 font-semibold">Como conta:</p>
-              <p>
-                Contagem de cards <strong>distintos</strong> que estão atualmente em alguma fase do pipe (linha de movimento com <code>Saída IS NULL</code>). Não soma rotações antigas: cada cliente conta uma vez por pipe.
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {(list.length ? list : [
-            { key: 'assessoria_financeira', label: 'Assessoria Financeira', table: '', total: 0, byPhase: [] },
-            { key: 'bpo', label: 'BPO', table: '', total: 0, byPhase: [] },
-            { key: 'coordenador_financeiro', label: 'Coordenador Financeiro', table: '', total: 0, byPhase: [] },
-          ]).map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => p.byPhase.length > 0 && setOpenKey(p.key)}
-              className="text-left rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3 hover:bg-indigo-500/10 hover:border-indigo-500/50 transition-colors disabled:opacity-60"
-              disabled={isLoading}
-            >
-              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{p.label}</p>
-              <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                {isLoading ? '—' : p.total}
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                clientes ativos no pipe
-              </p>
-            </button>
-          ))}
-        </div>
-      </CardContent>
-
-      <Dialog open={!!opened} onOpenChange={(o) => !o && setOpenKey(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {opened?.label}
-              <Badge variant="outline" className="text-[10px]">{opened?.total} ativos</Badge>
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">
-              Distribuição dos clientes ativos pela fase atual no pipe.
-            </p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="h-8 text-[10px] uppercase tracking-wider">Fase atual</TableHead>
-                  <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">Clientes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {opened?.byPhase.map((b) => (
-                  <TableRow key={b.fase}>
-                    <TableCell className="py-1.5 text-xs">{b.fase}</TableCell>
-                    <TableCell className="py-1.5 text-right tabular-nums text-xs">{b.count}</TableCell>
-                  </TableRow>
-                ))}
-                {opened && opened.byPhase.length === 0 && (
-                  <TableRow><TableCell colSpan={2} className="text-center text-xs text-muted-foreground py-4">Sem cards ativos.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-            {opened?.table && (
-              <p className="text-[10px] text-muted-foreground italic pt-2">
-                Fonte: <code>{opened.table}</code> · filtro: <code>"Saída" IS NULL</code>
-              </p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </Card>
-  );
-}
