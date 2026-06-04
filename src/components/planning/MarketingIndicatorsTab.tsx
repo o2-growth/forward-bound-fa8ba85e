@@ -260,7 +260,7 @@ export function MarketingIndicatorsTab() {
   const { getCardsForIndicator: o2GetCards, allCards: o2TaxAllCards } = useO2TaxAnalytics(dateRange.from, dateRange.to);
   const { cards: franquiaCards, getCardsForIndicator: franquiaGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Franquia');
   const { cards: oxyHackerCards, getCardsForIndicator: oxyGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Oxy Hacker');
-  const { allCards: outboundAllCards } = useOutboundAnalytics(dateRange.from, dateRange.to);
+  const { allCards: outboundAllCards, getCardsForIndicator: outboundGetCards } = useOutboundAnalytics(dateRange.from, dateRange.to);
 
   // Investment per month (Meta + Google) for the visible range — for cohorts
   const { byMonth: investmentByMonth, totalInvestment: investmentTotalForRange } = useInvestmentByMonth(dateRange.from, dateRange.to);
