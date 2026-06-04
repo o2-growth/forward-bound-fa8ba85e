@@ -1,216 +1,100 @@
-# Aba Marketing: novas seções (Cohort + Curva + Online/Offline + CAC)
 
-Replicar EXATAMENTE 4 abas da planilha `Indicadores Growth.xlsx` dentro do dashboard, na aba **Marketing** (`MarketingIndicatorsTab.tsx`). Não inventar coluna nova nem mudar fórmula — espelhar o que está na planilha.
+# Aba Marketing — Cohort, Curva de Conversão, Online/Offline e CAC
 
-CPV = CAC (fica de fora, vai depois).
+Replicar EXATAMENTE as 4 abas da planilha Indicadores Growth dentro de `MarketingIndicatorsTab.tsx`. Sem inventar coluna, sem mudar fórmula.
 
----
+## Estado atual verificado
 
-## Stack relevante
+- **Pre-fix 1 confirmado necessário**: em `MarketingIndicatorsTab.tsx` linha 259, `allAttributionCards` hoje agrega apenas Modelo Atual + Franquia + O2 TAX. Outbound não está sequer importado, e `oxyHackerCards` é buscado (linha 256) mas nunca consumido.
+- **Pre-fix 2 já está feito**: os dois edge functions (`fetch-meta-campaigns` linha 273-275, `fetch-google-campaigns` linha 122-130) já removeram o filtro ACTIVE/PAUSED e o Meta já tem paginação até `CAMPAIGNS_HARD_CAP`. **Pulando este pre-fix** — apenas validar empiricamente que histórico de mês com campanha arquivada aparece.
 
-- Aba Marketing: `src/components/planning/MarketingIndicatorsTab.tsx`
-- Hooks que JÁ trazem os dados crus:
-  - `useModeloAtualAnalytics`, `useOutboundAnalytics`, `useExpansaoAnalytics`, `useO2TaxAnalytics` — vendas (cards)
-  - `useMetaCampaigns`, `useGoogleCampaigns` — investimento de mídia
-  - `useMarketingAttribution` — atribuição
-- Filtro de data global: `dateRange` já propagado
-- Classificador de fonte: `src/lib/leadSource.ts`
+## Entrega em 7 commits
 
----
+### Commit 1 — Pre-fix attributionCards
+`MarketingIndicatorsTab.tsx`:
+- Importar `useOutboundAnalytics`.
+- Chamar `useOutboundAnalytics(dateRange.from, dateRange.to)` → desestruturar `allCards`.
+- No `useMemo` de `allAttributionCards` (linha 259): adicionar dois loops, um para `outboundAllCards` (bu: `'Outbound'`, id: `outbound_${c.id}`) e um para `oxyHackerCards` (bu: `'Oxy Hacker'`). Mesmo shape dos blocos existentes de Franquia/Modelo Atual.
+- Atualizar deps do `useMemo`.
 
-## SEÇÃO 1 — Cohort de Entrada
+### Commit 2 — Helper de classificação
+Novo `src/lib/marketingChannelGroup.ts` com `getChannelGroup(fonte?, origemLead?, tipoOrigem?): 'online' | 'offline' | 'desconhecido'` usando os tokens da spec (normalização NFD + lowercase + match por includes).
 
-**Definição (replicar exato):** cada linha = 1 venda. Agrupada pela safra do mês de **`dataEntrada`** (mês em que o lead foi criado no funil).
+### Commit 3 — Card CAC Total + hook de investimento mensal
+- Novo hook `src/hooks/useInvestmentByMonth.ts(startDate, endDate)`:
+  - Consome `useMetaCampaigns(startDate, endDate)` + `useGoogleCampaigns(startDate, endDate)` UMA vez no range completo.
+  - Retorna `{ totalInvestment, totalSales, byMonth: Map<'yyyy-MM', number>, isLoading }`.
+  - **Limitação aceita**: como Meta/Google retornam só o total agregado do range, não conseguimos cortar por mês a partir do mesmo response. Solução: para preencher `byMonth`, o hook dispara em paralelo um `useQuery` por mês visível dentro do range (key: `['investment-month', yyyyMM]`), reutilizando o cache 60min das edge functions. Cap em 24 meses para evitar abuso.
+- Novo componente `src/components/planning/marketing-indicators/CacTotalCard.tsx`:
+  - Recebe `investment`, `sales` (count), `cac = investment/sales` (0 se sales=0).
+  - Card grande no topo: número CAC em destaque + linha "Investimento: R$ X ÷ Vendas: N".
+- Montar acima de `RevenueMetricsCards` em `MarketingIndicatorsTab.tsx`.
+- Contagem de vendas: `allAttributionCards.filter(c => c.fase === 'Contrato assinado').length` (já existe lógica equivalente na linha 476 — reaproveitar).
 
-### Visualização
+### Commit 4 — Conversão Online vs Offline
+Novo `src/components/planning/marketing-indicators/OnlineOfflineSection.tsx`:
+- Recebe `allAttributionCards` + `totalInvestment` (Meta+Google do período).
+- Computa por `useMemo`:
+  - Para cada card, `group = getChannelGroup(card.fonte, card.origemLead, card.tipoOrigem)`.
+  - Leads = cards com `fase` em `['Novos Leads', 'MQLs', 'Tentativas de contato', ...]` — para evitar reinventar, **filtrar pelos cards retornados por `getCardsForIndicator('leads')`** de cada um dos 5 hooks (já existe no componente). Combiná-los em um set por id.
+  - Vendas = `c.fase === 'Contrato assinado'`.
+- Topo: 2 cards (Online / Offline) com Leads, Vendas, Conversão %, Investimento.
+- Embaixo: tabela por fonte (string crua de `fonte || origemLead || tipoOrigem`), colunas: Fonte, Grupo, Leads, Vendas, Taxa. Sort por Leads desc. Mostrar quem tiver Leads≥1 OR Vendas≥1.
 
-Tabela expansível por safra. Linha do cabeçalho da safra (colapsada por padrão) mostra agregados; expandindo aparecem as vendas individuais.
+### Commit 5 — Curva de Conversão
+Novo `src/components/planning/marketing-indicators/ConversionCurveSection.tsx`:
+- Filtra vendas: `c.dataAssinatura` dentro do `dateRange`, de TODAS as BUs (usa `allAttributionCards` — após Commit 1 já inclui as 5).
+- Calcula `dias = floor((dataAssinatura - dataEntrada) / 86400000)` por venda.
+- Topo: 2 cards grandes (Média / Mediana) + nota explicando cauda longa quando diff > 50%.
+- Tabela: Cliente, Criado em, Contrato assinado, Dias até fechar. Sort desc por dias.
 
-### Colunas (espelhar planilha)
+### Commit 6 — Cohort de Entrada
+Novo `src/components/planning/marketing-indicators/CohortTable.tsx` (componente reutilizável):
+- Props: `cards: AttributionCard[]`, `cohortType: 'entrada' | 'assinatura'`, `investmentByMonth: Map<string, number>`, `monthsInRange: string[]`.
+- Para `'entrada'`: agrupa cards (que tenham `dataAssinatura`) por `format(dataEntrada, 'yyyy-MM')`. Investimento da safra = `investmentByMonth.get(yyyyMM)`.
+- Tabela com expansão por safra usando `Collapsible`. Linha cabeçalho: Safra, Investimento, MRR Total, Setup Total, Pontual Total, Educação Total, Faturamento, CAC, # vendas. Linha de detalhe (uma por venda): Cliente, Criado em, Fonte, Produto, MRR, Setup, Pontual, Educação, Contrato assinado.
+- Safras sort desc. Vendas dentro sort asc por `dataEntrada`.
+- Renderizar na aba abaixo de Curva de Conversão.
 
-| Coluna | Fonte do dado |
-|---|---|
-| Safra | mês de `dataEntrada` formatado "Fevereiro 2024", "Março 2024", ... |
-| Cliente | `card.titulo` ou `card.empresa` |
-| Criado em | `card.dataEntrada` |
-| Fonte | `card.tipoOrigem` ou `card.origemLead` ou `card.fonte` (a categorização "Site/Redes Sociais", "Meta Ads", "Google Ads", "Prosp. Ativa", "Ind. Parceiro", "Ind. Prospect", "Colaborador O2", "Cliente", "Instagram", "LinkedIn", "Matéria Exame", "Globo Internacional") |
-| Investimento | spend Meta + Google do **mês de entrada** (linha de cabeçalho da safra) |
-| Produto | `card.produto` |
-| MRR | `card.valorMRR` |
-| MRR Total | SUM dos MRR das vendas da safra (linha de cabeçalho) |
-| Setup | `card.valorSetup` |
-| Setup Total | SUM dos Setup da safra |
-| Pontual | `card.valorPontual` |
-| Pontual Total | SUM dos Pontual da safra |
-| Educação | `card.valorEducacao` |
-| Educação Total | SUM dos Educação da safra |
-| Faturamento | MRR Total + Setup Total + Pontual Total + Educação Total (cabeçalho da safra) |
-| CAC | `Investimento ÷ nº de vendas da safra` (cabeçalho) |
-| Contrato assinado | `card.dataAssinatura` |
+### Commit 7 — Cohort de Assinatura
+Reusar `CohortTable` com `cohortType="assinatura"`:
+- Agrupa por `format(dataAssinatura, 'yyyy-MM')`.
+- Coluna "Criado em" renderizada por último (componente decide via prop).
+- Investimento da safra: para cada venda da safra, pega `format(dataEntrada, 'yyyy-MM')`, faz set único de meses de entrada, soma `investmentByMonth.get(m)` de cada um. Memoizado.
+- Renderizar abaixo de Cohort de Entrada.
 
-### Comportamento
+## Onde tudo entra (ordem final)
 
-- Ordenar safras desc (mais recente primeiro) ou asc — copiar o que dá menos atrito visual
-- Linhas individuais ordenadas por `dataEntrada` asc dentro da safra
-- Filtro de data global da aba filtra QUAIS safras aparecem (se range = Q1 2024, mostra safras Jan/Fev/Mar 2024)
-- Vendas vêm de TODAS as BUs (Modelo Atual + Outbound + Franquia + Oxy Hacker + O2 TAX)
-
----
-
-## SEÇÃO 2 — Cohort de Assinatura
-
-**Definição:** igual à Cohort de Entrada, **mas a safra é o mês de `dataAssinatura`** (não `dataEntrada`).
-
-### Diferenças importantes vs Cohort de Entrada
-
-- Coluna `Safra` = mês de `Contrato assinado`
-- Coluna `Criado em` aparece no FIM (a planilha inverte a ordem)
-- Investimento da safra = investimento do **mês de entrada do lead** (NÃO o mês da assinatura). Replicar essa lógica mesmo sendo contra-intuitiva — é o que a planilha faz e o user já validou.
-- `Faturamento` inclui Educação (a planilha de Entrada bugada não incluía, a de Assinatura inclui). **Usar a versão correta com Educação.**
-- CAC mesma fórmula: `Investimento ÷ nº de vendas da safra`
-
-### Implementação
-
-Componente reutilizável `CohortTable.tsx` que recebe prop `cohortType: 'entrada' | 'assinatura'` e troca o campo de agrupamento. Evita duplicar código.
-
----
-
-## SEÇÃO 3 — Curva de Conversão
-
-**Definição (replicar exato):** mostra quantos dias cada venda demorou da entrada até a assinatura. Dois KPIs gigantes no topo + tabela embaixo.
-
-### KPIs topo
-
-| KPI | Cálculo |
-|---|---|
-| **Média (dias)** | `mean(diasAteFechar)` de todas vendas do período |
-| **Mediana (dias)** | `median(diasAteFechar)` de todas vendas do período |
-
-A diferença grande entre média e mediana (planilha mostra 35 vs 14) indica cauda longa. Exibir os dois lado a lado, em cards grandes.
-
-### Tabela
-
-| Coluna | Fonte |
-|---|---|
-| Cliente | `card.titulo` ou `card.empresa` |
-| Criado em | `card.dataEntrada` |
-| Contrato assinado | `card.dataAssinatura` |
-| Dias até fechar | `dataAssinatura - dataEntrada` em dias |
-
-- Ordenar por "Dias até fechar" desc por padrão (vendas mais demoradas em cima — anomalias visíveis)
-- Vendas vêm de TODAS as BUs
-- Filtro de data global filtra por `dataAssinatura` dentro do range
-
----
-
-## SEÇÃO 4 — Conversão Online vs Offline
-
-**Definição (replicar exato):** taxa de conversão Leads → Vendas, segmentada por canal e agrupada em Online / Offline.
-
-### Agrupamento
-
-**ONLINE:**
-- Meta Ads
-- Google Ads
-- Site/Redes Sociais
-- Globo Internacional
-- Instagram
-- LinkedIn
-- Matéria Exame
-
-**OFFLINE:**
-- Colaborador O2
-- Ind. Parceiro
-- Ind. Prospect
-- Cliente
-- Prosp. Ativa
-
-Helper: `src/lib/marketingChannelGroup.ts` com função `getChannelGroup(fonte: string): 'online' | 'offline' | 'desconhecido'`.
-
-### Visualização
-
-**Topo — 2 cards lado a lado:**
-
-```
-┌─ Online ───────────────┐  ┌─ Offline ──────────────┐
-│ 1.357 leads             │  │ 16 leads                │
-│ 35 vendas               │  │ 12 vendas               │
-│ 2,58% conversão         │  │ 75% conversão           │
-└─────────────────────────┘  └─────────────────────────┘
+```text
+1. PerformanceGauges (existente)
+2. CacTotalCard            (Commit 3)
+3. RevenueMetricsCards (existente)
+4. OnlineOfflineSection    (Commit 4)
+5. ConversionCurveSection  (Commit 5)
+6. CohortTable entrada     (Commit 6)
+7. CohortTable assinatura  (Commit 7)
+8. ...resto (channel cards, campaign tables, etc.)
 ```
 
-**Embaixo — Tabela detalhada por fonte (replicar Tabela B da planilha):**
+## Restrições respeitadas
 
-| Fonte | Grupo | Leads | Vendas | Taxa de Conversão |
-|---|---|---|---|---|
+- Sem edge function nova.
+- Sem mexer em hooks/cálculos existentes (apenas consumir).
+- Sem migration.
+- Todas agregações em `useMemo`.
+- Filtro de data global da aba propaga para todas as seções via `dateRange`.
 
-Ordenar por Leads desc. Mostrar todas as fontes que tiverem pelo menos 1 lead OU 1 venda no período.
+## Validação manual
 
-### Adicional (não tem na planilha mas é grátis dado o dado)
+- Filtro = ano corrente: comparar números com planilha original.
+- Filtro = Q1 2024: cohort mostra só Jan/Fev/Mar 2024.
+- Curva: média/mediana batem com `mean()`/`median()` de `dataAssinatura − dataEntrada`.
+- Online: soma de vendas das fontes do grupo Online = total Online do card.
+- CAC = (Meta+Google) ÷ vendas.
+- Vendas do Outbound (ex. Matheus Staruck) aparecem nas cohorts → confirma Pre-fix 1.
 
-Card "Investimento por grupo":
-- Online: R$ X (Meta + Google do período)
-- Offline: R$ 0 (não temos como medir custo de indicação)
+## Fora do escopo
 
----
-
-## SEÇÃO 5 — CAC (consolidado)
-
-Não cria seção própria — o CAC já aparece em cada safra de cohort. Adicionar **apenas 1 card no topo da aba Marketing** mostrando:
-
-```
-CAC Total (período filtrado)
-R$ 6.842
-———
-Investimento: R$ 245.700  ÷  Vendas: 36
-```
-
-Fórmula: `(spend Meta + spend Google no período) ÷ (nº de vendas no período, vindas de qualquer fonte)`.
-
----
-
-## Onde colocar tudo na aba Marketing
-
-Ordem da aba (de cima pra baixo):
-
-1. **PerformanceGauges** (já existe)
-2. **Card CAC Total** (Seção 5) — NOVO
-3. **RevenueMetricsCards** (já existe)
-4. **Conversão Online vs Offline** (Seção 4) — NOVO
-5. **Curva de Conversão** (Seção 3) — NOVO
-6. **Cohort de Entrada** (Seção 1) — NOVO
-7. **Cohort de Assinatura** (Seção 2) — NOVO
-8. Resto do que já existe (channel cards, campaign tables, etc.)
-
----
-
-## Restrições
-
-1. **NÃO mexer** em hooks/cálculos existentes — apenas consumir.
-2. **NÃO criar** edge function nova.
-3. **NÃO mexer** em outras abas.
-4. **Filtro de data global** da aba Marketing precisa funcionar em TODAS as 4 seções novas.
-5. **Vendas** = todas as BUs (Modelo Atual + Outbound + Franquia + Oxy Hacker + O2 TAX).
-6. **Investimento** = Meta + Google APENAS (não temos outras fontes de custo).
-7. Performance: usar `useMemo` em todas as agregações pesadas (cohort tem ~400 linhas).
-
----
-
-## Entrega em commits separados
-
-1. **commit 1**: helper `marketingChannelGroup.ts` + tipos compartilhados em `marketing-indicators/types.ts`
-2. **commit 2**: card CAC Total no topo da aba
-3. **commit 3**: Conversão Online vs Offline (cards + tabela)
-4. **commit 4**: Curva de Conversão (KPIs + tabela)
-5. **commit 5**: Cohort de Entrada (tabela expansível)
-6. **commit 6**: Cohort de Assinatura (reusar `CohortTable` com prop)
-
-Rodar typecheck após cada commit. Não pushar se quebrar.
-
-## Validação
-
-- Filtro de data = ano corrente: números devem ser comparáveis aos da planilha
-- Trocar pra Q1 2024: cohort mostra só safras Jan/Fev/Mar
-- Curva de Conversão: média e mediana batem com `mean()` e `median()` dos `dataAssinatura - dataEntrada`
-- Online: soma das vendas das fontes do grupo = total online
-- CAC = (spend Meta + Google) ÷ vendas, com decimais corretos
+- CPV (= CAC) por canal — fica pra depois conforme spec.
+- Pre-fix 2 (já aplicado, apenas validar visualmente).
+- Qualquer mudança em outras abas.
