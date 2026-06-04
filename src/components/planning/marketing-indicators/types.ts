@@ -206,6 +206,7 @@ export const CHANNEL_COLORS: Record<ChannelId, string> = {
 export interface AttributionCard {
   id: string;
   titulo: string;
+  empresa?: string;
   campanha?: string;
   conjuntoGrupo?: string;
   fonte?: string;
@@ -216,6 +217,8 @@ export interface AttributionCard {
   palavraChaveAnuncio?: string;
   fase: string;
   dataEntrada: Date;
+  dataAssinatura?: Date | null;
+  produto?: string;
   valor: number;
   valorMRR: number;
   valorSetup: number;
