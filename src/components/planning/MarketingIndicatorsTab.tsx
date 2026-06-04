@@ -516,11 +516,11 @@ export function MarketingIndicatorsTab() {
     // Order matters: pipes de destino final primeiro (Modelo Atual / O2 TAX)
     // sobrescrevem Outbound, evitando duplicatas.
     const sources: Array<{ cards: any[]; bu: string; prefix: string; priority: number }> = [
-      { cards: maGetCards('vendas'),       bu: 'Modelo Atual', prefix: '',          priority: 1 },
-      { cards: o2GetCards('vendas'),       bu: 'O2 TAX',       prefix: 'o2tax_',    priority: 2 },
-      { cards: franquiaGetCards('vendas'), bu: 'Franquia',     prefix: '',          priority: 3 },
-      { cards: oxyGetCards('vendas'),      bu: 'Oxy Hacker',   prefix: 'oxy_',      priority: 4 },
-      { cards: outboundGetCards('vendas'), bu: 'Outbound',     prefix: 'outbound_', priority: 5 },
+      { cards: maGetCards('venda'),       bu: 'Modelo Atual', prefix: '',          priority: 1 },
+      { cards: o2GetCards('venda'),       bu: 'O2 TAX',       prefix: 'o2tax_',    priority: 2 },
+      { cards: franquiaGetCards('venda'), bu: 'Franquia',     prefix: '',          priority: 3 },
+      { cards: oxyGetCards('venda'),      bu: 'Oxy Hacker',   prefix: 'oxy_',      priority: 4 },
+      { cards: outboundGetCards('venda'), bu: 'Outbound',     prefix: 'outbound_', priority: 5 },
     ];
 
     const byKey = new Map<string, { card: AttributionCard; priority: number }>();
