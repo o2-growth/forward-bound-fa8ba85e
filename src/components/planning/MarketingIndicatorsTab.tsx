@@ -475,6 +475,47 @@ export function MarketingIndicatorsTab() {
     return counts;
   }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards]);
 
+  // ===== New sections data (Cohort / Curva / Online-Offline / CAC) =====
+  const leadsAttributionCards = useMemo<AttributionCard[]>(() => {
+    const out: AttributionCard[] = [];
+    const seen = new Set<string>();
+    const push = (c: any, bu: string, idPrefix = '') => {
+      const id = idPrefix + c.id;
+      if (seen.has(id)) return;
+      seen.add(id);
+      out.push({
+        id, titulo: c.titulo, empresa: c.empresa,
+        fonte: c.fonte, origemLead: c.origemLead, tipoOrigem: c.tipoOrigem,
+        fase: c.fase, dataEntrada: c.dataEntrada,
+        dataAssinatura: c.dataAssinatura ?? null,
+        produto: c.produto, valor: c.valor || 0,
+        valorMRR: c.valorMRR || 0, valorSetup: c.valorSetup || 0,
+        valorPontual: c.valorPontual || 0, valorEducacao: c.valorEducacao || 0,
+        bu,
+      });
+    };
+    for (const c of maGetCards('leads')) push(c, 'Modelo Atual');
+    for (const c of o2GetCards('leads')) push(c, 'O2 TAX', 'o2tax_');
+    for (const c of franquiaGetCards('leads')) push(c, 'Franquia');
+    for (const c of oxyGetCards('leads')) push(c, 'Oxy Hacker', 'oxy_');
+    for (const c of outboundGetCards('leads')) push(c, 'Outbound', 'outbound_');
+    return out;
+  }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards]);
+
+  // Sales = cards with dataAssinatura inside the filtered period (from ALL 5 BUs)
+  const salesInPeriod = useMemo<AttributionCard[]>(() => {
+    const fromT = dateRange.from.getTime();
+    const toT = dateRange.to.getTime();
+    return allAttributionCards.filter(c => {
+      const d = c.dataAssinatura;
+      if (!d) return false;
+      const t = d.getTime();
+      return t >= fromT && t <= toT;
+    });
+  }, [allAttributionCards, dateRange]);
+
+
+
   // Recalculate totals including enriched Google Ads data
   const enrichedTotals = useMemo(() => {
     const googleChannel = enrichedChannels.find(c => c.id === 'google_ads');
