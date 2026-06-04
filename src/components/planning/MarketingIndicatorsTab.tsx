@@ -502,17 +502,82 @@ export function MarketingIndicatorsTab() {
     return out;
   }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards]);
 
-  // Sales = cards with dataAssinatura inside the filtered period (from ALL 5 BUs)
+  // Sales = cards classified as 'vendas' by each BU hook (which already applies
+  // sales-phase rules + monthly dedup). We then dedupe across BUs by base id and
+  // empresa-normalizada to avoid Outbound→Modelo/O2 double-count, and filter by
+  // dataAssinatura within the selected period (fallback: dataEntrada).
   const salesInPeriod = useMemo<AttributionCard[]>(() => {
     const fromT = dateRange.from.getTime();
     const toT = dateRange.to.getTime();
-    return allAttributionCards.filter(c => {
-      const d = c.dataAssinatura;
+    const normalize = (s?: string | null) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const stripPrefix = (id: string) => id.replace(/^(outbound_|oxy_|o2tax_)/, '');
+
+    // Order matters: pipes de destino final primeiro (Modelo Atual / O2 TAX)
+    // sobrescrevem Outbound, evitando duplicatas.
+    const sources: Array<{ cards: any[]; bu: string; prefix: string; priority: number }> = [
+      { cards: maGetCards('venda'),       bu: 'Modelo Atual', prefix: '',          priority: 1 },
+      { cards: o2GetCards('venda'),       bu: 'O2 TAX',       prefix: 'o2tax_',    priority: 2 },
+      { cards: franquiaGetCards('venda'), bu: 'Franquia',     prefix: '',          priority: 3 },
+      { cards: oxyGetCards('venda'),      bu: 'Oxy Hacker',   prefix: 'oxy_',      priority: 4 },
+      { cards: outboundGetCards('venda'), bu: 'Outbound',     prefix: 'outbound_', priority: 5 },
+    ];
+
+    const byKey = new Map<string, { card: AttributionCard; priority: number }>();
+    for (const { cards, bu, prefix, priority } of sources) {
+      for (const c of cards) {
+        const baseId = stripPrefix(String(c.id));
+        const empresaKey = normalize((c as any).empresa || c.titulo);
+        const key = `${baseId}|${empresaKey}`;
+        const existing = byKey.get(key);
+        if (existing && existing.priority <= priority) continue;
+        byKey.set(key, {
+          priority,
+          card: {
+            id: prefix + c.id,
+            titulo: c.titulo,
+            empresa: (c as any).empresa,
+            campanha: c.campanha,
+            conjuntoGrupo: c.conjuntoGrupo,
+            fonte: c.fonte,
+            fbclid: c.fbclid,
+            gclid: c.gclid,
+            tipoOrigem: c.tipoOrigem,
+            origemLead: c.origemLead,
+            palavraChaveAnuncio: c.palavraChaveAnuncio,
+            fase: c.fase,
+            dataEntrada: c.dataEntrada,
+            dataAssinatura: c.dataAssinatura ?? null,
+            produto: c.produto,
+            valor: c.valor || 0,
+            valorMRR: c.valorMRR || 0,
+            valorSetup: c.valorSetup || 0,
+            valorPontual: c.valorPontual || 0,
+            valorEducacao: c.valorEducacao || 0,
+            bu,
+          },
+        });
+      }
+    }
+
+    const all = Array.from(byKey.values()).map(v => v.card);
+    const filtered = all.filter(c => {
+      const d = c.dataAssinatura ?? c.dataEntrada;
       if (!d) return false;
       const t = d.getTime();
       return t >= fromT && t <= toT;
     });
-  }, [allAttributionCards, dateRange]);
+
+    if (typeof window !== 'undefined') {
+      console.log('[MarketingIndicatorsTab] salesInPeriod:', {
+        bruto_por_bu: sources.map(s => ({ bu: s.bu, count: s.cards.length })),
+        apos_dedup: all.length,
+        no_periodo: filtered.length,
+      });
+    }
+
+    return filtered;
+  }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards, dateRange]);
 
 
 
