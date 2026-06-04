@@ -624,6 +624,42 @@ export function MarketingIndicatorsTab() {
         </div>
       )}
 
+      {/* ===== NEW: CAC Total ===== */}
+      <CacTotalCard
+        investment={investmentTotalForRange}
+        sales={salesInPeriod.length}
+      />
+
+      {/* ===== NEW: Online vs Offline ===== */}
+      <OnlineOfflineSection
+        leadsCards={leadsAttributionCards}
+        salesCards={salesInPeriod}
+        totalInvestment={investmentTotalForRange}
+      />
+
+      {/* ===== NEW: Curva de Conversão ===== */}
+      <ConversionCurveSection salesCards={salesInPeriod} />
+
+      {/* ===== NEW: Cohort de Entrada ===== */}
+      <CohortTable
+        cards={allAttributionCards}
+        cohortType="entrada"
+        investmentByMonth={investmentByMonth}
+        title="Cohort de Entrada"
+        description="Vendas agrupadas pelo mês de criação do lead no funil. Investimento = Meta + Google do mês da safra."
+      />
+
+      {/* ===== NEW: Cohort de Assinatura ===== */}
+      <CohortTable
+        cards={allAttributionCards}
+        cohortType="assinatura"
+        investmentByMonth={investmentByMonth}
+        title="Cohort de Assinatura"
+        description="Vendas agrupadas pelo mês de assinatura do contrato. Investimento = soma dos meses de entrada dos leads dessa safra."
+      />
+
+
+
 
       {/* Channel Metrics Cards (from spreadsheet) */}
       <ChannelMetricsCards
