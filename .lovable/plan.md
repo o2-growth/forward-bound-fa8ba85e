@@ -1,150 +1,216 @@
-# Nova aba: Insights Comerciais — diagnóstico automático + alertas inteligentes
+# Aba Marketing: novas seções (Cohort + Curva + Online/Offline + CAC)
 
-## Contexto
+Replicar EXATAMENTE 4 abas da planilha `Indicadores Growth.xlsx` dentro do dashboard, na aba **Marketing** (`MarketingIndicatorsTab.tsx`). Não inventar coluna nova nem mudar fórmula — espelhar o que está na planilha.
 
-Hoje Pedro (Head Comercial) gasta reuniões inteiras abrindo o dashboard e analisando gráficos manualmente: olha vendedor por vendedor, vê quantos dias sem venda, compara funil do período vs anterior, tenta entender por que alguém parou de vender. Quero automatizar essa análise numa nova aba que cospe **insights curtos, práticos e acionáveis** com sistema de alertas.
+CPV = CAC (fica de fora, vai depois).
 
-Não é mais um dashboard de gráficos. É uma **leitura rápida** com cards de insight estilo "Maria está 12 dias sem venda — gargalo é RR→Venda — provável causa é mudança de mix de origem dos leads".
+---
 
-## Stack atual relevante
+## Stack relevante
 
-- Tabs estão em `src/pages/Planning2026.tsx`, `TAB_CONFIG` no topo
-- Hooks de dados já prontos: `useModeloAtualAnalytics`, `useOutboundAnalytics`, `useExpansaoAnalytics`, `useO2TaxAnalytics`, `useCliente360`, `useCustomerSuccess`, `useMediaMetas`, `useConsolidatedMetas`
-- Classificador de origem: `src/lib/leadSource.ts` (`classifyLeadSource`)
-- Filtro global de período: já existe `dateRange` propagado via contexto/props no Planning2026
-- Permissões: `useUserPermissions` (admin, cfo, etc.) — precisa adicionar visibilidade pra closer também
-- Edge function de IA: `supabase/functions/ai-chat/index.ts` (Gemini 2.5 Flash) já está pronta
+- Aba Marketing: `src/components/planning/MarketingIndicatorsTab.tsx`
+- Hooks que JÁ trazem os dados crus:
+  - `useModeloAtualAnalytics`, `useOutboundAnalytics`, `useExpansaoAnalytics`, `useO2TaxAnalytics` — vendas (cards)
+  - `useMetaCampaigns`, `useGoogleCampaigns` — investimento de mídia
+  - `useMarketingAttribution` — atribuição
+- Filtro de data global: `dateRange` já propagado
+- Classificador de fonte: `src/lib/leadSource.ts`
 
-## Escopo desta entrega
+---
 
-### 1. Nova aba `'insights'`
+## SEÇÃO 1 — Cohort de Entrada
 
-Em `TAB_CONFIG` de `Planning2026.tsx`, adicionar:
-```ts
-{ key: 'insights', label: 'Insights Comerciais', icon: Sparkles }
+**Definição (replicar exato):** cada linha = 1 venda. Agrupada pela safra do mês de **`dataEntrada`** (mês em que o lead foi criado no funil).
+
+### Visualização
+
+Tabela expansível por safra. Linha do cabeçalho da safra (colapsada por padrão) mostra agregados; expandindo aparecem as vendas individuais.
+
+### Colunas (espelhar planilha)
+
+| Coluna | Fonte do dado |
+|---|---|
+| Safra | mês de `dataEntrada` formatado "Fevereiro 2024", "Março 2024", ... |
+| Cliente | `card.titulo` ou `card.empresa` |
+| Criado em | `card.dataEntrada` |
+| Fonte | `card.tipoOrigem` ou `card.origemLead` ou `card.fonte` (a categorização "Site/Redes Sociais", "Meta Ads", "Google Ads", "Prosp. Ativa", "Ind. Parceiro", "Ind. Prospect", "Colaborador O2", "Cliente", "Instagram", "LinkedIn", "Matéria Exame", "Globo Internacional") |
+| Investimento | spend Meta + Google do **mês de entrada** (linha de cabeçalho da safra) |
+| Produto | `card.produto` |
+| MRR | `card.valorMRR` |
+| MRR Total | SUM dos MRR das vendas da safra (linha de cabeçalho) |
+| Setup | `card.valorSetup` |
+| Setup Total | SUM dos Setup da safra |
+| Pontual | `card.valorPontual` |
+| Pontual Total | SUM dos Pontual da safra |
+| Educação | `card.valorEducacao` |
+| Educação Total | SUM dos Educação da safra |
+| Faturamento | MRR Total + Setup Total + Pontual Total + Educação Total (cabeçalho da safra) |
+| CAC | `Investimento ÷ nº de vendas da safra` (cabeçalho) |
+| Contrato assinado | `card.dataAssinatura` |
+
+### Comportamento
+
+- Ordenar safras desc (mais recente primeiro) ou asc — copiar o que dá menos atrito visual
+- Linhas individuais ordenadas por `dataEntrada` asc dentro da safra
+- Filtro de data global da aba filtra QUAIS safras aparecem (se range = Q1 2024, mostra safras Jan/Fev/Mar 2024)
+- Vendas vêm de TODAS as BUs (Modelo Atual + Outbound + Franquia + Oxy Hacker + O2 TAX)
+
+---
+
+## SEÇÃO 2 — Cohort de Assinatura
+
+**Definição:** igual à Cohort de Entrada, **mas a safra é o mês de `dataAssinatura`** (não `dataEntrada`).
+
+### Diferenças importantes vs Cohort de Entrada
+
+- Coluna `Safra` = mês de `Contrato assinado`
+- Coluna `Criado em` aparece no FIM (a planilha inverte a ordem)
+- Investimento da safra = investimento do **mês de entrada do lead** (NÃO o mês da assinatura). Replicar essa lógica mesmo sendo contra-intuitiva — é o que a planilha faz e o user já validou.
+- `Faturamento` inclui Educação (a planilha de Entrada bugada não incluía, a de Assinatura inclui). **Usar a versão correta com Educação.**
+- CAC mesma fórmula: `Investimento ÷ nº de vendas da safra`
+
+### Implementação
+
+Componente reutilizável `CohortTable.tsx` que recebe prop `cohortType: 'entrada' | 'assinatura'` e troca o campo de agrupamento. Evita duplicar código.
+
+---
+
+## SEÇÃO 3 — Curva de Conversão
+
+**Definição (replicar exato):** mostra quantos dias cada venda demorou da entrada até a assinatura. Dois KPIs gigantes no topo + tabela embaixo.
+
+### KPIs topo
+
+| KPI | Cálculo |
+|---|---|
+| **Média (dias)** | `mean(diasAteFechar)` de todas vendas do período |
+| **Mediana (dias)** | `median(diasAteFechar)` de todas vendas do período |
+
+A diferença grande entre média e mediana (planilha mostra 35 vs 14) indica cauda longa. Exibir os dois lado a lado, em cards grandes.
+
+### Tabela
+
+| Coluna | Fonte |
+|---|---|
+| Cliente | `card.titulo` ou `card.empresa` |
+| Criado em | `card.dataEntrada` |
+| Contrato assinado | `card.dataAssinatura` |
+| Dias até fechar | `dataAssinatura - dataEntrada` em dias |
+
+- Ordenar por "Dias até fechar" desc por padrão (vendas mais demoradas em cima — anomalias visíveis)
+- Vendas vêm de TODAS as BUs
+- Filtro de data global filtra por `dataAssinatura` dentro do range
+
+---
+
+## SEÇÃO 4 — Conversão Online vs Offline
+
+**Definição (replicar exato):** taxa de conversão Leads → Vendas, segmentada por canal e agrupada em Online / Offline.
+
+### Agrupamento
+
+**ONLINE:**
+- Meta Ads
+- Google Ads
+- Site/Redes Sociais
+- Globo Internacional
+- Instagram
+- LinkedIn
+- Matéria Exame
+
+**OFFLINE:**
+- Colaborador O2
+- Ind. Parceiro
+- Ind. Prospect
+- Cliente
+- Prosp. Ativa
+
+Helper: `src/lib/marketingChannelGroup.ts` com função `getChannelGroup(fonte: string): 'online' | 'offline' | 'desconhecido'`.
+
+### Visualização
+
+**Topo — 2 cards lado a lado:**
+
+```
+┌─ Online ───────────────┐  ┌─ Offline ──────────────┐
+│ 1.357 leads             │  │ 16 leads                │
+│ 35 vendas               │  │ 12 vendas               │
+│ 2,58% conversão         │  │ 75% conversão           │
+└─────────────────────────┘  └─────────────────────────┘
 ```
 
-Permissão: visível pra **admin** e **closers**. Atualize `useUserPermissions` se necessário pra incluir o role `closer` (ou equivalente — confira o que existe). NÃO mexer em permissões de outros tabs. CFO **não vê** essa aba (é comercial, não CS).
+**Embaixo — Tabela detalhada por fonte (replicar Tabela B da planilha):**
 
-### 2. Componente `InsightsTab.tsx`
+| Fonte | Grupo | Leads | Vendas | Taxa de Conversão |
+|---|---|---|---|---|
 
-Localização: `src/components/planning/InsightsTab.tsx`
+Ordenar por Leads desc. Mostrar todas as fontes que tiverem pelo menos 1 lead OU 1 venda no período.
 
-Estrutura visual:
-- **Header**: contador agregado `🔴 X críticos · 🟡 Y atenção · 🟢 Z saudável` + filtros (tipo: todos / vendedor / BU / cliente) + toggle "ver só meus" (closer)
-- **Lista de cards de insight** ordenada por severidade (crítico primeiro)
-- Cada card: ícone de severidade, título curto, 2-4 linhas de detalhe (números + comparação), "provável causa" (vinda da IA), botão "ver detalhes" que abre Sheet com mais dados
+### Adicional (não tem na planilha mas é grátis dado o dado)
 
-Período: **lê do filtro global de data** já existente no Planning2026. Se filtro = mês corrente, analisa mês corrente vs mês anterior. Se filtro = semana, analisa semana vs semana anterior. Se for range customizado, compara com período de mesma duração imediatamente anterior.
+Card "Investimento por grupo":
+- Online: R$ X (Meta + Google do período)
+- Offline: R$ 0 (não temos como medir custo de indicação)
 
-### 3. Engine de regras: `src/lib/insightsEngine.ts`
+---
 
-TypeScript puro, recebe os dados dos hooks e devolve `Insight[]`. Cada regra é uma função independente. Regras mínimas a implementar:
+## SEÇÃO 5 — CAC (consolidado)
 
-**Por vendedor (closer + SDR):**
-- `R1`: Dias desde última venda > 1.5x da média histórica do vendedor → 🟡; > 2.5x → 🔴
-- `R2`: Volume de vendas no período < 60% da média histórica → 🟡; < 30% → 🔴
-- `R3`: Conversão entre etapas (leads→MQL, MQL→RR, RR→venda) caiu > 30% vs período anterior → 🟡; > 50% → 🔴
-- `R4`: Ticket médio caiu > 25% vs histórico → 🟡
-- `R5`: Volume de leads recebidos caiu > 40% → 🟡 (alerta de fome de pipeline)
-- `R6`: Mix de origem mudou (ex: era 30% inbound, virou 80% organico) → 🟡
+Não cria seção própria — o CAC já aparece em cada safra de cohort. Adicionar **apenas 1 card no topo da aba Marketing** mostrando:
 
-**Por BU:**
-- `R7`: Faturamento < 70% da meta no período → 🟡; < 50% → 🔴
-- `R8`: Funil furando — qual etapa caiu mais vs período anterior, mostrar
-- `R9`: Crescimento negativo 2 semanas seguidas → 🟡; 3+ → 🔴
-
-**Por cliente (cross com CS):**
-- `R10`: NPS atual < 7 + tratativa aberta há > 7 dias → 🔴
-- `R11`: Setup atrasado > 30 dias da meta → 🟡
-- `R12`: MRR concentrado: top 3 clientes > 40% do MRR total da BU → 🟡 (info de risco)
-
-**Saudáveis (🟢):**
-- `R13`: Vendedor batendo > 110% da meta → 🟢
-- `R14`: BU crescendo > 15% vs período anterior → 🟢
-- `R15`: Cliente NPS subindo + tratativa fechada bem → 🟢
-
-Cada `Insight` tem shape:
-```ts
-type Insight = {
-  id: string;
-  severity: 'critico' | 'atencao' | 'saudavel';
-  category: 'vendedor' | 'bu' | 'cliente';
-  subject: string; // "Maria Silva", "Modelo Atual", "Irrigamax"
-  title: string; // "12 dias sem venda"
-  metrics: { label: string; value: string; comparison?: string }[]; // ["8 vendas", "média: 12", "-33% vs mês anterior"]
-  rule_id: string; // 'R1', 'R2', ...
-  raw_context: Record<string, any>; // dados crus pra mandar pra IA
-  ai_reasoning?: string; // preenchido depois pela IA
-};
+```
+CAC Total (período filtrado)
+R$ 6.842
+———
+Investimento: R$ 245.700  ÷  Vendas: 36
 ```
 
-### 4. Camada de IA (híbrido)
+Fórmula: `(spend Meta + spend Google no período) ÷ (nº de vendas no período, vindas de qualquer fonte)`.
 
-Apenas para insights com severidade 🔴 (críticos), chamar `ai-chat` com prompt curto:
-- Input: `raw_context` do insight + comparação período atual vs anterior
-- Output esperado: 1-2 frases de "provável causa" em PT-BR
+---
 
-System prompt sugerido (adicionar em `src/lib/aiSystemPrompts.ts`):
-```
-Você é analista comercial sênior. Receberá um JSON com métricas de um vendedor/BU/cliente comparando período atual vs anterior. Em NO MÁXIMO 2 frases, em PT-BR, identifique a causa mais provável da anomalia e sugira 1 ação prática. Seja direto, sem floreio. Formato: "<causa em 1 frase>. <ação sugerida começando com verbo no infinitivo>."
-```
+## Onde colocar tudo na aba Marketing
 
-Chamadas em paralelo (Promise.all) com cap de 10 simultâneas. Cache em memória (React Query) — staleTime 30min, mesma chave do insight.
+Ordem da aba (de cima pra baixo):
 
-**NÃO** chamar IA para 🟡 e 🟢 — texto da regra basta. Isso mantém custo baixo.
+1. **PerformanceGauges** (já existe)
+2. **Card CAC Total** (Seção 5) — NOVO
+3. **RevenueMetricsCards** (já existe)
+4. **Conversão Online vs Offline** (Seção 4) — NOVO
+5. **Curva de Conversão** (Seção 3) — NOVO
+6. **Cohort de Entrada** (Seção 1) — NOVO
+7. **Cohort de Assinatura** (Seção 2) — NOVO
+8. Resto do que já existe (channel cards, campaign tables, etc.)
 
-### 5. Salvar histórico de insights (fase opcional, mas faça)
-
-Migration aditiva nova:
-
-Tabela `commercial_insights_snapshots`:
-- `id` uuid PK
-- `user_id` uuid references auth.users — quem visualizou
-- `period_start`, `period_end` timestamptz
-- `insights` jsonb (array completo)
-- `generated_at` timestamptz default now()
-
-Só guarda snapshot quando usuário clica "Salvar leitura desta semana". Permite voltar e ver o estado de 2 semanas atrás. RLS: só vê os próprios snapshots.
-
-**MIGRATION ADITIVA APENAS.** Nada de DELETE/DROP/UPDATE em dados existentes.
-
-### 6. UI dos cards
-
-Componente `InsightCard.tsx`:
-- Borda colorida por severidade (vermelho/amarelo/verde)
-- Header: ícone + título + chip da categoria
-- Corpo: lista de métricas com comparação
-- Footer: "Provável causa: <ai_reasoning>" (só pros críticos)
-- Botão "Ver detalhes" abre Sheet lateral com dados crus + link pra abrir o vendedor/cliente no tab apropriado
-
-Componente `InsightsTab.tsx`:
-- Filtros no topo: severidade (chips multi), categoria (chips multi), busca por nome
-- Toggle "Ver só meus" — closer vê só insights onde ele é o vendedor
-- Lista virtualizada se passar de 50 itens (use `react-virtual` se já estiver no projeto, senão lista normal)
-- Skeleton de loading com 6 cards placeholder
+---
 
 ## Restrições
 
-1. **Migration aditiva apenas** (REGRA ABSOLUTA): zero DELETE/DROP/TRUNCATE/UPDATE em dados existentes.
-2. **Não alterar** hooks existentes. Apenas consumir.
-3. **Não criar** edge function nova — use `ai-chat` que já existe.
-4. **Não mexer** em outros tabs / outras permissões além do necessário pra liberar 'insights' pra admin+closer.
+1. **NÃO mexer** em hooks/cálculos existentes — apenas consumir.
+2. **NÃO criar** edge function nova.
+3. **NÃO mexer** em outras abas.
+4. **Filtro de data global** da aba Marketing precisa funcionar em TODAS as 4 seções novas.
+5. **Vendas** = todas as BUs (Modelo Atual + Outbound + Franquia + Oxy Hacker + O2 TAX).
+6. **Investimento** = Meta + Google APENAS (não temos outras fontes de custo).
+7. Performance: usar `useMemo` em todas as agregações pesadas (cohort tem ~400 linhas).
+
+---
 
 ## Entrega em commits separados
 
-1. **commit 1**: migration `commercial_insights_snapshots` + RLS
-2. **commit 2**: `insightsEngine.ts` com todas regras R1-R15 + tipos + testes manuais via console.log
-3. **commit 3**: componentes `InsightCard.tsx` + `InsightsTab.tsx` + adicionar aba ao `Planning2026.tsx`
-4. **commit 4**: integração com IA via `ai-chat` para insights críticos
-5. **commit 5**: snapshot/histórico (botão "Salvar leitura")
+1. **commit 1**: helper `marketingChannelGroup.ts` + tipos compartilhados em `marketing-indicators/types.ts`
+2. **commit 2**: card CAC Total no topo da aba
+3. **commit 3**: Conversão Online vs Offline (cards + tabela)
+4. **commit 4**: Curva de Conversão (KPIs + tabela)
+5. **commit 5**: Cohort de Entrada (tabela expansível)
+6. **commit 6**: Cohort de Assinatura (reusar `CohortTable` com prop)
 
-Rodar typecheck após cada commit. Não pushar se quebrar tipos.
+Rodar typecheck após cada commit. Não pushar se quebrar.
 
-## Validação esperada
+## Validação
 
-- Abrir aba com filtro = mês corrente: deve aparecer pelo menos os críticos óbvios (vendedor 0 venda, BU < 50% meta)
-- Trocar filtro pra semana: contagem e cards mudam
-- Closer logado vê só insights onde ele é o vendedor (quando toggle "ver só meus" ligado)
-- Insight crítico mostra "Provável causa: ..." escrito pela IA
-- Insight amarelo/verde NÃO chama IA (sem custo desnecessário)
+- Filtro de data = ano corrente: números devem ser comparáveis aos da planilha
+- Trocar pra Q1 2024: cohort mostra só safras Jan/Fev/Mar
+- Curva de Conversão: média e mediana batem com `mean()` e `median()` dos `dataAssinatura - dataEntrada`
+- Online: soma das vendas das fontes do grupo = total online
+- CAC = (spend Meta + Google) ÷ vendas, com decimais corretos
