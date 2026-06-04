@@ -16,6 +16,8 @@ import { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useMarketingAttribution, detectChannel } from "@/hooks/useMarketingAttribution";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
+import { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
+import { useInvestmentByMonth } from "@/hooks/useInvestmentByMonth";
 import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
 import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
 import { useMediaMetas } from "@/contexts/MediaMetasContext";
@@ -36,6 +38,10 @@ import { DetailSheet, columnFormatters } from "./indicators/DetailSheet";
 import { BestAdsSection } from "./marketing-indicators/BestAdsSection";
 import { InvestmentForecast } from "./marketing-indicators/InvestmentForecast";
 import { CHANNEL_LABELS, ChannelId, CostPerStage, AttributionCard } from "./marketing-indicators/types";
+import { CacTotalCard } from "./marketing-indicators/CacTotalCard";
+import { OnlineOfflineSection } from "./marketing-indicators/OnlineOfflineSection";
+import { ConversionCurveSection } from "./marketing-indicators/ConversionCurveSection";
+import { CohortTable } from "./marketing-indicators/CohortTable";
 
 
 
@@ -254,6 +260,10 @@ export function MarketingIndicatorsTab() {
   const { getCardsForIndicator: o2GetCards, allCards: o2TaxAllCards } = useO2TaxAnalytics(dateRange.from, dateRange.to);
   const { cards: franquiaCards, getCardsForIndicator: franquiaGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Franquia');
   const { cards: oxyHackerCards, getCardsForIndicator: oxyGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Oxy Hacker');
+  const { allCards: outboundAllCards, getCardsForIndicator: outboundGetCards } = useOutboundAnalytics(dateRange.from, dateRange.to);
+
+  // Investment per month (Meta + Google) for the visible range — for cohorts
+  const { byMonth: investmentByMonth, totalInvestment: investmentTotalForRange } = useInvestmentByMonth(dateRange.from, dateRange.to);
 
   // Build attribution cards from all BUs
   const allAttributionCards = useMemo((): AttributionCard[] => {
@@ -261,10 +271,11 @@ export function MarketingIndicatorsTab() {
     
     for (const c of modeloAtualAllCards) {
       result.push({
-        id: c.id, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
+        id: c.id, titulo: c.titulo, empresa: c.empresa, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
         origemLead: c.origemLead, palavraChaveAnuncio: c.palavraChaveAnuncio,
-        fase: c.fase, dataEntrada: c.dataEntrada, valor: c.valor,
+        fase: c.fase, dataEntrada: c.dataEntrada, dataAssinatura: c.dataAssinatura,
+        produto: c.produto, valor: c.valor,
         valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
         valorEducacao: c.valorEducacao, bu: 'Modelo Atual',
       });
@@ -275,9 +286,33 @@ export function MarketingIndicatorsTab() {
         id: c.id, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
         origemLead: c.origemLead, palavraChaveAnuncio: c.palavraChaveAnuncio,
-        fase: c.fase, dataEntrada: c.dataEntrada, valor: c.valor,
+        fase: c.fase, dataEntrada: c.dataEntrada, dataAssinatura: (c as any).dataAssinatura ?? null,
+        produto: c.produto, valor: c.valor,
         valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
         bu: 'Franquia',
+      });
+    }
+
+    for (const c of oxyHackerCards) {
+      result.push({
+        id: `oxy_${c.id}`, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
+        fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
+        origemLead: c.origemLead, palavraChaveAnuncio: c.palavraChaveAnuncio,
+        fase: c.fase, dataEntrada: c.dataEntrada, dataAssinatura: (c as any).dataAssinatura ?? null,
+        produto: c.produto, valor: c.valor,
+        valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
+        bu: 'Oxy Hacker',
+      });
+    }
+
+    for (const c of outboundAllCards) {
+      result.push({
+        id: `outbound_${c.id}`, titulo: c.titulo, empresa: c.empresa,
+        fonte: c.fonte, tipoOrigem: c.tipoOrigem, origemLead: c.origemLead,
+        fase: c.fase, dataEntrada: c.dataEntrada, dataAssinatura: c.dataAssinatura,
+        produto: c.produto, valor: c.valor,
+        valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
+        valorEducacao: c.valorEducacao, bu: 'Outbound',
       });
     }
 
@@ -285,7 +320,8 @@ export function MarketingIndicatorsTab() {
     for (const c of o2TaxAllCards) {
       result.push({
         id: `o2tax_${c.id}`, titulo: c.titulo,
-        fase: c.fase, dataEntrada: c.dataEntrada, valor: c.valor,
+        fase: c.fase, dataEntrada: c.dataEntrada,
+        produto: c.produto, valor: c.valor,
         valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
         bu: 'O2 TAX',
       });
@@ -293,7 +329,7 @@ export function MarketingIndicatorsTab() {
     
     
     return result;
-  }, [modeloAtualAllCards, franquiaCards, o2TaxAllCards]);
+  }, [modeloAtualAllCards, franquiaCards, oxyHackerCards, o2TaxAllCards, outboundAllCards]);
 
   // Resolve archived/deleted campaign names for attribution
   const { data: campaignNamesMap } = useMetaCampaignNames();
@@ -439,6 +475,47 @@ export function MarketingIndicatorsTab() {
     return counts;
   }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards]);
 
+  // ===== New sections data (Cohort / Curva / Online-Offline / CAC) =====
+  const leadsAttributionCards = useMemo<AttributionCard[]>(() => {
+    const out: AttributionCard[] = [];
+    const seen = new Set<string>();
+    const push = (c: any, bu: string, idPrefix = '') => {
+      const id = idPrefix + c.id;
+      if (seen.has(id)) return;
+      seen.add(id);
+      out.push({
+        id, titulo: c.titulo, empresa: c.empresa,
+        fonte: c.fonte, origemLead: c.origemLead, tipoOrigem: c.tipoOrigem,
+        fase: c.fase, dataEntrada: c.dataEntrada,
+        dataAssinatura: c.dataAssinatura ?? null,
+        produto: c.produto, valor: c.valor || 0,
+        valorMRR: c.valorMRR || 0, valorSetup: c.valorSetup || 0,
+        valorPontual: c.valorPontual || 0, valorEducacao: c.valorEducacao || 0,
+        bu,
+      });
+    };
+    for (const c of maGetCards('leads')) push(c, 'Modelo Atual');
+    for (const c of o2GetCards('leads')) push(c, 'O2 TAX', 'o2tax_');
+    for (const c of franquiaGetCards('leads')) push(c, 'Franquia');
+    for (const c of oxyGetCards('leads')) push(c, 'Oxy Hacker', 'oxy_');
+    for (const c of outboundGetCards('leads')) push(c, 'Outbound', 'outbound_');
+    return out;
+  }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards]);
+
+  // Sales = cards with dataAssinatura inside the filtered period (from ALL 5 BUs)
+  const salesInPeriod = useMemo<AttributionCard[]>(() => {
+    const fromT = dateRange.from.getTime();
+    const toT = dateRange.to.getTime();
+    return allAttributionCards.filter(c => {
+      const d = c.dataAssinatura;
+      if (!d) return false;
+      const t = d.getTime();
+      return t >= fromT && t <= toT;
+    });
+  }, [allAttributionCards, dateRange]);
+
+
+
   // Recalculate totals including enriched Google Ads data
   const enrichedTotals = useMemo(() => {
     const googleChannel = enrichedChannels.find(c => c.id === 'google_ads');
@@ -546,6 +623,42 @@ export function MarketingIndicatorsTab() {
           </Button>
         </div>
       )}
+
+      {/* ===== NEW: CAC Total ===== */}
+      <CacTotalCard
+        investment={investmentTotalForRange}
+        sales={salesInPeriod.length}
+      />
+
+      {/* ===== NEW: Online vs Offline ===== */}
+      <OnlineOfflineSection
+        leadsCards={leadsAttributionCards}
+        salesCards={salesInPeriod}
+        totalInvestment={investmentTotalForRange}
+      />
+
+      {/* ===== NEW: Curva de Conversão ===== */}
+      <ConversionCurveSection salesCards={salesInPeriod} />
+
+      {/* ===== NEW: Cohort de Entrada ===== */}
+      <CohortTable
+        cards={allAttributionCards}
+        cohortType="entrada"
+        investmentByMonth={investmentByMonth}
+        title="Cohort de Entrada"
+        description="Vendas agrupadas pelo mês de criação do lead no funil. Investimento = Meta + Google do mês da safra."
+      />
+
+      {/* ===== NEW: Cohort de Assinatura ===== */}
+      <CohortTable
+        cards={allAttributionCards}
+        cohortType="assinatura"
+        investmentByMonth={investmentByMonth}
+        title="Cohort de Assinatura"
+        description="Vendas agrupadas pelo mês de assinatura do contrato. Investimento = soma dos meses de entrada dos leads dessa safra."
+      />
+
+
 
 
       {/* Channel Metrics Cards (from spreadsheet) */}
