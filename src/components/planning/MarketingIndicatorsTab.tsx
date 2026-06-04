@@ -260,6 +260,10 @@ export function MarketingIndicatorsTab() {
   const { getCardsForIndicator: o2GetCards, allCards: o2TaxAllCards } = useO2TaxAnalytics(dateRange.from, dateRange.to);
   const { cards: franquiaCards, getCardsForIndicator: franquiaGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Franquia');
   const { cards: oxyHackerCards, getCardsForIndicator: oxyGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Oxy Hacker');
+  const { allCards: outboundAllCards } = useOutboundAnalytics(dateRange.from, dateRange.to);
+
+  // Investment per month (Meta + Google) for the visible range — for cohorts
+  const { byMonth: investmentByMonth, totalInvestment: investmentTotalForRange } = useInvestmentByMonth(dateRange.from, dateRange.to);
 
   // Build attribution cards from all BUs
   const allAttributionCards = useMemo((): AttributionCard[] => {
@@ -267,10 +271,11 @@ export function MarketingIndicatorsTab() {
     
     for (const c of modeloAtualAllCards) {
       result.push({
-        id: c.id, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
+        id: c.id, titulo: c.titulo, empresa: c.empresa, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
         origemLead: c.origemLead, palavraChaveAnuncio: c.palavraChaveAnuncio,
-        fase: c.fase, dataEntrada: c.dataEntrada, valor: c.valor,
+        fase: c.fase, dataEntrada: c.dataEntrada, dataAssinatura: c.dataAssinatura,
+        produto: c.produto, valor: c.valor,
         valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
         valorEducacao: c.valorEducacao, bu: 'Modelo Atual',
       });
@@ -281,9 +286,33 @@ export function MarketingIndicatorsTab() {
         id: c.id, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
         origemLead: c.origemLead, palavraChaveAnuncio: c.palavraChaveAnuncio,
-        fase: c.fase, dataEntrada: c.dataEntrada, valor: c.valor,
+        fase: c.fase, dataEntrada: c.dataEntrada, dataAssinatura: (c as any).dataAssinatura ?? null,
+        produto: c.produto, valor: c.valor,
         valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
         bu: 'Franquia',
+      });
+    }
+
+    for (const c of oxyHackerCards) {
+      result.push({
+        id: `oxy_${c.id}`, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
+        fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
+        origemLead: c.origemLead, palavraChaveAnuncio: c.palavraChaveAnuncio,
+        fase: c.fase, dataEntrada: c.dataEntrada, dataAssinatura: (c as any).dataAssinatura ?? null,
+        produto: c.produto, valor: c.valor,
+        valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
+        bu: 'Oxy Hacker',
+      });
+    }
+
+    for (const c of outboundAllCards) {
+      result.push({
+        id: `outbound_${c.id}`, titulo: c.titulo, empresa: c.empresa,
+        fonte: c.fonte, tipoOrigem: c.tipoOrigem, origemLead: c.origemLead,
+        fase: c.fase, dataEntrada: c.dataEntrada, dataAssinatura: c.dataAssinatura,
+        produto: c.produto, valor: c.valor,
+        valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
+        valorEducacao: c.valorEducacao, bu: 'Outbound',
       });
     }
 
@@ -291,7 +320,8 @@ export function MarketingIndicatorsTab() {
     for (const c of o2TaxAllCards) {
       result.push({
         id: `o2tax_${c.id}`, titulo: c.titulo,
-        fase: c.fase, dataEntrada: c.dataEntrada, valor: c.valor,
+        fase: c.fase, dataEntrada: c.dataEntrada,
+        produto: c.produto, valor: c.valor,
         valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
         bu: 'O2 TAX',
       });
@@ -299,7 +329,7 @@ export function MarketingIndicatorsTab() {
     
     
     return result;
-  }, [modeloAtualAllCards, franquiaCards, o2TaxAllCards]);
+  }, [modeloAtualAllCards, franquiaCards, oxyHackerCards, o2TaxAllCards, outboundAllCards]);
 
   // Resolve archived/deleted campaign names for attribution
   const { data: campaignNamesMap } = useMetaCampaignNames();
