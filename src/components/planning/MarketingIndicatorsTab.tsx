@@ -38,6 +38,10 @@ import { DetailSheet, columnFormatters } from "./indicators/DetailSheet";
 import { BestAdsSection } from "./marketing-indicators/BestAdsSection";
 import { InvestmentForecast } from "./marketing-indicators/InvestmentForecast";
 import { CHANNEL_LABELS, ChannelId, CostPerStage, AttributionCard } from "./marketing-indicators/types";
+import { CacTotalCard } from "./marketing-indicators/CacTotalCard";
+import { OnlineOfflineSection } from "./marketing-indicators/OnlineOfflineSection";
+import { ConversionCurveSection } from "./marketing-indicators/ConversionCurveSection";
+import { CohortTable } from "./marketing-indicators/CohortTable";
 
 
 
