@@ -977,7 +977,7 @@ export function useJornadaData() {
     };
 
     return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, operacao };
-  }, [data, oxyProductsByMonth]);
+  }, [data, oxyProductsByMonth, pipesActiveData]);
 
   return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };
 }
