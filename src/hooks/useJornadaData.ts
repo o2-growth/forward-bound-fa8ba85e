@@ -420,9 +420,18 @@ export function useJornadaData() {
       const valorValuation = parseNum(row['Valor Valuation']);
       const valorEducacao = parseNum(row['Valor Educação'] || row['Valor Educacao']);
 
+      // Anti-duplicação: quando o cliente vive no pipe de Assessoria Financeira e o
+      // `Produtos` da Central de Projetos NÃO inclui CFOaaS explicitamente, o
+      // `Valor CFOaaS` registrado aqui é, na verdade, o fee da Assessoria (registrado
+      // no campo errado por falta de campo dedicado). O fee verdadeiro virá do
+      // enriquecimento via pipe — zeramos aqui para não somar duas vezes.
+      const produtosLowerStr = produtoPartsBase.map(p => normTituloMatchPre(p)).join('|');
+      const produtosIncluemCfoaas = /cfoaas|caas|c\.a\.a\.s|cfo as a service/.test(produtosLowerStr);
+      const valorCfoaasEffective = (hasAssessoriaPipe && !produtosIncluemCfoaas) ? 0 : valorCfoaas;
+
       // If pontual-only product, CFOaaS goes to pontual (data entry error in Pipefy)
-      let mrr = isPontualOnly ? 0 : (valorCfoaas + valorOxy);
-      let pontual = valorDiagnostico + valorTurnaround + valorValuation + valorEducacao + (isPontualOnly ? valorCfoaas : 0);
+      let mrr = isPontualOnly ? 0 : (valorCfoaasEffective + valorOxy);
+      let pontual = valorDiagnostico + valorTurnaround + valorValuation + valorEducacao + (isPontualOnly ? valorCfoaasEffective : 0);
 
       // Override específico (Dago): valor lançado como pontual é, na verdade, recorrente (MRR)
       const PONTUAL_TO_MRR_OVERRIDES = ['libracom', 'rgo'];
