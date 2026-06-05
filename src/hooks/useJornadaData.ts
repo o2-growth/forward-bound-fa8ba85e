@@ -111,7 +111,7 @@ export function useJornadaData() {
   const { oxyProductsByMonth } = useOxyFinance(oxyYear);
 
   const result = useMemo(() => {
-    if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '' };
+    if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '', onboardingAtrasado: [] as any[] };
 
 
     const { projetos, setup, tratativas, nps, rotinas, clientes, connections } = data;
