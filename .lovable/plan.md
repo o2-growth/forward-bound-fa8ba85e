@@ -1,28 +1,94 @@
-## Objetivo
+## Diagnóstico: "Gap a Realocar" do Modelo Atual
 
-Permitir salvar metas de "A Vender" mesmo quando o total anual por BU não fecha exatamente com a meta original, transformando a trava atual em **aviso** (não-bloqueante). Isso desbloqueia os valores redondos de Jun–Dez para o Modelo Atual (550k / 600k / 700k×3 / 600k).
+Investiguei a tabela do Modelo Atual (`BUInvestmentTable` em `src/components/planning/MediaInvestmentTab.tsx`) e existem **dois indicadores diferentes** sendo confundidos:
 
-## Mudanças no código
+### 1. Badge "Balanceado / desbalanceado" (rodapé fixo) — FUNCIONA
+Linha 3179–3191. Mostra `pendingValidation[bu].diff`, que é `Σ(newAVender) − Σ(originalAVender)` apenas dos meses que o usuário editou. Quando você muda Jul −100k e Ago +100k, dá zero. Isso funciona como esperado.
 
-**Arquivo:** `src/components/planning/MediaInvestmentTab.tsx`
+### 2. "Gap a Realocar" dentro da tabela do Modelo Atual — NÃO FUNCIONA como o rótulo sugere
+Linhas 778–880. A fórmula é:
 
-1. **`handleSaveAll` (linhas 1942–1946)** — remover o `return` que bloqueia o save quando `!isAllBalanced`. O save sempre prossegue; se houver desbalanço, mostramos apenas um toast de aviso (`toast.warning`) com o valor do gap por BU, mas a operação continua.
+```ts
+const gap = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
+// b.gap = mrrBaseProjetado − mrrBase (Oxy real) apenas para meses Oxy
+```
 
-2. **Barra inferior (linhas 3128–3168)** — manter os badges visuais (Modelo Atual: -R$ 1.873.744 em vermelho), pois ajudam o usuário a enxergar o desbalanço, mas:
-   - O botão "Salvar Todas" deixa de ficar travado visualmente (sempre verde / habilitado).
-   - O `title` do botão muda para algo como: "Salvar (há BUs desbalanceados — será salvo mesmo assim)" quando `!isAllBalanced`.
-   - O ícone passa a ser sempre `CheckCircle2` (verde) se balanceado, ou `AlertTriangle` (âmbar) se não — mas clicável nos dois casos.
+Ou seja: é a soma do déficit **passado** entre MRR projetado e MRR real (Oxy) dos meses fechados. **Esse número é fixo** — não muda quando você edita A Vender dos meses futuros.
 
-3. Sem mudanças em banco, hooks ou edge functions. A regra de equilíbrio anual deixa de ser uma trava do produto e vira responsabilidade do usuário.
+O texto explicativo no rodapé do popover diz literalmente:
+> "Realoque editando 'A Vender' de qualquer mês futuro **até zerar o saldo**."
 
-## Consequências esperadas
+Mas a fórmula nunca subtrai a compensação que o usuário fez nos meses futuros. Resultado: o cartão fica permanentemente vermelho mesmo depois de você ter adicionado o A Vender extra nos meses futuros.
 
-- Você consegue salvar Jun=550k, Jul=600k, Ago=700k, Set=700k, Out=700k, Nov=700k, Dez=600k mesmo com o gap de ~R$ 1,87M no Modelo Atual.
-- A "Meta Anual" do Modelo Atual continua a mesma no banco (`monetary_metas`); apenas a soma de "A Vender" vai ficar abaixo dela. Os cards de pacing/projeção que comparam realizado vs meta anual continuam funcionando normalmente.
-- Qualquer cálculo que dependa da soma de "A Vender" para reconstruir a meta passará a refletir o novo total (menor). Se quiser, em iteração futura podemos adicionar um botão "Ajustar Meta Anual ao A Vender" para reconciliar.
+### Causa raiz
+Faltou a parte da "compensação". O saldo real deveria ser:
 
-## Detalhes técnicos
+```
+saldoRealocar = gapPassadoOxy − compensacaoFutura
+compensacaoFutura = Σ(novoAVender − originalAVender) dos meses NÃO-Oxy (futuros / projeção)
+```
 
-- A constante `isAllBalanced` continua existindo (usada para colorir badges e ícone), só perde o poder de bloquear o `handleSaveAll`.
-- Toast de aviso: para cada BU com `Math.abs(diff) >= 100`, listar `BU: ±R$ X` num único `toast.warning` antes de prosseguir com `bulkUpdateMetas`.
-- Nenhuma alteração em `useMonetaryMetas`, `usePlanGrowthData`, `manage-redistribution` ou tabelas.
+Quando `saldoRealocar ≈ 0`, o usuário compensou todo o déficit.
+
+---
+
+## Plano de correção
+
+### Mudanças em `src/components/planning/MediaInvestmentTab.tsx`
+
+**1. Passar as edições pendentes para dentro do `BUInvestmentTable`**
+
+Adicionar uma nova prop opcional na assinatura do componente:
+
+```ts
+pendingAVenderDiff?: number; // soma (novo − original) das edições pendentes desta BU
+```
+
+No render do Modelo Atual (~ linha 3060–3115, busca `title="Modelo Atual"`), passar:
+
+```tsx
+pendingAVenderDiff={pendingValidation.modelo_atual?.diff || 0}
+```
+
+E o mesmo para as outras BUs (o cálculo só vai mudar a UI no Modelo Atual porque é a única com `hasOxyReal`, mas a prop é genérica).
+
+**2. Recalcular o `gap` levando a compensação em conta**
+
+Substituir o bloco das linhas 796–797:
+
+```ts
+const gapBruto = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
+const compensacao = Math.max(0, pendingAVenderDiff || 0);
+const gap = Math.max(0, gapBruto - compensacao);
+const isResolved = gap < 1;
+```
+
+**3. Atualizar o popover de detalhamento (linhas 856–863)**
+
+Adicionar uma linha extra no `<tfoot>` mostrando a compensação:
+
+```
+Gap bruto (Oxy − Projeção):        R$ X
+Compensação A Vender (pendente):  − R$ Y
+─────────────────────────────────────────
+Saldo a realocar:                  R$ (X − Y)
+```
+
+E ajustar o texto auxiliar para deixar claro: edições pendentes (ainda não salvas) reduzem o saldo; depois de salvar, o gap bruto também muda porque a cadeia MRR é reconstruída.
+
+**4. Tooltip da linha amarela "Gap a Realocar" da tabela**
+
+Trocar `title` / texto para refletir o novo cálculo, evitando confusão entre gap bruto e saldo.
+
+### Comportamento esperado após a correção
+
+- Antes de qualquer edição: gap mostra o déficit puro Oxy vs projeção (mesmo de hoje).
+- Usuário aumenta A Vender de Set em +R$ 200k: badge do rodapé fica "+R$ 200k" (desbalanceado), e o "Gap a Realocar" cai em R$ 200k.
+- Quando a compensação iguala o gap, o cartão fica verde "✓ Tudo realocado".
+- Ao salvar, as edições viram parte do plano salvo e o cálculo volta a partir do novo baseline (gap = 0 se totalmente compensado).
+
+### Fora de escopo
+
+- Não mexer no save (cascade-aware já implementado na mensagem anterior).
+- Não mexer na lógica de `mrrBaseGap` por mês (badge laranja "Δ Oxy/Projeção" continua igual, é informativo por mês).
+- Não tocar nas outras BUs além de aceitar a prop nova — só Modelo Atual tem Oxy real hoje.
