@@ -3186,6 +3186,7 @@ export function MediaInvestmentTab() {
             dreByMonth={dreByBU.franquia || {}}
             isLoadingRealized={isLoadingRealized}
             pendingMonths={getPendingMonths('franquia')}
+            pendingAVenderDiff={pendingValidation['franquia']?.diff || 0}
           />
           </div>
         </div>
