@@ -10,7 +10,7 @@ import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useMarketingIndicators } from "@/hooks/useMarketingIndicators";
 import { useMetaCampaigns, useMetaCampaignNames } from "@/hooks/useMetaCampaigns";
 import { useGoogleCampaigns } from "@/hooks/useGoogleCampaigns";
-import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
+import { useModeloAtualMetas, isTestCard } from "@/hooks/useModeloAtualMetas";
 import { useO2TaxMetas } from "@/hooks/useO2TaxMetas";
 import { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
@@ -268,8 +268,10 @@ export function MarketingIndicatorsTab() {
   // Build attribution cards from all BUs
   const allAttributionCards = useMemo((): AttributionCard[] => {
     const result: AttributionCard[] = [];
-    
+    const stripPrefix = (id: string) => String(id).replace(/^(outbound_|oxy_|o2tax_)/, '');
+
     for (const c of modeloAtualAllCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: c.id, titulo: c.titulo, empresa: c.empresa, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
@@ -280,8 +282,9 @@ export function MarketingIndicatorsTab() {
         valorEducacao: c.valorEducacao, bu: 'Modelo Atual',
       });
     }
-    
+
     for (const c of franquiaCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: c.id, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
@@ -294,6 +297,7 @@ export function MarketingIndicatorsTab() {
     }
 
     for (const c of oxyHackerCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: `oxy_${c.id}`, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
@@ -306,6 +310,7 @@ export function MarketingIndicatorsTab() {
     }
 
     for (const c of outboundAllCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: `outbound_${c.id}`, titulo: c.titulo, empresa: c.empresa,
         fonte: c.fonte, tipoOrigem: c.tipoOrigem, origemLead: c.origemLead,
@@ -318,6 +323,7 @@ export function MarketingIndicatorsTab() {
 
     // O2 TAX cards (no marketing fields — will appear as orgânico / sem campanha)
     for (const c of o2TaxAllCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: `o2tax_${c.id}`, titulo: c.titulo,
         fase: c.fase, dataEntrada: c.dataEntrada,
@@ -326,10 +332,11 @@ export function MarketingIndicatorsTab() {
         bu: 'O2 TAX',
       });
     }
-    
-    
+
+
     return result;
   }, [modeloAtualAllCards, franquiaCards, oxyHackerCards, o2TaxAllCards, outboundAllCards]);
+
 
   // Resolve archived/deleted campaign names for attribution
   const { data: campaignNamesMap } = useMetaCampaignNames();
@@ -479,13 +486,17 @@ export function MarketingIndicatorsTab() {
   const leadsAttributionCards = useMemo<AttributionCard[]>(() => {
     const out: AttributionCard[] = [];
     const seen = new Set<string>();
+    const stripPrefix = (id: string) => String(id).replace(/^(outbound_|oxy_|o2tax_)/, '');
     const push = (c: any, bu: string, idPrefix = '') => {
       const id = idPrefix + c.id;
       if (seen.has(id)) return;
+      if (isTestCard(stripPrefix(String(c.id)))) return;
       seen.add(id);
       out.push({
         id, titulo: c.titulo, empresa: c.empresa,
+        campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, origemLead: c.origemLead, tipoOrigem: c.tipoOrigem,
+        fbclid: c.fbclid, gclid: c.gclid, palavraChaveAnuncio: c.palavraChaveAnuncio,
         fase: c.fase, dataEntrada: c.dataEntrada,
         dataAssinatura: c.dataAssinatura ?? null,
         produto: c.produto, valor: c.valor || 0,
@@ -502,19 +513,18 @@ export function MarketingIndicatorsTab() {
     return out;
   }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards]);
 
-  // Sales = cards classified as 'vendas' by each BU hook (which already applies
-  // sales-phase rules + monthly dedup). We then dedupe across BUs by base id and
-  // empresa-normalizada to avoid Outbound→Modelo/O2 double-count, and filter by
-  // dataAssinatura within the selected period (fallback: dataEntrada).
+  // Sales = cards classified as 'venda' por cada hook de BU. Cada hook já aplica:
+  //   - regra universal de venda (entrou em Contrato assinado/Ganho)
+  //   - sales-date-prioritization (Data de assinatura do contrato quando preenchida)
+  //   - dedup mensal
+  //   - filtro de dateRange
+  // Aqui só dedupimos entre BUs (Outbound → Modelo Atual/O2 TAX vencem) e
+  // removemos test cards. NÃO re-filtramos por data — confiamos no hook.
   const salesInPeriod = useMemo<AttributionCard[]>(() => {
-    const fromT = dateRange.from.getTime();
-    const toT = dateRange.to.getTime();
     const normalize = (s?: string | null) =>
       (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-    const stripPrefix = (id: string) => id.replace(/^(outbound_|oxy_|o2tax_)/, '');
+    const stripPrefix = (id: string) => String(id).replace(/^(outbound_|oxy_|o2tax_)/, '');
 
-    // Order matters: pipes de destino final primeiro (Modelo Atual / O2 TAX)
-    // sobrescrevem Outbound, evitando duplicatas.
     const sources: Array<{ cards: any[]; bu: string; prefix: string; priority: number }> = [
       { cards: maGetCards('venda'),       bu: 'Modelo Atual', prefix: '',          priority: 1 },
       { cards: o2GetCards('venda'),       bu: 'O2 TAX',       prefix: 'o2tax_',    priority: 2 },
@@ -527,6 +537,7 @@ export function MarketingIndicatorsTab() {
     for (const { cards, bu, prefix, priority } of sources) {
       for (const c of cards) {
         const baseId = stripPrefix(String(c.id));
+        if (isTestCard(baseId)) continue;
         const empresaKey = normalize((c as any).empresa || c.titulo);
         const key = `${baseId}|${empresaKey}`;
         const existing = byKey.get(key);
@@ -561,23 +572,17 @@ export function MarketingIndicatorsTab() {
     }
 
     const all = Array.from(byKey.values()).map(v => v.card);
-    const filtered = all.filter(c => {
-      const d = c.dataAssinatura ?? c.dataEntrada;
-      if (!d) return false;
-      const t = d.getTime();
-      return t >= fromT && t <= toT;
-    });
 
     if (typeof window !== 'undefined') {
-      console.log('[MarketingIndicatorsTab] salesInPeriod:', {
+      console.log('[MarketingIndicatorsTab] salesInPeriod (entrada em Contrato assinado/Ganho no período):', {
         bruto_por_bu: sources.map(s => ({ bu: s.bu, count: s.cards.length })),
-        apos_dedup: all.length,
-        no_periodo: filtered.length,
+        apos_dedup_e_test_cards: all.length,
       });
     }
 
-    return filtered;
-  }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards, dateRange]);
+    return all;
+  }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards]);
+
 
 
 
