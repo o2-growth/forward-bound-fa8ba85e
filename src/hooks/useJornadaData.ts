@@ -664,11 +664,18 @@ export function useJornadaData() {
 
     const carteiraClientes = allClientes.filter(c => {
       if (INACTIVE_PHASES.includes(c.faseAtual)) return false;
-      if (isMariClient(c.cfo) || isPedroloClient(c.cfo)) {
+      if (isPedroloClient(c.cfo)) {
+        return isAssinaturaNoMesPassado(c.dataAssinatura);
+      }
+      if (isMariClient(c.cfo)) {
+        // Assessoria Financeira: recorrente → fica na carteira todo mês
+        if (c.temAssessoriaFinanceira) return true;
+        // Diagnóstico / Turnaround / Valuation: só no mês da assinatura
         return isAssinaturaNoMesPassado(c.dataAssinatura);
       }
       return true;
     });
+
 
     const cfoMap = new Map<string, JornadaCfo>();
     for (const c of carteiraClientes) {
