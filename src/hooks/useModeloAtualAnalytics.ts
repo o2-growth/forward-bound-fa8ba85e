@@ -461,6 +461,23 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
         }
       }
       
+      // For venda: dedup extra por (id, mês-da-data-efetiva) preferindo 'Ganho' sobre 'Contrato assinado'
+      // O mesmo card pode passar pelas duas fases finais no mesmo mês — contamos 1 venda única.
+      if (indicator === 'venda') {
+        const byCardMonth = new Map<string, ModeloAtualCard>();
+        for (const card of result) {
+          const effectiveDate = card.dataAssinatura || card.dataEntrada;
+          const monthKey = `${card.id}|${effectiveDate.getFullYear()}-${effectiveDate.getMonth()}`;
+          const existing = byCardMonth.get(monthKey);
+          if (!existing || (card.fase === 'Ganho' && existing.fase !== 'Ganho')) {
+            byCardMonth.set(monthKey, card);
+          }
+        }
+        const deduped = Array.from(byCardMonth.values());
+        console.log(`[useModeloAtualAnalytics] getCardsForIndicator venda: ${result.length} → ${deduped.length} (dedup id|mês, prefere Ganho)`);
+        return deduped;
+      }
+      
       console.log(`[useModeloAtualAnalytics] getCardsForIndicator ${indicator}: ${result.length} entries (every entry)`);
       return result;
     };
