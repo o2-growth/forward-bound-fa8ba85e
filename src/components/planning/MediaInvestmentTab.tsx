@@ -3135,6 +3135,7 @@ export function MediaInvestmentTab() {
             isLoadingRealized={isLoadingRealized}
             pendingMonths={getPendingMonths('modelo_atual')}
             metaAnualFixa={22_250_000}
+            pendingAVenderDiff={pendingValidation['modelo_atual']?.diff || 0}
           />
 
           <BUInvestmentTable
