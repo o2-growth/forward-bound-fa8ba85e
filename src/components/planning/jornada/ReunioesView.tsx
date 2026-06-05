@@ -377,7 +377,7 @@ export function ReunioesView({ reunioes, allCfos, clientes, onboardingAtrasado =
                     <p className="font-semibold mb-1">De onde vem:</p>
                     <p>Pipefy → pipe <strong>Gestão de Rotinas CFO</strong> → tabela <code>pipefy_moviment_rotinas</code>.</p>
                     <p className="mt-2 font-semibold">Como conta:</p>
-                    <p>Cards cuja <code>Fase Atual</code> é <strong>Kick-off do Projeto</strong> ou <strong>Primeiras Entregas - Diagnóstico</strong> e o campo <code>Overdue</code> do Pipefy está marcado como <code>true</code>.</p>
+                    <p>Cards cuja <code>Fase Atual</code> é <strong>Kick-off do Projeto</strong> ou <strong>Primeiras Entregas - Diagnóstico</strong> e cuja <code>Data Prevista</code> já está vencida (ou com o flag <code>Overdue</code> do Pipefy marcado como <code>true</code>).</p>
                   </TooltipContent>
                 </Tooltip>
               </h4>

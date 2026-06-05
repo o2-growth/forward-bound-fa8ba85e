@@ -1,51 +1,44 @@
-# Onboarding atrasado na aba Reuniões
+## Diagnóstico
 
-Adicionar, dentro da aba **Reuniões** da Operação, um novo bloco mostrando os cards do pipe **Gestão de Rotinas CFO** (`pipefy_moviment_rotinas`) que estão atualmente nas fases:
+Consultei o pipe **3.2 Gestão de Rotinas (CFO)** (306755752) e listei os 11 cards das fases de onboarding:
 
-- **Kick-off do Projeto**
-- **Primeiras Entregas - Diagnóstico**
+- Kick-off do Projeto: 2 cards (Data Prevista 12/06/2026 → ainda no futuro)
+- Primeiras Entregas - Diagnóstico: 9 cards — vários com Data Prevista no passado (02/05, 06/05, 13/05, 21/05, 05/06) e outros futuros
 
-Cada lista mostra somente cards **atrasados** segundo o campo **`Overdue`** do Pipefy (mesma fonte de verdade que já alimenta o badge de tarefas atrasadas hoje).
+**Problema:** em todos eles o campo `late` (=Overdue) do Pipefy vem `false`, mesmo nos que estão claramente vencidos (hoje é 05/06/2026). Como nosso filtro atual exige `Overdue === true`, todos são descartados e o bloco aparece vazio.
 
-## O que aparece para o usuário
+O campo `Overdue` no Pipefy não está sendo atualizado de forma confiável para esse pipe — não dá pra confiar nele como critério único.
 
-- Bloco separado por fase, na mesma aba **Reuniões** (acima ou abaixo da tabela atual).
-- Para cada fase: título da seção, contagem total de atrasados, e tabela com:
-  - Cliente (Título), CFO Responsável, Data Prevista de Entrega, Dias de atraso, link para o card no Pipefy.
-- Respeita o filtro de CFO já existente (CFO logado em modo `cfo` continua travado no seu nome).
-- Se não houver atrasados em uma fase, mostra mensagem vazia padrão.
+## Correção
 
-## Como o dado é obtido (técnico)
+Em `src/hooks/useJornadaData.ts` (bloco `Onboarding atrasado`, linhas ~1009-1044), trocar o critério:
 
-Tudo já está disponível no `useJornadaData` — `data.rotinas` é o conteúdo do pipe Gestão de Rotinas CFO. Não precisa nova chamada ao banco nem nova edge function.
+**Antes:**
+```ts
+const overdue = row['Overdue'] === true || row['Overdue'] === 'true';
+if (!overdue) continue;
+```
 
-1. **`src/hooks/useJornadaData.ts`** — depois do bloco que monta `reunioes` (linha ~826), construir um novo array `onboardingAtrasado`:
-   ```ts
-   const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico'];
-   const onboardingAtrasado = data.rotinas
-     .filter(r => r['Fase'] === r['Fase Atual'])
-     .filter(r => ONBOARDING_PHASES.includes(r['Fase Atual'] || ''))
-     .filter(r => r['Overdue'] === true || r['Overdue'] === 'true')
-     .map(r => ({
-       id: String(r.ID),
-       titulo: (r['Título'] || '').trim(),
-       cfo: normalizeCfoName((r['CFO Responsavel'] || '').trim()),
-       fase: r['Fase Atual'] || '',
-       dataPrevista: parseRotinaDateOnly(r['Data Prevista Entrega']),
-       diasAtraso: /* (now - dataPrevista)/86400000, mínimo 0 */,
-     }));
-   ```
-   Retornar junto com o resto: `return { ..., onboardingAtrasado }`.
+**Depois:** considerar atrasado quando `Data Prevista Entrega < hoje` (com fallback para o flag do Pipefy):
+```ts
+const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
+const pipefyOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
+const dateOverdue = dataPrevista ? dataPrevista.getTime() < startOfTodayTs : false;
+if (!pipefyOverdue && !dateOverdue) continue;
+```
 
-2. **`src/components/planning/jornada/types.ts`** — exportar interface `OnboardingAtrasadoCard`.
+Onde `startOfTodayTs` = início do dia de hoje (`new Date(); setHours(0,0,0,0)`).
 
-3. **`src/components/planning/CustomerSuccessTab.tsx`** — desestruturar `onboardingAtrasado` do `useJornadaData()` e passar para `<ReunioesView />`.
+## Ajuste no tooltip
 
-4. **`src/components/planning/jornada/ReunioesView.tsx`** — receber nova prop `onboardingAtrasado`, aplicar filtro de CFO já em uso na view, e renderizar duas seções (uma por fase) usando os componentes `Card` + `Table` já importados. Link para Pipefy usa `PipefyCardLink` com `PIPEFY_PIPES.rotinas`.
+Em `src/components/planning/jornada/ReunioesView.tsx`, atualizar o texto explicativo do bloco para refletir o novo critério: "Cards nas fases Kick-off do Projeto / Primeiras Entregas - Diagnóstico com Data Prevista vencida (ou marcados Overdue pelo Pipefy). Fonte: pipe Gestão de Rotinas CFO."
 
 ## Fora de escopo
 
-- Não alterar a lógica de `processRotinas` (KPI de tarefas atrasadas continua agregando todas as fases não-terminais como hoje).
-- Não criar nova aba.
-- Não mudar a definição de "atrasado" — fica 100% no flag `Overdue` do Pipefy.
-- Não mexer em filtros globais de data (esses cards são "estado atual", não dependem de período).
+- Não mexer no KPI `tarefasAtrasadas` (segue lógica atual de rotinas).
+- Não alterar outros pipes nem `processRotinas`.
+- Sem novas chamadas, queries ou edge functions — usa os dados já carregados em `data.rotinas`.
+
+## Resultado esperado
+
+Os ~5 cards da fase "Primeiras Entregas - Diagnóstico" com Data Prevista entre 02/05 e 05/06 passam a aparecer no bloco "Onboarding atrasado", agrupados por fase, com a coluna "Dias de atraso" calculada corretamente.
