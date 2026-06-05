@@ -56,6 +56,7 @@ type TipoDialogType = 'mrr' | 'pontual' | null;
 export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNavigateToAlertas, operacao }: VisaoGeralCSProps) {
   const [openDialog, setOpenDialog] = useState<KpiDialogType>(null);
   const [tipoDialog, setTipoDialog] = useState<TipoDialogType>(null);
+  const [produtoDialog, setProdutoDialog] = useState<string | null>(null);
   
 
   const activeClientes = useMemo(() => {
@@ -129,6 +130,27 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
       else saas++;
     });
     return { saas, pontual };
+  }, [activeClientes]);
+
+  // Distribuição por Produto (campo Pipefy · Central de Projetos)
+  // Um cliente pode ter múltiplos produtos (ex: "CFOaaS, Setup" ou "OXY + Gênio").
+  // Quebramos por vírgula e "+" para contar cada produto individualmente.
+  const clientesByProduto = useMemo(() => {
+    const map: Record<string, { count: number; mrr: number; clientes: JornadaCliente[] }> = {};
+    activeClientes.forEach(c => {
+      const raw = (c.produto || '').toString().trim();
+      const parts = raw
+        ? raw.split(/[,+]/).map(p => p.trim()).filter(Boolean)
+        : ['Sem produto'];
+      const unique = Array.from(new Set(parts));
+      unique.forEach(produto => {
+        if (!map[produto]) map[produto] = { count: 0, mrr: 0, clientes: [] };
+        map[produto].count++;
+        map[produto].mrr += c.mrr;
+        map[produto].clientes.push(c);
+      });
+    });
+    return Object.entries(map).sort((a, b) => b[1].count - a[1].count);
   }, [activeClientes]);
 
   const clientesByFase = useMemo(() => {
@@ -261,7 +283,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Por Tipo */}
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por tipo de produto</p>
@@ -294,6 +316,55 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               </p>
             </div>
 
+
+            {/* Por Produto — tabela compacta clicável */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Por produto</p>
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider">Produto</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">Clientes</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">MRR</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">%</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientesByProduto.map(([produto, data]) => {
+                      const pct = activeClientes.length > 0 ? (data.count / activeClientes.length) * 100 : 0;
+                      return (
+                        <TableRow
+                          key={produto}
+                          className="hover:bg-muted/30 cursor-pointer"
+                          onClick={() => setProdutoDialog(produto)}
+                        >
+                          <TableCell className="py-1.5 font-medium text-xs truncate max-w-[140px]" title={produto}>{produto}</TableCell>
+                          <TableCell className="py-1.5 text-right tabular-nums text-xs">{data.count}</TableCell>
+                          <TableCell className="py-1.5 text-right tabular-nums text-xs text-green-600 dark:text-green-400">
+                            {data.mrr > 0 ? formatCurrency(data.mrr) : '—'}
+                          </TableCell>
+                          <TableCell className="py-1.5 text-right">
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <div className="w-8 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground tabular-nums w-7 text-right">{pct.toFixed(0)}%</span>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {clientesByProduto.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-4 text-xs text-muted-foreground">Sem dados.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-[10px] text-muted-foreground italic">
+                Clientes com múltiplos produtos contam em cada um. MRR de BPO, Assessoria e Coordenador vem dos pipes dedicados (Pipefy) e é casado por título.
+              </p>
+            </div>
 
             {/* Por CFO — tabela compacta */}
             <div className="md:col-span-2 space-y-2">
@@ -718,6 +789,51 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
               {activeClientes
                 .filter(c => tipoDialog === 'pontual' ? (c.mrr === 0 && c.pontual > 0) : c.mrr > 0)
                 .sort((a, b) => (tipoDialog === 'pontual' ? b.pontual - a.pontual : b.mrr - a.mrr))
+                .map(c => (
+                  <TableRow key={c.id}>
+                    <TableCell className="text-xs font-medium">
+                      <a
+                        href={`https://app.pipefy.com/open-cards/${c.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        {c.titulo}
+                      </a>
+                    </TableCell>
+                    <TableCell className="text-xs">{c.cfo || '—'}</TableCell>
+                    <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.mrr)}</TableCell>
+                    <TableCell className="text-xs text-right tabular-nums">{formatCurrency(c.pontual)}</TableCell>
+                    <TableCell className="text-xs">{c.faseAtual}</TableCell>
+                  </TableRow>
+                ))}
+            </TableBody>
+          </Table>
+        </DialogContent>
+      </Dialog>
+
+      {/* Produto Dialog */}
+      <Dialog open={produtoDialog !== null} onOpenChange={(open) => !open && setProdutoDialog(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Produto: {produtoDialog} — {clientesByProduto.find(([p]) => p === produtoDialog)?.[1].count ?? 0} clientes
+            </DialogTitle>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Cliente</TableHead>
+                <TableHead className="text-xs">CFO</TableHead>
+                <TableHead className="text-xs text-right">MRR</TableHead>
+                <TableHead className="text-xs text-right">Pontual</TableHead>
+                <TableHead className="text-xs">Fase</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(clientesByProduto.find(([p]) => p === produtoDialog)?.[1].clientes ?? [])
+                .slice()
+                .sort((a, b) => b.mrr - a.mrr)
                 .map(c => (
                   <TableRow key={c.id}>
                     <TableCell className="text-xs font-medium">
