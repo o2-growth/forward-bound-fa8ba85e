@@ -717,7 +717,9 @@ export function useJornadaData() {
       if (isPedroloClient(c.cfo)) {
         receitaCliente = (c.valorSetup ?? 0) + (c.valorOxy ?? 0);
       } else if (isMariClient(c.cfo)) {
-        receitaCliente = c.mrr + (c.pontual ?? 0);
+        // Pontual da Mari só conta no mês da assinatura; MRR (Assessoria) sempre.
+        const pontualValido = isAssinaturaNoMesPassado(c.dataAssinatura) ? (c.pontual ?? 0) : 0;
+        receitaCliente = c.mrr + pontualValido;
       } else {
         receitaCliente = c.mrr;
       }
