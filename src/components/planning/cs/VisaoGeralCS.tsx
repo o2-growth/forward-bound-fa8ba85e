@@ -136,7 +136,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
   // Um cliente pode ter múltiplos produtos (ex: "CFOaaS, Setup" ou "OXY + Gênio").
   // Quebramos por vírgula e "+" para contar cada produto individualmente.
   const clientesByProduto = useMemo(() => {
-    const map: Record<string, { count: number; mrr: number; clientes: JornadaCliente[] }> = {};
+    const map: Record<string, { count: number; mrr: number; pontual: number; clientes: JornadaCliente[] }> = {};
     activeClientes.forEach(c => {
       const raw = (c.produto || '').toString().trim();
       const parts = raw
@@ -144,9 +144,10 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
         : ['Sem produto'];
       const unique = Array.from(new Set(parts));
       unique.forEach(produto => {
-        if (!map[produto]) map[produto] = { count: 0, mrr: 0, clientes: [] };
+        if (!map[produto]) map[produto] = { count: 0, mrr: 0, pontual: 0, clientes: [] };
         map[produto].count++;
         map[produto].mrr += c.mrr;
+        map[produto].pontual += c.pontual || 0;
         map[produto].clientes.push(c);
       });
     });
