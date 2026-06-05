@@ -3163,8 +3163,8 @@ export function MediaInvestmentTab() {
             <Button 
               size="sm" 
               onClick={handleSaveAll} 
-              className={isAllBalanced ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-              title={!isAllBalanced ? 'Equilibre o A Vender para poder salvar' : 'Salvar todas as alterações'}
+              className={isAllBalanced ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}
+              title={!isAllBalanced ? 'Há BUs desbalanceados — será salvo mesmo assim' : 'Salvar todas as alterações'}
             >
               <Save className="h-4 w-4 mr-1" />
               Salvar Todas
