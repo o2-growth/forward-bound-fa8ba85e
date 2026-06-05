@@ -204,7 +204,7 @@ function buildClientAlerts(cliente: JornadaCliente): string[] {
   return alerts;
 }
 
-export function ReunioesView({ reunioes, allCfos, clientes }: ReunioesViewProps) {
+export function ReunioesView({ reunioes, allCfos, clientes, onboardingAtrasado = [] }: ReunioesViewProps) {
   const [filterCfo, setFilterCfo] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterMonth, setFilterMonth] = useState<string>('');
