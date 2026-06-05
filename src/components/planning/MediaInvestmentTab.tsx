@@ -3152,6 +3152,7 @@ export function MediaInvestmentTab() {
             dreByMonth={dreByBU.o2_tax || {}}
             isLoadingRealized={isLoadingRealized}
             pendingMonths={getPendingMonths('o2_tax')}
+            pendingAVenderDiff={pendingValidation['o2_tax']?.diff || 0}
           />
 
           <BUInvestmentTable
@@ -3168,6 +3169,7 @@ export function MediaInvestmentTab() {
             dreByMonth={dreByBU.oxy_hacker || {}}
             isLoadingRealized={isLoadingRealized}
             pendingMonths={getPendingMonths('oxy_hacker')}
+            pendingAVenderDiff={pendingValidation['oxy_hacker']?.diff || 0}
           />
 
           <BUInvestmentTable
