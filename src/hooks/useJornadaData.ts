@@ -90,6 +90,21 @@ export function useJornadaData() {
     retry: 1,
   });
 
+  // Cards ativos dos pipes dedicados (Assessoria Financeira hoje; BPO/Coordenador futuramente).
+  // Usado pra enriquecer a carteira da Mari com fee mensal recorrente.
+  const { data: pipesActiveData } = useQuery({
+    queryKey: ['jornada-pipes-active-aggregated'],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('query-external-db', {
+        body: { action: 'pipes_active_aggregated' },
+      });
+      if (error) throw error;
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
   // Receita extra de produtos OXY (Oxy + Oxy+Gênio + Oxy+Gênio+Especialista) do DRE Oxy Finance
   // — adicionada ao MRR Total do squad Pedrolo (mês calendário anterior)
   const oxyYear = new Date().getFullYear();
