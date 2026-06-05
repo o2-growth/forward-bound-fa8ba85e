@@ -268,8 +268,10 @@ export function MarketingIndicatorsTab() {
   // Build attribution cards from all BUs
   const allAttributionCards = useMemo((): AttributionCard[] => {
     const result: AttributionCard[] = [];
-    
+    const stripPrefix = (id: string) => String(id).replace(/^(outbound_|oxy_|o2tax_)/, '');
+
     for (const c of modeloAtualAllCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: c.id, titulo: c.titulo, empresa: c.empresa, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
@@ -280,8 +282,9 @@ export function MarketingIndicatorsTab() {
         valorEducacao: c.valorEducacao, bu: 'Modelo Atual',
       });
     }
-    
+
     for (const c of franquiaCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: c.id, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
@@ -294,6 +297,7 @@ export function MarketingIndicatorsTab() {
     }
 
     for (const c of oxyHackerCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: `oxy_${c.id}`, titulo: c.titulo, campanha: c.campanha, conjuntoGrupo: c.conjuntoGrupo,
         fonte: c.fonte, fbclid: c.fbclid, gclid: c.gclid, tipoOrigem: c.tipoOrigem,
@@ -306,6 +310,7 @@ export function MarketingIndicatorsTab() {
     }
 
     for (const c of outboundAllCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: `outbound_${c.id}`, titulo: c.titulo, empresa: c.empresa,
         fonte: c.fonte, tipoOrigem: c.tipoOrigem, origemLead: c.origemLead,
@@ -318,6 +323,7 @@ export function MarketingIndicatorsTab() {
 
     // O2 TAX cards (no marketing fields — will appear as orgânico / sem campanha)
     for (const c of o2TaxAllCards) {
+      if (isTestCard(stripPrefix(String(c.id)))) continue;
       result.push({
         id: `o2tax_${c.id}`, titulo: c.titulo,
         fase: c.fase, dataEntrada: c.dataEntrada,
@@ -326,10 +332,11 @@ export function MarketingIndicatorsTab() {
         bu: 'O2 TAX',
       });
     }
-    
-    
+
+
     return result;
   }, [modeloAtualAllCards, franquiaCards, oxyHackerCards, o2TaxAllCards, outboundAllCards]);
+
 
   // Resolve archived/deleted campaign names for attribution
   const { data: campaignNamesMap } = useMetaCampaignNames();
