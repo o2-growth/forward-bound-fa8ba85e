@@ -932,6 +932,9 @@ export function IndicatorsTab() {
       );
     }
 
+    // Se há filtro de pessoa ativo, respeitar o total (mesmo 0). Sem filtro, fallback ao annualMeta prorateado.
+    const hasPersonFilter = effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0;
+    if (hasPersonFilter) return Math.round(total);
     return total > 0 ? total : Math.round(indicator.annualMeta * periodFraction);
   };
 
