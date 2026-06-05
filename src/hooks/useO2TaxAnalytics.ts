@@ -21,6 +21,7 @@ export interface O2TaxCard {
   dataEntrada: Date;
   dataSaida: Date | null; // "Saída" from database
   dataCriacao: Date | null; // "Data Criação" for MQL logic
+  dataAssinatura: Date | null; // "Data de assinatura do contrato"
   contato: string | null;
   setor: string | null;
   duracao: number; // Duration calculated dynamically from Entrada/Saída
@@ -83,6 +84,7 @@ const PHASE_TO_INDICATOR: Record<string, IndicatorType> = {
   '1° Reunião Realizada - Apresentação': 'rr',
   'Proposta enviada / Follow Up': 'proposta',
   'Contrato assinado': 'venda',
+  'Ganho': 'venda',
 };
 
 // Active phases (not lost/won)
@@ -139,6 +141,7 @@ function parseRawCard(row: any): O2TaxCard {
     dataEntrada,
     dataSaida,
     dataCriacao: parseDate(row['Data Criação']),
+    dataAssinatura: parseDate(row['Data de assinatura do contrato']),
     contato: row['Nome - Interlocução O2'] || row['Nome'] || null,
     setor: row['Setor'] || null,
     duracao,
