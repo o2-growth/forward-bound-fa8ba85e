@@ -1953,7 +1953,38 @@ export function MediaInvestmentTab() {
     
     try {
       const updates: any[] = [];
-      
+
+      // ---------- Cascade-aware MRR rebuild for Modelo Atual ----------
+      // The displayed A Vender on reload = saved faturamento − recomputed MRR chain.
+      // If we naively use the current (pre-pending) chain to derive faturamento,
+      // changing earlier months drifts later months' A Vender. So we rebuild the
+      // chain forward, applying pending A Venders, and use the resulting MRR
+      // for each month's saved faturamento. Round-trip becomes exact.
+      const modeloPending = pendingChanges['modelo_atual'] || {};
+      const currentAVenderModelo: Record<string, number> = {};
+      modeloAtualFunnel.forEach((d) => {
+        currentAVenderModelo[d.month] = Number(d.faturamentoVender) || 0;
+      });
+      const effectiveAVenderModelo: Record<string, number> = { ...currentAVenderModelo };
+      for (const [m, v] of Object.entries(modeloPending)) {
+        effectiveAVenderModelo[m] = Number(v) || 0;
+      }
+      const newMrrChainModelo: Record<string, number> = {};
+      {
+        const janMeta = Number(metasMensaisModeloAtual["Jan"]) || 0;
+        let mrrAtual = (valorVenderInicial > 0 && janMeta > 0)
+          ? (janMeta - valorVenderInicial)
+          : mrrInicial;
+        let aVenderAnterior = 0;
+        months.forEach((m, idx) => {
+          if (idx > 0) mrrAtual = mrrAtual * (1 - churnMensal);
+          mrrAtual = mrrAtual + aVenderAnterior * retencaoVendas;
+          newMrrChainModelo[m] = mrrAtual;
+          aVenderAnterior = effectiveAVenderModelo[m] || 0;
+        });
+      }
+      // ---------------------------------------------------------------
+
       for (const [bu, monthChanges] of Object.entries(pendingChanges)) {
         for (const [month, newAVender] of Object.entries(monthChanges)) {
           const origValue = originalValuesRef.current[bu]?.[month] || 0;
@@ -1974,7 +2005,10 @@ export function MediaInvestmentTab() {
           } else {
             let mrrBaseDoMes = 0;
             const monthIndex = months.indexOf(month);
-            if (bu === 'modelo_atual') mrrBaseDoMes = modeloAtualFunnel[monthIndex]?.mrrBase || 0;
+            if (bu === 'modelo_atual') {
+              // Use the cascade-rebuilt MRR so reload reproduces this exact aVender.
+              mrrBaseDoMes = newMrrChainModelo[month] || 0;
+            }
             
             const newFaturamento = mrrBaseDoMes + newAVender;
             const ticketMedio = buMeta ? buMeta.ticket_medio : indicadoresPorBU[buKeyForIndicators as keyof typeof indicadoresPorBU].ticketMedio;
@@ -1997,6 +2031,7 @@ export function MediaInvestmentTab() {
           });
         }
       }
+
       
       if (updates.length > 0) {
         await bulkUpdateMetas.mutateAsync(updates);
