@@ -370,6 +370,20 @@ export function useJornadaData() {
     // === 2. Build JornadaCliente[] ===
     const clienteMap = new Map<string, JornadaCliente>();
 
+    // Pré-índice de títulos com Assessoria Financeira ativa (pipe dedicado).
+    // Usado para classificar produtos ANTES de decidir isPontualOnly — assim
+    // o CFOaaS desses clientes não cai erroneamente no pontual.
+    const normTituloMatchPre = (s: string) =>
+      (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const titlesComAssessoria = new Set<string>();
+    const pipeRowsPre: Array<Record<string, any>> = Array.isArray(pipesActiveData?.rows) ? pipesActiveData.rows : [];
+    for (const r of pipeRowsPre) {
+      if (String(r.produto_origem || '') === 'Assessoria Financeira') {
+        const k = normTituloMatchPre(String(r.titulo || ''));
+        if (k) titlesComAssessoria.add(k);
+      }
+    }
+
     for (const row of projetos) {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const id = String(row.ID || '');
@@ -377,6 +391,7 @@ export function useJornadaData() {
 
       const titulo = (row['Título'] || '').trim();
       const tituloLower = titulo.toLowerCase();
+      const tituloNorm = normTituloMatchPre(titulo);
       const faseAtual = row['Fase Atual'] || '';
       const rawCfo = (row['CFO Responsavel'] || row['Responsavel'] || '').trim();
       const cfo = normalizeCfoName(rawCfo);
@@ -387,9 +402,15 @@ export function useJornadaData() {
         : (row['Produtos'] || '').trim();
       // Check if product is pontual-only (no recurring component)
       const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico Estratégico', 'Diagnóstico', 'Turnaround', 'Valuation', 'Educação', 'Educação – Dono CFO', 'Educação – Engenheiro de Negócios', 'Educação – Financeiro Raiz'];
-      const produtoParts = dbProdutos && dbProdutos.size > 0
+      const produtoPartsBase = dbProdutos && dbProdutos.size > 0
         ? [...dbProdutos]
         : produto.split(',').map(p => p.trim());
+      // Se o título existe no pipe de Assessoria, injeta esse produto ANTES da
+      // checagem pontual-only (para que o CFOaaS seja tratado como MRR recorrente).
+      const hasAssessoriaPipe = titlesComAssessoria.has(tituloNorm);
+      const produtoParts = hasAssessoriaPipe && !produtoPartsBase.some(p => normTituloMatchPre(p) === 'assessoria financeira')
+        ? [...produtoPartsBase, 'Assessoria Financeira']
+        : produtoPartsBase;
       const isPontualOnly = produtoParts.length > 0 && produtoParts.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
 
       const valorCfoaas = parseNum(row['Valor CFOaaS']);
