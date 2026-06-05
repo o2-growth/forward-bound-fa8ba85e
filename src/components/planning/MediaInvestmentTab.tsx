@@ -2086,7 +2086,7 @@ export function MediaInvestmentTab() {
       console.error('Error saving changes:', error);
       toast.error('Erro ao salvar alterações');
     }
-  }, [pendingChanges, isAllBalanced, metas, bulkUpdateMetas, indicadoresPorBU, modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel, allFunnelMetas, bulkUpsertFunnelMetas, logAction]);
+  }, [pendingChanges, isAllBalanced, metas, bulkUpdateMetas, indicadoresPorBU, modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel, allFunnelMetas, bulkUpsertFunnelMetas, logAction, metasMensaisModeloAtual, valorVenderInicial, mrrInicial, churnMensal, retencaoVendas, pendingValidation]);
 
   const handleDiscardAll = useCallback(() => {
     setPendingChanges({});
