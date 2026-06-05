@@ -536,6 +536,53 @@ export function useJornadaData() {
 
     const allClientes = Array.from(clienteMap.values());
 
+    // === 2.4 Enriquecimento por pipes dedicados (Assessoria Financeira) ===
+    // O fee mensal de Assessoria Financeira vive no pipe `pipefy_moviment_assessoria_financeira`
+    // (não está na Central de Projetos). Match por título normalizado (NFD sem acentos).
+    // Quando casa: soma valor_mrr em cliente.mrr, marca temAssessoriaFinanceira e
+    // garante 'Assessoria Financeira' na lista de produtos.
+    const normTituloMatch = (s: string) =>
+      (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const pipeRows: Array<Record<string, any>> = Array.isArray(pipesActiveData?.rows) ? pipesActiveData.rows : [];
+    if (pipeRows.length > 0) {
+      const byTitle = new Map<string, JornadaCliente>();
+      for (const c of allClientes) {
+        const k = normTituloMatch(c.titulo);
+        if (k && !byTitle.has(k)) byTitle.set(k, c);
+      }
+      let matched = 0;
+      const unmatched: string[] = [];
+      for (const row of pipeRows) {
+        const t = normTituloMatch(String(row.titulo || ''));
+        if (!t) continue;
+        const cliente = byTitle.get(t);
+        const valor = Number(row.valor_mrr || 0);
+        const produtoOrigem = String(row.produto_origem || 'Assessoria Financeira');
+        if (!cliente) {
+          unmatched.push(String(row.titulo || ''));
+          continue;
+        }
+        cliente.mrr += valor;
+        if (produtoOrigem === 'Assessoria Financeira') {
+          cliente.temAssessoriaFinanceira = true;
+        }
+        if (!cliente.produtos.includes(produtoOrigem)) {
+          cliente.produtos = [...cliente.produtos, produtoOrigem];
+          cliente.produto = cliente.produto
+            ? `${cliente.produto}, ${produtoOrigem}`
+            : produtoOrigem;
+        }
+        matched++;
+      }
+      console.log('[Mari pipe-enrich]', {
+        total_cards_pipe: pipeRows.length,
+        matched,
+        unmatched: unmatched.length,
+        unmatched_titulos: unmatched.slice(0, 10),
+      });
+    }
+
+
     // === 2.5 Clones virtuais para o squad Pedrolo ===
     // Clientes Pipefy que possuem produtos OXY / OXY + Gênio / OXY + Gênio + Especialista
     // são duplicados (com cfo forçado p/ Pedrolo e id sufixado) para aparecerem na carteira
