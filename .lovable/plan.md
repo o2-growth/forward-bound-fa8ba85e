@@ -1,94 +1,67 @@
-## Diagnóstico: "Gap a Realocar" do Modelo Atual
+## Problema
 
-Investiguei a tabela do Modelo Atual (`BUInvestmentTable` em `src/components/planning/MediaInvestmentTab.tsx`) e existem **dois indicadores diferentes** sendo confundidos:
+Hoje, no funil de vendas, um mesmo card pode contar **2 vezes no mesmo mês** porque o pipe do Pipefy tem duas fases finais (`Contrato assinado` → `Ganho`), e a deduplicação atual é por `id|fase|mês` em vez de `id|mês`.
 
-### 1. Badge "Balanceado / desbalanceado" (rodapé fixo) — FUNCIONA
-Linha 3179–3191. Mostra `pendingValidation[bu].diff`, que é `Σ(newAVender) − Σ(originalAVender)` apenas dos meses que o usuário editou. Quando você muda Jul −100k e Ago +100k, dá zero. Isso funciona como esperado.
+Exemplo concreto Maio/26 Modelo Atual: aparecem **33 movimentações** mas são **19 vendas reais únicas** (14 cards passaram pelas duas fases dentro de Maio).
 
-### 2. "Gap a Realocar" dentro da tabela do Modelo Atual — NÃO FUNCIONA como o rótulo sugere
-Linhas 778–880. A fórmula é:
+## Solução
 
-```ts
-const gap = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
-// b.gap = mrrBaseProjetado − mrrBase (Oxy real) apenas para meses Oxy
+Mudar a chave de deduplicação da contagem de venda para `id|mês`, escolhendo **uma única linha por card por mês** com a seguinte prioridade:
+
+1. Se o card foi pra `Ganho` no mês → usa essa linha
+2. Senão, usa a linha de `Contrato assinado`
+
+A data efetiva continua sendo `Data de assinatura do contrato` (regra existente, não muda).
+
+## Escopo
+
+Aplicar em **todas as 4 BUs**:
+- Modelo Atual
+- O2 TAX
+- Oxy Hacker (já é só Contrato assinado — sem mudança real, só padronizar)
+- Expansão (Franquia)
+
+## Arquivos a alterar
+
+| Arquivo | O que muda |
+|---------|-----------|
+| `src/hooks/useModeloAtualAnalytics.ts` | `getCardsForIndicator('venda')` → dedup por `id|mês`, preferindo `Ganho` |
+| `src/hooks/useModeloAtualMetas.ts` | Contagem de venda no funil mensal → mesma dedup |
+| `src/hooks/useO2TaxAnalytics.ts` | Mesma dedup |
+| `src/hooks/useO2TaxMetas.ts` | Mesma dedup |
+| `src/hooks/useExpansaoAnalytics.ts` | Mesma dedup |
+| `src/hooks/useExpansaoMetas.ts` | Mesma dedup |
+| `src/hooks/useClosersMetas.ts` | Contagem de venda por closer → mesma dedup (para Rank Closer não inflar) |
+
+## O que NÃO muda
+
+- **Valores monetários** (MRR / Setup / Pontual / Faturamento) — já agregam só de `Ganho` (Modelo Atual / O2 TAX) ou só de `Contrato assinado` (Expansão), não somam as duas fases. Sem risco de duplicação financeira.
+- **Funil das outras fases** (Leads, MQL, RM, RR, Proposta) — regra atual de dedup `id|fase|mês` permanece.
+- **Data de atribuição ao mês** — continua `Data de assinatura do contrato` quando preenchida.
+
+## Impacto esperado nos números
+
+- Contagem de **vendas no funil** vai cair (Modelo Atual Maio/26: 33 → 19; padrão similar nos outros meses e BUs).
+- Conversão **Proposta → Venda** vai ficar mais coerente (não passa de 100% por causa de duplicação).
+- Rank de Closer/SDR por número de vendas vai refletir vendas únicas.
+- **Receita realizada não muda** (gauges monetários intactos).
+
+## Detalhes técnicos
+
+Padrão a aplicar em cada hook de Analytics (`getCardsForIndicator('venda')`):
+
+```text
+1. Filtrar movimentações em (Contrato assinado, Ganho) com effectiveTime no período
+2. Agrupar por (id, mês-do-effectiveTime)
+3. Para cada grupo: manter linha com fase = 'Ganho' se existir, senão 'Contrato assinado'
+4. Retornar lista resultante
 ```
 
-Ou seja: é a soma do déficit **passado** entre MRR projetado e MRR real (Oxy) dos meses fechados. **Esse número é fixo** — não muda quando você edita A Vender dos meses futuros.
+Padrão a aplicar em cada hook de Metas (contagem mensal):
 
-O texto explicativo no rodapé do popover diz literalmente:
-> "Realoque editando 'A Vender' de qualquer mês futuro **até zerar o saldo**."
-
-Mas a fórmula nunca subtrai a compensação que o usuário fez nos meses futuros. Resultado: o cartão fica permanentemente vermelho mesmo depois de você ter adicionado o A Vender extra nos meses futuros.
-
-### Causa raiz
-Faltou a parte da "compensação". O saldo real deveria ser:
-
-```
-saldoRealocar = gapPassadoOxy − compensacaoFutura
-compensacaoFutura = Σ(novoAVender − originalAVender) dos meses NÃO-Oxy (futuros / projeção)
+```text
+Mesmo agrupamento por (id, mês) — incrementar contador 1x por card único no mês,
+em vez de 1x por movimentação.
 ```
 
-Quando `saldoRealocar ≈ 0`, o usuário compensou todo o déficit.
-
----
-
-## Plano de correção
-
-### Mudanças em `src/components/planning/MediaInvestmentTab.tsx`
-
-**1. Passar as edições pendentes para dentro do `BUInvestmentTable`**
-
-Adicionar uma nova prop opcional na assinatura do componente:
-
-```ts
-pendingAVenderDiff?: number; // soma (novo − original) das edições pendentes desta BU
-```
-
-No render do Modelo Atual (~ linha 3060–3115, busca `title="Modelo Atual"`), passar:
-
-```tsx
-pendingAVenderDiff={pendingValidation.modelo_atual?.diff || 0}
-```
-
-E o mesmo para as outras BUs (o cálculo só vai mudar a UI no Modelo Atual porque é a única com `hasOxyReal`, mas a prop é genérica).
-
-**2. Recalcular o `gap` levando a compensação em conta**
-
-Substituir o bloco das linhas 796–797:
-
-```ts
-const gapBruto = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
-const compensacao = Math.max(0, pendingAVenderDiff || 0);
-const gap = Math.max(0, gapBruto - compensacao);
-const isResolved = gap < 1;
-```
-
-**3. Atualizar o popover de detalhamento (linhas 856–863)**
-
-Adicionar uma linha extra no `<tfoot>` mostrando a compensação:
-
-```
-Gap bruto (Oxy − Projeção):        R$ X
-Compensação A Vender (pendente):  − R$ Y
-─────────────────────────────────────────
-Saldo a realocar:                  R$ (X − Y)
-```
-
-E ajustar o texto auxiliar para deixar claro: edições pendentes (ainda não salvas) reduzem o saldo; depois de salvar, o gap bruto também muda porque a cadeia MRR é reconstruída.
-
-**4. Tooltip da linha amarela "Gap a Realocar" da tabela**
-
-Trocar `title` / texto para refletir o novo cálculo, evitando confusão entre gap bruto e saldo.
-
-### Comportamento esperado após a correção
-
-- Antes de qualquer edição: gap mostra o déficit puro Oxy vs projeção (mesmo de hoje).
-- Usuário aumenta A Vender de Set em +R$ 200k: badge do rodapé fica "+R$ 200k" (desbalanceado), e o "Gap a Realocar" cai em R$ 200k.
-- Quando a compensação iguala o gap, o cartão fica verde "✓ Tudo realocado".
-- Ao salvar, as edições viram parte do plano salvo e o cálculo volta a partir do novo baseline (gap = 0 se totalmente compensado).
-
-### Fora de escopo
-
-- Não mexer no save (cascade-aware já implementado na mensagem anterior).
-- Não mexer na lógica de `mrrBaseGap` por mês (badge laranja "Δ Oxy/Projeção" continua igual, é informativo por mês).
-- Não tocar nas outras BUs além de aceitar a prop nova — só Modelo Atual tem Oxy real hoje.
+Após a mudança, atualizar a memória `Sales Phase Universal Definition` indicando que ambas as fases continuam válidas para detectar venda, mas a **contagem é deduplicada por card+mês**.
