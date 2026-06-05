@@ -573,6 +573,35 @@ export function MarketingIndicatorsTab() {
       }
     }
 
+    // Fallback: algumas fontes chegam em `allAttributionCards` como movimentações
+    // assinadas/ganhas, mas ainda não entram em getCardsForIndicator('venda') por
+    // variação de fase/data. Garante que Curva/CAC não zerem quando a origem tem venda.
+    for (const c of allAttributionCards) {
+      const phase = normalize(c.fase);
+      if (phase !== 'contrato assinado' && phase !== 'ganho') continue;
+      const phaseEntryDate = isValidDate(c.dataEntrada) ? c.dataEntrada : new Date();
+      const rawSignedDate = isValidDate(c.dataAssinatura) ? c.dataAssinatura : null;
+      const effectiveDate = rawSignedDate || phaseEntryDate;
+      if (effectiveDate.getTime() < dateRange.from.getTime() || effectiveDate.getTime() > dateRange.to.getTime()) continue;
+
+      const baseId = stripPrefix(String(c.id));
+      if (isTestCard(baseId)) continue;
+      const empresaKey = normalize(c.empresa || c.titulo);
+      const key = `${baseId}|${empresaKey}`;
+      const existing = byKey.get(key);
+      if (existing && existing.priority <= 99) continue;
+      const createdDate = isValidDate(c.dataCriacao) ? c.dataCriacao : phaseEntryDate;
+      byKey.set(key, {
+        priority: 99,
+        card: {
+          ...c,
+          dataEntrada: createdDate,
+          dataCriacao: createdDate,
+          dataAssinatura: effectiveDate,
+        },
+      });
+    }
+
     const all = Array.from(byKey.values()).map(v => v.card);
 
     if (typeof window !== 'undefined') {
@@ -585,7 +614,7 @@ export function MarketingIndicatorsTab() {
     }
 
     return all;
-  }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards]);
+  }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards, allAttributionCards, dateRange]);
 
 
 
