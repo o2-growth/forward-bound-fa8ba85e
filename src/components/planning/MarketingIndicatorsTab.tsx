@@ -513,17 +513,15 @@ export function MarketingIndicatorsTab() {
     return out;
   }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards]);
 
-  // Sales = cards classified as 'venda' por cada hook de BU. Cada hook já aplica:
-  //   - regra universal de venda (entrou em Contrato assinado/Ganho)
-  //   - sales-date-prioritization (Data de assinatura do contrato quando preenchida)
-  //   - dedup mensal
-  //   - filtro de dateRange
-  // Aqui só dedupimos entre BUs (Outbound → Modelo Atual/O2 TAX vencem) e
-  // removemos test cards. NÃO re-filtramos por data — confiamos no hook.
+  // Sales = cards classified as 'venda' por cada hook de BU. Cada hook já aplica
+  // escopo/filtro do período. Aqui só normalizamos as datas para uso nas seções
+  // Marketing: entrada do lead = Data Criação quando existir; assinatura = campo
+  // de assinatura quando existir, senão a entrada na fase de venda.
   const salesInPeriod = useMemo<AttributionCard[]>(() => {
     const normalize = (s?: string | null) =>
       (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const stripPrefix = (id: string) => String(id).replace(/^(outbound_|oxy_|o2tax_)/, '');
+    const isValidDate = (d: unknown): d is Date => d instanceof Date && !Number.isNaN(d.getTime());
 
     const sources: Array<{ cards: any[]; bu: string; prefix: string; priority: number }> = [
       { cards: maGetCards('venda'),       bu: 'Modelo Atual', prefix: '',          priority: 1 },
@@ -542,6 +540,9 @@ export function MarketingIndicatorsTab() {
         const key = `${baseId}|${empresaKey}`;
         const existing = byKey.get(key);
         if (existing && existing.priority <= priority) continue;
+        const phaseEntryDate = isValidDate(c.dataEntrada) ? c.dataEntrada : new Date();
+        const createdDate = isValidDate(c.dataCriacao) ? c.dataCriacao : phaseEntryDate;
+        const signedDate = isValidDate(c.dataAssinatura) ? c.dataAssinatura : phaseEntryDate;
         byKey.set(key, {
           priority,
           card: {
@@ -557,8 +558,9 @@ export function MarketingIndicatorsTab() {
             origemLead: c.origemLead,
             palavraChaveAnuncio: c.palavraChaveAnuncio,
             fase: c.fase,
-            dataEntrada: c.dataEntrada,
-            dataAssinatura: c.dataAssinatura ?? null,
+            dataEntrada: createdDate,
+            dataCriacao: createdDate,
+            dataAssinatura: signedDate,
             produto: c.produto,
             valor: c.valor || 0,
             valorMRR: c.valorMRR || 0,
@@ -577,6 +579,8 @@ export function MarketingIndicatorsTab() {
       console.log('[MarketingIndicatorsTab] salesInPeriod (entrada em Contrato assinado/Ganho no período):', {
         bruto_por_bu: sources.map(s => ({ bu: s.bu, count: s.cards.length })),
         apos_dedup_e_test_cards: all.length,
+        com_data_assinatura: all.filter(c => c.dataAssinatura).length,
+        com_data_criacao: all.filter(c => c.dataCriacao).length,
       });
     }
 
