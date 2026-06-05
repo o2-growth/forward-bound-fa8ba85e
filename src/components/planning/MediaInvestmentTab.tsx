@@ -795,8 +795,11 @@ function BUInvestmentTable({
                      fonte: (temOxy ? 'Oxy' : 'Projeção') as 'Oxy' | 'Projeção',
                    };
                  });
-                 const gap = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
-                const isResolved = gap < 1;
+                  const gapBruto = breakdown.reduce((sum, b) => (b.gap > 0 ? sum + b.gap : sum), 0);
+                  // Compensação: edições pendentes de A Vender (futuros) que aumentam o plano
+                  const compensacao = Math.max(0, Number(pendingAVenderDiff) || 0);
+                  const gap = Math.max(0, gapBruto - compensacao);
+                  const isResolved = gap < 1;
                 return (
                   <TableRow className={isResolved ? 'bg-emerald-500/10' : 'bg-destructive/10'}>
                     <TableCell></TableCell>
