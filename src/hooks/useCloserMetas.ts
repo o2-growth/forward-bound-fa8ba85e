@@ -59,6 +59,27 @@ export function useCloserMetas(year: number = 2026) {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Carrega metas absolutas (fonte oficial cadastrada via aba admin) para
+  // bloquear rateio de closers sem nenhuma meta absoluta cadastrada no mês.
+  const { metas: absoluteMetas } = useCloserAbsoluteMetas(year);
+
+  // Conjunto de chaves "firstName|month" indicando que o closer possui ao menos
+  // uma linha de meta absoluta (qualquer campo > 0) naquele mês.
+  const absoluteMetaIndex = useMemo(() => {
+    const set = new Set<string>();
+    for (const m of absoluteMetas || []) {
+      const hasAny =
+        (m.rm_meta || 0) > 0 ||
+        (m.rr_meta || 0) > 0 ||
+        (m.prop_meta || 0) > 0 ||
+        (m.venda_meta || 0) > 0 ||
+        (m.faturamento_meta || 0) > 0;
+      if (!hasAny) continue;
+      set.add(`${firstNameKey(m.closer)}|${m.month}`);
+    }
+    return set;
+  }, [absoluteMetas]);
+
   // Get percentage for a specific BU/month/closer
   const getPercentage = (bu: string, month: string, closer: string): number => {
     const closersForBU = BU_CLOSERS[bu as BuType] || [];
@@ -74,7 +95,11 @@ export function useCloserMetas(year: number = 2026) {
     return meta?.percentage ?? defaultPercentage;
   };
 
-  // Get filtered meta value based on selected closers
+  // Get filtered meta value based on selected closers.
+  // Guard: só aplica o rateio (closer_metas %) para closers que possuem
+  // pelo menos uma meta absoluta cadastrada para o mês. Closers sem meta
+  // absoluta no mês são tratados como 0 — evita "meta fantasma" quando o
+  // admin removeu o closer da fonte oficial mas o % antigo ainda existe.
   const getFilteredMeta = (
     baseMeta: number,
     bu: string,
@@ -82,13 +107,20 @@ export function useCloserMetas(year: number = 2026) {
     selectedClosers: string[]
   ): number => {
     if (selectedClosers.length === 0) return baseMeta;
-    
-    const totalPercentage = selectedClosers.reduce((sum, closer) => {
+
+    const validClosers = selectedClosers.filter(c =>
+      absoluteMetaIndex.has(`${firstNameKey(c)}|${month}`)
+    );
+
+    if (validClosers.length === 0) return 0;
+
+    const totalPercentage = validClosers.reduce((sum, closer) => {
       return sum + getPercentage(bu, month, closer);
     }, 0);
-    
+
     return baseMeta * (totalPercentage / 100);
   };
+
 
   // Mutation for updating a single closer meta
   const updateMeta = useMutation({
