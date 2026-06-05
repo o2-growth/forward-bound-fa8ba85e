@@ -280,10 +280,31 @@ function CustomerSuccessTabInner() {
     return list.filter((r: any) => filters.cfos.includes(r.cfo));
   }, [onboardingAtrasado, filters.cfos]);
 
-  // Compute MRR base from active clients (respects CFO + Produto + Data)
+  // MRR Base agora vem da Oxy Finance (tabela mrr_base_monthly, sincronizada via sync-mrr-base).
+  // Usa o mês final do dateRange selecionado, ou o mês mais recente disponível.
+  const { mrrBaseData } = useMrrBase();
   const mrrBase = useMemo(() => {
-    return filteredClientesPeriodo.reduce((s, c) => s + c.mrr, 0);
-  }, [filteredClientesPeriodo]);
+    if (!mrrBaseData || mrrBaseData.length === 0) return 0;
+    const MONTHS_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    let targetMonth: string | null = null;
+    let targetYear: number | null = null;
+    if (dateRange?.to) {
+      targetMonth = MONTHS_PT[dateRange.to.getMonth()];
+      targetYear = dateRange.to.getFullYear();
+    }
+    if (targetMonth && targetYear) {
+      const row = mrrBaseData.find(r => r.month === targetMonth && r.year === targetYear);
+      if (row) return Number(row.value) || 0;
+    }
+    // Fallback: mês mais recente com valor > 0
+    const sorted = [...mrrBaseData]
+      .filter(r => Number(r.value) > 0)
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return MONTHS_PT.indexOf(b.month) - MONTHS_PT.indexOf(a.month);
+      });
+    return sorted.length > 0 ? Number(sorted[0].value) : 0;
+  }, [mrrBaseData, dateRange]);
 
   const isLoading = jornadaLoading || npsLoading;
   const error = jornadaError || npsError;
