@@ -35,7 +35,9 @@ const ONLINE_FONTES = new Set([
   'site', 'site / redes sociais', 'site/redes sociais',
   'redes sociais', 'social', 'organic', 'organico', 'direct', 'direto',
   'blog', 'newsletter', 'email marketing', 'e-mail marketing',
+  'email', 'e-mail', 'mail',
   'webinar', 'lead magnet', 'isca digital', 'whatsapp', 'whats',
+  'formulario tax', 'formulário tax', 'formulario', 'formulário',
   // Profissional/PR digital
   'linkedin', 'linkedin ads',
   'tiktok', 'spotify', 'podcast',
@@ -60,8 +62,9 @@ const OFFLINE_FONTES = new Set([
   // Outbound / Prospecção
   'prosp. ativa', 'prospeccao ativa', 'prospecção ativa', 'prospeccao',
   'outbound', 'sdr outbound', 'cold call', 'cold mail',
-  // Eventos / Off
+  // Eventos / Off (G4 = sempre offline)
   'evento', 'eventos', 'feira', 'palestra', 'roadshow',
+  'g4', 'g4 educacao', 'g4 educação',
   'midia offline', 'mídia offline',
 ].map(normalize));
 
@@ -77,6 +80,7 @@ const ONLINE_TOKENS = [
   'globo internacional', 'materia exame',
   'webinar', 'podcast', 'newsletter',
   'email marketing', 'e-mail marketing',
+  'formulario', 'formulário',
   'whatsapp', 'utm_',
 ].map(normalize);
 
@@ -87,6 +91,7 @@ const OFFLINE_TOKENS = [
   'prosp. ativa', 'prospeccao', 'prospecção',
   'outbound', 'cold call', 'cold mail',
   'evento', 'feira', 'palestra', 'roadshow',
+  'g4 ', ' g4', '-g4', 'g4-', 'g4 sao paulo', 'g4 são paulo',
 ].map(normalize);
 
 // ============================================================================
@@ -111,6 +116,12 @@ export function getChannelGroup(
 ): ChannelGroup {
   const fields = [fonte, origemLead, tipoOrigem].map(normalize).filter(Boolean);
 
+  // 0. "Sem origem" (todos os 3 campos vazios) → offline por regra de negócio.
+  if (fields.length === 0) {
+    if (looksLikeAdCampaign(campanha)) return 'online';
+    return 'offline';
+  }
+
   // 1. Match exato em qualquer um dos 3 campos
   for (const f of fields) {
     if (ONLINE_FONTES.has(f)) return 'online';
@@ -120,6 +131,8 @@ export function getChannelGroup(
   // 2. Match por substring no haystack combinado
   const haystack = fields.join(' | ');
   if (haystack) {
+    // G4 sempre offline — checa antes dos demais tokens
+    if (/\bg4\b/.test(haystack)) return 'offline';
     if (ONLINE_TOKENS.some(t => haystack.includes(t))) return 'online';
     if (OFFLINE_TOKENS.some(t => haystack.includes(t))) return 'offline';
   }

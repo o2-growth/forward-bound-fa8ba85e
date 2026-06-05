@@ -37,12 +37,15 @@ export function CohortTable({ cards, cohortType, investmentByMonth, title, descr
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const groups = useMemo<SafraGroup[]>(() => {
-    // Vendas = qualquer card com dataAssinatura preenchida
-    const sales = cards.filter(c => c.dataAssinatura instanceof Date);
+    // `cards` já é a lista de VENDAS reais do período (salesInPeriod).
+    // - Cohort de Entrada: agrupa por mês de dataEntrada (sempre presente).
+    // - Cohort de Assinatura: agrupa por mês de dataAssinatura (ignora vendas sem data).
     const map = new Map<string, AttributionCard[]>();
 
-    for (const c of sales) {
-      const refDate = cohortType === 'entrada' ? c.dataEntrada : c.dataAssinatura!;
+    for (const c of cards) {
+      const refDate = cohortType === 'entrada'
+        ? c.dataEntrada
+        : (c.dataAssinatura instanceof Date ? c.dataAssinatura : null);
       if (!refDate) continue;
       const key = format(refDate, 'yyyy-MM');
       const list = map.get(key) || [];
