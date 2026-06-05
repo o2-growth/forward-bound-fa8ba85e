@@ -10,7 +10,7 @@ import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useMarketingIndicators } from "@/hooks/useMarketingIndicators";
 import { useMetaCampaigns, useMetaCampaignNames } from "@/hooks/useMetaCampaigns";
 import { useGoogleCampaigns } from "@/hooks/useGoogleCampaigns";
-import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
+import { useModeloAtualMetas, isTestCard } from "@/hooks/useModeloAtualMetas";
 import { useO2TaxMetas } from "@/hooks/useO2TaxMetas";
 import { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
