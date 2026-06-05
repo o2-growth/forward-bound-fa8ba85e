@@ -347,6 +347,7 @@ interface BUInvestmentTableProps {
   isLoadingRealized?: boolean;
   pendingMonths?: Set<string>;
   metaAnualFixa?: number;
+  pendingAVenderDiff?: number;
 }
 
 function BUInvestmentTable({
@@ -369,6 +370,7 @@ function BUInvestmentTable({
   isLoadingRealized = false,
   pendingMonths = new Set(),
   metaAnualFixa,
+  pendingAVenderDiff = 0,
 }: BUInvestmentTableProps) {
   const [editingMonth, setEditingMonth] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
