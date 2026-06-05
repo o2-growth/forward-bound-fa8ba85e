@@ -273,6 +273,12 @@ function CustomerSuccessTabInner() {
     return reunioes.filter(r => filters.cfos.includes(r.cfo));
   }, [reunioes, filters.cfos]);
 
+  const filteredOnboardingAtrasado = useMemo(() => {
+    const list = onboardingAtrasado || [];
+    if (filters.cfos.length === 0) return list;
+    return list.filter((r: any) => filters.cfos.includes(r.cfo));
+  }, [onboardingAtrasado, filters.cfos]);
+
   // Compute MRR base from active clients (respects CFO + Produto + Data)
   const mrrBase = useMemo(() => {
     return filteredClientesPeriodo.reduce((s, c) => s + c.mrr, 0);
