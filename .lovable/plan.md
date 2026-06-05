@@ -1,53 +1,28 @@
-## Causa raiz (confirmada com a aritmética dos números do print)
+## Objetivo
 
-Meu fix em `useCloserMetas.getFilteredMeta` está funcionando — para Pedro + Consolidado, ele zera a meta de **todas** as BUs em que Pedro opera (`modelo_atual`, `oxy_hacker`, `franquia`). A BU `o2_tax` já é descartada antes porque Pedro não está em `BU_CLOSERS.o2_tax`.
+Permitir salvar metas de "A Vender" mesmo quando o total anual por BU não fecha exatamente com a meta original, transformando a trava atual em **aviso** (não-bloqueante). Isso desbloqueia os valores redondos de Jun–Dez para o Modelo Atual (550k / 600k / 700k×3 / 600k).
 
-Resultado: `total = 0` em `getMetaForIndicator` (linha 902 de `IndicatorsTab.tsx`).
+## Mudanças no código
 
-O problema é a **última linha** dessa função (linha 935):
+**Arquivo:** `src/components/planning/MediaInvestmentTab.tsx`
 
-```ts
-return total > 0 ? total : Math.round(indicator.annualMeta * periodFraction);
-```
+1. **`handleSaveAll` (linhas 1942–1946)** — remover o `return` que bloqueia o save quando `!isAllBalanced`. O save sempre prossegue; se houver desbalanço, mostramos apenas um toast de aviso (`toast.warning`) com o valor do gap por BU, mas a operação continua.
 
-Quando o total dá 0, ele cai num fallback genérico baseado em `annualMeta` (2400/1200/960/480/240) prorateado pelo período. Para 5 dias:
+2. **Barra inferior (linhas 3128–3168)** — manter os badges visuais (Modelo Atual: -R$ 1.873.744 em vermelho), pois ajudam o usuário a enxergar o desbalanço, mas:
+   - O botão "Salvar Todas" deixa de ficar travado visualmente (sempre verde / habilitado).
+   - O `title` do botão muda para algo como: "Salvar (há BUs desbalanceados — será salvo mesmo assim)" quando `!isAllBalanced`.
+   - O ícone passa a ser sempre `CheckCircle2` (verde) se balanceado, ou `AlertTriangle` (âmbar) se não — mas clicável nos dois casos.
 
-| Indicador | annualMeta × 5/365 | Print |
-|---|---|---|
-| MQLs | 2400 × 5/365 = **32,87 → 33** | 33 ✅ |
-| Reuniões Agendadas | 1200 × 5/365 = **16,4 → 16** | 16 ✅ |
-| Reuniões Realizadas | 960 × 5/365 = **13,15 → 13** | 13 ✅ |
-| Propostas | 480 × 5/365 = **6,57 → 7** | 7 ✅ |
-| Vendas | 240 × 5/365 = **3,29 → 3** | 3 ✅ |
+3. Sem mudanças em banco, hooks ou edge functions. A regra de equilíbrio anual deixa de ser uma trava do produto e vira responsabilidade do usuário.
 
-Bate exato. Ou seja, o "0" legítimo está sendo substituído pelo fallback.
+## Consequências esperadas
 
-Os acelerômetros monetários (R$ 0 corretos) não têm esse fallback — por isso só os de cima quebram.
+- Você consegue salvar Jun=550k, Jul=600k, Ago=700k, Set=700k, Out=700k, Nov=700k, Dez=600k mesmo com o gap de ~R$ 1,87M no Modelo Atual.
+- A "Meta Anual" do Modelo Atual continua a mesma no banco (`monetary_metas`); apenas a soma de "A Vender" vai ficar abaixo dela. Os cards de pacing/projeção que comparam realizado vs meta anual continuam funcionando normalmente.
+- Qualquer cálculo que dependa da soma de "A Vender" para reconstruir a meta passará a refletir o novo total (menor). Se quiser, em iteração futura podemos adicionar um botão "Ajustar Meta Anual ao A Vender" para reconciliar.
 
-## Plano
+## Detalhes técnicos
 
-**Único arquivo: `src/components/planning/IndicatorsTab.tsx` (1 linha)**
-
-Em `getMetaForIndicator`, distinguir "sem dado no DB" (fallback faz sentido) de "filtrado a 0 por pessoa" (deve permanecer 0):
-
-- Se há filtro ativo de closer (`effectiveSelectedClosers.length > 0`) ou de SDR (`effectiveSelectedSDRs.length > 0`), **não** aplicar fallback — retornar `total` diretamente (mesmo se 0).
-- Sem filtro de pessoa: manter o fallback atual `total > 0 ? total : annualMeta * periodFraction` (preserva comportamento histórico para BUs sem meta cadastrada).
-
-Aproximadamente:
-
-```ts
-const hasPersonFilter = effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0;
-if (hasPersonFilter) return total;
-return total > 0 ? total : Math.round(indicator.annualMeta * periodFraction);
-```
-
-## Validação
-
-- Pedro + Consolidado, 01–05/Jun: Meta dos 5 cards de cima → **0** (em vez de 33/16/13/7/3).
-- Sem filtro de closer/SDR, Consolidado: cards continuam mostrando os mesmos valores de hoje (fallback preservado).
-- Daniel + Modelo Atual (que tem `closer_absolute_metas` real): cards mostram o rateio normal.
-
-## Fora de escopo
-- Não mexer em `useCloserMetas` (o guard já está correto).
-- Não mexer em séries do gráfico (`getMonthlyMetasFromFunnel`) nem nos cards monetários (já corretos).
-- Não tocar em realizado.
+- A constante `isAllBalanced` continua existindo (usada para colorir badges e ícone), só perde o poder de bloquear o `handleSaveAll`.
+- Toast de aviso: para cada BU com `Math.abs(diff) >= 100`, listar `BU: ±R$ X` num único `toast.warning` antes de prosseguir com `bulkUpdateMetas`.
+- Nenhuma alteração em `useMonetaryMetas`, `usePlanGrowthData`, `manage-redistribution` ou tabelas.

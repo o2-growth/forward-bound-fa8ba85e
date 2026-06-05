@@ -1941,8 +1941,14 @@ export function MediaInvestmentTab() {
   // Batch save all pending changes
   const handleSaveAll = useCallback(async () => {
     if (!isAllBalanced) {
-      toast.error('O total de A Vender não está balanceado. Redistribua o valor entre os meses.');
-      return;
+      const unbalanced = Object.entries(pendingValidation)
+        .filter(([, v]) => Math.abs(v.diff) >= 100)
+        .map(([bu, v]) => {
+          const label = bu === 'modelo_atual' ? 'Modelo Atual' : bu === 'o2_tax' ? 'O2 TAX' : bu === 'oxy_hacker' ? 'Oxy Hacker' : 'Franquia';
+          return `${label}: ${v.diff > 0 ? '+' : ''}${formatCurrency(v.diff)}`;
+        })
+        .join(' • ');
+      toast.warning(`A Vender desbalanceado — salvando mesmo assim. ${unbalanced}`);
     }
     
     try {
@@ -3157,8 +3163,8 @@ export function MediaInvestmentTab() {
             <Button 
               size="sm" 
               onClick={handleSaveAll} 
-              className={isAllBalanced ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-              title={!isAllBalanced ? 'Equilibre o A Vender para poder salvar' : 'Salvar todas as alterações'}
+              className={isAllBalanced ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'}
+              title={!isAllBalanced ? 'Há BUs desbalanceados — será salvo mesmo assim' : 'Salvar todas as alterações'}
             >
               <Save className="h-4 w-4 mr-1" />
               Salvar Todas
