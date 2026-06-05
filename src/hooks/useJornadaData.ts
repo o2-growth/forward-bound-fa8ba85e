@@ -111,7 +111,7 @@ export function useJornadaData() {
   const { oxyProductsByMonth } = useOxyFinance(oxyYear);
 
   const result = useMemo(() => {
-    if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '' };
+    if (!data) return { clientes: [], cfos: [], alertas: [], pipeline: [], reunioes: [] as any[], allCfos: [] as string[], allProdutos: [] as string[], lastSync: '', onboardingAtrasado: [] as any[] };
 
 
     const { projetos, setup, tratativas, nps, rotinas, clientes, connections } = data;
@@ -1006,7 +1006,44 @@ export function useJornadaData() {
       churnsOxyCount: churnsOxy.length,
     };
 
-    return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, operacao };
+    // === 8. Onboarding atrasado (Kick-off do Projeto + Primeiras Entregas - Diagnóstico) ===
+    // Cards atualmente nessas fases no pipe Gestão de Rotinas CFO, marcados como Overdue=true pelo Pipefy.
+    const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico'];
+    const nowTs = now.getTime();
+    const onboardingAtrasado: Array<{
+      id: string;
+      titulo: string;
+      cfo: string;
+      fase: string;
+      dataPrevista: Date | null;
+      diasAtraso: number;
+    }> = [];
+    const seenOnboardingIds = new Set<string>();
+    for (const row of data.rotinas) {
+      if (row['Fase'] !== row['Fase Atual']) continue;
+      const fase = row['Fase Atual'] || '';
+      if (!ONBOARDING_PHASES.includes(fase)) continue;
+      const overdue = row['Overdue'] === true || row['Overdue'] === 'true';
+      if (!overdue) continue;
+      const id = String(row.ID || '');
+      if (!id || seenOnboardingIds.has(id)) continue;
+      seenOnboardingIds.add(id);
+      const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
+      const diasAtraso = dataPrevista
+        ? Math.max(0, Math.round((nowTs - dataPrevista.getTime()) / 86400000))
+        : 0;
+      onboardingAtrasado.push({
+        id,
+        titulo: (row['Título'] || '').trim(),
+        cfo: normalizeCfoName((row['CFO Responsavel'] || '').trim()),
+        fase,
+        dataPrevista,
+        diasAtraso,
+      });
+    }
+    onboardingAtrasado.sort((a, b) => b.diasAtraso - a.diasAtraso);
+
+    return { clientes: allClientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, lastSync, operacao, onboardingAtrasado };
   }, [data, oxyProductsByMonth, pipesActiveData]);
 
   return { ...result, isLoading, error, refetch, isFetching, dataUpdatedAt };

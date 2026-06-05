@@ -91,7 +91,7 @@ function CustomerSuccessTabInner() {
     a.getDate() === b.getDate();
 
   // Data hooks
-  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, operacao, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
+  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, operacao, onboardingAtrasado, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
   const { data: npsData, isLoading: npsLoading, error: npsError } = useNpsData();
   const { data: opsData } = useOperationsData();
 
@@ -272,6 +272,12 @@ function CustomerSuccessTabInner() {
     if (filters.cfos.length === 0) return reunioes;
     return reunioes.filter(r => filters.cfos.includes(r.cfo));
   }, [reunioes, filters.cfos]);
+
+  const filteredOnboardingAtrasado = useMemo(() => {
+    const list = onboardingAtrasado || [];
+    if (filters.cfos.length === 0) return list;
+    return list.filter((r: any) => filters.cfos.includes(r.cfo));
+  }, [onboardingAtrasado, filters.cfos]);
 
   // Compute MRR base from active clients (respects CFO + Produto + Data)
   const mrrBase = useMemo(() => {
@@ -463,7 +469,7 @@ function CustomerSuccessTabInner() {
           </TabsContent>
 
           <TabsContent value="reunioes" className="mt-4">
-            <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} />
+            <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} onboardingAtrasado={filteredOnboardingAtrasado} />
           </TabsContent>
 
           <TabsContent value="nps" className="mt-4">

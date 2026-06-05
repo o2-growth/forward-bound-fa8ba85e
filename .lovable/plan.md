@@ -1,63 +1,51 @@
-## Diagnóstico
+# Onboarding atrasado na aba Reuniões
 
-Caso ESPÓLIO DE MÁRCIO LOUZADA CARPENA confirmado no banco:
-- `Valor Diagnostico = 45.000` (correto, é o pontual real)
-- `Valor CFOaaS = 15.000` (fee mensal Assessoria Financeira)
-- Campo `Produtos` no Pipefy = só "Diagnóstico Estratégico" (Assessoria vive em pipe separado)
+Adicionar, dentro da aba **Reuniões** da Operação, um novo bloco mostrando os cards do pipe **Gestão de Rotinas CFO** (`pipefy_moviment_rotinas`) que estão atualmente nas fases:
 
-**Por que aparece 60k de pontual hoje** (`useJornadaData.ts` linhas 388–404):
+- **Kick-off do Projeto**
+- **Primeiras Entregas - Diagnóstico**
 
-```ts
-isPontualOnly = produtoParts.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
-// "Diagnóstico Estratégico" sozinho → true
-pontual = valorDiagnostico + (isPontualOnly ? valorCfoaas : 0);
-// 45.000 + 15.000 = 60.000  ❌
-```
+Cada lista mostra somente cards **atrasados** segundo o campo **`Overdue`** do Pipefy (mesma fonte de verdade que já alimenta o badge de tarefas atrasadas hoje).
 
-O CFOaaS é jogado no pontual porque a detecção de Assessoria só acontece depois, no pipe-enrich (linhas 539–583). Resultado: pontual fica inflado em 15k e o MRR também recebe 15k via `valor_assessoria` (o 15k acaba contado duas vezes em telas que somam mrr+pontual).
+## O que aparece para o usuário
 
-**Segunda regra (cliente híbrido)**: hoje, se `temAssessoriaFinanceira = true`, o cliente fica na carteira da Mari todo mês e `receitaCliente = mrr + pontual` (linha 699) — ou seja, o pontual continua sendo somado todo mês ao invés de só no mês da entrada.
+- Bloco separado por fase, na mesma aba **Reuniões** (acima ou abaixo da tabela atual).
+- Para cada fase: título da seção, contagem total de atrasados, e tabela com:
+  - Cliente (Título), CFO Responsável, Data Prevista de Entrega, Dias de atraso, link para o card no Pipefy.
+- Respeita o filtro de CFO já existente (CFO logado em modo `cfo` continua travado no seu nome).
+- Se não houver atrasados em uma fase, mostra mensagem vazia padrão.
 
-## Mudanças
+## Como o dado é obtido (técnico)
 
-### 1. `src/hooks/useJornadaData.ts` — detectar Assessoria ANTES de classificar produtos
+Tudo já está disponível no `useJornadaData` — `data.rotinas` é o conteúdo do pipe Gestão de Rotinas CFO. Não precisa nova chamada ao banco nem nova edge function.
 
-- Antes do loop principal de `projetos` (antes da linha 373), construir um `Set<string>` `titlesComAssessoria` com títulos normalizados (NFD) que aparecem em `pipesActiveData.rows` com `produto_origem === 'Assessoria Financeira'`.
-- Dentro do loop, se o título normalizado do projeto estiver nesse set, adicionar `'Assessoria Financeira'` em `produtoParts` antes de calcular `isPontualOnly`. Isso faz `isPontualOnly = false` para o Espólio → `pontual = 45k`, `mrr = 0 + 15k (do pipe-enrich) = 15k`.
-- O bloco pipe-enrich existente (539–583) continua somando `valor_mrr` em `cliente.mrr` e marcando `temAssessoriaFinanceira` — sem mudança lá.
+1. **`src/hooks/useJornadaData.ts`** — depois do bloco que monta `reunioes` (linha ~826), construir um novo array `onboardingAtrasado`:
+   ```ts
+   const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico'];
+   const onboardingAtrasado = data.rotinas
+     .filter(r => r['Fase'] === r['Fase Atual'])
+     .filter(r => ONBOARDING_PHASES.includes(r['Fase Atual'] || ''))
+     .filter(r => r['Overdue'] === true || r['Overdue'] === 'true')
+     .map(r => ({
+       id: String(r.ID),
+       titulo: (r['Título'] || '').trim(),
+       cfo: normalizeCfoName((r['CFO Responsavel'] || '').trim()),
+       fase: r['Fase Atual'] || '',
+       dataPrevista: parseRotinaDateOnly(r['Data Prevista Entrega']),
+       diasAtraso: /* (now - dataPrevista)/86400000, mínimo 0 */,
+     }));
+   ```
+   Retornar junto com o resto: `return { ..., onboardingAtrasado }`.
 
-### 2. `src/hooks/useJornadaData.ts` — agregação da Mari (linhas 660–702)
+2. **`src/components/planning/jornada/types.ts`** — exportar interface `OnboardingAtrasadoCard`.
 
-Alterar a regra de receita da Mari para que **pontual só conte no mês da assinatura**:
+3. **`src/components/planning/CustomerSuccessTab.tsx`** — desestruturar `onboardingAtrasado` do `useJornadaData()` e passar para `<ReunioesView />`.
 
-```ts
-} else if (isMariClient(c.cfo)) {
-  const pontualValido = isAssinaturaNoMesPassado(c.dataAssinatura) ? (c.pontual ?? 0) : 0;
-  receitaCliente = c.mrr + pontualValido;
-}
-```
+4. **`src/components/planning/jornada/ReunioesView.tsx`** — receber nova prop `onboardingAtrasado`, aplicar filtro de CFO já em uso na view, e renderizar duas seções (uma por fase) usando os componentes `Card` + `Table` já importados. Link para Pipefy usa `PipefyCardLink` com `PIPEFY_PIPES.rotinas`.
 
-Carteira da Mari (665–677) já está correta:
-- `temAssessoriaFinanceira` → sempre na carteira (MRR recorrente)
-- Demais (puro pontual) → só no mês da assinatura
+## Fora de escopo
 
-### 3. `src/components/planning/jornada/CfoView.tsx` — espelhar a regra (linhas 778–800)
-
-A função `activeClientes` já mantém clientes com Assessoria todo mês. Onde houver soma de receita da Mari nessa view, aplicar a mesma regra "pontual só no mês da assinatura". Verificar todos os locais que somam `c.mrr + c.pontual` para Mari e gatear o pontual com `inMesPassado(c.dataAssinatura)`.
-
-### Resultado esperado
-
-Espólio (assinou em mês ≠ mês passado):
-- pontual exibido no card = **45k** (correto)
-- mrr exibido = **15k** (correto, recorrente da Assessoria)
-- contribuição na receita da Mari = só 15k (pontual já expirou)
-
-Se um cliente híbrido assinar este mês passado:
-- mês atual: receita = 15k MRR + 45k pontual = 60k
-- meses seguintes: receita = só 15k MRR (recorrente até churn)
-
-### Fora de escopo
-
-- Pipes BPO / Coordenador (continuam só Assessoria por enquanto).
-- Pedrolo, override de Dago, Guará — sem mudança.
-- Memos.
+- Não alterar a lógica de `processRotinas` (KPI de tarefas atrasadas continua agregando todas as fases não-terminais como hoje).
+- Não criar nova aba.
+- Não mudar a definição de "atrasado" — fica 100% no flag `Overdue` do Pipefy.
+- Não mexer em filtros globais de data (esses cards são "estado atual", não dependem de período).
