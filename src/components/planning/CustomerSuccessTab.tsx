@@ -11,6 +11,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { CustomerSuccessFilterProvider, useCustomerSuccessFilters } from '@/contexts/CustomerSuccessFilterContext';
 import { DateRangePickerGA } from './DateRangePickerGA';
 import { useJornadaData } from '@/hooks/useJornadaData';
+import { useMrrBase } from '@/hooks/useMrrBase';
 import { useNpsData, processNpsData, NpsCard } from '@/hooks/useNpsData';
 import { useOperationsData } from '@/hooks/useOperationsData';
 import { parsePipefyDate } from '@/hooks/dateUtils';
