@@ -21,6 +21,7 @@ export interface O2TaxCard {
   dataEntrada: Date;
   dataSaida: Date | null; // "Saída" from database
   dataCriacao: Date | null; // "Data Criação" for MQL logic
+  dataAssinatura: Date | null; // "Data de assinatura do contrato"
   contato: string | null;
   setor: string | null;
   duracao: number; // Duration calculated dynamically from Entrada/Saída
@@ -83,6 +84,7 @@ const PHASE_TO_INDICATOR: Record<string, IndicatorType> = {
   '1° Reunião Realizada - Apresentação': 'rr',
   'Proposta enviada / Follow Up': 'proposta',
   'Contrato assinado': 'venda',
+  'Ganho': 'venda',
 };
 
 // Active phases (not lost/won)
@@ -139,6 +141,7 @@ function parseRawCard(row: any): O2TaxCard {
     dataEntrada,
     dataSaida,
     dataCriacao: parseDate(row['Data Criação']),
+    dataAssinatura: parseDate(row['Data de assinatura do contrato']),
     contato: row['Nome - Interlocução O2'] || row['Nome'] || null,
     setor: row['Setor'] || null,
     duracao,
@@ -395,8 +398,10 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
         const cardIndicator = PHASE_TO_INDICATOR[card.fase];
         if (!cardIndicator || !indicatorsToCheck.includes(cardIndicator)) continue;
         
-        const entryTime = card.dataEntrada.getTime();
-        if (entryTime >= startTime && entryTime <= endTime) {
+        const effectiveTime = (cardIndicator === 'venda' && card.dataAssinatura)
+          ? card.dataAssinatura.getTime()
+          : card.dataEntrada.getTime();
+        if (effectiveTime >= startTime && effectiveTime <= endTime) {
           const month = `${card.dataEntrada.getFullYear()}-${card.dataEntrada.getMonth()}`;
           const key = `${card.id}|${card.fase}|${month}`;
           if (!seenKeys.has(key)) {

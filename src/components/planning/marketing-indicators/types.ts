@@ -217,6 +217,7 @@ export interface AttributionCard {
   palavraChaveAnuncio?: string;
   fase: string;
   dataEntrada: Date;
+  dataCriacao?: Date | null;
   dataAssinatura?: Date | null;
   produto?: string;
   valor: number;
