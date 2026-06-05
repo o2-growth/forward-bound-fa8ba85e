@@ -712,7 +712,7 @@ export function MarketingIndicatorsTab() {
 
       {/* ===== NEW: Cohort de Entrada ===== */}
       <CohortTable
-        cards={allAttributionCards}
+        cards={salesInPeriod}
         cohortType="entrada"
         investmentByMonth={investmentByMonth}
         title="Cohort de Entrada"
@@ -721,7 +721,7 @@ export function MarketingIndicatorsTab() {
 
       {/* ===== NEW: Cohort de Assinatura ===== */}
       <CohortTable
-        cards={allAttributionCards}
+        cards={salesInPeriod}
         cohortType="assinatura"
         investmentByMonth={investmentByMonth}
         title="Cohort de Assinatura"
