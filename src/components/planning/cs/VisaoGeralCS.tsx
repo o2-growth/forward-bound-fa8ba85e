@@ -328,6 +328,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                       <TableHead className="h-8 text-[10px] uppercase tracking-wider">Produto</TableHead>
                       <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">Clientes</TableHead>
                       <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">MRR</TableHead>
+                      <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">Pontual</TableHead>
                       <TableHead className="h-8 text-[10px] uppercase tracking-wider text-right">%</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -345,6 +346,9 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                           <TableCell className="py-1.5 text-right tabular-nums text-xs text-green-600 dark:text-green-400">
                             {data.mrr > 0 ? formatCurrency(data.mrr) : '—'}
                           </TableCell>
+                          <TableCell className="py-1.5 text-right tabular-nums text-xs text-blue-600 dark:text-blue-400">
+                            {data.pontual > 0 ? formatCurrency(data.pontual) : '—'}
+                          </TableCell>
                           <TableCell className="py-1.5 text-right">
                             <div className="flex items-center gap-1.5 justify-end">
                               <div className="w-8 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -357,7 +361,7 @@ export function VisaoGeralCS({ clientes, cfos, alertas, npsScore, mrrBase, onNav
                       );
                     })}
                     {clientesByProduto.length === 0 && (
-                      <TableRow><TableCell colSpan={4} className="text-center py-4 text-xs text-muted-foreground">Sem dados.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-4 text-xs text-muted-foreground">Sem dados.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
