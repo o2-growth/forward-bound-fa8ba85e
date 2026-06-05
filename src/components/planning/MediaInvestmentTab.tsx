@@ -1941,8 +1941,14 @@ export function MediaInvestmentTab() {
   // Batch save all pending changes
   const handleSaveAll = useCallback(async () => {
     if (!isAllBalanced) {
-      toast.error('O total de A Vender não está balanceado. Redistribua o valor entre os meses.');
-      return;
+      const unbalanced = Object.entries(pendingValidation)
+        .filter(([, v]) => Math.abs(v.diff) >= 100)
+        .map(([bu, v]) => {
+          const label = bu === 'modelo_atual' ? 'Modelo Atual' : bu === 'o2_tax' ? 'O2 TAX' : bu === 'oxy_hacker' ? 'Oxy Hacker' : 'Franquia';
+          return `${label}: ${v.diff > 0 ? '+' : ''}${formatCurrency(v.diff)}`;
+        })
+        .join(' • ');
+      toast.warning(`A Vender desbalanceado — salvando mesmo assim. ${unbalanced}`);
     }
     
     try {
