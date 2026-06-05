@@ -1007,9 +1007,12 @@ export function useJornadaData() {
     };
 
     // === 8. Onboarding atrasado (Kick-off do Projeto + Primeiras Entregas - Diagnóstico) ===
-    // Cards atualmente nessas fases no pipe Gestão de Rotinas CFO, marcados como Overdue=true pelo Pipefy.
+    // Cards atualmente nessas fases no pipe Gestão de Rotinas CFO com Data Prevista vencida
+    // (ou flag Overdue=true do Pipefy como fallback — esse flag costuma vir stale, por isso a data manda).
     const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico'];
-    const nowTs = now.getTime();
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const startOfTodayTs = startOfToday.getTime();
     const onboardingAtrasado: Array<{
       id: string;
       titulo: string;
@@ -1023,14 +1026,15 @@ export function useJornadaData() {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const fase = row['Fase Atual'] || '';
       if (!ONBOARDING_PHASES.includes(fase)) continue;
-      const overdue = row['Overdue'] === true || row['Overdue'] === 'true';
-      if (!overdue) continue;
+      const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
+      const pipefyOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
+      const dateOverdue = dataPrevista ? dataPrevista.getTime() < startOfTodayTs : false;
+      if (!pipefyOverdue && !dateOverdue) continue;
       const id = String(row.ID || '');
       if (!id || seenOnboardingIds.has(id)) continue;
       seenOnboardingIds.add(id);
-      const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
       const diasAtraso = dataPrevista
-        ? Math.max(0, Math.round((nowTs - dataPrevista.getTime()) / 86400000))
+        ? Math.max(0, Math.round((startOfTodayTs - dataPrevista.getTime()) / 86400000))
         : 0;
       onboardingAtrasado.push({
         id,
