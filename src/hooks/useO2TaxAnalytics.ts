@@ -398,8 +398,10 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
         const cardIndicator = PHASE_TO_INDICATOR[card.fase];
         if (!cardIndicator || !indicatorsToCheck.includes(cardIndicator)) continue;
         
-        const entryTime = card.dataEntrada.getTime();
-        if (entryTime >= startTime && entryTime <= endTime) {
+        const effectiveTime = (cardIndicator === 'venda' && card.dataAssinatura)
+          ? card.dataAssinatura.getTime()
+          : card.dataEntrada.getTime();
+        if (effectiveTime >= startTime && effectiveTime <= endTime) {
           const month = `${card.dataEntrada.getFullYear()}-${card.dataEntrada.getMonth()}`;
           const key = `${card.id}|${card.fase}|${month}`;
           if (!seenKeys.has(key)) {
