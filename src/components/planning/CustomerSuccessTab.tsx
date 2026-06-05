@@ -469,7 +469,7 @@ function CustomerSuccessTabInner() {
           </TabsContent>
 
           <TabsContent value="reunioes" className="mt-4">
-            <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} />
+            <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} onboardingAtrasado={filteredOnboardingAtrasado} />
           </TabsContent>
 
           <TabsContent value="nps" className="mt-4">
