@@ -831,6 +831,36 @@ Deno.serve(async (req) => {
         data: rpcResult.rows[0]?.result ?? null,
       };
       console.log(`RPC ${functionName}(${argsArr.join(", ")}): ok`);
+    } else if (action === "pipes_active_aggregated") {
+      // Agrega cards ATIVOS dos pipes dedicados (hoje só Assessoria Financeira; BPO/Coordenador
+      // ficam pra depois). Retorna 1 linha por ID (mais recente), com valor do fee mensal.
+      // Estrutura preparada pra UNION ALL futuro.
+      const sql = `
+        SELECT DISTINCT ON ("ID")
+          "ID"::text                     AS id,
+          "Título"                       AS titulo,
+          "Fase"                         AS fase,
+          "Fase Atual"                   AS fase_atual,
+          "Entrada"                      AS entrada,
+          COALESCE(valor_assessoria, 0)  AS valor_mrr,
+          'Assessoria Financeira'        AS produto_origem
+        FROM pipefy_moviment_assessoria_financeira
+        WHERE "Saída" IS NULL
+        ORDER BY "ID", "Entrada" DESC
+      `;
+      try {
+        const pipeRes = await client.query(sql);
+        result = {
+          action: "pipes_active_aggregated",
+          rows: pipeRes.rows,
+          count: pipeRes.rows.length,
+        };
+        console.log(`pipes_active_aggregated: ${pipeRes.rows.length} cards ativos`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`pipes_active_aggregated query failed: ${msg}`);
+        result = { action: "pipes_active_aggregated", rows: [], count: 0, error: msg };
+      }
     } else {
       await client.end();
       return new Response(JSON.stringify({ error: "Invalid action" }), {

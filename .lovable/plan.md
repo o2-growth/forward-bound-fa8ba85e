@@ -1,47 +1,92 @@
-## Diagnóstico
+## Contexto
 
-Em `src/components/planning/MarketingIndicatorsTab.tsx` (linhas 506-515) a variável `salesInPeriod` — que alimenta **Cohort de Entrada**, **Cohort de Assinatura**, **Curva de Conversão** e **Online vs Offline** — é construída assim:
+Hoje toda a carteira da Mari é tratada como serviço pontual: o cliente só aparece na carteira no mês da assinatura e some no mês seguinte. Funciona pra Diagnóstico/Turnaround/Valuation, mas não pra **Assessoria Financeira**, que é um produto recorrente com fee mensal.
 
-```ts
-return allAttributionCards.filter(c => c.dataAssinatura in periodo)
+A Central de Projetos (`pipefy_central_projetos`) não tem coluna pro valor de Assessoria — esse valor vive no pipe externo `pipefy_moviment_assessoria_financeira` (coluna `valor_assessoria`). Por isso hoje o sistema nem enxerga esses clientes corretamente.
+
+Investiguei: a memória do projeto já descreve esse comportamento como "desejado", mas o código atual **não** tem nenhum enriquecimento por pipe dedicado nem a ação `pipes_active_aggregated`. Vamos implementar.
+
+## O que muda
+
+### 1. Edge Function `query-external-db` — nova ação `pipes_active_aggregated`
+
+Adicionar bloco que faz:
+
+```sql
+SELECT DISTINCT ON ("ID")
+  "ID", "Título", "Fase", "Fase Atual", "Entrada",
+  "Data de assinatura do contrato",
+  COALESCE("valor_assessoria", 0) AS valor_mrr,
+  'Assessoria Financeira' AS produto_origem
+FROM pipefy_moviment_assessoria_financeira
+WHERE "Saída" IS NULL
+ORDER BY "ID", "Entrada" DESC
 ```
 
-Onde `allAttributionCards` é a união dos 5 hooks (`modeloAtualAllCards`, `franquiaCards`, `oxyHackerCards`, `outboundAllCards`, `o2TaxAllCards`) — ou seja, **TODOS os cards de cada BU**, não só vendas.
+Retorna `{ rows: [{ id, titulo, fase, dataAssinatura, valorAssessoria, produto_origem }] }`.
 
-Isso gera 3 problemas que somam até inflar para 184:
+Escopo agora: só Assessoria Financeira (BPO/Coordenador ficam pra depois — não foi pedido). Estrutura fica pronta pra UNION ALL futuro.
 
-1. **Sem filtro de fase de venda.** Qualquer card com `dataAssinatura` preenchida entra na conta, mesmo perdidos depois, em elaboração, ou em fases posteriores. A regra do projeto (memória `sales-phase-universal-definition`) é contar venda só quando a fase está em `Contrato assinado` / `Ganho` (e fases equivalentes por BU).
+### 2. `src/hooks/useJornadaData.ts` — enriquecer carteira da Mari
 
-2. **Double-count Outbound → Modelo Atual / Tax.** Um lead Outbound que vira venda aparece duas vezes: uma no pipe Outbound (com `outbound_` prefix) e outra no pipe Modelo Atual ou O2 TAX (id cru). IDs diferentes → não dedup.
+- Nova query (`useQuery`) que chama `query-external-db` action `pipes_active_aggregated`.
+- Após montar `clienteMap` da Central de Projetos, fazer um pass de enriquecimento:
+  - Normalizar título (`trim + lowercase + NFD sem acentos`).
+  - Para cada linha do pipe, achar cliente Mari correspondente por título.
+  - Quando casar:
+    - somar `valorAssessoria` em `cliente.mrr`,
+    - acrescentar `'Assessoria Financeira'` em `cliente.produto`,
+    - marcar flag interna `temAssessoriaFinanceira = true`.
+  - Cards sem match: log `console.warn` (mesma postura da memo, não viram cliente fantasma).
 
-3. **Sem dedup mensal/por card.** A regra `funnel-deduplication-rules-v2` exige no máx 1 contagem por card/fase/mês — `salesInPeriod` não aplica isso.
+### 3. Regra de carteira da Mari (linha ~605 do hook e ~789 do `CfoView.tsx`)
 
-O resto do dashboard (`pipefyVolumes.vendas`) usa `getCardsForIndicator('vendas')` que já aplica fase + dedup corretamente — por isso aquele card no topo bate, mas as 4 seções novas não.
+Substituir:
 
-## Correção
+```ts
+if (isMariClient(c.cfo) || isPedroloClient(c.cfo)) {
+  return isAssinaturaNoMesPassado(c.dataAssinatura);
+}
+```
 
-Trocar a construção de `salesInPeriod` para reusar os mesmos `getCardsForIndicator('vendas')` que já aplicam fase + dedup, e deduplicar entre BUs pelo ID base (sem prefixo) e/ou empresa normalizada.
+Por:
 
-### Passos
+```ts
+if (isPedroloClient(c.cfo)) {
+  return isAssinaturaNoMesPassado(c.dataAssinatura);
+}
+if (isMariClient(c.cfo)) {
+  // Assessoria Financeira: recorrente → fica na carteira todo mês
+  if (c.temAssessoriaFinanceira) return true;
+  // Diagnóstico/Turnaround/Valuation: só no mês da assinatura
+  return isAssinaturaNoMesPassado(c.dataAssinatura);
+}
+```
 
-1. **Em `MarketingIndicatorsTab.tsx`, substituir o bloco `salesInPeriod` (linhas 506-515)** por:
-   - Coletar vendas de cada BU via `maGetCards('vendas')`, `o2GetCards('vendas')`, `franquiaGetCards('vendas')`, `oxyGetCards('vendas')`, `outboundGetCards('vendas')`.
-   - Para cada coleção, mapear para `AttributionCard` (mesma forma do `push` que já existe em `leadsInPeriod` linhas 497-501), com prefixos consistentes (`outbound_`, `oxy_`, `o2tax_`).
-   - Concatenar e deduplicar por chave `${baseId}|${empresaNormalizada}` (strip dos prefixos `outbound_`, `oxy_`, `o2tax_`) — prevalece o registro do pipe "destino final" (ordem: Modelo Atual > O2 TAX > Franquia > Oxy Hacker > Outbound).
-   - Filtrar para `dataAssinatura` dentro de `[dateRange.from, dateRange.to]`. Se `dataAssinatura` for null mas o card foi contado em `vendas` pelo getCardsForIndicator (que já valida período), usar `dataEntrada` como fallback só pra Cohort de Entrada — mas em Cohort de Assinatura e Curva, excluir os sem `dataAssinatura`.
+Mesma substituição em `CfoView.tsx` `activeClientes`.
 
-2. **Sanity log temporário** (dev only): console.log de `salesInPeriod.length` por BU antes/depois do dedup, para validar o número final contra `pipefyVolumes.vendas`. Remover depois.
+### 4. Receita agregada do CFO (linha ~629)
 
-3. **Validação manual:** mês passado (filtro do usuário) → o número de linhas total na Cohort de Entrada deve bater com `pipefyVolumes.vendas` mostrado no topo do dashboard. Se ainda divergir, comparar lista de IDs.
+Mantém `mrr + pontual` pra Mari — fórmula já funciona pros dois casos:
+- Cliente puro Assessoria: `mrr` (assessoria) + `pontual` (0).
+- Cliente puro Diagnóstico: `mrr` (0) + `pontual` (diagnostico).
+- Cliente com os dois: soma correta dos dois.
 
-### Arquivos editados
+Nada a mudar aqui.
 
-- `src/components/planning/MarketingIndicatorsTab.tsx` (apenas o `useMemo` do `salesInPeriod`).
+### 5. Tipo `JornadaCliente`
 
-Nenhum outro componente precisa mudar — `CohortTable`, `ConversionCurveSection` e `OnlineOfflineSection` recebem `salesCards` corrigido e funcionam automaticamente.
+Adicionar `temAssessoriaFinanceira?: boolean` em `src/components/planning/jornada/types.ts`.
 
-### Não-objetivos
+## Validação
 
-- Não vou mexer em leads/MQLs (filtro do usuário não acusou divergência ali).
-- Não vou mexer em investimento/CAC (mesma razão).
-- Não vou mexer nos hooks de BU — a lógica de "o que é venda" já está certa neles via `getCardsForIndicator`.
+1. Console log `[Mari pipe-enrich]` mostrando `total_cards_pipe`, `matched`, `unmatched`.
+2. Aba Jornada → CFO Mariana: clientes de Assessoria Financeira devem aparecer mês após mês, com MRR correto.
+3. Clientes só de Diagnóstico continuam aparecendo apenas no mês da assinatura (comportamento atual preservado).
+4. MRR total da Mari = soma de assessoria mensal + diagnósticos do mês.
+
+## Fora de escopo
+
+- BPO e Coordenador Financeiro (a memo menciona, mas você não pediu agora — implementação futura é trivial: adicionar UNION ALL na mesma ação).
+- Alterar lógica do Pedrolo.
+- Atualizar memo `mem://logic/operations/bpo-assessoria-coordenador-values` — faço após a implementação rodar OK.

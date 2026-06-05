@@ -58,6 +58,10 @@ export interface JornadaCliente {
     tratativa: number; // 0-20
     setup: number;     // 0-20
   };
+
+  // Flag interna: cliente tem produto recorrente Assessoria Financeira (pipe dedicado).
+  // Usado para manter o cliente na carteira da Mari mês a mês (não expirar como Diagnóstico).
+  temAssessoriaFinanceira?: boolean;
 }
 
 export interface JornadaCfo {
