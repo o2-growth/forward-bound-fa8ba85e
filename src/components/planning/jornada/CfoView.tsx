@@ -1121,8 +1121,24 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                       <TooltipTrigger asChild>
                         <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
                       </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs text-xs">
-                        <p>MRR = CFOaaS + OXY. NPS = média dos clientes respondentes. Health = média ponderada (NPS 30 + Reuniões 30 + Tratativa 20 + Setup 20). Fonte: Pipefy — Central de Projetos + NPS</p>
+                      <TooltipContent side="top" className="max-w-xs text-xs space-y-1">
+                        {cfo.nome.includes('Pedrolo') ? (
+                          <>
+                            <p className="font-semibold">Lógica do squad Pedrolo</p>
+                            <p>O squad atende clientes <strong>OXY</strong> (Setup + SaaS), que são receitas <strong>pontuais</strong> — não recorrentes.</p>
+                            <p>Por isso, o <strong>pontual do mês anterior entra como "receita" do mês atual</strong>: cada cliente fica na carteira no mês seguinte à assinatura e some no virar do mês. O MRR exibido = Setup + SaaS OXY do mês passado.</p>
+                            <p className="text-muted-foreground">Fonte: Pipefy — Central de Projetos + Oxy Finance (SaaS)</p>
+                          </>
+                        ) : cfo.nome.includes('Mariana') ? (
+                          <>
+                            <p className="font-semibold">Lógica do squad Mariana</p>
+                            <p>O squad atende serviços <strong>pontuais</strong> (Diagnóstico, Turnaround, Valuation) e <strong>Assessoria Financeira</strong> (recorrente).</p>
+                            <p>Para os pontuais, o <strong>valor do mês anterior entra como "receita" do mês atual</strong> — cliente fica na carteira apenas no mês seguinte à assinatura. Já a Assessoria Financeira é recorrente e permanece na carteira todo mês.</p>
+                            <p className="text-muted-foreground">Fonte: Pipefy — Central de Projetos + pipe Assessoria</p>
+                          </>
+                        ) : (
+                          <p>MRR = CFOaaS + OXY. NPS = média dos clientes respondentes. Health = média ponderada (NPS 30 + Reuniões 30 + Tratativa 20 + Setup 20). Fonte: Pipefy — Central de Projetos + NPS</p>
+                        )}
                       </TooltipContent>
                     </Tooltip>
                   </span>
