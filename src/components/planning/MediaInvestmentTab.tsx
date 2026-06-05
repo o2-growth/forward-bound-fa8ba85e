@@ -860,17 +860,33 @@ function BUInvestmentTable({
                               </tbody>
                               <tfoot className="bg-muted/30 sticky bottom-0">
                                 <tr className="border-t">
-                                  <td className="px-3 py-2 font-semibold" colSpan={4}>Total a realocar</td>
+                                  <td className="px-3 py-2 text-muted-foreground" colSpan={4}>Gap bruto (Oxy − Projeção)</td>
+                                  <td className="text-right px-3 py-2 font-medium text-muted-foreground">
+                                    {formatCurrency(gapBruto)}
+                                  </td>
+                                </tr>
+                                <tr className="border-t">
+                                  <td className="px-3 py-2 text-muted-foreground" colSpan={4}>
+                                    Compensação A Vender (pendente)
+                                  </td>
+                                  <td className="text-right px-3 py-2 font-medium text-emerald-600">
+                                    {compensacao > 0 ? `− ${formatCurrency(compensacao)}` : 'R$ 0'}
+                                  </td>
+                                </tr>
+                                <tr className="border-t-2 border-border">
+                                  <td className="px-3 py-2 font-semibold" colSpan={4}>Saldo a realocar</td>
                                   <td className={`text-right px-3 py-2 font-bold ${isResolved ? 'text-emerald-600' : 'text-destructive'}`}>
-                                    {isResolved ? 'R$ 0' : formatCurrency(gap)}
+                                    {isResolved ? 'R$ 0 ✓' : formatCurrency(gap)}
                                   </td>
                                 </tr>
                               </tfoot>
                             </table>
                           </div>
                           <div className="p-3 border-t bg-muted/20 text-[11px] text-muted-foreground leading-relaxed">
-                            <strong>Oxy:</strong> meses fechados com dado real. <strong>Projeção:</strong> meses futuros calculados como MRR anterior × 0,95 + 25% das vendas anteriores. Realoque editando "A Vender" de qualquer mês futuro até zerar o saldo.
+                            <strong>Oxy:</strong> meses fechados com dado real. <strong>Projeção:</strong> meses futuros (MRR anterior × 0,95 + 25% das vendas anteriores).<br />
+                            Aumente "A Vender" dos meses futuros para gerar <strong>compensação</strong> — quando ela igualar o gap bruto, o saldo zera. As edições contam mesmo antes de salvar.
                           </div>
+
                         </PopoverContent>
                       </Popover>
                     </TableCell>
