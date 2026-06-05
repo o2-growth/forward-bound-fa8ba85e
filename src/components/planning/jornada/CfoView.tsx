@@ -779,20 +779,26 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
     const now = new Date();
     const mesAnteriorStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const mesAnteriorEnd = new Date(now.getFullYear(), now.getMonth(), 1);
-    const isMariOrPedrolo = (cfo: string) =>
-      cfo.includes('Mariana') || cfo.includes('Pedrolo');
+    const isMari = (cfo: string) => cfo.includes('Mariana');
+    const isPedrolo = (cfo: string) => cfo.includes('Pedrolo');
+    const inMesPassado = (dt: Date | null | undefined) =>
+      !!dt && dt >= mesAnteriorStart && dt < mesAnteriorEnd;
     // Quando há dateRange ativo, usar clientesPeriodo (snapshot do fim do período);
     // caso contrário, lista crua de clientes (compatibilidade com comportamento anterior).
     const source = dateRange ? clientesPeriodo : clientes;
     return source.filter(c => {
       if (INACTIVE_PHASES.includes(c.faseAtual)) return false;
-      if (isMariOrPedrolo(c.cfo)) {
-        const dt = c.dataAssinatura;
-        return !!dt && dt >= mesAnteriorStart && dt < mesAnteriorEnd;
+      if (isPedrolo(c.cfo)) return inMesPassado(c.dataAssinatura);
+      if (isMari(c.cfo)) {
+        // Assessoria Financeira: recorrente → fica na carteira todo mês
+        if (c.temAssessoriaFinanceira) return true;
+        // Diagnóstico / Turnaround / Valuation: só no mês da assinatura
+        return inMesPassado(c.dataAssinatura);
       }
       return true;
     });
   }, [clientes, clientesPeriodo, dateRange]);
+
 
   // A1: Count churns per CFO
   // Fonte preferida: dossiê oficial (mesmos overrides da aba Churn), filtrado pelo dateRange.
