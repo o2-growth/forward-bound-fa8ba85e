@@ -42,10 +42,20 @@ interface ReuniaoData {
   ata4?: string | null;
 }
 
+interface OnboardingAtrasadoCard {
+  id: string;
+  titulo: string;
+  cfo: string;
+  fase: string;
+  dataPrevista: Date | null;
+  diasAtraso: number;
+}
+
 interface ReunioesViewProps {
   reunioes: ReuniaoData[];
   allCfos: string[];
   clientes?: JornadaCliente[];
+  onboardingAtrasado?: OnboardingAtrasadoCard[];
 }
 
 // Deadlines: R1=7, R2=14, R3=21, R4=28
