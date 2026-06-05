@@ -91,7 +91,7 @@ function CustomerSuccessTabInner() {
     a.getDate() === b.getDate();
 
   // Data hooks
-  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, operacao, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
+  const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, operacao, onboardingAtrasado, isLoading: jornadaLoading, error: jornadaError } = useJornadaData();
   const { data: npsData, isLoading: npsLoading, error: npsError } = useNpsData();
   const { data: opsData } = useOperationsData();
 
