@@ -95,7 +95,7 @@ const BU_SDRS: Record<BuType, string[]> = {
   modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Matheus', 'Ana'],
   o2_tax: ['Carlos'],
   oxy_hacker: ['Carlos'],
-  franquia: ['Carlos', 'Bruna'],
+  franquia: ['Carlos', 'Bruna', 'Kethlin'],
 };
 
 // SDR options for MultiSelect
@@ -106,6 +106,7 @@ const sdrOptions: MultiSelectOption[] = [
   { value: 'Matheus', label: 'Matheus' },
   { value: 'Ana', label: 'Ana' },
   { value: 'Bruna', label: 'Bruna (Franquia)' },
+  { value: 'Kethlin', label: 'Kethlin (Franquia)' },
 ];
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
