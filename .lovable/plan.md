@@ -1,44 +1,92 @@
-## Diagnóstico
+## Objetivo
 
-Consultei o pipe **3.2 Gestão de Rotinas (CFO)** (306755752) e listei os 11 cards das fases de onboarding:
+Fechar a etapa de Cohort/Curva/Online-Offline/CAC garantindo que (1) toda fonte real do Pipefy está classificada explicitamente como online ou offline, (2) "venda" segue a regra universal de entrada em Contrato assinado/Ganho, e (3) test cards estão fora.
 
-- Kick-off do Projeto: 2 cards (Data Prevista 12/06/2026 → ainda no futuro)
-- Primeiras Entregas - Diagnóstico: 9 cards — vários com Data Prevista no passado (02/05, 06/05, 13/05, 21/05, 05/06) e outros futuros
+## Passo 1 — Auditar fontes reais (script de diagnóstico, NÃO entra no app)
 
-**Problema:** em todos eles o campo `late` (=Overdue) do Pipefy vem `false`, mesmo nos que estão claramente vencidos (hoje é 05/06/2026). Como nosso filtro atual exige `Overdue === true`, todos são descartados e o bloco aparece vazio.
+Rodar uma query única via Edge Function `query-external-db` (action `preview`, limit 5000) em 4 tabelas:
 
-O campo `Overdue` no Pipefy não está sendo atualizado de forma confiável para esse pipe — não dá pra confiar nele como critério único.
+- `pipefy_moviment_cfos` (Modelo Atual)
+- `pipefy_moviment_outbound` (Outbound)
+- `pipefy_cards_movements` (O2 TAX)
+- `pipefy_cards_movements_expansao` (Franquia + Oxy Hacker — separar por campo `Produto`)
 
-## Correção
+Extrair tripla `Fonte | Origem do lead | Tipo de Origem do lead`, deduplicar por `ID`, e listar todas as combinações distintas com contagem.
 
-Em `src/hooks/useJornadaData.ts` (bloco `Onboarding atrasado`, linhas ~1009-1044), trocar o critério:
+Saída: relatório em `/mnt/documents/fontes-audit.csv` com colunas `bu, fonte, origem_lead, tipo_origem, count, classificacao_atual`.
 
-**Antes:**
+## Passo 2 — Atualizar `src/lib/marketingChannelGroup.ts`
+
+Substituir a lista de tokens por um mapeamento explícito baseado na auditoria:
+
 ```ts
-const overdue = row['Overdue'] === true || row['Overdue'] === 'true';
-if (!overdue) continue;
+const ONLINE_FONTES = new Set([...]);   // fontes literais
+const OFFLINE_FONTES = new Set([...]);  // fontes literais
+const ONLINE_TOKENS = [...];            // fallback por substring para fontes novas
+const OFFLINE_TOKENS = [...];
 ```
 
-**Depois:** considerar atrasado quando `Data Prevista Entrega < hoje` (com fallback para o flag do Pipefy):
-```ts
-const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
-const pipefyOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
-const dateOverdue = dataPrevista ? dataPrevista.getTime() < startOfTodayTs : false;
-if (!pipefyOverdue && !dateOverdue) continue;
+Regra:
+1. Match exato (normalizado) em `ONLINE_FONTES` / `OFFLINE_FONTES` → ganha
+2. Caso contrário, fallback por substring (lista atual)
+3. Última camada: heurística pelo nome de campanha (`Campanha` começa com número/UTM → online)
+4. Sobrou: `desconhecido`
+
+Tokens conhecidos hoje que precisam entrar (do código atual + Indicadores 26): `meta ads, facebook, instagram, google ads, googleads, site, site/redes sociais, redes sociais, linkedin, matéria exame, globo internacional, youtube, organic, direct, podcast, blog` (online) e `colaborador o2, ind. parceiro, ind. prospect, já era cliente, prosp. ativa, outbound, evento, indicação cliente, indicação fornecedor` (offline). A lista final sai do Passo 1.
+
+## Passo 3 — Painel "Fontes sem classificação" no dashboard
+
+Novo bloco no fim de `OnlineOfflineSection.tsx`, só aparece se houver pelo menos 1 fonte `desconhecido`:
+
+```
+┌─ Fontes sem classificação (N) ──────────────────────────┐
+│ Fonte                       BU          Leads   Vendas  │
+│ <nome bruto>                Modelo A.   12      1       │
+│ ...                                                     │
+│ Tooltip: "Adicione em marketingChannelGroup.ts"         │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Onde `startOfTodayTs` = início do dia de hoje (`new Date(); setHours(0,0,0,0)`).
+Isso garante visibilidade futura quando aparecer fonte nova.
 
-## Ajuste no tooltip
+## Passo 4 — Mudar definição de venda
 
-Em `src/components/planning/jornada/ReunioesView.tsx`, atualizar o texto explicativo do bloco para refletir o novo critério: "Cards nas fases Kick-off do Projeto / Primeiras Entregas - Diagnóstico com Data Prevista vencida (ou marcados Overdue pelo Pipefy). Fonte: pipe Gestão de Rotinas CFO."
+Hoje `salesInPeriod` filtra `card.dataAssinatura dentro do dateRange`. Trocar para a regra universal já memorizada:
 
-## Fora de escopo
+- Venda = card que entrou em fase `Contrato assinado` ou `Ganho` (normalizada) dentro do período
+- Usar `dataAssinatura` apenas como referência de display
 
-- Não mexer no KPI `tarefasAtrasadas` (segue lógica atual de rotinas).
-- Não alterar outros pipes nem `processRotinas`.
-- Sem novas chamadas, queries ou edge functions — usa os dados já carregados em `data.rotinas`.
+Em `MarketingIndicatorsTab.tsx`, substituir o `useMemo` de `salesInPeriod` por uma helper compartilhada que respeita `sales-phase-universal-definition` + `sales-date-prioritization-logic` (prioriza `Data de assinatura do contrato` quando preenchida, senão data de entrada na fase). Isso já existe em vários hooks — vou centralizar em `src/lib/salesRecognition.ts` e reusar.
 
-## Resultado esperado
+## Passo 5 — Excluir test cards
 
-Os ~5 cards da fase "Primeiras Entregas - Diagnóstico" com Data Prevista entre 02/05 e 05/06 passam a aparecer no bloco "Onboarding atrasado", agrupados por fase, com a coluna "Dias de atraso" calculada corretamente.
+Importar `isTestCard` (já existente) e aplicar nos 3 datasets feed das seções novas:
+- `allAttributionCards`
+- `leadsAttributionCards`
+- `salesInPeriod`
+
+## Passo 6 — Validar números
+
+Após o build, comparar com `Indicadores Growth.xlsx` (período abr/2026 ou outro fechado) para:
+- CAC total
+- Online/Offline split (leads + vendas + conversão)
+- Média/Mediana dias até fechar
+- Cohort de Entrada e Assinatura (mês a mês)
+
+Se algum bater fora, registrar a divergência junto ao painel "Fontes sem classificação" pra discutir antes de mexer em fórmula.
+
+## Arquivos afetados
+
+```
+src/lib/marketingChannelGroup.ts          (reescrita do mapper)
+src/lib/salesRecognition.ts               (NOVO — helper compartilhado)
+src/components/planning/MarketingIndicatorsTab.tsx   (salesInPeriod + isTestCard)
+src/components/planning/marketing-indicators/OnlineOfflineSection.tsx   (painel desconhecido)
+/mnt/documents/fontes-audit.csv           (artefato de auditoria)
+```
+
+## Notas técnicas
+
+- Memória a atualizar: `mem://features/marketing/cohort-curva-online-offline-cac` com nova definição de venda + isTestCard.
+- Sem alteração em edge functions, metas, ou DB schema.
+- O painel de desconhecido é o seguro: se aparecer fonte nova depois, dá pra reclassificar em 1 PR sem mexer no resto.
