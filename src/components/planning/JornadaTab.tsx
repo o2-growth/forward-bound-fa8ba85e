@@ -214,7 +214,7 @@ export function JornadaTab() {
         <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
-          <TabsTrigger value="reunioes">Reuniões</TabsTrigger>
+          <TabsTrigger value="reunioes">Entrega</TabsTrigger>
           <TabsTrigger value="cfos">CFOs</TabsTrigger>
           <TabsTrigger value="alertas">
             Alertas

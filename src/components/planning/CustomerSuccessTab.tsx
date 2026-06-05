@@ -452,7 +452,7 @@ function CustomerSuccessTabInner() {
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
             <TabsTrigger value="clientes">Clientes</TabsTrigger>
             <TabsTrigger value="cfos">CFOs</TabsTrigger>
-            <TabsTrigger value="reunioes">Reuniões</TabsTrigger>
+            <TabsTrigger value="reunioes">Entrega</TabsTrigger>
             <TabsTrigger value="nps">NPS</TabsTrigger>
             <TabsTrigger value="churn">Churn</TabsTrigger>
             <TabsTrigger value="alertas">
