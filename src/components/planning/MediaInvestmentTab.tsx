@@ -2053,6 +2053,48 @@ export function MediaInvestmentTab() {
         }
       }
 
+      // ---------- Cascade flush: re-save faturamento for ALL Modelo Atual months ----------
+      // Bug fix: when the user edits month X, the MRR chain of ALL later months
+      // changes. If we only save faturamento of edited months, the unedited
+      // months keep their old faturamento — and on reload A Vender shifts
+      // (because A Vender exibido = faturamento − MRR recomputado).
+      // Solution: for every Modelo Atual month, recompute faturamento using
+      // the new MRR chain + effective A Vender, and push an update if it
+      // differs from what's stored.
+      {
+        const modeloTicket = indicadoresPorBU.modeloAtual.ticketMedio;
+        for (const m of months) {
+          // Skip months already pushed in the main loop above
+          const alreadyPushed = updates.some(u => u.bu === 'modelo_atual' && u.month === m);
+          if (alreadyPushed) continue;
+
+          const mrrBaseDoMes = newMrrChainModelo[m] || 0;
+          const aVender = effectiveAVenderModelo[m] || 0;
+          const newFaturamento = mrrBaseDoMes + aVender;
+
+          const buMeta = metas.find(x => x.bu === 'modelo_atual' && x.month === m);
+          const storedFaturamento = Number(buMeta?.faturamento) || 0;
+          // Skip if no meaningful change (round to 1 BRL)
+          if (Math.abs(storedFaturamento - newFaturamento) < 1) continue;
+
+          const ticketMedio = buMeta ? Number(buMeta.ticket_medio) || modeloTicket : modeloTicket;
+          const vendas = Math.round(newFaturamento / ticketMedio);
+
+          updates.push({
+            bu: 'modelo_atual',
+            month: m,
+            year: 2026,
+            faturamento: newFaturamento,
+            mrr: Math.round(newFaturamento * 0.25),
+            setup: Math.round(newFaturamento * 0.60),
+            pontual: Math.round(newFaturamento * 0.15),
+            vendas,
+            ticket_medio: ticketMedio,
+          });
+        }
+      }
+      // ------------------------------------------------------------------------------------
+
       
       if (updates.length > 0) {
         await bulkUpdateMetas.mutateAsync(updates);
