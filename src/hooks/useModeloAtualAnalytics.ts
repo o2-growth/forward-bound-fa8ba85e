@@ -212,6 +212,9 @@ function parseCards(rows: Record<string, any>[], skipPhaseFilter = false): Model
 }
 
 export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
+  // Enriquecimento de produto via pipefy_db_clientes (campo "Produtos" não existe nos movimentos)
+  const { produtosMap } = useClientesProdutos();
+
   // Memoize date strings to prevent queryKey instability (fixes "Should have a queue" error)
   const startDateStr = useMemo(() => startDate.toISOString().split('T')[0], [startDate.getTime()]);
   const endDateStr = useMemo(() => endDate.toISOString().split('T')[0], [endDate.getTime()]);
