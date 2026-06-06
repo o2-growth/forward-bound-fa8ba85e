@@ -494,31 +494,46 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
   }, [getCardsForIndicator]);
 
   // Helper function to convert ModeloAtualCard to DetailItem
-  const toDetailItem = (card: ModeloAtualCard): DetailItem => ({
-    id: card.id,
-    name: card.titulo || card.empresa || 'Sem título',
-    company: card.empresa || card.contato || undefined,
-    phase: card.faseDestino,
-    date: (card.dataAssinatura && PHASE_TO_INDICATOR[card.fase] === 'venda' 
-      ? card.dataAssinatura 
-      : card.dataEntrada).toISOString(),
-    value: card.valor,
-    revenueRange: card.faixa || undefined,
-    responsible: card.closer || card.responsavel || undefined, // Prioritize closer for display
-    duration: card.duracao,
-    product: card.produto || 'CaaS',
-    mrr: card.valorMRR,
-    setup: card.valorSetup,
-    pontual: card.valorPontual,
-    closer: card.closer,
-    sdr: card.sdr,
-    dataAssinatura: card.dataAssinatura?.toISOString() || undefined,
-    dataCriacao: card.dataCriacao?.toISOString() || undefined,
-    tipoOrigem: card.tipoOrigem,
-    origemLead: card.origemLead,
-    fonte: card.fonte,
-    campanha: card.campanha,
-  });
+  const toDetailItem = (card: ModeloAtualCard): DetailItem => {
+    // Resolve produto via pipefy_db_clientes (campo "Produtos" não vem nos movimentos):
+    // tenta título → empresa, depois classifica em categoria única (fallback CaaS).
+    const lookupKeys = [
+      normalizeClientKey(card.titulo),
+      normalizeClientKey(card.empresa),
+    ].filter(Boolean);
+    let produtoRaw: string | undefined = card.produto;
+    for (const k of lookupKeys) {
+      const found = produtosMap.get(k);
+      if (found) { produtoRaw = found; break; }
+    }
+    const productCategory = classifyProduto(produtoRaw);
+
+    return {
+      id: card.id,
+      name: card.titulo || card.empresa || 'Sem título',
+      company: card.empresa || card.contato || undefined,
+      phase: card.faseDestino,
+      date: (card.dataAssinatura && PHASE_TO_INDICATOR[card.fase] === 'venda'
+        ? card.dataAssinatura
+        : card.dataEntrada).toISOString(),
+      value: card.valor,
+      revenueRange: card.faixa || undefined,
+      responsible: card.closer || card.responsavel || undefined, // Prioritize closer for display
+      duration: card.duracao,
+      product: productCategory,
+      mrr: card.valorMRR,
+      setup: card.valorSetup,
+      pontual: card.valorPontual,
+      closer: card.closer,
+      sdr: card.sdr,
+      dataAssinatura: card.dataAssinatura?.toISOString() || undefined,
+      dataCriacao: card.dataCriacao?.toISOString() || undefined,
+      tipoOrigem: card.tipoOrigem,
+      origemLead: card.origemLead,
+      fonte: card.fonte,
+      campanha: card.campanha,
+    };
+  };
 
   // Get detail items for a specific indicator
   const getDetailItemsForIndicator = (indicator: IndicatorType): DetailItem[] => {
