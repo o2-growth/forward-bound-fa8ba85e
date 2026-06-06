@@ -5,6 +5,8 @@ import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isTestCard } from "@/hooks/useModeloAtualMetas";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
+import { useClientesProdutos } from "./useClientesProdutos";
+import { classifyProduto, normalizeClientKey } from "@/lib/productClassifier";
 
 export interface ModeloAtualCard {
   id: string;
