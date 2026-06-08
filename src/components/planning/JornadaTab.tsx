@@ -242,9 +242,11 @@ export function JornadaTab() {
           <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} />
         </TabsContent>
 
-        <TabsContent value="cfos" className="mt-4">
-          <CfoView cfos={filteredCfos} clientes={filteredClientes} />
-        </TabsContent>
+        {!isCfo && (
+          <TabsContent value="cfos" className="mt-4">
+            <CfoView cfos={filteredCfos} clientes={filteredClientes} />
+          </TabsContent>
+        )}
 
         <TabsContent value="alertas" className="mt-4">
           <AlertasView alertas={filteredAlertas} />
