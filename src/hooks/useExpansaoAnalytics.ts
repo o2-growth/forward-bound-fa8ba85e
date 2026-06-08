@@ -467,7 +467,9 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
   }, [cards, fullHistory, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners]);
 
   // Helper function to convert ExpansaoCard to DetailItem
-  const toDetailItem = (card: ExpansaoCard): DetailItem => ({
+  const toDetailItem = (rawCard: ExpansaoCard): DetailItem => {
+    const card = enrichCardWithEffectiveOwners(rawCard);
+    return ({
     id: card.id,
     name: card.titulo,
     company: card.titulo,
