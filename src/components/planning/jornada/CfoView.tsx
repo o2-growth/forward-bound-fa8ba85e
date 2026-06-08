@@ -1117,33 +1117,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
             >
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center justify-between">
-                  <span>
-                    {cfo.nome}
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help inline ml-1" />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs text-xs space-y-1">
-                        {cfo.nome.includes('Pedrolo') ? (
-                          <>
-                            <p className="font-semibold">Lógica do squad Pedrolo</p>
-                            <p>O squad atende clientes <strong>OXY</strong> (Setup + SaaS), que são receitas <strong>pontuais</strong> — não recorrentes.</p>
-                            <p>Por isso, o <strong>pontual do mês anterior entra como "receita" do mês atual</strong>: cada cliente fica na carteira no mês seguinte à assinatura e some no virar do mês. O MRR exibido = Setup + SaaS OXY do mês passado.</p>
-                            <p className="text-muted-foreground">Fonte: Pipefy — Central de Projetos + Oxy Finance (SaaS)</p>
-                          </>
-                        ) : cfo.nome.includes('Mariana') ? (
-                          <>
-                            <p className="font-semibold">Lógica do squad Mariana</p>
-                            <p>O squad atende serviços <strong>pontuais</strong> (Diagnóstico, Turnaround, Valuation) e <strong>Assessoria Financeira</strong> (recorrente).</p>
-                            <p>Para os pontuais, o <strong>valor do mês anterior entra como "receita" do mês atual</strong> — cliente fica na carteira apenas no mês seguinte à assinatura. Já a Assessoria Financeira é recorrente e permanece na carteira todo mês.</p>
-                            <p className="text-muted-foreground">Fonte: Pipefy — Central de Projetos + pipe Assessoria</p>
-                          </>
-                        ) : (
-                          <p>MRR = CFOaaS + OXY. NPS = média dos clientes respondentes. Health = média ponderada (NPS 30 + Reuniões 30 + Tratativa 20 + Setup 20). Fonte: Pipefy — Central de Projetos + NPS</p>
-                        )}
-                      </TooltipContent>
-                    </Tooltip>
-                  </span>
+                  <span>{cfo.nome}</span>
                   <span className="text-xs font-normal text-muted-foreground">
                     Health: {cfo.healthScoreMedio}
                   </span>
@@ -1151,7 +1125,29 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                 <p className="text-sm text-muted-foreground">
                   {cfo.clientes} clientes | {formatCompact(cfo.mrrTotal)} MRR
                 </p>
+                {(cfo.nome.includes('Pedrolo') || cfo.nome.includes('Mariana')) && (
+                  <div className="mt-2 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+                    <Info className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold text-amber-900 dark:text-amber-200">Como ler este squad</p>
+                      {cfo.nome.includes('Pedrolo') ? (
+                        <p className="text-amber-900/90 dark:text-amber-100/90">
+                          Squad <strong>OXY</strong> (Setup + SaaS) — receita <strong>pontual</strong>, não recorrente.
+                          O valor fechado no <strong>mês anterior</strong> aparece como receita do <strong>mês atual</strong>.
+                          Cliente fica na carteira apenas no mês seguinte à assinatura.
+                        </p>
+                      ) : (
+                        <p className="text-amber-900/90 dark:text-amber-100/90">
+                          Squad atende <strong>pontuais</strong> (Diagnóstico, Turnaround, Valuation) e <strong>Assessoria Financeira</strong> (recorrente).
+                          Para os pontuais, o valor do <strong>mês anterior</strong> entra como receita do <strong>mês atual</strong>.
+                          A Assessoria Financeira permanece na carteira todo mês.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardHeader>
+
               <CardContent className="space-y-3">
                 {/* Health bar */}
                 <div>

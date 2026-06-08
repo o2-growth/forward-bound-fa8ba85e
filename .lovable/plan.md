@@ -1,15 +1,37 @@
-## Objetivo
+## 1. Resetar senha da Andrea Franzen
 
-Analistas (role `cfo`) não devem ver a aba **CFOs** dentro da Operação/Jornada. Devem continuar vendo Pipeline, Clientes, Entrega e Alertas.
+- Usuária: `andrea.franzen@o2inc.com.br` (id `b72f477f-0685-4d0b-9947-404bd0d119a5`)
+- Nova senha: `Alterar@01`
+- Execução via script Node usando `SUPABASE_SERVICE_ROLE_KEY` chamando `auth.admin.updateUserById`.
 
-## Mudança
+## 2. Tornar a explicação evidente nos cards do Pedrolo e da Mariana
 
-Arquivo único: `src/components/planning/JornadaTab.tsx`
+Hoje a lógica especial (pontual do mês anterior conta como receita do mês atual) está só num tooltip do ícone ℹ️ — passa despercebido, principalmente quando o próprio Pedrolo ou a Mariana logam e veem apenas o card deles.
 
-1. Importar `useUserPermissions` e ler `isCfo`.
-2. Renderizar condicionalmente o `<TabsTrigger value="cfos">` e o `<TabsContent value="cfos">` apenas quando `!isCfo`.
-3. Ajustar o `grid-cols-5` do `TabsList` para `grid-cols-4` quando a aba CFOs estiver oculta (analistas veem 4 abas; admins/usuários normais veem 5).
+**Mudança em `src/components/planning/jornada/CfoView.tsx` (~linha 1118–1155):**
 
-Admin continua vendo a aba normalmente — somente quem tem a role `cfo` (analistas) terá a aba escondida.
+Quando o card for do Pedrolo ou da Mariana, adicionar logo abaixo do `CardHeader`, antes do conteúdo, um **banner âmbar persistente** (sempre visível, não hover) com:
 
-Nenhuma outra tela é afetada.
+```
+┌──────────────────────────────────────────────┐
+│ ℹ️  Como ler este squad                       │
+│ Receita é pontual (não recorrente). O valor  │
+│ fechado no mês anterior aparece como receita │
+│ do mês atual. [+ texto específico Pedrolo/   │
+│ Mari]                                        │
+└──────────────────────────────────────────────┘
+```
+
+- Pedrolo: enfatiza Setup + SaaS OXY do mês passado.
+- Mariana: enfatiza pontuais (Diagnóstico/Turnaround/Valuation) + Assessoria recorrente que fica todo mês.
+
+Estilo: `border border-amber-500/40 bg-amber-500/10 text-xs rounded-md p-2` com ícone `Info` — chama atenção sem poluir.
+
+O tooltip atual no ícone ℹ️ é removido (vira redundante), mas o ícone fica como âncora visual dentro do banner.
+
+Demais cards (outros CFOs) continuam exatamente como estão hoje, sem banner.
+
+## Detalhes técnicos
+- Arquivo único alterado: `src/components/planning/jornada/CfoView.tsx`
+- Senha reset: script `/tmp` usando `@supabase/supabase-js` admin client, descartado após uso.
+- Nenhuma migração de banco necessária.
