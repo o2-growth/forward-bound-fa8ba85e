@@ -461,9 +461,10 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
         }
       }
 
-      return result;
+      // Enriquece com SDR/Closer efetivos do histórico (fix Expansão Lead/MQL)
+      return result.map(enrichCardWithEffectiveOwners);
     };
-  }, [cards, fullHistory, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto]);
+  }, [cards, fullHistory, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners]);
 
   // Helper function to convert ExpansaoCard to DetailItem
   const toDetailItem = (card: ExpansaoCard): DetailItem => ({
