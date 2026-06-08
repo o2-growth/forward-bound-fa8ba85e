@@ -215,11 +215,11 @@ export function JornadaTab() {
 
       {/* Sub-tabs */}
       <Tabs defaultValue="pipeline" className="w-full">
-        <TabsList className="grid w-full max-w-2xl grid-cols-5">
+        <TabsList className={`grid w-full max-w-2xl ${isCfo ? 'grid-cols-4' : 'grid-cols-5'}`}>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="clientes">Clientes</TabsTrigger>
           <TabsTrigger value="reunioes">Entrega</TabsTrigger>
-          <TabsTrigger value="cfos">CFOs</TabsTrigger>
+          {!isCfo && <TabsTrigger value="cfos">CFOs</TabsTrigger>}
           <TabsTrigger value="alertas">
             Alertas
             {filteredAlertas.length > 0 && (
