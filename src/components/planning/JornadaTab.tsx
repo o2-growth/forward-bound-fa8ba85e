@@ -12,8 +12,10 @@ import { CfoView } from "./jornada/CfoView";
 import { AlertasView } from "./jornada/AlertasView";
 import { ReunioesView } from "./jornada/ReunioesView";
 import type { JornadaFilter, JornadaCliente, JornadaCfo, PipelineFase } from "./jornada/types";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 export function JornadaTab() {
+  const { isCfo } = useUserPermissions();
   const { clientes, cfos, alertas, pipeline, reunioes, allCfos, allProdutos, isLoading, error, refetch, isFetching, dataUpdatedAt } = useJornadaData();
 
   const lastUpdatedLabel = dataUpdatedAt
