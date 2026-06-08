@@ -1,43 +1,47 @@
-# Dedup de Reunião Marcada (RM) por título normalizado + mês
+# Mostrar os 8 MQLs "invisíveis" da Expansão
 
-## Problema
+Não consigo consultar o Pipefy direto daqui (a edge function exige JWT do usuário logado). Em vez disso, vou expor esses cards **dentro do próprio dashboard**, na BU Expansão (Franquia), para você inspecionar quem são os 8 que somem ao filtrar SDR.
 
-No drill-down de **Reunião agendada / Qualificado** em Modelo Atual/Jun-2026, cards distintos no Pipefy (IDs diferentes) representam o mesmo cliente reaberto/recadastrado e contam 2x. Casos confirmados:
+## O que vou fazer
 
-- Kopu (1227194784 + 1360806670)
-- Núcleo (976231563 + 1365789446)
-- José Edson Pascaol Filho (1361675259 + 1362514316)
-- G4 Pic pay (1365680160 + 1365683470)
+### 1. Chip "Sem SDR atribuído" no drill-down de MQL (Expansão)
+No mini-painel que abre ao clicar em MQL da Expansão, adicionar um chip abaixo do total:
 
-Hoje a dedup existe só para **venda** (por id+mês). Para RM não há dedup por título.
+```text
+22 MQLs  •  ⚠ 8 sem SDR atribuído no Pipefy  [ver lista]
+```
 
-## Mudança
+Ao clicar em **[ver lista]**, abre uma tabela com:
 
-Aplicar dedup adicional para `indicator='rm'` em `getCardsForIndicator` e `getDetailItemsForIndicator`:
+| Título | ID Pipefy | Fase atual | Data entrada MQL | Investimento | SDR (efetivo) | Closer (efetivo) |
 
-- **Chave:** `normalize(titulo) + ano-mês da dataEntrada`
-- **Normalize:** trim, lowercase, NFD sem acentos (regra já existente em `mem://logic/indicators/string-normalization-rules`)
-- **Critério de preferência** ao escolher 1 entre N duplicatas no mesmo mês:
-  1. Maior `dataEntrada` (entrada mais recente — reflete reagendamento)
-  2. Em empate, manter o de menor ID (estável)
-- **Escopo:** somente RM. Não muda Leads, MQL, RR, Proposta nem Venda.
-- **Aplicação:** Modelo Atual + O2 TAX (Expansão já dedup por `card+indicator+mês` via `monthlyFirstEntries`, mas títulos diferentes; fica fora do escopo a menos que você queira incluir).
+Só aparecem os cards cujo `effectiveSdrByCard.get(id)` retornou `null` (nunca tiveram SDR em nenhum movimento do histórico).
 
-## Onde mexer
+### 2. Link direto pro Pipefy em cada linha
+Cada título vira link `https://app.pipefy.com/pipes/<pipeId>/cards/<cardId>` (usando o `deep-linking-config-v2` já existente), pra você abrir e ver na hora se é lead órfão, perdido, duplicado ou ICP-fora.
 
-- `src/hooks/useModeloAtualAnalytics.ts` → bloco `getCardsForIndicator('rm')` (adicionar dedup pós-filtro, igual ao padrão do `venda`)
-- `src/hooks/useO2TaxAnalytics.ts` → mesmo bloco para `'rm'`
-- Atualizar memória `mem://logic/indicators/sales-monthly-card-dedup` (renomear/ampliar) para incluir a regra de RM por título+mês
+### 3. Console.log temporário (debug)
+Em `useExpansaoAnalytics.ts`, log único por render listando os cards sem SDR efetivo:
 
-## Impacto esperado
+```text
+[Expansao MQL sem SDR] Jun/2026 Franquia:
+  - 1234567 "Empresa X" | fase=Lead | inv=R$15-30k | closer=null
+  - 1234568 "Empresa Y" | fase=MQL  | inv=R$30k+   | closer=Bruna
+  ...
+```
 
-- Modelo Atual / Jun-2026: 42 → ~38 RMs
-- Reflete em: card "Qtd Reuniões Marcadas", drill-down do funil, e nos gráficos diários/semanais (a contagem do dia da duplicata removida cai 1)
-- **Não** afeta metas, valores monetários, conversões com base no mesmo numerador (taxa RM→RR vai melhorar levemente)
+Removo o log depois que confirmarmos a causa.
 
-## Validação
+## Arquivos afetados
 
-Após a mudança, conferir no preview que:
-- Modelo Atual / Jun-2026 mostra ~38 RMs
-- Drill-down não lista mais 2 linhas "Kopu", "Núcleo", "G4 Pic pay" ou "José Edson"
-- Maio/2026 (referência anterior) não muda significativamente (sanity check)
+- `src/hooks/useExpansaoAnalytics.ts` — expor `getCardsWithoutSdr(indicator)` + log
+- `src/components/planning/ClickableFunnelChart.tsx` ou o drill-down de MQL Expansão — renderizar o chip + tabela
+- Escopo restrito à **Expansão (Franquia + Oxy Hacker)**, não toca Modelo Atual nem O2 TAX
+
+## Decisão de regra (continua pendente, mas independente do debug acima)
+
+Depois que você ver os 8 cards, decidimos:
+- Se forem órfãos legítimos (perdidos / sem trabalho) → mantém 14 e o chip vira a explicação permanente.
+- Se forem cards válidos da Bruna/Kethlin → mudamos a regra pra "todo lead Franquia conta pros SDRs da BU" via fallback `BU_SDRS['franquia']`.
+
+Confirma que posso implementar esse painel de inspeção?

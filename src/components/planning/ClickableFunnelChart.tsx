@@ -670,12 +670,60 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     }
     
     const items = getItemsForIndicator(stage.indicator);
-    const columns = getColumnsForIndicator(stage.indicator);
-    
+    let columns = getColumnsForIndicator(stage.indicator);
+    let description = `${formatNumber(stage.value)} registros no período selecionado`;
+
+    // ============================================================
+    // DEBUG Expansão: mostrar SDR/Closer + contar cards sem SDR
+    // Ajuda a identificar os MQLs "invisíveis" quando o filtro de
+    // SDR está ativo (Franquia/Oxy Hacker não atribuem SDR nas
+    // fases iniciais do Pipefy).
+    // ============================================================
+    const isExpansaoBU = useExpansaoData || useOxyHackerData;
+    if (isExpansaoBU && (stage.indicator === 'mql' || stage.indicator === 'leads')) {
+      const semSdr = items.filter(i => !(i.sdr && String(i.sdr).trim()));
+      const semCloser = items.filter(i => !((i.closer || i.responsible) && String(i.closer || i.responsible).trim()));
+      if (semSdr.length > 0) {
+        description += ` • ⚠ ${semSdr.length} sem SDR atribuído no Pipefy`;
+      }
+      // Override columns: incluir SDR + Closer + Investimento
+      columns = [
+        { key: 'name' as keyof DetailItem, label: 'Título' },
+        { key: 'company' as keyof DetailItem, label: 'Empresa/Contato' },
+        { key: 'date' as keyof DetailItem, label: 'Data', format: columnFormatters.date },
+        { key: 'revenueRange' as keyof DetailItem, label: 'Investimento', format: columnFormatters.revenueRange },
+        { key: 'sdr' as keyof DetailItem, label: 'SDR (efetivo)' },
+        { key: 'closer' as keyof DetailItem, label: 'Closer (efetivo)' },
+      ];
+      // Ordena: cards sem SDR no topo
+      items.sort((a, b) => {
+        const aHas = !!(a.sdr && String(a.sdr).trim());
+        const bHas = !!(b.sdr && String(b.sdr).trim());
+        if (aHas === bHas) return 0;
+        return aHas ? 1 : -1;
+      });
+      // Console log único para o usuário inspecionar
+      // eslint-disable-next-line no-console
+      console.log(
+        `[Expansão ${stage.name} sem SDR] ${semSdr.length} de ${items.length} cards sem SDR efetivo:`,
+        semSdr.map(i => ({
+          id: i.id,
+          titulo: i.name,
+          empresa: i.company,
+          fase: (i as any).fase,
+          investimento: i.revenueRange,
+          sdr: i.sdr,
+          closer: i.closer || i.responsible,
+        }))
+      );
+      // eslint-disable-next-line no-console
+      console.log(`[Expansão ${stage.name}] ${semCloser.length} também sem Closer.`);
+    }
+
     setSheetKpis([]);
     setSheetCharts([]);
     setSheetTitle(`${stage.name}`);
-    setSheetDescription(`${formatNumber(stage.value)} registros no período selecionado`);
+    setSheetDescription(description);
     setSheetItems(items);
     setSheetColumns(columns);
     setSheetOpen(true);
