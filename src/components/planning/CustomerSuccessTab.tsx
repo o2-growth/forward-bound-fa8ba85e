@@ -291,6 +291,11 @@ function CustomerSuccessTabInner() {
   // Usa o mês final do dateRange selecionado, ou o mês mais recente disponível.
   const { mrrBaseData } = useMrrBase();
   const mrrBase = useMemo(() => {
+    // Quando há filtro de CFO (analista filtrando equipe, ou CFO logado travado no próprio nome),
+    // o MRR Base global da Oxy Finance não representa a equipe — usa a soma do MRR ativo dos clientes filtrados.
+    if (filters.cfos.length > 0 || filters.produtos.length > 0) {
+      return filteredClientesPeriodo.reduce((sum, c) => sum + (Number(c.mrr) || 0), 0);
+    }
     if (!mrrBaseData || mrrBaseData.length === 0) return 0;
     const MONTHS_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     let targetMonth: string | null = null;
@@ -311,7 +316,7 @@ function CustomerSuccessTabInner() {
         return MONTHS_PT.indexOf(b.month) - MONTHS_PT.indexOf(a.month);
       });
     return sorted.length > 0 ? Number(sorted[0].value) : 0;
-  }, [mrrBaseData, dateRange]);
+  }, [mrrBaseData, dateRange, filters.cfos, filters.produtos, filteredClientesPeriodo]);
 
   const isLoading = jornadaLoading || npsLoading;
   const error = jornadaError || npsError;
