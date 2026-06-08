@@ -1,21 +1,23 @@
 ---
-name: Sales Monthly Card Deduplication
-description: Vendas (Contrato assinado + Ganho) deduplicadas por id+mês preferindo 'Ganho' em todos os analytics
+name: Sales + RM Monthly Dedup
+description: Dedup adicional de venda (id+mês prefere Ganho) e RM (titulo normalizado+mês) em Modelo Atual e O2 TAX
 type: logic
 ---
-Para contagem e drill-down de **venda** (indicator='venda'), aplicar deduplicação adicional por `(card.id, mês-da-data-efetiva)` preferindo a linha de `Ganho` sobre `Contrato assinado`.
+## Venda
+Dedup adicional por `(card.id, mês-da-data-efetiva)` preferindo `Ganho` sobre `Contrato assinado`. Mesmo card passa pelas 2 fases finais no mesmo mês — sem dedup, conta 2x.
 
-**Motivo:** o pipe do Pipefy tem 2 fases finais (`Contrato assinado` → `Ganho`). Um mesmo card pode passar pelas duas no mesmo mês — sem a dedup, conta 2x.
+## RM (Reunião agendada / Qualificado)
+Dedup adicional por `(normalize(titulo), mês-da-dataEntrada)` em `indicator='rm'`. Mesmo cliente recadastrado/reaberto como **card distinto no Pipefy** (IDs diferentes) no mesmo mês conta 1x.
+
+- `normalize` = trim + lowercase + NFD sem acentos
+- Empate: prefere `dataEntrada` mais recente; se mesma data, menor ID
+- Cards sem título caem em chave única por ID (não deduplicam)
 
 **Aplicado em:**
-- `src/hooks/useModeloAtualAnalytics.ts` → `getCardsForIndicator('venda')`
-- `src/hooks/useO2TaxAnalytics.ts` → `getCardsForIndicator('venda')`
-- `src/hooks/useExpansaoAnalytics.ts` → já fazia naturalmente via `monthlyFirstEntries` (dedupKey = `card+indicator+month`)
-- `useOxyHackerMetas`, `useClosersMetas`, demais Metas hooks → já mapeavam só uma fase ('Contrato assinado' ou 'Ganho'), sem risco
+- `src/hooks/useModeloAtualAnalytics.ts` → `getCardsForIndicator('rm' | 'venda')`
+- `src/hooks/useO2TaxAnalytics.ts` → `getCardsForIndicator('rm' | 'venda')`
+- Expansão: dedup natural via `monthlyFirstEntries` (não precisa)
 
-**Não muda:**
-- Valores monetários (MRR/Setup/Pontual) — agregam só de 'Ganho' (Modelo Atual/O2 TAX) ou 'Contrato assinado' (Expansão)
-- Funil das outras fases (Leads, MQL, RM, RR, Proposta) — dedup por `id|fase|mês` permanece
-- Data efetiva continua sendo `Data de assinatura do contrato` quando preenchida
+**Não muda:** Leads, MQL, RR, Proposta, valores monetários, metas.
 
-**Validação:** Modelo Atual Maio/26 caiu de 33 → 19 movimentações no drill-down de venda.
+**Validação Jun/2026 Modelo Atual:** 42 RMs → ~38 (dedup de Kopu, Núcleo, José Edson, G4 Pic pay).
