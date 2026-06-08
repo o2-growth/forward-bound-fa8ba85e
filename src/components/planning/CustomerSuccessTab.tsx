@@ -43,8 +43,15 @@ function CustomerSuccessTabInner() {
 
   // CFO lock-in: usuários com role 'cfo' são travados no seu próprio nome
   const { user } = useAuth();
-  const { isCfo } = useUserPermissions(user?.id);
+  const { isAdmin, isCfo, loading: permissionsLoading } = useUserPermissions(user?.id);
   const { data: lockedCfoName, isLoading: cfoNameLoading } = useMyCfoName(!!isCfo);
+  const canViewCfoTab = isAdmin && !isCfo;
+
+  useEffect(() => {
+    if (!permissionsLoading && !canViewCfoTab && activeTab === 'cfos') {
+      setActiveTab('visao-geral');
+    }
+  }, [activeTab, canViewCfoTab, permissionsLoading]);
 
   useEffect(() => {
     if (isCfo && lockedCfoName) {
@@ -309,7 +316,7 @@ function CustomerSuccessTabInner() {
   const isLoading = jornadaLoading || npsLoading;
   const error = jornadaError || npsError;
 
-  if (isLoading || (isCfo && cfoNameLoading)) {
+  if (permissionsLoading || isLoading || (isCfo && cfoNameLoading)) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -448,10 +455,10 @@ function CustomerSuccessTabInner() {
 
         {/* Sub-tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-4xl grid-cols-7">
+          <TabsList className={`grid w-full max-w-4xl ${canViewCfoTab ? 'grid-cols-7' : 'grid-cols-6'}`}>
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
             <TabsTrigger value="clientes">Clientes</TabsTrigger>
-            <TabsTrigger value="cfos">CFOs</TabsTrigger>
+            {canViewCfoTab && <TabsTrigger value="cfos">CFOs</TabsTrigger>}
             <TabsTrigger value="reunioes">Entrega</TabsTrigger>
             <TabsTrigger value="nps">NPS</TabsTrigger>
             <TabsTrigger value="churn">Churn</TabsTrigger>
@@ -481,14 +488,16 @@ function CustomerSuccessTabInner() {
             <ClientesView clientes={filteredClientes} />
           </TabsContent>
 
-          <TabsContent value="cfos" className="mt-4">
-            <CfoView
-              cfos={filteredCfos}
-              clientes={filteredClientesPeriodo}
-              dateRange={{ from: csStartDate, to: csEndDate }}
-              churnDossier={opsData?.churnDossier || []}
-            />
-          </TabsContent>
+          {canViewCfoTab && (
+            <TabsContent value="cfos" className="mt-4">
+              <CfoView
+                cfos={filteredCfos}
+                clientes={filteredClientesPeriodo}
+                dateRange={{ from: csStartDate, to: csEndDate }}
+                churnDossier={opsData?.churnDossier || []}
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="reunioes" className="mt-4">
             <ReunioesView reunioes={filteredReunioes} allCfos={allCfos} clientes={filteredClientes} onboardingAtrasado={filteredOnboardingAtrasado} />
