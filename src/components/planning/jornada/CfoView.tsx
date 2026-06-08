@@ -105,7 +105,6 @@ const CFO_SQUADS: Record<string, {
     fee: 15000,
     beneficios: 1231.40,
     membros: [
-      { nome: 'Roberta Costa Curta Lirio', cargo: 'Analista FP&A', fee: 7500, beneficios: 1084.85 },
       { nome: 'Raissa Bonamigo Daros', cargo: 'Estagiária FP&A', fee: 1500, beneficios: 747 },
     ],
   },
@@ -113,8 +112,11 @@ const CFO_SQUADS: Record<string, {
     nome: 'Rafael Marchioretto Bokorni',
     fee: 14000,
     beneficios: 1321.61,
-    membros: [],
+    membros: [
+      { nome: 'Roberta Costa Curta Lirio', cargo: 'Analista FP&A', fee: 7500, beneficios: 1084.85 },
+    ],
   },
+
 };
 
 /* ── Targets from Structure tab ── */
