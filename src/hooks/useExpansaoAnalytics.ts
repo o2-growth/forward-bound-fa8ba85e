@@ -496,6 +496,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     fonte: card.fonte,
     campanha: card.campanha,
   });
+  };
 
   // Get detail items for an indicator (uses same FIRST ENTRY logic)
   const getDetailItemsForIndicator = useMemo(() => {
