@@ -352,6 +352,52 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     return map;
   }, [cards, fullHistory]);
 
+  // ============================================================
+  // FIX: Atribuição retroativa de SDR/Closer via fullHistory
+  // ------------------------------------------------------------
+  // Em Expansão (Franquia/Oxy Hacker) o campo `SDR responsável` só é
+  // preenchido no Pipefy quando o card avança para "Tentativas de contato".
+  // Resultado: movimentos das fases Lead/MQL ficam com sdr=null mesmo
+  // quando o card já "pertence" a um SDR no mundo real (atribuído depois).
+  //
+  // Solução: mapa cardId -> último SDR/Closer não-vazio em QUALQUER
+  // movimento do card. Quando enriquecemos um card cujos campos
+  // SDR/Closer estão vazios, preenchemos com o valor do mapa.
+  // Faz o filtro de SDR no ClickableFunnelChart resgatar cards de
+  // fase inicial. Escopo: só Expansão (este hook).
+  // ============================================================
+  const { effectiveSdrByCard, effectiveCloserByCard } = useMemo(() => {
+    const sdrMap = new Map<string, string>();
+    const closerMap = new Map<string, string>();
+    const allMovements = [...cards, ...(fullHistory.length > 0 ? fullHistory : [])];
+    const sorted = allMovements
+      .slice()
+      .sort((a, b) => a.dataEntrada.getTime() - b.dataEntrada.getTime());
+    for (const mov of sorted) {
+      if (mov.sdr && mov.sdr.trim()) sdrMap.set(mov.id, mov.sdr.trim());
+      if (mov.closer && mov.closer.trim()) closerMap.set(mov.id, mov.closer.trim());
+    }
+    return { effectiveSdrByCard: sdrMap, effectiveCloserByCard: closerMap };
+  }, [cards, fullHistory]);
+
+  const enrichCardWithEffectiveOwners = useMemo(() => {
+    return (card: ExpansaoCard): ExpansaoCard => {
+      const hasSdr = !!(card.sdr && card.sdr.trim());
+      const hasCloser = !!(card.closer && card.closer.trim());
+      if (hasSdr && hasCloser) return card;
+      const effSdr = effectiveSdrByCard.get(card.id) || null;
+      const effCloser = effectiveCloserByCard.get(card.id) || null;
+      const newSdr = hasSdr ? card.sdr : effSdr;
+      const newCloser = hasCloser ? card.closer : effCloser;
+      // `responsavel` mantém a regra do parser: Closer || SDR
+      const newResponsavel = card.responsavel || newCloser || newSdr;
+      if (newSdr === card.sdr && newCloser === card.closer && newResponsavel === card.responsavel) {
+        return card;
+      }
+      return { ...card, sdr: newSdr, closer: newCloser, responsavel: newResponsavel };
+    };
+  }, [effectiveSdrByCard, effectiveCloserByCard]);
+
   const getCardsForIndicator = useMemo(() => {
     return (indicator: IndicatorType): ExpansaoCard[] => {
       const allMovements = [...cards, ...(fullHistory.length > 0 ? fullHistory : [])];
@@ -415,12 +461,15 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
         }
       }
 
-      return result;
+      // Enriquece com SDR/Closer efetivos do histórico (fix Expansão Lead/MQL)
+      return result.map(enrichCardWithEffectiveOwners);
     };
-  }, [cards, fullHistory, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto]);
+  }, [cards, fullHistory, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners]);
 
   // Helper function to convert ExpansaoCard to DetailItem
-  const toDetailItem = (card: ExpansaoCard): DetailItem => ({
+  const toDetailItem = (rawCard: ExpansaoCard): DetailItem => {
+    const card = enrichCardWithEffectiveOwners(rawCard);
+    return ({
     id: card.id,
     name: card.titulo,
     company: card.titulo,
@@ -447,6 +496,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     fonte: card.fonte,
     campanha: card.campanha,
   });
+  };
 
   // Get detail items for an indicator (uses same FIRST ENTRY logic)
   const getDetailItemsForIndicator = useMemo(() => {
