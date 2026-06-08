@@ -411,6 +411,26 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
         }
       }
       
+      // For rm: dedup extra por (titulo normalizado, mês-da-entrada) preferindo entrada mais recente
+      if (indicator === 'rm') {
+        const normTitle = (s: string) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const byTitleMonth = new Map<string, O2TaxCard>();
+        for (const card of result) {
+          const t = normTitle(card.titulo);
+          if (!t) { byTitleMonth.set(`__notitle__${card.id}`, card); continue; }
+          const monthKey = `${t}|${card.dataEntrada.getFullYear()}-${card.dataEntrada.getMonth()}`;
+          const existing = byTitleMonth.get(monthKey);
+          if (!existing) { byTitleMonth.set(monthKey, card); continue; }
+          if (card.dataEntrada > existing.dataEntrada ||
+              (card.dataEntrada.getTime() === existing.dataEntrada.getTime() && Number(card.id) < Number(existing.id))) {
+            byTitleMonth.set(monthKey, card);
+          }
+        }
+        const deduped = Array.from(byTitleMonth.values());
+        console.log(`[O2 TAX Analytics] getCardsForIndicator(rm): ${result.length} → ${deduped.length} (dedup titulo|mês)`);
+        return deduped;
+      }
+
       // For venda: dedup extra por (id, mês-da-data-efetiva) preferindo 'Ganho' sobre 'Contrato assinado'
       // O mesmo card pode passar pelas duas fases finais no mesmo mês — contamos 1 venda única.
       if (indicator === 'venda') {
@@ -427,6 +447,7 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
         console.log(`[O2 TAX Analytics] getCardsForIndicator(venda): ${result.length} → ${deduped.length} (dedup id|mês, prefere Ganho)`);
         return deduped;
       }
+
       
       console.log(`[O2 TAX Analytics] getCardsForIndicator(${indicator}): ${result.length} entries (every entry)`);
       return result;
