@@ -10,13 +10,14 @@ import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { BUType, IndicatorType } from "@/hooks/useFunnelRealized";
 import { BU_CLOSERS, type CloserType } from "@/hooks/useCloserMetas";
+import { BU_SDRS as BU_SDRS_CANON } from "@/hooks/useSdrMetas";
 
-// Mesmo mapping usado em IndicatorsTab (mantido em sync manualmente — pequeno)
+// Fonte única de verdade do mapping SDR↔BU (mem://team-structure/sdr-bu-assignment)
 const BU_SDRS: Record<BUType, string[]> = {
-  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Matheus', 'Ana'],
-  o2_tax: ['Carlos'],
-  oxy_hacker: ['Carlos'],
-  franquia: ['Carlos', 'Bruna'],
+  modelo_atual: [...BU_SDRS_CANON.modelo_atual],
+  o2_tax: [...BU_SDRS_CANON.o2_tax],
+  oxy_hacker: [...BU_SDRS_CANON.oxy_hacker],
+  franquia: [...BU_SDRS_CANON.franquia],
 };
 import { DetailSheet, DetailItem, columnFormatters } from "./indicators/DetailSheet";
 import { KpiItem } from "./indicators/KpiCard";

@@ -89,13 +89,13 @@ const buOptions: MultiSelectOption[] = [
   { value: 'franquia', label: 'Franquia' },
 ];
 
-// SDR mapping by BU
+// SDR mapping by BU (fonte única — mem://team-structure/sdr-bu-assignment)
 // Bruna atua tanto como SDR quanto como Closer no time de Franquia.
 const BU_SDRS: Record<BuType, string[]> = {
-  modelo_atual: ['Carlos', 'Erica', 'Amanda', 'Matheus', 'Ana'],
+  modelo_atual: ['Amanda', 'Matheus', 'Carlos', 'Erica', 'Ana'],
   o2_tax: ['Carlos'],
-  oxy_hacker: ['Carlos'],
-  franquia: ['Carlos', 'Bruna', 'Kethlin'],
+  oxy_hacker: ['Amanda', 'Carlos'],
+  franquia: ['Amanda', 'Carlos', 'Bruna', 'Kethlin'],
 };
 
 // SDR options for MultiSelect
@@ -3308,7 +3308,7 @@ export function IndicatorsTab() {
           <LeadsMqlsStackedChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
           <MeetingsScheduledChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
         </div>
-        <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} selectedSDRs={selectedSDRs} selectedOrigens={selectedOrigens} />
+        <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={effectiveSelectedClosers} selectedSDRs={effectiveSelectedSDRs} selectedOrigens={selectedOrigens} />
       </div>
 
       {/* Charts Section with View Mode Toggle */}
