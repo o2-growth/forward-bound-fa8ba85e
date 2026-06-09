@@ -1,37 +1,13 @@
-## 1. Resetar senha da Andrea Franzen
+## Ação
 
-- Usuária: `andrea.franzen@o2inc.com.br` (id `b72f477f-0685-4d0b-9947-404bd0d119a5`)
-- Nova senha: `Alterar@01`
-- Execução via script Node usando `SUPABASE_SERVICE_ROLE_KEY` chamando `auth.admin.updateUserById`.
+Resetar a senha do usuário `daniel.trindade@o2inc.com.br` (id `8f658b59-e72e-41d6-8cbc-c5788bbeb01a`) para `Alterar@01` via Admin API (`supabase.auth.admin.updateUserById`) com service role — mesmo procedimento usado para a Andrea.
 
-## 2. Tornar a explicação evidente nos cards do Pedrolo e da Mariana
+## Emails ativos na plataforma (contas reais @o2inc.com.br e externas legítimas)
 
-Hoje a lógica especial (pontual do mês anterior conta como receita do mês atual) está só num tooltip do ícone ℹ️ — passa despercebido, principalmente quando o próprio Pedrolo ou a Mariana logam e veem apenas o card deles.
+amanda.serafim · ana.rodrigues · anderson.mendes · andrea.franzen · andrey.lopes · andreylopes.ia@gmail.com · bruna.mota · carlos.ramos · carolina.boeira · contato@accorsiconsultoria.com.br · daniel.trindade · douglas.schossler · eduarda.nery · eduarda.rovani · eduardo.dagostini · eduardo.pedrolo · eric.silveira · erica.rocha · everton.bisinella · felipe.brenner · gustavo.cochlar · humberto.behs · joao.victor · joseane.sartori · jv241004@gmail.com · kethlin.moreira · liliana.almeida · lucas.ilha · marco.azevedo · mariana.luz · matheus.besnos · oliveira · pamela.quadros · pedro.albite · pedro.fuzer · pedro.pimenta · rafael.fleck · rafael.marchioretto · raissa.daros · roberta.costa · sergio.piva · tainara.konzen · thiago.zanoni · tiago.pisoni · vinicius.sanfelice (todos `@o2inc.com.br` exceto onde indicado)
 
-**Mudança em `src/components/planning/jornada/CfoView.tsx` (~linha 1118–1155):**
+Há também ~10 contas de auditoria/teste (`*tempmail.dev`, `*@t.dev`, `temp-*`) que podem ser removidas depois se quiser limpeza.
 
-Quando o card for do Pedrolo ou da Mariana, adicionar logo abaixo do `CardHeader`, antes do conteúdo, um **banner âmbar persistente** (sempre visível, não hover) com:
+## Nenhuma alteração de código
 
-```
-┌──────────────────────────────────────────────┐
-│ ℹ️  Como ler este squad                       │
-│ Receita é pontual (não recorrente). O valor  │
-│ fechado no mês anterior aparece como receita │
-│ do mês atual. [+ texto específico Pedrolo/   │
-│ Mari]                                        │
-└──────────────────────────────────────────────┘
-```
-
-- Pedrolo: enfatiza Setup + SaaS OXY do mês passado.
-- Mariana: enfatiza pontuais (Diagnóstico/Turnaround/Valuation) + Assessoria recorrente que fica todo mês.
-
-Estilo: `border border-amber-500/40 bg-amber-500/10 text-xs rounded-md p-2` com ícone `Info` — chama atenção sem poluir.
-
-O tooltip atual no ícone ℹ️ é removido (vira redundante), mas o ícone fica como âncora visual dentro do banner.
-
-Demais cards (outros CFOs) continuam exatamente como estão hoje, sem banner.
-
-## Detalhes técnicos
-- Arquivo único alterado: `src/components/planning/jornada/CfoView.tsx`
-- Senha reset: script `/tmp` usando `@supabase/supabase-js` admin client, descartado após uso.
-- Nenhuma migração de banco necessária.
+Operação apenas de dado em `auth.users`. Não mexe em arquivos do projeto.
