@@ -3052,6 +3052,17 @@ export function IndicatorsTab() {
         ))}
       </div>
 
+      {/* Temperatura dos Leads (Modelo Atual only) */}
+      {selectedBUs.includes('modelo_atual') && (
+        <TemperaturaSection
+          analytics={modeloAtualAnalyticsRaw}
+          startDate={startDate}
+          endDate={endDate}
+        />
+      )}
+
+
+
       {/* Weekly Comparison Panel */}
       <WeeklyComparison
         startDate={startDate}
