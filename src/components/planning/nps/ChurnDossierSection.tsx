@@ -477,6 +477,49 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
         </div>
       </div>
 
+      {/* Linha 3 — Logo Churn por tipo de cliente */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Logo Churn por tipo de cliente
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-destructive mb-1">
+                <Percent className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn Total</span>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{logoChurnPct.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filtered.length} de {activeClientesCount + filtered.length} clientes</p>
+            </CardContent>
+          </Card>
+          <Card className="border-blue-500/30 bg-blue-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
+                <Percent className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn MRR</span>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{logoChurnMrrPct.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filteredMrr.length} de {activeClientesMrrCount + filteredMrr.length} clientes MRR</p>
+            </CardContent>
+          </Card>
+          <Card className="border-cyan-500/30 bg-cyan-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 mb-1">
+                <Percent className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn Pontual</span>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{logoChurnPontualPct.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filteredPontual.length} de {activeClientesPontualCount + filteredPontual.length} clientes Pontual</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+
       {/* Top motivo (compacto, fora dos KPIs principais) */}
       {topMotivo !== '—' && (
         <Card className="border-warning/30 bg-warning/5">
