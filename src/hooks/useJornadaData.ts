@@ -1016,9 +1016,20 @@ export function useJornadaData() {
     };
 
     // === 8. Onboarding atrasado (Kick-off do Projeto + Primeiras Entregas - Diagnóstico) ===
-    // Cards atualmente nessas fases no pipe Gestão de Rotinas CFO com Data Prevista vencida
-    // (ou flag Overdue=true do Pipefy como fallback — esse flag costuma vir stale, por isso a data manda).
+    // Cards atualmente nessas fases no pipe Gestão de Rotinas CFO com Data Prevista vencida.
+    // FIX: cruza com Central de Projetos — só conta se o cliente AINDA está em "Onboarding" lá.
+    // Sem isso, cards de rotina ficam órfãos (cliente avançou pra "Em Operação", "Em Tratativa", etc.)
+    // e seguem gerando alerta falso enquanto o pipe Rotinas não for atualizado no Pipefy.
     const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico'];
+    const normTitle = (s: string) =>
+      (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const activeOnboardingTitles = new Set<string>();
+    for (const row of data.projetos) {
+      if (row['Fase'] !== row['Fase Atual']) continue;
+      if ((row['Fase Atual'] || '').trim() !== 'Onboarding') continue;
+      const t = normTitle(row['Título'] || '');
+      if (t) activeOnboardingTitles.add(t);
+    }
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const startOfTodayTs = startOfToday.getTime();
@@ -1035,6 +1046,9 @@ export function useJornadaData() {
       if (row['Fase'] !== row['Fase Atual']) continue;
       const fase = row['Fase Atual'] || '';
       if (!ONBOARDING_PHASES.includes(fase)) continue;
+      const tituloRaw = (row['Título'] || '').trim();
+      // Ignora cards fantasmas — cliente já saiu da fase Onboarding no Central de Projetos
+      if (!activeOnboardingTitles.has(normTitle(tituloRaw))) continue;
       const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
       const pipefyOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
       const dateOverdue = dataPrevista ? dataPrevista.getTime() < startOfTodayTs : false;
@@ -1047,7 +1061,7 @@ export function useJornadaData() {
         : 0;
       onboardingAtrasado.push({
         id,
-        titulo: (row['Título'] || '').trim(),
+        titulo: tituloRaw,
         cfo: normalizeCfoName((row['CFO Responsavel'] || '').trim()),
         fase,
         dataPrevista,
