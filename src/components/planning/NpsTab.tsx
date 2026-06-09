@@ -273,18 +273,11 @@ export function NpsTab() {
               data={opsData?.churnDossier || []}
               selectedProdutos={selectedProdutos}
               globalCfos={selectedCfos}
-              activeClientesCount={opsData?.kpis?.totalAtivos ?? 0}
-              activeClientesMrrCount={opsData?.kpis?.activeClientesMrr ?? 0}
-              activeClientesPontualCount={opsData?.kpis?.activeClientesPontual ?? 0}
-              activeMrr={opsData?.kpis?.mrrTotal ?? 0}
-              globalDateRange={
-                selectedPeriod === 'q1' ? { from: new Date('2026-01-01'), to: new Date('2026-03-31') } :
-                selectedPeriod === 'q2' ? { from: new Date('2026-04-01'), to: new Date('2026-06-30') } :
-                selectedPeriod === 'q3' ? { from: new Date('2026-07-01'), to: new Date('2026-09-30') } :
-                selectedPeriod === 'q4' ? { from: new Date('2025-10-01'), to: new Date('2025-12-31') } :
-                dateRange?.from && dateRange?.to ? { from: dateRange.from, to: dateRange.to } :
-                undefined
-              }
+              activeClientesCount={activeFromJornada.total}
+              activeClientesMrrCount={activeFromJornada.mrr}
+              activeClientesPontualCount={activeFromJornada.pontual}
+              activeMrr={mrrBaseAtual}
+              globalDateRange={globalChurnDateRange}
             />
           </div>
         )}
