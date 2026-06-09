@@ -107,7 +107,16 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
     }
 
     // Recompute KPIs from filtered data
-    const totalAtivos = filteredCfoDistribution.reduce((sum, c) => sum + c.clientes, 0);
+    const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico', 'Turnaround', 'Valuation', 'Educação'];
+    const isPontualOnly = (produtoRaw: string) => {
+      const produtos = (produtoRaw || '').split(',').map(p => p.trim()).filter(Boolean);
+      return produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+    };
+    const allClients = filteredCfoDistribution.flatMap(c => c.clients);
+    const totalAtivos = allClients.length;
+    const activeClientesPontual = allClients.filter(cl => isPontualOnly(cl.produto || '')).length;
+    const activeClientesMrr = totalAtivos - activeClientesPontual;
+    const pontualTotalAtivo = allClients.reduce((sum, cl) => sum + (cl.pontual || 0), 0);
     const emOnboarding = filteredCfoDistribution.reduce((sum, c) =>
       sum + c.clients.filter(cl => cl.fase === 'Onboarding').length, 0);
     const emOperacao = filteredCfoDistribution.reduce((sum, c) =>
@@ -130,6 +139,9 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
       emOnboarding,
       emOperacao,
       mrrTotal,
+      pontualTotalAtivo,
+      activeClientesMrr,
+      activeClientesPontual,
       tratativasAtivas,
       emSetup,
       setupAtrasados,
