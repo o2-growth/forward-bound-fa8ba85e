@@ -347,7 +347,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
           <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Estado atual</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className={`border-emerald-500/20 bg-emerald-500/5 ${clickableCardCls} hover:border-emerald-500/50`} role="button" tabIndex={0} onClick={openMrrAtivo} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMrrAtivo(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
@@ -363,11 +363,22 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
                 <Users className="h-4 w-4" />
-                <span className="text-[11px] font-medium uppercase tracking-wider">Clientes Ativos</span>
+                <span className="text-[11px] font-medium uppercase tracking-wider">Clientes MRR</span>
                 <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
-              <p className="text-2xl font-bold text-foreground">{activeClientesCount}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Carteira atual · clique pra ver</p>
+              <p className="text-2xl font-bold text-foreground">{activeClientesMrrCount}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Recorrentes · clique pra ver</p>
+            </CardContent>
+          </Card>
+          <Card className={`border-cyan-500/20 bg-cyan-500/5 ${clickableCardCls} hover:border-cyan-500/50`} role="button" tabIndex={0} onClick={openClientesAtivos} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesAtivos(); } }}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 mb-1">
+                <Users className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Clientes Pontual</span>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{activeClientesPontualCount}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Só pontuais · clique pra ver</p>
             </CardContent>
           </Card>
           <Card className={`border-violet-500/20 bg-violet-500/5 ${clickableCardCls} hover:border-violet-500/50`} role="button" tabIndex={0} onClick={openLtMedio} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLtMedio(); } }}>
