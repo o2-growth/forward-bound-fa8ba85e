@@ -43,7 +43,31 @@ export interface ModeloAtualCard {
   motivoPerda?: string;
   faseAtual?: string;
   produto?: string; // Sub-produto vendido (campo "Produtos" do Pipefy)
+  temperatura?: 'Quente' | 'Morno' | 'Frio'; // Tag de prioridade do lead (Labels / Prioridade Lead)
 }
+
+// Normaliza valor bruto vindo das colunas Labels / Prioridade [do] Lead
+// (que podem chegar como string simples "Quente" ou como JSON array string '["Quente"]').
+// Mapeia Fria→Frio, Morna→Morno para padronizar.
+export function parseTemperatura(row: Record<string, any>): 'Quente' | 'Morno' | 'Frio' | undefined {
+  const raw = row['Labels'] ?? row['Prioridade Lead'] ?? row['Prioridade do Lead'] ?? '';
+  if (raw == null) return undefined;
+  let str = String(raw).trim();
+  if (!str || str === '[]') return undefined;
+  // Tenta parse JSON quando começa com '['
+  if (str.startsWith('[')) {
+    try {
+      const arr = JSON.parse(str);
+      if (Array.isArray(arr) && arr.length > 0) str = String(arr[0]).trim();
+    } catch { /* mantém raw */ }
+  }
+  const norm = str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (norm.startsWith('quente')) return 'Quente';
+  if (norm.startsWith('morn')) return 'Morno';
+  if (norm.startsWith('fri')) return 'Frio';
+  return undefined;
+}
+
 
 // Map destination phases to indicators (based on pipefy_moviment_cfos table)
 const PHASE_TO_INDICATOR: Record<string, IndicatorType> = {
