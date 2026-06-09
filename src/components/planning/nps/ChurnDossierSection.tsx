@@ -151,20 +151,17 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   }, [activeMrr, totalMrrPerdido]);
   // Logo Churn % = qtd clientes churn / (ativos + churn) × 100
   const logoChurnPct = useMemo(() => {
-    const base = activeClientesCount + filtered.length;
-    return base > 0 ? (filtered.length / base) * 100 : 0;
+    return activeClientesCount > 0 ? (filtered.length / activeClientesCount) * 100 : 0;
   }, [activeClientesCount, filtered.length]);
 
   // Segmentação MRR vs Pontual
   const filteredMrr = useMemo(() => filtered.filter(d => d.tipoCliente !== 'pontual'), [filtered]);
   const filteredPontual = useMemo(() => filtered.filter(d => d.tipoCliente === 'pontual'), [filtered]);
   const logoChurnMrrPct = useMemo(() => {
-    const base = activeClientesMrrCount + filteredMrr.length;
-    return base > 0 ? (filteredMrr.length / base) * 100 : 0;
+    return activeClientesMrrCount > 0 ? (filteredMrr.length / activeClientesMrrCount) * 100 : 0;
   }, [activeClientesMrrCount, filteredMrr.length]);
   const logoChurnPontualPct = useMemo(() => {
-    const base = activeClientesPontualCount + filteredPontual.length;
-    return base > 0 ? (filteredPontual.length / base) * 100 : 0;
+    return activeClientesPontualCount > 0 ? (filteredPontual.length / activeClientesPontualCount) * 100 : 0;
   }, [activeClientesPontualCount, filteredPontual.length]);
   
   const avgLt = useMemo(() => {
