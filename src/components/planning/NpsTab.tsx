@@ -29,6 +29,8 @@ export function NpsTab() {
   const [churnOpen, setChurnOpen] = useState(false);
   const { data: npsData, isLoading, error } = useNpsData();
   const { data: opsData } = useOperationsData();
+  const { clientes: jornadaClientes } = useJornadaData();
+  const { mrrBaseData, getMrrBaseForMonth } = useMrrBase();
 
   // Filter state
   const [selectedProdutos, setSelectedProdutos] = useState<string[]>([]);
