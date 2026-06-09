@@ -222,8 +222,10 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
     motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
     faseAtual: row['Fase Atual'] || row['fase_atual'] || undefined,
     produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
+    temperatura: parseTemperatura(row),
   };
 }
+
 
 // Parse multiple rows into cards
 function parseCards(rows: Record<string, any>[], skipPhaseFilter = false): ModeloAtualCard[] {
