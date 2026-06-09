@@ -160,51 +160,53 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Call Gemini
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiKey) {
-      return new Response(JSON.stringify({ error: "GEMINI_API_KEY não configurada" }), {
+    // 2. Call Lovable AI Gateway (OpenAI-compatible)
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableKey) {
+      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const userMessage = `JSON do cliente:\n\`\`\`json\n${JSON.stringify(cliente360, null, 2)}\n\`\`\`\n\nProduza o diagnóstico seguindo as regras.`;
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-    const geminiResp = await fetch(geminiUrl, {
+    const gatewayResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
       body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 2048,
-          thinkingConfig: { thinkingBudget: 0 },
-        },
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userMessage },
+        ],
+        temperature: 0.2,
+        max_tokens: 2048,
       }),
     });
 
-    if (!geminiResp.ok) {
-      const errText = await geminiResp.text();
-      console.error("Gemini error:", errText);
-      return new Response(JSON.stringify({ error: `Gemini falhou: ${errText.slice(0, 500)}` }), {
-        status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    if (!gatewayResp.ok) {
+      const errText = await gatewayResp.text();
+      console.error("Lovable AI Gateway error:", gatewayResp.status, errText);
+      const status = gatewayResp.status === 429 ? 429 : gatewayResp.status === 402 ? 402 : 502;
+      const msg = status === 429
+        ? "Limite de requisições atingido. Tente em instantes."
+        : status === 402
+          ? "Créditos da workspace esgotados. Adicione em Settings → Workspace → Usage."
+          : `IA falhou: ${errText.slice(0, 500)}`;
+      return new Response(JSON.stringify({ error: msg }), {
+        status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const geminiData = await geminiResp.json();
-    const candidate = geminiData?.candidates?.[0];
-    const analysis = candidate?.content?.parts
-      ?.map((part: { text?: string }) => part.text ?? "")
-      .join("\n")
-      .trim() ?? "";
+    const gatewayData = await gatewayResp.json();
+    const choice = gatewayData?.choices?.[0];
+    const analysis = (choice?.message?.content ?? "").toString().trim();
 
-    if (candidate?.finishReason && candidate.finishReason !== "STOP") {
-      console.warn("Gemini finishReason:", candidate.finishReason, geminiData?.promptFeedback ?? null);
+    if (choice?.finish_reason && choice.finish_reason !== "stop") {
+      console.warn("Gateway finish_reason:", choice.finish_reason);
     }
 
     if (!analysis) {
-      return new Response(JSON.stringify({ error: "Gemini não retornou texto para a análise" }), {
+      return new Response(JSON.stringify({ error: "IA não retornou texto para a análise" }), {
         status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
