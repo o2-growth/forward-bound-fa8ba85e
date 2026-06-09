@@ -1,58 +1,46 @@
-# Operação: separar clientes ativos por tipo + Logo Churn segmentado
 
-## Objetivo
+## Problemas detectados
 
-1. Na aba Operação / Dossiê de Churn, separar **Clientes Ativos** em dois grupos:
-   - **Clientes MRR** (recorrentes: CFOaaS + OXY, etc.)
-   - **Clientes Pontual** (somente produtos pontuais: Diagnóstico, Turnaround, Valuation, Educação)
-2. Adicionar **Logo Churn comparativo por tipo**:
-   - Logo Churn Total (já existe — base = todos clientes)
-   - Logo Churn **MRR** = churns de clientes MRR / (ativos MRR + churns MRR)
-   - Logo Churn **Pontual** = churns de clientes Pontual / (ativos Pontual + churns Pontual)
+Hoje o `ChurnDossierSection` recebe três insumos vindos de `useOperationsData` (Pipefy bruto) que estão divergindo da Visão Geral CS:
 
-A regra de classificação MRR vs Pontual já existe no hook (`PONTUAL_ONLY_PRODUCTS` em `useOperationsData.ts:271`): se TODOS os produtos do cliente pertencem à lista pontual → cliente Pontual; caso contrário → cliente MRR.
+| Métrica | Fonte atual (errada) | Fonte correta |
+|---|---|---|
+| MRR ativo (base do Revenue Churn) | `opsData.kpis.mrrTotal` (soma Pipefy) | `mrr_base_monthly` (Oxy Finance) — Jun/2026 = **R$ 722.605** |
+| Clientes ativos (base Logo Churn Total) | `opsData.kpis.totalAtivos` = **139** | Visão Geral CS / `useJornadaData` = **128** |
+| Clientes ativos MRR (base Logo Churn MRR) | `opsData.kpis.activeClientesMrr` = **11** | Visão Geral CS = total MRR (≈ 128 - pontuais) |
+| Clientes ativos Pontual | `opsData.kpis.activeClientesPontual` | Visão Geral CS (`c.mrr === 0 && c.pontual > 0`) |
+
+A Visão Geral CS (`src/components/planning/cs/VisaoGeralCS.tsx`) consome `useJornadaData` + `useMrrBase`, que são a fonte de verdade aceita pelo usuário.
 
 ## Mudanças
 
-### 1. `src/hooks/useOperationsData.ts` — expor contagens segmentadas
+### 1. `src/components/planning/NpsTab.tsx`
+- Importar `useJornadaData` e `useMrrBase`.
+- Calcular, com a mesma lógica de Visão Geral CS:
+  - `activeClientes = jornada.clientes.filter(c => !INACTIVE_PHASES.includes(c.faseAtual))`
+  - `activeClientesPontualCount = activeClientes.filter(c => c.mrr === 0 && c.pontual > 0).length`
+  - `activeClientesMrrCount = activeClientes.length - activeClientesPontualCount`
+  - `mrrBaseAtual` = `getMrrBaseForMonth` do mês de referência (último mês do `globalDateRange.to`; se sem filtro, o mês mais recente disponível em `mrr_base_monthly`).
+- Substituir os 4 props passados ao `ChurnDossierSection`:
+  - `activeClientesCount = activeClientes.length`
+  - `activeClientesMrrCount` e `activeClientesPontualCount` (acima)
+  - `activeMrr = mrrBaseAtual`
 
-Em `processProjects()` (linha ~262):
-- Contar separadamente `activeClientesMrr` e `activeClientesPontual` durante o loop atual de `currentPhase`.
-- `pontualTotalAtivo` (soma de `clientPontual` dos ativos) — já temos por cliente, falta agregar.
-- Retornar esses novos campos junto com `mrrTotal`, `emOnboarding`, etc.
+### 2. `src/components/planning/nps/ChurnDossierSection.tsx`
+- Nenhuma mudança de fórmula: continuar com
+  - `revenueChurnPct = totalMrrPerdido / (activeMrr + totalMrrPerdido) × 100`
+  - `logoChurnPct = filtered.length / (activeClientesCount + filtered.length) × 100`
+  - `logoChurnMrrPct` / `logoChurnPontualPct` idem.
+- O efeito da mudança vem só da troca da fonte dos números.
+- Atualizar o `formula` dos drawers `openMrrAtivo` e `openRevenueChurnPct` para refletir que `MRR` agora é o **MRR Base (Oxy Finance)** do mês de referência, não a soma Pipefy.
+- O drawer "MRR Ativo — clientes que compõem" deixa de mostrar a lista de clientes (não há mais correspondência 1:1 com a soma). Substituir por um card simples com o valor e a referência da fonte (`Oxy Finance · mrr_base_monthly`).
 
-No retorno do hook (linha ~778), propagar `activeClientesMrr`, `activeClientesPontual`, `pontualTotalAtivo`.
+### 3. Sem mudanças em
+- `useOperationsData.ts` (continua alimentando OperationsSection / "Visão Geral" antiga).
+- Lógica de churn (filtro, overrides, dedup) permanece intocada.
 
-### 2. Classificar cada churn em MRR vs Pontual
-
-No `churnDossier` (mesma função, linha ~373), adicionar campo `tipoCliente: 'mrr' | 'pontual'` em cada `ChurnDossierCard` usando a mesma regra `PONTUAL_ONLY_PRODUCTS` aplicada ao campo `produto` do card.
-
-Adicionar `tipoCliente` à interface `ChurnDossierCard` (linha ~171).
-
-### 3. `src/components/planning/nps/ChurnDossierSection.tsx` — novos KPIs
-
-- Receber `activeClientesMrrCount` e `activeClientesPontualCount` via props.
-- Em `filtered`, separar `filteredMrr = filtered.filter(d => d.tipoCliente === 'mrr')` e `filteredPontual = filtered.filter(d => d.tipoCliente === 'pontual')`.
-- Calcular `logoChurnMrrPct` e `logoChurnPontualPct`.
-- **Linha "Estado atual"** (hoje 3 cards: MRR · Clientes Ativos · LT Médio): trocar o card único "Clientes Ativos" por **2 cards lado a lado**: "Clientes MRR" e "Clientes Pontual" (mantendo a linha com 4 cards no md+).
-- **Linha "Churn no período"** (hoje 5 cards): adicionar 2 cards extras → "Logo Churn MRR (%)" e "Logo Churn Pontual (%)". Layout passa a `lg:grid-cols-7` (ou agrupar em duas linhas se ficar apertado — preferência: nova sub-linha "Logo Churn segmentado" com 3 cards: Total / MRR / Pontual).
-- Cada novo card abre drawer só com clientes do tipo correspondente (reuso de `openLogoChurnPct` parametrizado por tipo).
-
-### 4. `src/components/planning/nps/OperationsSection.tsx` — KPI strip
-
-No strip principal (linha ~191), substituir o card único "Clientes Ativos" por dois: "Clientes MRR" e "Clientes Pontual" (com totais vindos do hook).
-
-### 5. `src/components/planning/NpsTab.tsx` — passar novas props
-
-Propagar `activeClientesMrrCount` e `activeClientesPontualCount` para `<ChurnDossierSection>`.
-
-## O que NÃO muda
-
-- Cálculo de MRR financeiro (já exclui Pontual corretamente).
-- Revenue Churn (R$ / %) — continua usando MRR perdido como hoje.
-- Filtros existentes (CFO, Motivo, Período, Produto).
-- Lista de overrides do dossiê.
-
-## Pontos de decisão
-
-**Layout dos 3 logos churn (Total / MRR / Pontual)**: minha sugestão é criar uma **terceira linha dedicada** "Logo Churn por tipo de cliente" com os 3 cards lado a lado, mantendo a linha "Churn no período" enxuta (5 cards atuais). Confirmo isso na implementação, mas se preferir tudo numa linha só (7 cards), me avisa.
+## Resultado esperado (Jun/2026, sem filtros)
+- MRR card "Estado atual" → R$ 722.605
+- Revenue Churn (%) calculado sobre R$ 722.605 + perdido
+- Logo Churn Total → 128 + N churns na base
+- Logo Churn MRR → base correta de clientes MRR (mesma da Visão Geral)

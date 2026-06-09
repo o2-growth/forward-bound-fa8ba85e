@@ -256,11 +256,11 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   };
 
   const openMrrAtivo = () => setDrawerKpi({
-    title: 'MRR Ativo — clientes que compõem',
-    subtitle: `${formatCurrency(activeMrr)} · ${activeClientesCount} cliente(s)`,
-    formula: 'Soma de Valor CFOaaS + Valor OXY dos clientes em Onboarding ou Em Operação Recorrente.',
+    title: 'MRR Base — Oxy Finance',
+    subtitle: `${formatCurrency(activeMrr)} no mês de referência`,
+    formula: 'MRR Base oficial vindo da Oxy Finance (tabela mrr_base_monthly). Reflete o mês final do período selecionado, ou o mês mais recente disponível quando não há filtro de período.',
     columns: ['cliente', 'cfo', 'mrr', 'fase'],
-    groups: [{ title: 'Clientes ativos', rows: activeRows('mrr'), emptyHint: 'Lista de clientes ativos não disponível neste contexto.' }],
+    groups: [{ title: 'Detalhamento por cliente não disponível', rows: [], emptyHint: 'O MRR Base vem agregado da Oxy Finance — não há breakdown por cliente neste card. Use a Visão Geral CS para ver a lista.' }],
   });
 
   const openClientesAtivos = () => setDrawerKpi({
@@ -289,8 +289,8 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
 
   const openRevenueChurnPct = () => setDrawerKpi({
     title: 'Revenue Churn (%)',
-    subtitle: `${revenueChurnPct.toFixed(2)}% · ${formatCurrency(totalMrrPerdido)} perdidos sobre ${formatCurrency(activeMrr + totalMrrPerdido)}`,
-    formula: 'Revenue Churn / (MRR ativo + Revenue Churn) × 100. Aproxima o % do MRR base inicial que foi perdido.',
+    subtitle: `${revenueChurnPct.toFixed(2)}% · ${formatCurrency(totalMrrPerdido)} perdidos sobre MRR Base ${formatCurrency(activeMrr)}`,
+    formula: 'Revenue Churn / (MRR Base + Revenue Churn) × 100. MRR Base = Oxy Finance (mrr_base_monthly) do mês de referência.',
     columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
     groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('mrr') }],
   });

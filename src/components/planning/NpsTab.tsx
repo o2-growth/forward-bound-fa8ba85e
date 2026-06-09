@@ -12,7 +12,12 @@ import { NpsFilters } from './nps/NpsFilters';
 
 import { useNpsData, processNpsData, NpsCard } from '@/hooks/useNpsData';
 import { useOperationsData } from '@/hooks/useOperationsData';
+import { useJornadaData } from '@/hooks/useJornadaData';
+import { useMrrBase } from '@/hooks/useMrrBase';
 import { parsePipefyDate } from '@/hooks/dateUtils';
+
+const NPS_INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
+const MONTHS_BR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 import { QuarterlyComparison } from './nps/QuarterlyComparison';
 import { OkrProximity } from './nps/OkrProximity';
 import { ChevronDown, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
@@ -24,6 +29,8 @@ export function NpsTab() {
   const [churnOpen, setChurnOpen] = useState(false);
   const { data: npsData, isLoading, error } = useNpsData();
   const { data: opsData } = useOperationsData();
+  const { clientes: jornadaClientes } = useJornadaData();
+  const { mrrBaseData, getMrrBaseForMonth } = useMrrBase();
 
   // Filter state
   const [selectedProdutos, setSelectedProdutos] = useState<string[]>([]);
@@ -183,6 +190,40 @@ export function NpsTab() {
   // Always use filteredNpsData when available — it already returns full data when no filters match
   const displayData = filteredNpsData ?? npsData;
 
+  // Compute global churn date range (used both for ChurnDossier props and MRR base month selection)
+  const globalChurnDateRange = useMemo(() => {
+    if (selectedPeriod === 'q1') return { from: new Date('2026-01-01'), to: new Date('2026-03-31') };
+    if (selectedPeriod === 'q2') return { from: new Date('2026-04-01'), to: new Date('2026-06-30') };
+    if (selectedPeriod === 'q3') return { from: new Date('2026-07-01'), to: new Date('2026-09-30') };
+    if (selectedPeriod === 'q4') return { from: new Date('2025-10-01'), to: new Date('2025-12-31') };
+    if (dateRange?.from && dateRange?.to) return { from: dateRange.from, to: dateRange.to };
+    return undefined;
+  }, [selectedPeriod, dateRange]);
+
+  // Active clientes from Jornada (same source as Visão Geral CS)
+  const activeFromJornada = useMemo(() => {
+    const list = (jornadaClientes || []).filter(c => !NPS_INACTIVE_PHASES.includes(c.faseAtual));
+    const pontual = list.filter(c => (c.mrr ?? 0) === 0 && (c.pontual ?? 0) > 0).length;
+    return { total: list.length, mrr: list.length - pontual, pontual };
+  }, [jornadaClientes]);
+
+  // MRR Base do mês de referência (Oxy Finance · mrr_base_monthly)
+  const mrrBaseAtual = useMemo(() => {
+    if (!mrrBaseData || mrrBaseData.length === 0) return 0;
+    const ref = globalChurnDateRange?.to ?? new Date();
+    const monthName = MONTHS_BR[ref.getMonth()];
+    const year = ref.getFullYear();
+    const exact = getMrrBaseForMonth(monthName, year);
+    if (exact > 0) return exact;
+    // Fallback: latest available row
+    const sorted = [...mrrBaseData].sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return MONTHS_BR.indexOf(b.month) - MONTHS_BR.indexOf(a.month);
+    });
+    return Number(sorted[0]?.value ?? 0);
+  }, [mrrBaseData, getMrrBaseForMonth, globalChurnDateRange]);
+
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -232,18 +273,11 @@ export function NpsTab() {
               data={opsData?.churnDossier || []}
               selectedProdutos={selectedProdutos}
               globalCfos={selectedCfos}
-              activeClientesCount={opsData?.kpis?.totalAtivos ?? 0}
-              activeClientesMrrCount={opsData?.kpis?.activeClientesMrr ?? 0}
-              activeClientesPontualCount={opsData?.kpis?.activeClientesPontual ?? 0}
-              activeMrr={opsData?.kpis?.mrrTotal ?? 0}
-              globalDateRange={
-                selectedPeriod === 'q1' ? { from: new Date('2026-01-01'), to: new Date('2026-03-31') } :
-                selectedPeriod === 'q2' ? { from: new Date('2026-04-01'), to: new Date('2026-06-30') } :
-                selectedPeriod === 'q3' ? { from: new Date('2026-07-01'), to: new Date('2026-09-30') } :
-                selectedPeriod === 'q4' ? { from: new Date('2025-10-01'), to: new Date('2025-12-31') } :
-                dateRange?.from && dateRange?.to ? { from: dateRange.from, to: dateRange.to } :
-                undefined
-              }
+              activeClientesCount={activeFromJornada.total}
+              activeClientesMrrCount={activeFromJornada.mrr}
+              activeClientesPontualCount={activeFromJornada.pontual}
+              activeMrr={mrrBaseAtual}
+              globalDateRange={globalChurnDateRange}
             />
           </div>
         )}
