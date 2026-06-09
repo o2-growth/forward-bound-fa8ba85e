@@ -43,6 +43,8 @@ const RevenuePaceChart = lazy(() => import("./indicators/RevenuePaceChart").then
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
+import { TemperaturaSection } from "./indicators/TemperaturaSection";
+
 import { CardInvestigator } from "./indicators/CardInvestigator";
 
 type ViewMode = 'daily' | 'accumulated';
@@ -3049,6 +3051,17 @@ export function IndicatorsTab() {
           />
         ))}
       </div>
+
+      {/* Temperatura dos Leads (Modelo Atual only) */}
+      {selectedBUs.includes('modelo_atual') && (
+        <TemperaturaSection
+          analytics={modeloAtualAnalyticsRaw}
+          startDate={startDate}
+          endDate={endDate}
+        />
+      )}
+
+
 
       {/* Weekly Comparison Panel */}
       <WeeklyComparison
