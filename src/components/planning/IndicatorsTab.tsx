@@ -43,6 +43,8 @@ const RevenuePaceChart = lazy(() => import("./indicators/RevenuePaceChart").then
 import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
+import { TemperaturaSection } from "./indicators/TemperaturaSection";
+
 import { CardInvestigator } from "./indicators/CardInvestigator";
 
 type ViewMode = 'daily' | 'accumulated';
