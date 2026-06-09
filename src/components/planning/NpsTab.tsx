@@ -232,6 +232,10 @@ export function NpsTab() {
               data={opsData?.churnDossier || []}
               selectedProdutos={selectedProdutos}
               globalCfos={selectedCfos}
+              activeClientesCount={opsData?.kpis?.totalAtivos ?? 0}
+              activeClientesMrrCount={opsData?.kpis?.activeClientesMrr ?? 0}
+              activeClientesPontualCount={opsData?.kpis?.activeClientesPontual ?? 0}
+              activeMrr={opsData?.kpis?.mrrTotal ?? 0}
               globalDateRange={
                 selectedPeriod === 'q1' ? { from: new Date('2026-01-01'), to: new Date('2026-03-31') } :
                 selectedPeriod === 'q2' ? { from: new Date('2026-04-01'), to: new Date('2026-06-30') } :
