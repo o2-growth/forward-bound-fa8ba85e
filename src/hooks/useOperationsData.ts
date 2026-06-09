@@ -184,6 +184,7 @@ export interface ChurnDossierCard {
   ltMeses: string;
   problemasOxy: string;
   diagnostico: number;
+  tipoCliente: 'mrr' | 'pontual';
 }
 
 export interface OperationsKpis {
@@ -193,6 +194,9 @@ export interface OperationsKpis {
   emTratativa: number;
   churn: number;
   mrrTotal: number;
+  pontualTotalAtivo: number;
+  activeClientesMrr: number;
+  activeClientesPontual: number;
   tratativasAtivas: number;
   emSetup: number;
   setupAtrasados: number;
@@ -266,9 +270,17 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   const cfoMapAtivos: Record<string, { clientes: number; mrr: number; clients: CfoClient[] }> = {};
   let mrrTotal = 0;
   let mrrEmRisco = 0;
+  let pontualTotalAtivo = 0;
+  let activeClientesMrr = 0;
+  let activeClientesPontual = 0;
 
   const fasesAtivas = ['Onboarding', 'Em Operação Recorrente'];
   const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico', 'Turnaround', 'Valuation', 'Educação'];
+  const classifyTipoCliente = (produtoRaw: string): 'mrr' | 'pontual' => {
+    const produtos = (produtoRaw || '').split(',').map(p => p.trim()).filter(Boolean);
+    const onlyPontual = produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+    return onlyPontual ? 'pontual' : 'mrr';
+  };
 
   currentPhase.forEach(card => {
     const fase = card['Fase Atual'] || 'Desconhecida';
@@ -295,6 +307,9 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
         fase,
       });
       mrrTotal += clientMrr;
+      pontualTotalAtivo += clientPontual;
+      if (isPontualOnly) activeClientesPontual += 1;
+      else activeClientesMrr += 1;
     }
 
     if (fase === 'Em Tratativa') {
@@ -419,6 +434,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     const baseMrr = parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']);
     const baseMotivo = trat?.['Motivo Churn'] || trat?.['Motivo'] || card['Motivo Principal do Churn'] || '';
 
+    const produtoStr = card['Produtos'] || '';
     return {
       id: card.ID,
       mesChurn,
@@ -428,13 +444,14 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       motivoPrincipal: override?.motivo || baseMotivo,
       motivosCancelamento: trat?.['Motivo Churn'] || card['Motivos cancelamento'] || '',
       cfo: card['CFO Responsavel'] || card['Responsavel'] || '',
-      produto: card['Produtos'] || '',
+      produto: produtoStr,
       faseAtual: card['Fase Atual'] || '',
       dataAssinatura,
       dataEncerramento,
       ltMeses,
       problemasOxy,
       diagnostico: parseNumber(card['Valor Diagnostico']),
+      tipoCliente: classifyTipoCliente(produtoStr),
       _refDate: refDate,
     };
   }).filter((c): c is NonNullable<typeof c> => c !== null)
@@ -459,6 +476,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     ltMeses: '2',
     problemasOxy: 'Não',
     diagnostico: 0,
+    tipoCliente: 'mrr',
   });
 
   // ============= Override oficial Abr/2026 (XLSX fonte de verdade) =============
@@ -524,6 +542,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       ltMeses: '',
       problemasOxy: '',
       diagnostico: 0,
+      tipoCliente: 'mrr',
     });
   });
 
@@ -531,6 +550,9 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     phaseCount,
     cfoDistribution,
     mrrTotal,
+    pontualTotalAtivo,
+    activeClientesMrr,
+    activeClientesPontual,
     mrrEmRisco,
     totalCards: currentPhase.length,
     emOnboarding: phaseCount['Onboarding'] || 0,
@@ -781,6 +803,9 @@ export function useOperationsData() {
         emTratativa: projectData.emTratativa,
         churn: projectData.churn,
         mrrTotal: projectData.mrrTotal,
+        pontualTotalAtivo: projectData.pontualTotalAtivo,
+        activeClientesMrr: projectData.activeClientesMrr,
+        activeClientesPontual: projectData.activeClientesPontual,
         tratativasAtivas: tratativaData.ativas,
         emSetup: setupData.emSetup,
         setupAtrasados: setupData.setupAtrasados,

@@ -81,13 +81,15 @@ interface Props {
   globalDateRange?: { from?: Date; to?: Date };
   globalCfos?: string[];
   activeClientesCount?: number;
+  activeClientesMrrCount?: number;
+  activeClientesPontualCount?: number;
   activeMrr?: number;
   tratativasResolvidasCount?: number;
   activeClients?: ActiveClientLite[];
   tratativasResolvidas?: TratativaResolvidaLite[];
 }
 
-export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeMrr = 0, tratativasResolvidasCount = 0, activeClients = [], tratativasResolvidas = [] }: Props) {
+export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRange, globalCfos = [], activeClientesCount = 0, activeClientesMrrCount = 0, activeClientesPontualCount = 0, activeMrr = 0, tratativasResolvidasCount = 0, activeClients = [], tratativasResolvidas = [] }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filterMotivo, setFilterMotivo] = useState<string>('all');
   const [filterTipoChurn, setFilterTipoChurn] = useState<string>('all');
@@ -153,6 +155,18 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
     const base = activeClientesCount + filtered.length;
     return base > 0 ? (filtered.length / base) * 100 : 0;
   }, [activeClientesCount, filtered.length]);
+
+  // Segmentação MRR vs Pontual
+  const filteredMrr = useMemo(() => filtered.filter(d => d.tipoCliente !== 'pontual'), [filtered]);
+  const filteredPontual = useMemo(() => filtered.filter(d => d.tipoCliente === 'pontual'), [filtered]);
+  const logoChurnMrrPct = useMemo(() => {
+    const base = activeClientesMrrCount + filteredMrr.length;
+    return base > 0 ? (filteredMrr.length / base) * 100 : 0;
+  }, [activeClientesMrrCount, filteredMrr.length]);
+  const logoChurnPontualPct = useMemo(() => {
+    const base = activeClientesPontualCount + filteredPontual.length;
+    return base > 0 ? (filteredPontual.length / base) * 100 : 0;
+  }, [activeClientesPontualCount, filteredPontual.length]);
   
   const avgLt = useMemo(() => {
     const lts = filtered.map(d => parseFloat(d.ltMeses)).filter(n => !isNaN(n) && n > 0);
@@ -333,7 +347,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
           <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Estado atual</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Card className={`border-emerald-500/20 bg-emerald-500/5 ${clickableCardCls} hover:border-emerald-500/50`} role="button" tabIndex={0} onClick={openMrrAtivo} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMrrAtivo(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 mb-1">
@@ -349,11 +363,22 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
                 <Users className="h-4 w-4" />
-                <span className="text-[11px] font-medium uppercase tracking-wider">Clientes Ativos</span>
+                <span className="text-[11px] font-medium uppercase tracking-wider">Clientes MRR</span>
                 <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
-              <p className="text-2xl font-bold text-foreground">{activeClientesCount}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Carteira atual · clique pra ver</p>
+              <p className="text-2xl font-bold text-foreground">{activeClientesMrrCount}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Recorrentes · clique pra ver</p>
+            </CardContent>
+          </Card>
+          <Card className={`border-cyan-500/20 bg-cyan-500/5 ${clickableCardCls} hover:border-cyan-500/50`} role="button" tabIndex={0} onClick={openClientesAtivos} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesAtivos(); } }}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 mb-1">
+                <Users className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Clientes Pontual</span>
+                <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{activeClientesPontualCount}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Só pontuais · clique pra ver</p>
             </CardContent>
           </Card>
           <Card className={`border-violet-500/20 bg-violet-500/5 ${clickableCardCls} hover:border-violet-500/50`} role="button" tabIndex={0} onClick={openLtMedio} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openLtMedio(); } }}>
@@ -451,6 +476,49 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
           })()}
         </div>
       </div>
+
+      {/* Linha 3 — Logo Churn por tipo de cliente */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Logo Churn por tipo de cliente
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Card className="border-destructive/30 bg-destructive/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-destructive mb-1">
+                <Percent className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn Total</span>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{logoChurnPct.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filtered.length} de {activeClientesCount + filtered.length} clientes</p>
+            </CardContent>
+          </Card>
+          <Card className="border-blue-500/30 bg-blue-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
+                <Percent className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn MRR</span>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{logoChurnMrrPct.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filteredMrr.length} de {activeClientesMrrCount + filteredMrr.length} clientes MRR</p>
+            </CardContent>
+          </Card>
+          <Card className="border-cyan-500/30 bg-cyan-500/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 mb-1">
+                <Percent className="h-4 w-4" />
+                <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn Pontual</span>
+              </div>
+              <p className="text-2xl font-bold text-foreground">{logoChurnPontualPct.toFixed(2)}%</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filteredPontual.length} de {activeClientesPontualCount + filteredPontual.length} clientes Pontual</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
 
       {/* Top motivo (compacto, fora dos KPIs principais) */}
       {topMotivo !== '—' && (

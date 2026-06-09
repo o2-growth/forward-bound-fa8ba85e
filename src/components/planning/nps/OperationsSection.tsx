@@ -107,7 +107,16 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
     }
 
     // Recompute KPIs from filtered data
-    const totalAtivos = filteredCfoDistribution.reduce((sum, c) => sum + c.clientes, 0);
+    const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico', 'Turnaround', 'Valuation', 'Educação'];
+    const isPontualOnly = (produtoRaw: string) => {
+      const produtos = (produtoRaw || '').split(',').map(p => p.trim()).filter(Boolean);
+      return produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+    };
+    const allClients = filteredCfoDistribution.flatMap(c => c.clients);
+    const totalAtivos = allClients.length;
+    const activeClientesPontual = allClients.filter(cl => isPontualOnly(cl.produto || '')).length;
+    const activeClientesMrr = totalAtivos - activeClientesPontual;
+    const pontualTotalAtivo = allClients.reduce((sum, cl) => sum + (cl.pontual || 0), 0);
     const emOnboarding = filteredCfoDistribution.reduce((sum, c) =>
       sum + c.clients.filter(cl => cl.fase === 'Onboarding').length, 0);
     const emOperacao = filteredCfoDistribution.reduce((sum, c) =>
@@ -130,6 +139,9 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
       emOnboarding,
       emOperacao,
       mrrTotal,
+      pontualTotalAtivo,
+      activeClientesMrr,
+      activeClientesPontual,
       tratativasAtivas,
       emSetup,
       setupAtrasados,
@@ -179,7 +191,8 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
   } = filteredData;
 
   const kpiTooltips: Record<string, string> = {
-    'Clientes Ativos': 'Clientes em Onboarding ou Em Operação Recorrente. Fonte: Pipefy — Central de Projetos (pipe 306756838)',
+    'Clientes MRR': 'Clientes ativos (Onboarding ou Em Operação Recorrente) com produtos recorrentes (CFOaaS, OXY, etc.). Fonte: Pipefy — Central de Projetos (pipe 306756838)',
+    'Clientes Pontual': 'Clientes ativos cujos produtos são apenas pontuais (Diagnóstico, Turnaround, Valuation, Educação). Fonte: Pipefy — Central de Projetos',
     'MRR Total': 'Soma de Valor CFOaaS + Valor OXY dos clientes ativos. Fonte: Pipefy — Central de Projetos',
     'Em Tratativa': 'Clientes com tratativa ativa. Fonte: Pipefy — Tratativas (pipe 306731433)',
     'Em Setup': 'Setups em andamento. Fonte: Pipefy — Setup (pipe 304026589)',
@@ -188,7 +201,8 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
   };
 
   const kpiCards = [
-    { icon: Users, label: 'Clientes Ativos', value: kpis.totalAtivos, color: 'text-primary' },
+    { icon: Users, label: 'Clientes MRR', value: kpis.activeClientesMrr ?? 0, color: 'text-primary' },
+    { icon: Users, label: 'Clientes Pontual', value: kpis.activeClientesPontual ?? 0, color: 'text-cyan-600 dark:text-cyan-400' },
     { icon: UserCheck, label: 'Em Operação', value: kpis.emOperacao, color: 'text-green-600 dark:text-green-400' },
     { icon: ClipboardList, label: 'Onboarding', value: kpis.emOnboarding, color: 'text-blue-600 dark:text-blue-400' },
     { icon: Settings, label: 'Em Setup', value: kpis.emSetup, color: 'text-indigo-600 dark:text-indigo-400' },
@@ -212,7 +226,14 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
 
   function renderKpiDetail(kpi: string) {
     switch (kpi) {
-      case 'Clientes Ativos':
+      case 'Clientes MRR':
+      case 'Clientes Pontual': {
+        const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico', 'Turnaround', 'Valuation', 'Educação'];
+        const isPontual = (produtoRaw: string) => {
+          const produtos = (produtoRaw || '').split(',').map(p => p.trim()).filter(Boolean);
+          return produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+        };
+        const wantsPontual = kpi === 'Clientes Pontual';
         return (
           <div className="max-h-[300px] overflow-auto">
             <Table>
@@ -220,21 +241,27 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                 <TableRow>
                   <TableHead>CFO</TableHead>
                   <TableHead className="text-right">Clientes</TableHead>
-                  <TableHead className="text-right">MRR</TableHead>
+                  <TableHead className="text-right">{wantsPontual ? 'Pontual' : 'MRR'}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {cfoDistribution.map(cfo => (
-                  <TableRow key={cfo.cfo}>
-                    <TableCell className="font-medium">{cfo.cfo}</TableCell>
-                    <TableCell className="text-right">{cfo.clientes}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(cfo.mrr)}</TableCell>
-                  </TableRow>
-                ))}
+                {cfoDistribution.map(cfo => {
+                  const matched = cfo.clients.filter(c => isPontual(c.produto || '') === wantsPontual);
+                  if (matched.length === 0) return null;
+                  const valor = matched.reduce((s, c) => s + (wantsPontual ? (c.pontual || 0) : (c.mrr || 0)), 0);
+                  return (
+                    <TableRow key={cfo.cfo}>
+                      <TableCell className="font-medium">{cfo.cfo}</TableCell>
+                      <TableCell className="text-right">{matched.length}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(valor)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
         );
+      }
       case 'Em Operação':
         return (
           <div className="max-h-[300px] overflow-auto">
