@@ -435,8 +435,8 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                 <ChevronRight className="h-3 w-3 ml-auto opacity-50" />
               </div>
               <p className="text-2xl font-bold text-foreground">{filtered.length}</p>
-              {hasFilters
-                ? <p className="text-[10px] text-muted-foreground mt-0.5">de {data.length} total · clique pra ver</p>
+              {activeClientesCount > 0
+                ? <p className="text-[10px] text-muted-foreground mt-0.5">de {activeClientesCount} clientes ativos · clique pra ver</p>
                 : <p className="text-[10px] text-muted-foreground mt-0.5">clique pra ver lista</p>}
             </CardContent>
           </Card>
