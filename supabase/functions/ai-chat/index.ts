@@ -68,57 +68,54 @@ Deno.serve(async (req) => {
     });
     if (insUserErr) return json({ error: insUserErr.message }, 500);
 
-    // Monta payload Gemini
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiKey) return json({ error: "GEMINI_API_KEY não configurada" }, 500);
+    // Monta payload para Lovable AI Gateway (formato OpenAI-compatible)
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    if (!lovableKey) return json({ error: "LOVABLE_API_KEY não configurada" }, 500);
 
-    const contents = [
-      ...window.map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })),
-      { role: "user", parts: [{ text: user_message }] },
-    ];
-
-    const geminiBody: Record<string, unknown> = {
-      contents,
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 2048,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
-    };
+    const openaiMessages: Array<{ role: string; content: string }> = [];
     if (systemMsg?.content) {
-      geminiBody.systemInstruction = { parts: [{ text: systemMsg.content }] };
+      openaiMessages.push({ role: "system", content: systemMsg.content });
     }
+    for (const m of window) {
+      openaiMessages.push({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: m.content,
+      });
+    }
+    openaiMessages.push({ role: "user", content: user_message });
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-    const geminiResp = await fetch(geminiUrl, {
+    const modelId = "google/gemini-2.5-flash";
+    const gatewayResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(geminiBody),
+      headers: {
+        "Content-Type": "application/json",
+        "Lovable-API-Key": lovableKey,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        messages: openaiMessages,
+        temperature: 0.3,
+        max_tokens: 2048,
+      }),
     });
 
-    if (!geminiResp.ok) {
-      const errText = await geminiResp.text();
-      console.error("Gemini error:", geminiResp.status, errText);
-      if (geminiResp.status === 429) return json({ error: "Limite de requisições atingido. Tente em instantes." }, 429);
-      if (geminiResp.status === 402) return json({ error: "Créditos esgotados para o modelo." }, 402);
-      return json({ error: `Gemini falhou: ${errText.slice(0, 500)}` }, 502);
+    if (!gatewayResp.ok) {
+      const errText = await gatewayResp.text();
+      console.error("Lovable AI Gateway error:", gatewayResp.status, errText);
+      if (gatewayResp.status === 429) return json({ error: "Limite de requisições atingido. Tente em instantes." }, 429);
+      if (gatewayResp.status === 402) return json({ error: "Créditos da workspace esgotados. Adicione em Settings → Workspace → Usage." }, 402);
+      return json({ error: `IA falhou: ${errText.slice(0, 500)}` }, 502);
     }
 
-    const geminiData = await geminiResp.json();
-    const candidate = geminiData?.candidates?.[0];
-    const assistantText: string = (candidate?.content?.parts ?? [])
-      .map((p: { text?: string }) => p?.text ?? "")
-      .join("\n")
-      .trim();
+    const gatewayData = await gatewayResp.json();
+    const choice = gatewayData?.choices?.[0];
+    const assistantText: string = (choice?.message?.content ?? "").toString().trim();
     if (!assistantText) {
-      return json({ error: "Gemini não retornou texto" }, 502);
+      return json({ error: "IA não retornou texto" }, 502);
     }
 
     // Insere resposta assistant
-    const usageMeta = geminiData?.usageMetadata ?? null;
+    const usageMeta = gatewayData?.usage ?? null;
     const { data: inserted, error: insAssErr } = await supabase
       .from("ai_messages")
       .insert({
@@ -126,9 +123,9 @@ Deno.serve(async (req) => {
         role: "assistant",
         content: assistantText,
         metadata: {
-          model: "gemini-2.5-flash",
+          model: modelId,
           usage: usageMeta,
-          finish_reason: candidate?.finishReason ?? null,
+          finish_reason: choice?.finish_reason ?? null,
         },
       })
       .select("id, role, content, metadata, created_at")
