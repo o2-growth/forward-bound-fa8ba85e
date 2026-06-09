@@ -476,6 +476,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     ltMeses: '2',
     problemasOxy: 'Não',
     diagnostico: 0,
+    tipoCliente: 'mrr',
   });
 
   // ============= Override oficial Abr/2026 (XLSX fonte de verdade) =============
