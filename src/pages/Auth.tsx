@@ -449,7 +449,7 @@ export default function Auth() {
       case 'forgot': return 'Recuperar senha';
       case 'reset': return 'Redefinir senha';
       case 'signup': return 'Criar conta';
-      default: return 'Planejamento Estratégico';
+      default: return 'Dashboard Estratégico';
     }
   };
 
