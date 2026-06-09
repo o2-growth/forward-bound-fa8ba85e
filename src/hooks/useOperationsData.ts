@@ -184,6 +184,7 @@ export interface ChurnDossierCard {
   ltMeses: string;
   problemasOxy: string;
   diagnostico: number;
+  tipoCliente: 'mrr' | 'pontual';
 }
 
 export interface OperationsKpis {
@@ -193,6 +194,9 @@ export interface OperationsKpis {
   emTratativa: number;
   churn: number;
   mrrTotal: number;
+  pontualTotalAtivo: number;
+  activeClientesMrr: number;
+  activeClientesPontual: number;
   tratativasAtivas: number;
   emSetup: number;
   setupAtrasados: number;
