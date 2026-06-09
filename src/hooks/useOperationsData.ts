@@ -542,6 +542,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       ltMeses: '',
       problemasOxy: '',
       diagnostico: 0,
+      tipoCliente: 'mrr',
     });
   });
 
