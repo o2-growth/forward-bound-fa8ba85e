@@ -593,6 +593,8 @@ function CustomerSuccessTabInner() {
                     selectedProdutos={filters.produtos}
                     globalCfos={filters.cfos}
                     activeClientesCount={filteredClientesPeriodo.length}
+                    activeClientesMrrCount={clientesSplitPeriodo.mrr}
+                    activeClientesPontualCount={clientesSplitPeriodo.pontual}
                     activeMrr={mrrBase}
                     tratativasResolvidasCount={resolvidasNoPeriodo}
                     activeClients={filteredClientesPeriodo.map(c => ({
