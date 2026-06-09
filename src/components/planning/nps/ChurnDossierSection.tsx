@@ -145,10 +145,9 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   }, [data, filterMotivo, filterTipoChurn, excludeMotivos, globalCfos, selectedProdutos, globalDateRange]);
 
   const totalMrrPerdido = useMemo(() => filtered.reduce((s, d) => s + (d.mrr || 0), 0), [filtered]);
-  // Revenue Churn % = MRR perdido / (MRR ativo + MRR perdido) × 100
+  // Revenue Churn % = MRR perdido / MRR Base × 100
   const revenueChurnPct = useMemo(() => {
-    const base = activeMrr + totalMrrPerdido;
-    return base > 0 ? (totalMrrPerdido / base) * 100 : 0;
+    return activeMrr > 0 ? (totalMrrPerdido / activeMrr) * 100 : 0;
   }, [activeMrr, totalMrrPerdido]);
   // Logo Churn % = qtd clientes churn / (ativos + churn) × 100
   const logoChurnPct = useMemo(() => {
