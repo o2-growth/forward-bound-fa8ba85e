@@ -190,6 +190,40 @@ export function NpsTab() {
   // Always use filteredNpsData when available — it already returns full data when no filters match
   const displayData = filteredNpsData ?? npsData;
 
+  // Compute global churn date range (used both for ChurnDossier props and MRR base month selection)
+  const globalChurnDateRange = useMemo(() => {
+    if (selectedPeriod === 'q1') return { from: new Date('2026-01-01'), to: new Date('2026-03-31') };
+    if (selectedPeriod === 'q2') return { from: new Date('2026-04-01'), to: new Date('2026-06-30') };
+    if (selectedPeriod === 'q3') return { from: new Date('2026-07-01'), to: new Date('2026-09-30') };
+    if (selectedPeriod === 'q4') return { from: new Date('2025-10-01'), to: new Date('2025-12-31') };
+    if (dateRange?.from && dateRange?.to) return { from: dateRange.from, to: dateRange.to };
+    return undefined;
+  }, [selectedPeriod, dateRange]);
+
+  // Active clientes from Jornada (same source as Visão Geral CS)
+  const activeFromJornada = useMemo(() => {
+    const list = (jornadaClientes || []).filter(c => !NPS_INACTIVE_PHASES.includes(c.faseAtual));
+    const pontual = list.filter(c => (c.mrr ?? 0) === 0 && (c.pontual ?? 0) > 0).length;
+    return { total: list.length, mrr: list.length - pontual, pontual };
+  }, [jornadaClientes]);
+
+  // MRR Base do mês de referência (Oxy Finance · mrr_base_monthly)
+  const mrrBaseAtual = useMemo(() => {
+    if (!mrrBaseData || mrrBaseData.length === 0) return 0;
+    const ref = globalChurnDateRange?.to ?? new Date();
+    const monthName = MONTHS_BR[ref.getMonth()];
+    const year = ref.getFullYear();
+    const exact = getMrrBaseForMonth(monthName, year);
+    if (exact > 0) return exact;
+    // Fallback: latest available row
+    const sorted = [...mrrBaseData].sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return MONTHS_BR.indexOf(b.month) - MONTHS_BR.indexOf(a.month);
+    });
+    return Number(sorted[0]?.value ?? 0);
+  }, [mrrBaseData, getMrrBaseForMonth, globalChurnDateRange]);
+
+
   return (
     <div className="space-y-8">
       {/* Header */}
