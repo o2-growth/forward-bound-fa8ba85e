@@ -341,7 +341,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   const CHURN_CUTOFF = new Date('2025-10-01').getTime();
 
   // Overrides from Q1 2026 churn dossier spreadsheet (source of truth)
-  const CHURN_OVERRIDES: Record<string, { motivo?: string; mrr?: number; exclude?: boolean }> = {
+  const CHURN_OVERRIDES: Record<string, { motivo?: string; mrr?: number; exclude?: boolean; dataEncerramento?: string }> = {
     'zebl arquitetura eireli': { motivo: 'Comercial O2', mrr: 6570 },
     'aled atacadão led': { motivo: 'Comercial O2' },
     'cymaco engenharia': { motivo: 'Atendimento O2' },
@@ -355,9 +355,12 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     'gold metropolitana': { mrr: 0 },
     'grande concreto': { mrr: 6570 },
     'protecface respiradores': { mrr: 15000 },
+    // Force churn date for cards missing it in Pipefy
+    'arcoiristintas': { dataEncerramento: '2026-05-11' },
     // Clients NOT in Q1 dossier spreadsheet — exclude from churn dossier
     'cavimk': { exclude: true },
     'exportadora são francisco': { exclude: true },
+    'casa das redes estrela': { exclude: true },
   };
   // Dedup: track seen titles to prevent duplicate cards (e.g. ZEBL, KV TRANSPORTES)
   const seenChurnTitles = new Set<string>();
@@ -396,7 +399,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     // fases terminais sem preencher "Data do churn" nem "Finalizacao contrato
     // ultimo dia") apareçam como churns fantasmas no mês da migração.
     const dataChurnManual = toLocalDateBR((card as any)['Data do churn']);
-    const dataOficial = finalizacaoContrato || dataChurnManual || '';
+    const dataOficial = override?.dataEncerramento || finalizacaoContrato || dataChurnManual || '';
     if (!dataOficial) return null as any;
     const dataEncerramento = dataOficial;
     // mesChurn deriva direto de dataEncerramento (sempre YYYY-MM-DD vindo de toLocalDateBR).
