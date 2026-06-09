@@ -151,20 +151,17 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
   }, [activeMrr, totalMrrPerdido]);
   // Logo Churn % = qtd clientes churn / (ativos + churn) × 100
   const logoChurnPct = useMemo(() => {
-    const base = activeClientesCount + filtered.length;
-    return base > 0 ? (filtered.length / base) * 100 : 0;
+    return activeClientesCount > 0 ? (filtered.length / activeClientesCount) * 100 : 0;
   }, [activeClientesCount, filtered.length]);
 
   // Segmentação MRR vs Pontual
   const filteredMrr = useMemo(() => filtered.filter(d => d.tipoCliente !== 'pontual'), [filtered]);
   const filteredPontual = useMemo(() => filtered.filter(d => d.tipoCliente === 'pontual'), [filtered]);
   const logoChurnMrrPct = useMemo(() => {
-    const base = activeClientesMrrCount + filteredMrr.length;
-    return base > 0 ? (filteredMrr.length / base) * 100 : 0;
+    return activeClientesMrrCount > 0 ? (filteredMrr.length / activeClientesMrrCount) * 100 : 0;
   }, [activeClientesMrrCount, filteredMrr.length]);
   const logoChurnPontualPct = useMemo(() => {
-    const base = activeClientesPontualCount + filteredPontual.length;
-    return base > 0 ? (filteredPontual.length / base) * 100 : 0;
+    return activeClientesPontualCount > 0 ? (filteredPontual.length / activeClientesPontualCount) * 100 : 0;
   }, [activeClientesPontualCount, filteredPontual.length]);
   
   const avgLt = useMemo(() => {
@@ -304,8 +301,8 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
 
   const openLogoChurnPct = () => setDrawerKpi({
     title: 'Logo Churn (%)',
-    subtitle: `${logoChurnPct.toFixed(2)}% · ${filtered.length} de ${activeClientesCount + filtered.length} clientes`,
-    formula: 'Logo Churn / (Clientes ativos + Logo Churn) × 100. Aproxima o % da base inicial de clientes que caiu no período.',
+    subtitle: `${logoChurnPct.toFixed(2)}% · ${filtered.length} de ${activeClientesCount} clientes`,
+    formula: 'Logo Churn / Clientes ativos × 100. Base = total de clientes ativos no período (mesma fonte da Visão Geral CS).',
     columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
     groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('data') }],
   });
@@ -492,7 +489,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                 <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn Total</span>
               </div>
               <p className="text-2xl font-bold text-foreground">{logoChurnPct.toFixed(2)}%</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{filtered.length} de {activeClientesCount + filtered.length} clientes</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filtered.length} de {activeClientesCount} clientes</p>
             </CardContent>
           </Card>
           <Card className="border-blue-500/30 bg-blue-500/5">
@@ -502,7 +499,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                 <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn MRR</span>
               </div>
               <p className="text-2xl font-bold text-foreground">{logoChurnMrrPct.toFixed(2)}%</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{filteredMrr.length} de {activeClientesMrrCount + filteredMrr.length} clientes MRR</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filteredMrr.length} de {activeClientesMrrCount} clientes MRR</p>
             </CardContent>
           </Card>
           <Card className="border-cyan-500/30 bg-cyan-500/5">
@@ -512,7 +509,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
                 <span className="text-[11px] font-medium uppercase tracking-wider">Logo Churn Pontual</span>
               </div>
               <p className="text-2xl font-bold text-foreground">{logoChurnPontualPct.toFixed(2)}%</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{filteredPontual.length} de {activeClientesPontualCount + filteredPontual.length} clientes Pontual</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">{filteredPontual.length} de {activeClientesPontualCount} clientes Pontual</p>
             </CardContent>
           </Card>
         </div>
