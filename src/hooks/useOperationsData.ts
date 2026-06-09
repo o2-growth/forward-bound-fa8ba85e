@@ -270,9 +270,17 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
   const cfoMapAtivos: Record<string, { clientes: number; mrr: number; clients: CfoClient[] }> = {};
   let mrrTotal = 0;
   let mrrEmRisco = 0;
+  let pontualTotalAtivo = 0;
+  let activeClientesMrr = 0;
+  let activeClientesPontual = 0;
 
   const fasesAtivas = ['Onboarding', 'Em Operação Recorrente'];
   const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico', 'Turnaround', 'Valuation', 'Educação'];
+  const classifyTipoCliente = (produtoRaw: string): 'mrr' | 'pontual' => {
+    const produtos = (produtoRaw || '').split(',').map(p => p.trim()).filter(Boolean);
+    const onlyPontual = produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+    return onlyPontual ? 'pontual' : 'mrr';
+  };
 
   currentPhase.forEach(card => {
     const fase = card['Fase Atual'] || 'Desconhecida';
@@ -299,6 +307,9 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
         fase,
       });
       mrrTotal += clientMrr;
+      pontualTotalAtivo += clientPontual;
+      if (isPontualOnly) activeClientesPontual += 1;
+      else activeClientesMrr += 1;
     }
 
     if (fase === 'Em Tratativa') {
