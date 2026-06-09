@@ -155,6 +155,18 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
     const base = activeClientesCount + filtered.length;
     return base > 0 ? (filtered.length / base) * 100 : 0;
   }, [activeClientesCount, filtered.length]);
+
+  // Segmentação MRR vs Pontual
+  const filteredMrr = useMemo(() => filtered.filter(d => d.tipoCliente !== 'pontual'), [filtered]);
+  const filteredPontual = useMemo(() => filtered.filter(d => d.tipoCliente === 'pontual'), [filtered]);
+  const logoChurnMrrPct = useMemo(() => {
+    const base = activeClientesMrrCount + filteredMrr.length;
+    return base > 0 ? (filteredMrr.length / base) * 100 : 0;
+  }, [activeClientesMrrCount, filteredMrr.length]);
+  const logoChurnPontualPct = useMemo(() => {
+    const base = activeClientesPontualCount + filteredPontual.length;
+    return base > 0 ? (filteredPontual.length / base) * 100 : 0;
+  }, [activeClientesPontualCount, filteredPontual.length]);
   
   const avgLt = useMemo(() => {
     const lts = filtered.map(d => parseFloat(d.ltMeses)).filter(n => !isNaN(n) && n > 0);
