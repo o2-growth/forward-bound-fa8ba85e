@@ -1,53 +1,23 @@
-# Bug: Data de churn aparece 1 dia a menos que no Pipefy
+# Solução: Onboarding Atrasado com cards fantasmas
 
-## Causa raiz
+## Diagnóstico
+Problema é de **lógica do sistema**, não do banco. O hook `useJornadaData.ts` consulta apenas o pipe Rotinas isoladamente. Quando um cliente avança no Central de Projetos (vai pra "Em Operação Recorrente", "Em Tratativa", etc), o card da rotina de onboarding não é movido no Pipefy e permanece com `Data Prevista` vencida — gerando alerta falso.
 
-No card Bracci Metais, o Pipefy mostra **05/05/2026** mas no dossiê aparece **04/05/2026**.
+Cards afetados hoje: AVML, Balbúrdia, Cotrim, Etel, Getconnect, Grb, Grupo Lidon, IDB Hospitais, SAFRA OBRAS.
 
-A função `toLocalDateBR` em `src/hooks/useOperationsData.ts` (linhas 10-23) recebe a string ISO vinda do sync do Pipefy (ex.: `"2026-05-05T00:00:00.000Z"` — meia-noite **UTC**) e formata via `Intl.DateTimeFormat` no fuso `America/Sao_Paulo` (UTC-3). O resultado é `2026-05-04 21:00` → formatado como **`"2026-05-04"`**.
+## Solução proposta
+Defensiva no frontend (não depende de mexer no Pipefy). Em `src/hooks/useJornadaData.ts`, bloco `=== 8. Onboarding atrasado ===` (linhas 1018–1057):
 
-Esse shift afeta **todos** os campos de data-only do dossiê que passam por `toLocalDateBR`:
-- `Finalizacao contrato ultimo dia` (da Tratativa)
-- `Data do churn` (Central de Projetos)
+1. Antes do loop das rotinas, montar `Set<string> activeOnboardingTitles` com os títulos normalizados de `data.projetos` cuja `Fase Atual === 'Onboarding'`.
+2. Dentro do loop, após obter o título do card de rotina, se o título normalizado **não** estiver em `activeOnboardingTitles`, fazer `continue` — ignorando o card fantasma.
+3. Manter dedup por ID, cálculo de dias de atraso e ordenação como estão.
 
-Daí `dataEncerramento` e `mesChurn` saem um dia antes (e em casos de virada de mês, no mês anterior).
+Mesma estratégia já usada em outros pontos do hook (cruzar Rotinas com clientes ativos).
 
-Bracci passa despercebido pelo `parsePipefyDateOnly` (swap DD↔MM) porque day=5 e month=5 — o swap não muda nada — mas o shift de timezone continua acontecendo no `toLocalDateBR`.
+## Resultado esperado
+- Os 9 cards listados deixam de aparecer em "Onboarding atrasado".
+- Só permanecem alertas de clientes que realmente estão na fase Onboarding hoje.
+- Zero impacto em outras métricas/abas.
 
-## Correção
-
-Em `src/hooks/useOperationsData.ts`, ajustar `toLocalDateBR` para detectar **strings ISO date-only (meia-noite UTC)** e devolver a parte `YYYY-MM-DD` direto, **sem** conversão de timezone — exatamente como `parseRotinaDateOnly` já faz para esse caso.
-
-Lógica nova:
-
-```ts
-function toLocalDateBR(input) {
-  if (!input) return '';
-  if (typeof input === 'string') {
-    // Já no formato YYYY-MM-DD → retorna direto
-    const ymd = input.match(/^(\d{4}-\d{2}-\d{2})$/);
-    if (ymd) return ymd[1];
-    // ISO date-only à meia-noite UTC (Pipefy sync) → usar a parte da data direto
-    const isoMidnight = input.match(/^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.\d+)?Z?$/);
-    if (isoMidnight) return isoMidnight[1];
-  }
-  // Demais casos (Date real ou ISO com timestamp) → formatar no fuso BR
-  const d = input instanceof Date ? input : new Date(input);
-  if (isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Sao_Paulo',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(d);
-}
-```
-
-## Impacto
-
-- Bracci Metais passa a aparecer corretamente como churn em **05/05/2026**.
-- Qualquer outro churn cuja "Finalizacao contrato ultimo dia" ou "Data do churn" estivesse sendo exibida 1 dia antes é corrigido.
-- Cards cuja data caía no dia 1 do mês (e por isso eram atribuídos ao mês anterior) voltam ao mês correto, ajustando também o `mesChurn`.
-- Não altera datas que já vinham como `YYYY-MM-DD` puro nem datas com timestamp real.
-
-## Arquivo alterado
-
-- `src/hooks/useOperationsData.ts` — apenas a função `toLocalDateBR`.
+## Observação operacional (fora do escopo do código)
+Para resolver na raiz, o time precisa mover/arquivar no Pipefy os cards do pipe Rotinas quando o cliente sai de Onboarding. Esse fix do frontend protege o dashboard enquanto isso não acontece.
