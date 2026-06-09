@@ -289,8 +289,8 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
 
   const openRevenueChurnPct = () => setDrawerKpi({
     title: 'Revenue Churn (%)',
-    subtitle: `${revenueChurnPct.toFixed(2)}% · ${formatCurrency(totalMrrPerdido)} perdidos sobre ${formatCurrency(activeMrr + totalMrrPerdido)}`,
-    formula: 'Revenue Churn / (MRR ativo + Revenue Churn) × 100. Aproxima o % do MRR base inicial que foi perdido.',
+    subtitle: `${revenueChurnPct.toFixed(2)}% · ${formatCurrency(totalMrrPerdido)} perdidos sobre MRR Base ${formatCurrency(activeMrr)}`,
+    formula: 'Revenue Churn / (MRR Base + Revenue Churn) × 100. MRR Base = Oxy Finance (mrr_base_monthly) do mês de referência.',
     columns: ['cliente', 'cfo', 'mrr', 'data', 'motivo'],
     groups: [{ title: `Churns em ${periodoLabel}`, rows: churnRows('mrr') }],
   });
