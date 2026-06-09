@@ -399,7 +399,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     // fases terminais sem preencher "Data do churn" nem "Finalizacao contrato
     // ultimo dia") apareçam como churns fantasmas no mês da migração.
     const dataChurnManual = toLocalDateBR((card as any)['Data do churn']);
-    const dataOficial = finalizacaoContrato || dataChurnManual || '';
+    const dataOficial = override?.dataEncerramento || finalizacaoContrato || dataChurnManual || '';
     if (!dataOficial) return null as any;
     const dataEncerramento = dataOficial;
     // mesChurn deriva direto de dataEncerramento (sempre YYYY-MM-DD vindo de toLocalDateBR).
