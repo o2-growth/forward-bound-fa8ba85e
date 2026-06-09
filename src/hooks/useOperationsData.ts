@@ -434,6 +434,7 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     const baseMrr = parseNumber(card['Valor CFOaaS']) + parseNumber(card['Valor OXY']);
     const baseMotivo = trat?.['Motivo Churn'] || trat?.['Motivo'] || card['Motivo Principal do Churn'] || '';
 
+    const produtoStr = card['Produtos'] || '';
     return {
       id: card.ID,
       mesChurn,
@@ -443,13 +444,14 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
       motivoPrincipal: override?.motivo || baseMotivo,
       motivosCancelamento: trat?.['Motivo Churn'] || card['Motivos cancelamento'] || '',
       cfo: card['CFO Responsavel'] || card['Responsavel'] || '',
-      produto: card['Produtos'] || '',
+      produto: produtoStr,
       faseAtual: card['Fase Atual'] || '',
       dataAssinatura,
       dataEncerramento,
       ltMeses,
       problemasOxy,
       diagnostico: parseNumber(card['Valor Diagnostico']),
+      tipoCliente: classifyTipoCliente(produtoStr),
       _refDate: refDate,
     };
   }).filter((c): c is NonNullable<typeof c> => c !== null)
