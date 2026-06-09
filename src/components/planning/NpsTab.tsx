@@ -12,7 +12,12 @@ import { NpsFilters } from './nps/NpsFilters';
 
 import { useNpsData, processNpsData, NpsCard } from '@/hooks/useNpsData';
 import { useOperationsData } from '@/hooks/useOperationsData';
+import { useJornadaData } from '@/hooks/useJornadaData';
+import { useMrrBase } from '@/hooks/useMrrBase';
 import { parsePipefyDate } from '@/hooks/dateUtils';
+
+const NPS_INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arquivado'];
+const MONTHS_BR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 import { QuarterlyComparison } from './nps/QuarterlyComparison';
 import { OkrProximity } from './nps/OkrProximity';
 import { ChevronDown, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
