@@ -9,8 +9,16 @@ import { parsePipefyDate, parsePipefyDateOnly } from './dateUtils';
  */
 function toLocalDateBR(input: string | Date | null | undefined): string {
   if (!input) return '';
-  // Se já vier no formato YYYY-MM-DD, retorna direto.
-  if (typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+  if (typeof input === 'string') {
+    // Já no formato YYYY-MM-DD → retorna direto.
+    const ymd = input.match(/^(\d{4}-\d{2}-\d{2})$/);
+    if (ymd) return ymd[1];
+    // ISO date-only à meia-noite UTC (sync do Pipefy) → usa a parte da data
+    // direto, sem conversão de fuso (caso contrário 2026-05-05T00:00:00Z
+    // viraria 2026-05-04 no fuso BR).
+    const isoMidnight = input.match(/^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.\d+)?Z?$/);
+    if (isoMidnight) return isoMidnight[1];
+  }
   const d = input instanceof Date ? input : new Date(input);
   if (isNaN(d.getTime())) return '';
   // Formata via Intl no fuso BR — pt-CA produz YYYY-MM-DD.

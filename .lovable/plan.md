@@ -1,13 +1,53 @@
-## Ação
+# Bug: Data de churn aparece 1 dia a menos que no Pipefy
 
-Resetar a senha do usuário `daniel.trindade@o2inc.com.br` (id `8f658b59-e72e-41d6-8cbc-c5788bbeb01a`) para `Alterar@01` via Admin API (`supabase.auth.admin.updateUserById`) com service role — mesmo procedimento usado para a Andrea.
+## Causa raiz
 
-## Emails ativos na plataforma (contas reais @o2inc.com.br e externas legítimas)
+No card Bracci Metais, o Pipefy mostra **05/05/2026** mas no dossiê aparece **04/05/2026**.
 
-amanda.serafim · ana.rodrigues · anderson.mendes · andrea.franzen · andrey.lopes · andreylopes.ia@gmail.com · bruna.mota · carlos.ramos · carolina.boeira · contato@accorsiconsultoria.com.br · daniel.trindade · douglas.schossler · eduarda.nery · eduarda.rovani · eduardo.dagostini · eduardo.pedrolo · eric.silveira · erica.rocha · everton.bisinella · felipe.brenner · gustavo.cochlar · humberto.behs · joao.victor · joseane.sartori · jv241004@gmail.com · kethlin.moreira · liliana.almeida · lucas.ilha · marco.azevedo · mariana.luz · matheus.besnos · oliveira · pamela.quadros · pedro.albite · pedro.fuzer · pedro.pimenta · rafael.fleck · rafael.marchioretto · raissa.daros · roberta.costa · sergio.piva · tainara.konzen · thiago.zanoni · tiago.pisoni · vinicius.sanfelice (todos `@o2inc.com.br` exceto onde indicado)
+A função `toLocalDateBR` em `src/hooks/useOperationsData.ts` (linhas 10-23) recebe a string ISO vinda do sync do Pipefy (ex.: `"2026-05-05T00:00:00.000Z"` — meia-noite **UTC**) e formata via `Intl.DateTimeFormat` no fuso `America/Sao_Paulo` (UTC-3). O resultado é `2026-05-04 21:00` → formatado como **`"2026-05-04"`**.
 
-Há também ~10 contas de auditoria/teste (`*tempmail.dev`, `*@t.dev`, `temp-*`) que podem ser removidas depois se quiser limpeza.
+Esse shift afeta **todos** os campos de data-only do dossiê que passam por `toLocalDateBR`:
+- `Finalizacao contrato ultimo dia` (da Tratativa)
+- `Data do churn` (Central de Projetos)
 
-## Nenhuma alteração de código
+Daí `dataEncerramento` e `mesChurn` saem um dia antes (e em casos de virada de mês, no mês anterior).
 
-Operação apenas de dado em `auth.users`. Não mexe em arquivos do projeto.
+Bracci passa despercebido pelo `parsePipefyDateOnly` (swap DD↔MM) porque day=5 e month=5 — o swap não muda nada — mas o shift de timezone continua acontecendo no `toLocalDateBR`.
+
+## Correção
+
+Em `src/hooks/useOperationsData.ts`, ajustar `toLocalDateBR` para detectar **strings ISO date-only (meia-noite UTC)** e devolver a parte `YYYY-MM-DD` direto, **sem** conversão de timezone — exatamente como `parseRotinaDateOnly` já faz para esse caso.
+
+Lógica nova:
+
+```ts
+function toLocalDateBR(input) {
+  if (!input) return '';
+  if (typeof input === 'string') {
+    // Já no formato YYYY-MM-DD → retorna direto
+    const ymd = input.match(/^(\d{4}-\d{2}-\d{2})$/);
+    if (ymd) return ymd[1];
+    // ISO date-only à meia-noite UTC (Pipefy sync) → usar a parte da data direto
+    const isoMidnight = input.match(/^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.\d+)?Z?$/);
+    if (isoMidnight) return isoMidnight[1];
+  }
+  // Demais casos (Date real ou ISO com timestamp) → formatar no fuso BR
+  const d = input instanceof Date ? input : new Date(input);
+  if (isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(d);
+}
+```
+
+## Impacto
+
+- Bracci Metais passa a aparecer corretamente como churn em **05/05/2026**.
+- Qualquer outro churn cuja "Finalizacao contrato ultimo dia" ou "Data do churn" estivesse sendo exibida 1 dia antes é corrigido.
+- Cards cuja data caía no dia 1 do mês (e por isso eram atribuídos ao mês anterior) voltam ao mês correto, ajustando também o `mesChurn`.
+- Não altera datas que já vinham como `YYYY-MM-DD` puro nem datas com timestamp real.
+
+## Arquivo alterado
+
+- `src/hooks/useOperationsData.ts` — apenas a função `toLocalDateBR`.
