@@ -226,7 +226,14 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
 
   function renderKpiDetail(kpi: string) {
     switch (kpi) {
-      case 'Clientes Ativos':
+      case 'Clientes MRR':
+      case 'Clientes Pontual': {
+        const PONTUAL_ONLY_PRODUCTS = ['Diagnóstico', 'Turnaround', 'Valuation', 'Educação'];
+        const isPontual = (produtoRaw: string) => {
+          const produtos = (produtoRaw || '').split(',').map(p => p.trim()).filter(Boolean);
+          return produtos.length > 0 && produtos.every(p => PONTUAL_ONLY_PRODUCTS.includes(p));
+        };
+        const wantsPontual = kpi === 'Clientes Pontual';
         return (
           <div className="max-h-[300px] overflow-auto">
             <Table>
@@ -234,21 +241,27 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
                 <TableRow>
                   <TableHead>CFO</TableHead>
                   <TableHead className="text-right">Clientes</TableHead>
-                  <TableHead className="text-right">MRR</TableHead>
+                  <TableHead className="text-right">{wantsPontual ? 'Pontual' : 'MRR'}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {cfoDistribution.map(cfo => (
-                  <TableRow key={cfo.cfo}>
-                    <TableCell className="font-medium">{cfo.cfo}</TableCell>
-                    <TableCell className="text-right">{cfo.clientes}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(cfo.mrr)}</TableCell>
-                  </TableRow>
-                ))}
+                {cfoDistribution.map(cfo => {
+                  const matched = cfo.clients.filter(c => isPontual(c.produto || '') === wantsPontual);
+                  if (matched.length === 0) return null;
+                  const valor = matched.reduce((s, c) => s + (wantsPontual ? (c.pontual || 0) : (c.mrr || 0)), 0);
+                  return (
+                    <TableRow key={cfo.cfo}>
+                      <TableCell className="font-medium">{cfo.cfo}</TableCell>
+                      <TableCell className="text-right">{matched.length}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(valor)}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
         );
+      }
       case 'Em Operação':
         return (
           <div className="max-h-[300px] overflow-auto">
