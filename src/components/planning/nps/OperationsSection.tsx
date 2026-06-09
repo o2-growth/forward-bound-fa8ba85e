@@ -191,7 +191,8 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
   } = filteredData;
 
   const kpiTooltips: Record<string, string> = {
-    'Clientes Ativos': 'Clientes em Onboarding ou Em Operação Recorrente. Fonte: Pipefy — Central de Projetos (pipe 306756838)',
+    'Clientes MRR': 'Clientes ativos (Onboarding ou Em Operação Recorrente) com produtos recorrentes (CFOaaS, OXY, etc.). Fonte: Pipefy — Central de Projetos (pipe 306756838)',
+    'Clientes Pontual': 'Clientes ativos cujos produtos são apenas pontuais (Diagnóstico, Turnaround, Valuation, Educação). Fonte: Pipefy — Central de Projetos',
     'MRR Total': 'Soma de Valor CFOaaS + Valor OXY dos clientes ativos. Fonte: Pipefy — Central de Projetos',
     'Em Tratativa': 'Clientes com tratativa ativa. Fonte: Pipefy — Tratativas (pipe 306731433)',
     'Em Setup': 'Setups em andamento. Fonte: Pipefy — Setup (pipe 304026589)',
@@ -200,7 +201,8 @@ export function OperationsSection({ selectedProdutos = [], selectedCfos = [], da
   };
 
   const kpiCards = [
-    { icon: Users, label: 'Clientes Ativos', value: kpis.totalAtivos, color: 'text-primary' },
+    { icon: Users, label: 'Clientes MRR', value: kpis.activeClientesMrr ?? 0, color: 'text-primary' },
+    { icon: Users, label: 'Clientes Pontual', value: kpis.activeClientesPontual ?? 0, color: 'text-cyan-600 dark:text-cyan-400' },
     { icon: UserCheck, label: 'Em Operação', value: kpis.emOperacao, color: 'text-green-600 dark:text-green-400' },
     { icon: ClipboardList, label: 'Onboarding', value: kpis.emOnboarding, color: 'text-blue-600 dark:text-blue-400' },
     { icon: Settings, label: 'Em Setup', value: kpis.emSetup, color: 'text-indigo-600 dark:text-indigo-400' },
