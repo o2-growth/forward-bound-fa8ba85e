@@ -256,6 +256,12 @@ function CustomerSuccessTabInner() {
     });
   }, [filteredClientes, csEndDate]);
 
+  // Split MRR vs Pontual (mesma regra da Visão Geral CS: pontual = sem MRR recorrente e com receita pontual)
+  const clientesSplitPeriodo = useMemo(() => {
+    const pontual = filteredClientesPeriodo.filter(c => (Number(c.mrr) || 0) === 0 && (Number((c as any).pontual) || 0) > 0).length;
+    return { mrr: filteredClientesPeriodo.length - pontual, pontual };
+  }, [filteredClientesPeriodo]);
+
   const filteredCfos = useMemo((): JornadaCfo[] => {
     if (filters.cfos.length === 0 && filters.produtos.length === 0) return cfos;
     const cfoNames = [...new Set(filteredClientes.map(c => c.cfo).filter(Boolean))];
@@ -587,6 +593,8 @@ function CustomerSuccessTabInner() {
                     selectedProdutos={filters.produtos}
                     globalCfos={filters.cfos}
                     activeClientesCount={filteredClientesPeriodo.length}
+                    activeClientesMrrCount={clientesSplitPeriodo.mrr}
+                    activeClientesPontualCount={clientesSplitPeriodo.pontual}
                     activeMrr={mrrBase}
                     tratativasResolvidasCount={resolvidasNoPeriodo}
                     activeClients={filteredClientesPeriodo.map(c => ({
