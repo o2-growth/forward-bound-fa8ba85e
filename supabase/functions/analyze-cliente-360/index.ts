@@ -1,5 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import pg from "npm:pg@8.13.1";
+import {
+  buildSlackPgClient,
+  extractClientSlugCandidates,
+  fetchRecentMessages,
+  findChannelByCandidates,
+} from "../_shared/slack.ts";
 const { Client } = pg;
 
 const corsHeaders = {
