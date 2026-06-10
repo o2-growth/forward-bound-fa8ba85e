@@ -312,18 +312,17 @@ function CustomerSuccessTabInner() {
       const targetYear = refDate.getFullYear();
       const row = mrrBaseData.find(r => r.month === targetMonth && r.year === targetYear);
       if (row && Number(row.value) > 0) return Number(row.value);
-      // Mês selecionado sem dado: cai no mês mais recente disponível ≤ refDate
+      // Mês selecionado sem dado: pega o mês com valor > 0 mais próximo de refDate
+      // (em qualquer direção), priorizando o mais recente em caso de empate.
+      const targetIdx = targetYear * 12 + refDate.getMonth();
       const eligible = [...mrrBaseData]
         .filter(r => Number(r.value) > 0)
-        .filter(r => {
-          const mi = MONTHS_PT.indexOf(r.month);
-          return r.year < targetYear || (r.year === targetYear && mi <= refDate.getMonth());
+        .map(r => {
+          const idx = r.year * 12 + MONTHS_PT.indexOf(r.month);
+          return { r, distance: Math.abs(idx - targetIdx), idx };
         })
-        .sort((a, b) => {
-          if (a.year !== b.year) return b.year - a.year;
-          return MONTHS_PT.indexOf(b.month) - MONTHS_PT.indexOf(a.month);
-        });
-      if (eligible.length > 0) return Number(eligible[0].value);
+        .sort((a, b) => a.distance - b.distance || b.idx - a.idx);
+      if (eligible.length > 0) return Number(eligible[0].r.value);
     }
     // Fallback final: mês mais recente com valor > 0
     const sorted = [...mrrBaseData]
