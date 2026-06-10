@@ -1,4 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  buildSlackPgClient,
+  searchMessages,
+} from "../_shared/slack.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,6 +10,18 @@ const corsHeaders = {
 };
 
 const MAX_HISTORY = 20; // system + até 19 mais recentes
+const SLACK_TRIGGER_RE = /\b(slack|disse|falou|falaram|mensagem|mensagens|chat|reclam|coment|conversa|interno|menciono?u?)\b/i;
+
+function extractSearchTerm(userMessage: string): string | null {
+  // Tenta capturar termo entre aspas, depois "sobre X", senão último substantivo simples.
+  const quoted = userMessage.match(/["'""']([^"'""']{2,60})["'""']/);
+  if (quoted) return quoted[1].trim();
+  const sobre = userMessage.match(/sobre\s+([\wÀ-ú\-]{3,40}(?:\s+[\wÀ-ú\-]{3,40}){0,2})/i);
+  if (sobre) return sobre[1].trim();
+  const palavra = userMessage.match(/(?:palavra|termo|assunto|tema)\s+([\wÀ-ú\-]{3,40})/i);
+  if (palavra) return palavra[1].trim();
+  return null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -48,10 +64,10 @@ Deno.serve(async (req) => {
     if (convErr) return json({ error: convErr.message }, 500);
     if (!conv) return json({ error: "Conversa não encontrada" }, 404);
 
-    // Carrega histórico (system + últimas N)
+    // Carrega histórico (system + últimas N) + metadata p/ resolver canal Slack
     const { data: allMsgs, error: msgErr } = await supabase
       .from("ai_messages")
-      .select("role, content, created_at")
+      .select("role, content, metadata, created_at")
       .eq("conversation_id", conversation_id)
       .order("created_at", { ascending: true });
     if (msgErr) return json({ error: msgErr.message }, 500);
@@ -76,6 +92,42 @@ Deno.serve(async (req) => {
     if (systemMsg?.content) {
       openaiMessages.push({ role: "system", content: systemMsg.content });
     }
+
+    // Busca on-demand no Slack p/ conversas Cliente 360
+    let slackInjection: string | null = null;
+    if (conv.context_type === "cliente_360" && SLACK_TRIGGER_RE.test(user_message)) {
+      const firstAssistant = (allMsgs ?? []).find((m) => m.role === "assistant");
+      const meta = (firstAssistant?.metadata ?? null) as any;
+      const channelId = meta?.cliente360?.slack?.channel?.id ?? null;
+      const term = extractSearchTerm(user_message);
+      if (channelId && term) {
+        let slackPg: any = null;
+        try {
+          slackPg = buildSlackPgClient();
+          await slackPg.connect();
+          const found = await searchMessages(slackPg, { channelId, query: term, limit: 30 });
+          if (found.length) {
+            const lines = found.map((m) =>
+              `- [${m.when.slice(0, 10)}] ${m.username ?? "?"}${m.is_reply ? " (reply)" : ""}: ${
+                (m.text ?? "").replace(/\s+/g, " ").slice(0, 400)
+              }`
+            ).join("\n");
+            slackInjection =
+              `Resultado de busca no Slack para "${term}" (${found.length} mensagens, ordem decrescente):\n${lines}`;
+          } else {
+            slackInjection = `Resultado de busca no Slack para "${term}": nenhuma mensagem encontrada no canal vinculado.`;
+          }
+        } catch (e) {
+          console.error("ai-chat slack search error:", e);
+        } finally {
+          if (slackPg) { try { await slackPg.end(); } catch (_e) {} }
+        }
+      }
+    }
+    if (slackInjection) {
+      openaiMessages.push({ role: "system", content: slackInjection });
+    }
+
     for (const m of window) {
       openaiMessages.push({
         role: m.role === "assistant" ? "assistant" : "user",
