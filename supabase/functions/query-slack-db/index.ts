@@ -80,6 +80,13 @@ Deno.serve(async (req) => {
       return json({ messages }, 200);
     }
 
+    if (action === "list_channels") {
+      const query = String(body?.query ?? "").trim();
+      const limit = Number(body?.limit ?? 50);
+      const channels = await listChannels(pgClient, { query, limit });
+      return json({ channels }, 200);
+    }
+
     return json({ error: "unreachable" }, 500);
   } catch (err) {
     console.error("query-slack-db error:", err);
