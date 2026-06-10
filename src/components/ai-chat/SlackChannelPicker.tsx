@@ -79,7 +79,9 @@ export function SlackChannelPicker({
           updated_at: new Date().toISOString(),
         }, { onConflict: "cliente_id" });
       if (error) throw error;
-      toast.success(`Vinculado #${channel.name}`);
+      toast.success(`Canal #${channel.name} vinculado`, {
+        description: "Recarregando dossiê com o histórico de mensagens deste canal…",
+      });
       setOpen(false);
       await onChanged();
     } catch (err: any) {
