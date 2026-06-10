@@ -5,6 +5,7 @@ import {
   extractClientSlugCandidates,
   fetchRecentMessages,
   findChannelByCandidates,
+  findChannelById,
 } from "../_shared/slack.ts";
 const { Client } = pg;
 
@@ -166,38 +167,61 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1b. Anexa contexto Slack (canal interno-<slug>), se existir.
+    // 1b. Anexa contexto Slack. Prioriza override manual (cliente_slack_channels);
+    // se não houver override, cai para heurística baseada no nome do cliente.
     let slackPg: any = null;
     try {
-      const slugs = extractClientSlugCandidates(cliente360);
-      if (slugs.length) {
-        slackPg = buildSlackPgClient();
-        await slackPg.connect();
-        const channel = await findChannelByCandidates(slackPg, slugs);
-        if (channel) {
-          const messages = await fetchRecentMessages(slackPg, channel.id, {
-            days: 60,
-            rootLimit: 30,
-            maxRows: 200,
-          });
-          (cliente360 as any).slack = {
-            channel: {
-              id: channel.id,
-              name: channel.name,
-              member_count: channel.member_count ?? null,
-            },
-            window: { days: 60, messages_count: messages.length },
-            messages,
-          };
-        } else {
-          (cliente360 as any).slack = { channel: null, reason: "no_channel_match", candidates: slugs };
+      const { data: overrideRow } = await supabase
+        .from("cliente_slack_channels")
+        .select("channel_id, channel_name")
+        .eq("cliente_id", String(clienteId))
+        .maybeSingle();
+
+      slackPg = buildSlackPgClient();
+      await slackPg.connect();
+
+      let channel: any = null;
+      let source: "override" | "heuristic" = "heuristic";
+      let candidates: string[] = [];
+
+      if (overrideRow?.channel_id) {
+        channel = await findChannelById(slackPg, overrideRow.channel_id);
+        source = "override";
+        if (!channel) {
+          // Override aponta para canal que sumiu — usa nome salvo como fallback informativo.
+          channel = { id: overrideRow.channel_id, name: overrideRow.channel_name, member_count: null };
         }
       } else {
-        (cliente360 as any).slack = { channel: null, reason: "no_client_name_in_dossier" };
+        candidates = extractClientSlugCandidates(cliente360);
+        if (candidates.length) {
+          channel = await findChannelByCandidates(slackPg, candidates);
+        }
+      }
+
+      if (channel) {
+        const messages = await fetchRecentMessages(slackPg, channel.id, {
+          days: 60,
+          rootLimit: 30,
+          maxRows: 200,
+        });
+        (cliente360 as any).slack = {
+          source,
+          channel: {
+            id: channel.id,
+            name: channel.name,
+            member_count: channel.member_count ?? null,
+          },
+          window: { days: 60, messages_count: messages.length },
+          messages,
+        };
+      } else if (candidates.length) {
+        (cliente360 as any).slack = { source, channel: null, reason: "no_channel_match", candidates };
+      } else {
+        (cliente360 as any).slack = { source, channel: null, reason: "no_client_name_in_dossier" };
       }
     } catch (slackErr) {
       console.error("[analyze-cliente-360] slack context error:", slackErr);
-      (cliente360 as any).slack = { channel: null, reason: "slack_query_failed" };
+      (cliente360 as any).slack = { source: "heuristic", channel: null, reason: "slack_query_failed" };
     } finally {
       if (slackPg) { try { await slackPg.end(); } catch (_e) {} }
     }

@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { AIChatDrawer } from "@/components/ai-chat/AIChatDrawer";
+import { SlackChannelPicker } from "@/components/ai-chat/SlackChannelPicker";
 import { useCliente360 } from "@/hooks/useCliente360";
 import type { JornadaCliente } from "./types";
 
@@ -27,11 +28,6 @@ export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerPro
   );
 
   const slackInfo = (chat.cliente360 as any)?.slack ?? null;
-  const slackChip = slackInfo?.channel
-    ? `🔗 Slack: #${slackInfo.channel.name} (${slackInfo.window?.messages_count ?? 0} msgs/${slackInfo.window?.days ?? 60}d)`
-    : slackInfo
-      ? "🔗 Slack: canal não encontrado"
-      : null;
 
   const subtitle = (
     <>
@@ -44,14 +40,14 @@ export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerPro
       {cliente.tratativaAtiva && (
         <Badge variant="destructive" className="text-[10px]">Tratativa {cliente.tratativaDias}d</Badge>
       )}
-      {slackChip && (
-        <Badge
-          variant={slackInfo?.channel ? "secondary" : "outline"}
-          className="text-[10px] font-normal"
-          title={slackInfo?.channel?.name ?? slackInfo?.reason ?? ""}
-        >
-          {slackChip}
-        </Badge>
+      {realId && (
+        <SlackChannelPicker
+          clienteId={realId}
+          currentChannel={slackInfo?.channel ?? null}
+          source={slackInfo?.source ?? null}
+          messagesCount={slackInfo?.window?.messages_count}
+          onChanged={() => chat.regenerate()}
+        />
       )}
     </>
   );

@@ -7,6 +7,7 @@ import {
   fetchRecentMessages,
   findChannelByCandidates,
   findChannelByName,
+  listChannels,
   normalizeSlug,
   searchMessages,
 } from "../_shared/slack.ts";
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "");
-    if (!["find_channel", "recent_messages", "search_messages"].includes(action)) {
+    if (!["find_channel", "recent_messages", "search_messages", "list_channels"].includes(action)) {
       return json({ error: "action inválida" }, 400);
     }
 
@@ -77,6 +78,13 @@ Deno.serve(async (req) => {
       const limit = Number(body?.limit ?? 50);
       const messages = await searchMessages(pgClient, { channelId, query, limit });
       return json({ messages }, 200);
+    }
+
+    if (action === "list_channels") {
+      const query = String(body?.query ?? "").trim();
+      const limit = Number(body?.limit ?? 50);
+      const channels = await listChannels(pgClient, { query, limit });
+      return json({ channels }, 200);
     }
 
     return json({ error: "unreachable" }, 500);
