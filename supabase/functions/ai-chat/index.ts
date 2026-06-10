@@ -1,4 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  buildSlackPgClient,
+  searchMessages,
+} from "../_shared/slack.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,6 +10,18 @@ const corsHeaders = {
 };
 
 const MAX_HISTORY = 20; // system + até 19 mais recentes
+const SLACK_TRIGGER_RE = /\b(slack|disse|falou|falaram|mensagem|mensagens|chat|reclam|coment|conversa|interno|menciono?u?)\b/i;
+
+function extractSearchTerm(userMessage: string): string | null {
+  // Tenta capturar termo entre aspas, depois "sobre X", senão último substantivo simples.
+  const quoted = userMessage.match(/["'""']([^"'""']{2,60})["'""']/);
+  if (quoted) return quoted[1].trim();
+  const sobre = userMessage.match(/sobre\s+([\wÀ-ú\-]{3,40}(?:\s+[\wÀ-ú\-]{3,40}){0,2})/i);
+  if (sobre) return sobre[1].trim();
+  const palavra = userMessage.match(/(?:palavra|termo|assunto|tema)\s+([\wÀ-ú\-]{3,40})/i);
+  if (palavra) return palavra[1].trim();
+  return null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
