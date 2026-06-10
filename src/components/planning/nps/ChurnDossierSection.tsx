@@ -267,6 +267,35 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
     groups: [{ title: 'Carteira ativa', rows: activeRows('cliente'), emptyHint: 'Lista de clientes ativos não disponível neste contexto.' }],
   });
 
+  const buildActiveTypedRows = (tipo: 'mrr' | 'pontual'): DrawerRow[] =>
+    activeClients
+      .filter(c => (tipo === 'mrr' ? (c.mrr || 0) > 0 : (c.mrr || 0) === 0))
+      .map(c => ({
+        id: c.id,
+        pipeId: PIPEFY_PIPES.CENTRAL_PROJETOS,
+        cliente: c.titulo,
+        cfo: c.cfo,
+        mrr: c.mrr,
+        faseAtual: c.faseAtual,
+      } as DrawerRow))
+      .sort((a, b) => a.cliente.localeCompare(b.cliente));
+
+  const openClientesMrr = () => setDrawerKpi({
+    title: 'Clientes MRR',
+    subtitle: `${activeClientesMrrCount} cliente(s) recorrentes`,
+    formula: 'Clientes ativos com MRR > 0 (CFOaaS + OXY recorrente). Exclui clientes só Pontual.',
+    columns: ['cliente', 'cfo', 'mrr', 'fase'],
+    groups: [{ title: 'Carteira MRR', rows: buildActiveTypedRows('mrr'), emptyHint: 'Nenhum cliente MRR no período.' }],
+  });
+
+  const openClientesPontual = () => setDrawerKpi({
+    title: 'Clientes Pontual',
+    subtitle: `${activeClientesPontualCount} cliente(s) só pontuais`,
+    formula: 'Clientes ativos sem MRR recorrente — apenas serviços pontuais (Diagnóstico, Turnaround, Valuation, Educação).',
+    columns: ['cliente', 'cfo', 'mrr', 'fase'],
+    groups: [{ title: 'Carteira Pontual', rows: buildActiveTypedRows('pontual'), emptyHint: 'Nenhum cliente Pontual no período.' }],
+  });
+
   const openLtMedio = () => setDrawerKpi({
     title: 'LT Médio — churns do período',
     subtitle: `${avgLt} meses · ${filtered.length} churn(s)`,
@@ -355,7 +384,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
               <p className="text-[10px] text-muted-foreground mt-0.5">MRR ativo · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className={`border-blue-500/20 bg-blue-500/5 ${clickableCardCls} hover:border-blue-500/50`} role="button" tabIndex={0} onClick={openClientesAtivos} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesAtivos(); } }}>
+          <Card className={`border-blue-500/20 bg-blue-500/5 ${clickableCardCls} hover:border-blue-500/50`} role="button" tabIndex={0} onClick={openClientesMrr} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesMrr(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
                 <Users className="h-4 w-4" />
@@ -366,7 +395,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
               <p className="text-[10px] text-muted-foreground mt-0.5">Recorrentes · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className={`border-cyan-500/20 bg-cyan-500/5 ${clickableCardCls} hover:border-cyan-500/50`} role="button" tabIndex={0} onClick={openClientesAtivos} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesAtivos(); } }}>
+          <Card className={`border-cyan-500/20 bg-cyan-500/5 ${clickableCardCls} hover:border-cyan-500/50`} role="button" tabIndex={0} onClick={openClientesPontual} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesPontual(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 mb-1">
                 <Users className="h-4 w-4" />
