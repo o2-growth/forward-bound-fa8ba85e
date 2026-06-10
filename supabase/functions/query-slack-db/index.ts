@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action = String(body?.action ?? "");
-    if (!["find_channel", "recent_messages", "search_messages"].includes(action)) {
+    if (!["find_channel", "recent_messages", "search_messages", "list_channels"].includes(action)) {
       return json({ error: "action inválida" }, 400);
     }
 
