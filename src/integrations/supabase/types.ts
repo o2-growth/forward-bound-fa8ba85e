@@ -355,6 +355,33 @@ export type Database = {
         }
         Relationships: []
       }
+      cliente_slack_channels: {
+        Row: {
+          channel_id: string
+          channel_name: string
+          cliente_id: string
+          created_at: string
+          set_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel_id: string
+          channel_name: string
+          cliente_id: string
+          created_at?: string
+          set_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel_id?: string
+          channel_name?: string
+          cliente_id?: string
+          created_at?: string
+          set_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       closer_absolute_metas: {
         Row: {
           closer: string
