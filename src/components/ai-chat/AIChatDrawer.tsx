@@ -150,7 +150,9 @@ export function AIChatDrawer({
             {title}
           </SheetTitle>
           {subtitle && (
-            <SheetDescription className="flex flex-wrap gap-2 text-xs">{subtitle}</SheetDescription>
+            <SheetDescription asChild>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{subtitle}</div>
+            </SheetDescription>
           )}
           <div className="flex justify-end pt-2">
             <Button
