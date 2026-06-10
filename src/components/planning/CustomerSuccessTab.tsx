@@ -304,17 +304,16 @@ function CustomerSuccessTabInner() {
     }
     if (!mrrBaseData || mrrBaseData.length === 0) return 0;
     const MONTHS_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    let targetMonth: string | null = null;
-    let targetYear: number | null = null;
-    if (dateRange?.to) {
-      targetMonth = MONTHS_PT[dateRange.to.getMonth()];
-      targetYear = dateRange.to.getFullYear();
-    }
-    if (targetMonth && targetYear) {
+    // Mês alvo: usa `to` se houver, senão `from`. Quando usuário selecionou um período,
+    // não cai mais no fallback "mês mais recente" (evita exibir Jun quando pediu Abr).
+    const refDate = dateRange?.to ?? dateRange?.from;
+    if (refDate) {
+      const targetMonth = MONTHS_PT[refDate.getMonth()];
+      const targetYear = refDate.getFullYear();
       const row = mrrBaseData.find(r => r.month === targetMonth && r.year === targetYear);
-      if (row) return Number(row.value) || 0;
+      return row ? Number(row.value) || 0 : 0;
     }
-    // Fallback: mês mais recente com valor > 0
+    // Sem filtro de data: usa o mês mais recente com valor > 0
     const sorted = [...mrrBaseData]
       .filter(r => Number(r.value) > 0)
       .sort((a, b) => {
