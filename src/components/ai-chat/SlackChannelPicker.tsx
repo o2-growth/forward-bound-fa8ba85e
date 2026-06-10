@@ -116,12 +116,13 @@ export function SlackChannelPicker({
   }, [currentChannel, messagesCount]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Badge
           variant={currentChannel ? "secondary" : "outline"}
           className="cursor-pointer text-[10px] font-normal gap-1 hover:bg-secondary/80"
           title="Clique para trocar o canal Slack vinculado"
+          onClick={(e) => e.stopPropagation()}
         >
           {currentChannel ? <Hash className="h-3 w-3" /> : <Link2 className="h-3 w-3" />}
           {label}
@@ -133,7 +134,14 @@ export function SlackChannelPicker({
           )}
         </Badge>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="start">
+      <PopoverContent
+        className="w-80 p-0 z-[100]"
+        align="start"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.stopPropagation()}
+        onInteractOutside={(e) => e.stopPropagation()}
+      >
         <div className="p-3 border-b">
           <div className="text-xs font-semibold mb-2">Canal Slack do cliente</div>
           {currentChannel ? (
