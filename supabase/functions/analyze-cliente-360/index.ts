@@ -5,6 +5,7 @@ import {
   extractClientSlugCandidates,
   fetchRecentMessages,
   findChannelByCandidates,
+  findChannelById,
 } from "../_shared/slack.ts";
 const { Client } = pg;
 
