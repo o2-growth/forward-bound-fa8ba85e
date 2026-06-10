@@ -128,22 +128,28 @@ export function SlackChannelPicker({
   }, [currentChannel, messagesCount]);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(o) => { console.log("[SlackChannelPicker] onOpenChange", o); setOpen(o); }}>
       <PopoverTrigger asChild>
-        <Badge
-          variant={currentChannel ? "secondary" : "outline"}
-          className="cursor-pointer text-[10px] font-normal gap-1 hover:bg-secondary/80"
-          title="Clique para trocar o canal Slack vinculado"
+        <button
+          type="button"
+          aria-label={currentChannel ? `Trocar canal Slack vinculado (atual: #${currentChannel.name})` : "Vincular canal Slack ao cliente"}
+          className="inline-flex"
         >
-          {currentChannel ? <Hash className="h-3 w-3" /> : <Link2 className="h-3 w-3" />}
-          {label}
-          {source === "override" && currentChannel && (
-            <span className="text-[9px] opacity-70">(manual)</span>
-          )}
-          {source === "heuristic" && currentChannel && (
-            <span className="text-[9px] opacity-70">(auto)</span>
-          )}
-        </Badge>
+          <Badge
+            variant={currentChannel ? "secondary" : "outline"}
+            className="cursor-pointer text-[10px] font-normal gap-1 hover:bg-secondary/80"
+            title="Clique para trocar o canal Slack vinculado"
+          >
+            {currentChannel ? <Hash className="h-3 w-3" /> : <Link2 className="h-3 w-3" />}
+            {label}
+            {source === "override" && currentChannel && (
+              <span className="text-[9px] opacity-70">(manual)</span>
+            )}
+            {source === "heuristic" && currentChannel && (
+              <span className="text-[9px] opacity-70">(auto)</span>
+            )}
+          </Badge>
+        </button>
       </PopoverTrigger>
       <PopoverContent
         className="w-80 p-0 z-[100]"
