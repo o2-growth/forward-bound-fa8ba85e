@@ -166,6 +166,42 @@ Deno.serve(async (req) => {
       });
     }
 
+    // 1b. Anexa contexto Slack (canal interno-<slug>), se existir.
+    let slackPg: any = null;
+    try {
+      const slugs = extractClientSlugCandidates(cliente360);
+      if (slugs.length) {
+        slackPg = buildSlackPgClient();
+        await slackPg.connect();
+        const channel = await findChannelByCandidates(slackPg, slugs);
+        if (channel) {
+          const messages = await fetchRecentMessages(slackPg, channel.id, {
+            days: 60,
+            rootLimit: 30,
+            maxRows: 200,
+          });
+          (cliente360 as any).slack = {
+            channel: {
+              id: channel.id,
+              name: channel.name,
+              member_count: channel.member_count ?? null,
+            },
+            window: { days: 60, messages_count: messages.length },
+            messages,
+          };
+        } else {
+          (cliente360 as any).slack = { channel: null, reason: "no_channel_match", candidates: slugs };
+        }
+      } else {
+        (cliente360 as any).slack = { channel: null, reason: "no_client_name_in_dossier" };
+      }
+    } catch (slackErr) {
+      console.error("[analyze-cliente-360] slack context error:", slackErr);
+      (cliente360 as any).slack = { channel: null, reason: "slack_query_failed" };
+    } finally {
+      if (slackPg) { try { await slackPg.end(); } catch (_e) {} }
+    }
+
     // 2. Call Lovable AI Gateway (OpenAI-compatible)
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     if (!lovableKey) {
