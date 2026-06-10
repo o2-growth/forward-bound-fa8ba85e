@@ -384,7 +384,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
               <p className="text-[10px] text-muted-foreground mt-0.5">MRR ativo · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className={`border-blue-500/20 bg-blue-500/5 ${clickableCardCls} hover:border-blue-500/50`} role="button" tabIndex={0} onClick={openClientesAtivos} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesAtivos(); } }}>
+          <Card className={`border-blue-500/20 bg-blue-500/5 ${clickableCardCls} hover:border-blue-500/50`} role="button" tabIndex={0} onClick={openClientesMrr} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesMrr(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
                 <Users className="h-4 w-4" />
@@ -395,7 +395,7 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
               <p className="text-[10px] text-muted-foreground mt-0.5">Recorrentes · clique pra ver</p>
             </CardContent>
           </Card>
-          <Card className={`border-cyan-500/20 bg-cyan-500/5 ${clickableCardCls} hover:border-cyan-500/50`} role="button" tabIndex={0} onClick={openClientesAtivos} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesAtivos(); } }}>
+          <Card className={`border-cyan-500/20 bg-cyan-500/5 ${clickableCardCls} hover:border-cyan-500/50`} role="button" tabIndex={0} onClick={openClientesPontual} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openClientesPontual(); } }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400 mb-1">
                 <Users className="h-4 w-4" />
