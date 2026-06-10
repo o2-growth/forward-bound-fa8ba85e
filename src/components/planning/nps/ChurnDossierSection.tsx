@@ -267,6 +267,35 @@ export function ChurnDossierSection({ data, selectedProdutos = [], globalDateRan
     groups: [{ title: 'Carteira ativa', rows: activeRows('cliente'), emptyHint: 'Lista de clientes ativos não disponível neste contexto.' }],
   });
 
+  const buildActiveTypedRows = (tipo: 'mrr' | 'pontual'): DrawerRow[] =>
+    activeClients
+      .filter(c => (tipo === 'mrr' ? (c.mrr || 0) > 0 : (c.mrr || 0) === 0))
+      .map(c => ({
+        id: c.id,
+        pipeId: PIPEFY_PIPES.CENTRAL_PROJETOS,
+        cliente: c.titulo,
+        cfo: c.cfo,
+        mrr: c.mrr,
+        faseAtual: c.faseAtual,
+      } as DrawerRow))
+      .sort((a, b) => a.cliente.localeCompare(b.cliente));
+
+  const openClientesMrr = () => setDrawerKpi({
+    title: 'Clientes MRR',
+    subtitle: `${activeClientesMrrCount} cliente(s) recorrentes`,
+    formula: 'Clientes ativos com MRR > 0 (CFOaaS + OXY recorrente). Exclui clientes só Pontual.',
+    columns: ['cliente', 'cfo', 'mrr', 'fase'],
+    groups: [{ title: 'Carteira MRR', rows: buildActiveTypedRows('mrr'), emptyHint: 'Nenhum cliente MRR no período.' }],
+  });
+
+  const openClientesPontual = () => setDrawerKpi({
+    title: 'Clientes Pontual',
+    subtitle: `${activeClientesPontualCount} cliente(s) só pontuais`,
+    formula: 'Clientes ativos sem MRR recorrente — apenas serviços pontuais (Diagnóstico, Turnaround, Valuation, Educação).',
+    columns: ['cliente', 'cfo', 'mrr', 'fase'],
+    groups: [{ title: 'Carteira Pontual', rows: buildActiveTypedRows('pontual'), emptyHint: 'Nenhum cliente Pontual no período.' }],
+  });
+
   const openLtMedio = () => setDrawerKpi({
     title: 'LT Médio — churns do período',
     subtitle: `${avgLt} meses · ${filtered.length} churn(s)`,
