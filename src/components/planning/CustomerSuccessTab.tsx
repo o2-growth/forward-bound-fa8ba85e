@@ -304,16 +304,28 @@ function CustomerSuccessTabInner() {
     }
     if (!mrrBaseData || mrrBaseData.length === 0) return 0;
     const MONTHS_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-    // Mês alvo: usa `to` se houver, senão `from`. Quando usuário selecionou um período,
-    // não cai mais no fallback "mês mais recente" (evita exibir Jun quando pediu Abr).
-    const refDate = dateRange?.to ?? dateRange?.from;
+    // Mês alvo: o seletor de período do topo da aba atualiza csStartDate/csEndDate
+    // (não dateRange), então usamos csEndDate como referência primária.
+    const refDate = csEndDate ?? csStartDate ?? dateRange?.to ?? dateRange?.from;
     if (refDate) {
       const targetMonth = MONTHS_PT[refDate.getMonth()];
       const targetYear = refDate.getFullYear();
       const row = mrrBaseData.find(r => r.month === targetMonth && r.year === targetYear);
-      return row ? Number(row.value) || 0 : 0;
+      if (row && Number(row.value) > 0) return Number(row.value);
+      // Mês selecionado sem dado: cai no mês mais recente disponível ≤ refDate
+      const eligible = [...mrrBaseData]
+        .filter(r => Number(r.value) > 0)
+        .filter(r => {
+          const mi = MONTHS_PT.indexOf(r.month);
+          return r.year < targetYear || (r.year === targetYear && mi <= refDate.getMonth());
+        })
+        .sort((a, b) => {
+          if (a.year !== b.year) return b.year - a.year;
+          return MONTHS_PT.indexOf(b.month) - MONTHS_PT.indexOf(a.month);
+        });
+      if (eligible.length > 0) return Number(eligible[0].value);
     }
-    // Sem filtro de data: usa o mês mais recente com valor > 0
+    // Fallback final: mês mais recente com valor > 0
     const sorted = [...mrrBaseData]
       .filter(r => Number(r.value) > 0)
       .sort((a, b) => {
@@ -321,7 +333,7 @@ function CustomerSuccessTabInner() {
         return MONTHS_PT.indexOf(b.month) - MONTHS_PT.indexOf(a.month);
       });
     return sorted.length > 0 ? Number(sorted[0].value) : 0;
-  }, [mrrBaseData, dateRange, filters.cfos, filters.produtos, filteredClientesPeriodo]);
+  }, [mrrBaseData, dateRange, csStartDate, csEndDate, filters.cfos, filters.produtos, filteredClientesPeriodo]);
 
   const isLoading = jornadaLoading || npsLoading;
   const error = jornadaError || npsError;
