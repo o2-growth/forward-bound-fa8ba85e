@@ -26,6 +26,13 @@ export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerPro
     </span>
   );
 
+  const slackInfo = (chat.cliente360 as any)?.slack ?? null;
+  const slackChip = slackInfo?.channel
+    ? `🔗 Slack: #${slackInfo.channel.name} (${slackInfo.window?.messages_count ?? 0} msgs/${slackInfo.window?.days ?? 60}d)`
+    : slackInfo
+      ? "🔗 Slack: canal não encontrado"
+      : null;
+
   const subtitle = (
     <>
       <Badge variant="outline">{cliente.faseAtual}</Badge>
@@ -36,6 +43,15 @@ export function Cliente360Drawer({ cliente, open, onClose }: Cliente360DrawerPro
       <span>Lifetime: {cliente.lifetimeMonths ?? "—"} meses</span>
       {cliente.tratativaAtiva && (
         <Badge variant="destructive" className="text-[10px]">Tratativa {cliente.tratativaDias}d</Badge>
+      )}
+      {slackChip && (
+        <Badge
+          variant={slackInfo?.channel ? "secondary" : "outline"}
+          className="text-[10px] font-normal"
+          title={slackInfo?.channel?.name ?? slackInfo?.reason ?? ""}
+        >
+          {slackChip}
+        </Badge>
       )}
     </>
   );
