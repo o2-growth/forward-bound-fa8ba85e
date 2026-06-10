@@ -129,6 +129,43 @@ export async function findChannelByName(
   return (res.rows[0] as SlackChannel) ?? null;
 }
 
+export async function findChannelById(
+  pgClient: any,
+  id: string,
+): Promise<SlackChannel | null> {
+  const res = await pgClient.query(
+    `SELECT id, name, member_count, topic FROM slack_channels WHERE id = $1 LIMIT 1`,
+    [id],
+  );
+  return (res.rows[0] as SlackChannel) ?? null;
+}
+
+export async function listChannels(
+  pgClient: any,
+  opts: { query?: string; limit?: number } = {},
+): Promise<SlackChannel[]> {
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 200));
+  const q = (opts.query ?? "").trim();
+  if (q) {
+    const res = await pgClient.query(
+      `SELECT id, name, member_count, topic FROM slack_channels
+        WHERE name ILIKE $1
+        ORDER BY (name LIKE 'interno-%') DESC, member_count DESC NULLS LAST, name ASC
+        LIMIT $2`,
+      [`%${q}%`, limit],
+    );
+    return res.rows as SlackChannel[];
+  }
+  const res = await pgClient.query(
+    `SELECT id, name, member_count, topic FROM slack_channels
+      WHERE name LIKE 'interno-%'
+      ORDER BY member_count DESC NULLS LAST, name ASC
+      LIMIT $1`,
+    [limit],
+  );
+  return res.rows as SlackChannel[];
+}
+
 /**
  * Fetches recent root messages (and a sample of replies) for a channel.
  */
