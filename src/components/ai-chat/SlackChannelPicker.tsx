@@ -46,17 +46,27 @@ export function SlackChannelPicker({
   }, [query]);
 
   useEffect(() => {
+    console.log("[SlackChannelPicker] open state changed:", { open, clienteId });
+  }, [open, clienteId]);
+
+  useEffect(() => {
     if (!open) return;
     let cancel = false;
     setLoading(true);
+    console.log("[SlackChannelPicker] fetching list_channels", { query: debouncedQuery });
     (async () => {
       try {
+        const t0 = performance.now();
         const { data, error } = await supabase.functions.invoke("query-slack-db", {
           body: { action: "list_channels", query: debouncedQuery, limit: 30 },
         });
+        const dt = Math.round(performance.now() - t0);
         if (error) throw error;
-        if (!cancel) setResults((data?.channels ?? []) as SlackChannel[]);
+        const channels = (data?.channels ?? []) as SlackChannel[];
+        console.log("[SlackChannelPicker] list_channels OK", { count: channels.length, ms: dt });
+        if (!cancel) setResults(channels);
       } catch (err: any) {
+        console.error("[SlackChannelPicker] list_channels FAIL", err);
         if (!cancel) toast.error(`Falha ao listar canais: ${err?.message ?? err}`);
       } finally {
         if (!cancel) setLoading(false);
