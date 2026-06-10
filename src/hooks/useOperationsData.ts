@@ -372,10 +372,12 @@ function processProjects(rows: ProjectCard[], tratativas: TratativaCard[], npsRo
     'protecface respiradores': { mrr: 15000 },
     // Force churn date for cards missing it in Pipefy
     'arcoiristintas': { dataEncerramento: '2026-05-11' },
-    // Clients NOT in Q1 dossier spreadsheet — exclude from churn dossier
+    // Force inclusion in Mai/2026 dossier (oficial fonte de verdade)
+    'exportadora são francisco': { dataEncerramento: '2026-05-15' },
+    'casa das redes estrela': { dataEncerramento: '2026-05-15' },
+    // Clients NOT in dossier — exclude from churn dossier
     'cavimk': { exclude: true },
-    'exportadora são francisco': { exclude: true },
-    'casa das redes estrela': { exclude: true },
+
   };
   // Dedup: track seen titles to prevent duplicate cards (e.g. ZEBL, KV TRANSPORTES)
   const seenChurnTitles = new Set<string>();
