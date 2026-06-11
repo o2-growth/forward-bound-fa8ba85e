@@ -263,6 +263,7 @@ export function CommercialPaceDashboard({
 
   // Ranking
   const ranking = closers
+    .filter(c => c.id !== "__none__")
     .map(c => {
       const closerRev = sum((itemsByIndicator.venda || [])
         .filter(i => firstNameKey(personName(i)) === c.id)
