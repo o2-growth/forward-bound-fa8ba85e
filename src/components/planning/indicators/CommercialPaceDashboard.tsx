@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { DetailItem } from "./DetailSheet";
 import { firstNameKey, useCloserAbsoluteMetas } from "@/hooks/useCloserAbsoluteMetas";
 import { getMonthFactors, prorateMonthlyMeta } from "@/lib/businessDayProrate";
+import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
 
 type MetricKey = "rm" | "rr" | "prop" | "venda";
 
@@ -31,6 +32,7 @@ interface CommercialPaceDashboardProps {
   funnelMetas: { rm: number; rr: number; proposta: number; venda: number };
   isLoading: boolean;
   onBack: () => void;
+  onDateChange?: (start: Date, end: Date) => void;
 }
 
 const METRIC_DEFS: { key: MetricKey; label: string; varName: string; indicator: string }[] = [
@@ -69,6 +71,7 @@ export function CommercialPaceDashboard({
   funnelMetas,
   isLoading,
   onBack,
+  onDateChange,
 }: CommercialPaceDashboardProps) {
   const [mode, setMode] = useState<"cum" | "daily">("cum");
   const [paceOn, setPaceOn] = useState(true);
@@ -417,10 +420,15 @@ export function CommercialPaceDashboard({
             Funil por closer · {format(startDate, "dd 'de' MMM", { locale: ptBR })} — {format(endDate, "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
           </div>
         </div>
-        <div className="cp-month">
-          <div className="day num">Dia {elapsed} <small>/ {totalDays}</small></div>
-          <div className="cp-month-bar"><i style={{ width: `${monthPct * 100}%` }} /></div>
-          <div className="pct num">{Math.round(monthPct * 100)}% do período</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {onDateChange && (
+            <DateRangePickerGA startDate={startDate} endDate={endDate} onDateChange={onDateChange} />
+          )}
+          <div className="cp-month">
+            <div className="day num">Dia {elapsed} <small>/ {totalDays}</small></div>
+            <div className="cp-month-bar"><i style={{ width: `${monthPct * 100}%` }} /></div>
+            <div className="pct num">{Math.round(monthPct * 100)}% do período</div>
+          </div>
         </div>
       </header>
 
