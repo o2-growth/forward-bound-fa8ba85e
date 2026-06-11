@@ -689,6 +689,14 @@ export function CommercialPaceDashboard({
                     {m.label}
                   </button>
                 ))}
+                <button
+                  key="fat"
+                  className={"metric-chip" + (metricOn.fat ? "" : " off")}
+                  onClick={() => setMetricOn(s => ({ ...s, fat: !s.fat }))}
+                >
+                  <span className="swatch" style={{ background: `var(--m-fat)` }} />
+                  Faturamento
+                </button>
               </div>
               <button className={"pace-toggle" + (paceOn ? "" : " off")} onClick={() => setPaceOn(p => !p)}>
                 <span className="dash" /> Pace esperado
@@ -704,7 +712,14 @@ export function CommercialPaceDashboard({
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.4)" />
                 <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis yAxisId="left" allowDecimals={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  tickFormatter={(v: number) => v >= 1000 ? `R$ ${Math.round(v / 1000)}k` : `R$ ${Math.round(v)}`}
+                  width={70}
+                />
                 <Tooltip
                   contentStyle={{
                     background: "hsl(var(--popover))",
@@ -713,11 +728,17 @@ export function CommercialPaceDashboard({
                     color: "hsl(var(--popover-foreground))",
                     fontSize: 12,
                   }}
+                  formatter={(value: any, name: any) => {
+                    const isFat = typeof name === "string" && (name === "Faturamento" || name === "Meta Faturamento");
+                    if (isFat && typeof value === "number") return [brl(value), name];
+                    return [value, name];
+                  }}
                 />
                 {METRIC_DEFS.filter(m => metricOn[m.key]).flatMap(m => {
                   const lines = [
                     <Line
                       key={m.key}
+                      yAxisId="left"
                       type="monotone"
                       dataKey={m.key}
                       name={m.label}
@@ -731,6 +752,7 @@ export function CommercialPaceDashboard({
                     lines.push(
                       <Line
                         key={m.key + "_meta"}
+                        yAxisId="left"
                         type="monotone"
                         dataKey={m.key + "_meta"}
                         name={`Meta ${m.label}`}
@@ -744,6 +766,33 @@ export function CommercialPaceDashboard({
                   }
                   return lines;
                 })}
+                {metricOn.fat && (
+                  <Line
+                    key="fat"
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="fat"
+                    name="Faturamento"
+                    stroke={`var(--m-fat)`}
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                )}
+                {metricOn.fat && paceOn && fatMetaRef > 0 && (
+                  <Line
+                    key="fat_meta"
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="fat_meta"
+                    name="Meta Faturamento"
+                    stroke={`var(--m-fat)`}
+                    strokeWidth={1.5}
+                    strokeDasharray="6 6"
+                    strokeOpacity={0.5}
+                    dot={false}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
