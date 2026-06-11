@@ -139,6 +139,9 @@ export function TemperaturaSection({ analytics, startDate, endDate }: Props) {
           { key: "closer", label: "Closer" },
           { key: "sdr", label: "SDR" },
           { key: "mrr", label: "MRR", format: columnFormatters.currency },
+          { key: "setup", label: "Setup", format: columnFormatters.currency },
+          { key: "pontual", label: "Pontual", format: columnFormatters.currency },
+          { key: "total", label: "Total", format: columnFormatters.currency },
           {
             key: "revenueRange",
             label: "Faixa",

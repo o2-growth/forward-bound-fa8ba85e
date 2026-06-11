@@ -1,33 +1,33 @@
-## Diagnóstico
+# Adicionar colunas Setup / MRR / Pontual / Total nos drawers de Temperatura
 
-Os acelerômetros (97 MQL / 85 RM / 54 RR / 33 Prop / 0 Venda) usam diretamente `getRealizedForIndicator(...)` sobre todos os itens filtrados.
+## Onde
 
-O funil e a curva do `CommercialPaceDashboard` rodam outra agregação por **closer** e descartam silenciosamente todo item cujo `closer` esteja vazio ou esteja na lista de excluídos (`CommercialPaceDashboard.tsx` linhas 65-70 e 141):
+`src/components/planning/indicators/TemperaturaSection.tsx` — aba **Indicadores → Comercial → Modelo Atual**, seção "🌡 Temperatura dos Leads".
 
-```ts
-function personName(item) {
-  const name = (item.closer || "").trim();
-  if (!name) return "";
-  if (EXCLUDED_CLOSERS.has(name.toLowerCase())) return "";
-  return name;
-}
-...
-const name = personName(item);
-if (!name) continue;   // <- item some do total
-```
+Hoje, ao clicar em Quente / Morno / Frio, o `DetailSheet` mostra:
+Empresa · Fase Atual · Closer · SDR · MRR · Faixa · Entrada
 
-Como muitos MQLs/RMs ainda não têm closer atribuído, eles somem da agregação → totais do funil ficam abaixo dos acelerômetros (gap brutal em MQL: 97 → 35).
+## O que muda
 
-## Correção
+Adicionar 3 colunas monetárias mantendo Faixa. Layout final:
 
-Em `src/components/planning/indicators/CommercialPaceDashboard.tsx`:
+1. Empresa
+2. Fase Atual
+3. Closer
+4. SDR
+5. **MRR** (já existe) — formato moeda
+6. **Setup** (novo) — `valorSetup`, formato moeda
+7. **Pontual** (novo) — `valorPontual`, formato moeda
+8. **Total** (novo) — `MRR + Setup + Pontual` (exclui Educação, regra padrão do projeto), formato moeda
+9. Faixa
+10. Entrada
 
-1. Em vez de `continue` quando `personName` retornar vazio, agrupar o item em um closer sintético `"Sem responsável"` (id estável, ex.: `__none__`). Assim ele entra no total geral mas continua filtrável.
-2. Manter o fallback existente do MQL (usar `dataCriacao` e cair no dia 0 se idx<0).
-3. Não alterar o ranking de closers de forma indesejada: excluir o bucket `__none__` do `ranking` e do dropdown de seleção (continua aparecendo apenas no total "Todos").
+## Detalhes técnicos
 
-Resultado esperado: com closer = "Todos", os totais do funil e os topos da curva passam a bater com os acelerômetros (MQL 97, RM 85, RR 54, Prop 33, Venda 0).
+- `analytics.toDetailItem(card)` em `useModeloAtualAnalytics` já expõe `mrr`. Vou conferir se `valorSetup` e `valorPontual` já estão no `DetailItem`; se não, adicionar no mapper e no tipo `DetailItem` (`DetailSheet.tsx`).
+- Campo `total` calculado dentro do `toDetailItem` (ou inline antes de passar pro sheet) para não exigir mudança na assinatura de colunas.
+- Reuso de `columnFormatters.currency`.
 
-## Fora de escopo
+## Fora do escopo
 
-Acelerômetros, hooks de analytics por BU e demais abas — sem mudanças.
+Outras BUs, outras abas, aceleradores, ranking, funil — sem mudanças.

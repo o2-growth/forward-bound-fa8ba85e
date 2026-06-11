@@ -37,6 +37,7 @@ export interface DetailItem {
   mrr?: number; // Valor MRR for monetary indicators
   setup?: number; // Valor Setup for monetary indicators
   pontual?: number; // Valor Pontual for monetary indicators
+  total?: number; // MRR + Setup + Pontual (excludes Educação)
   closer?: string; // Closer responsável (for filtering)
   sla?: number; // SLA time in minutes (for SLA indicator drill-down)
   sdr?: string; // SDR responsável original (for display in sales drill-down)
