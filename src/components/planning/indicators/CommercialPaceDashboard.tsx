@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { DetailItem } from "./DetailSheet";
 import { firstNameKey, useCloserAbsoluteMetas } from "@/hooks/useCloserAbsoluteMetas";
 import { getMonthFactors, prorateMonthlyMeta } from "@/lib/businessDayProrate";
+import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
 
 type MetricKey = "rm" | "rr" | "prop" | "venda";
 
