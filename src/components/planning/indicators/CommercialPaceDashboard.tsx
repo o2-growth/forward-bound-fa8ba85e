@@ -91,8 +91,8 @@ export function CommercialPaceDashboard({
 }: CommercialPaceDashboardProps) {
   const [mode, setMode] = useState<"cum" | "daily">("cum");
   const [paceOn, setPaceOn] = useState(true);
-  const [metricOn, setMetricOn] = useState<Record<MetricKey, boolean>>({
-    rm: true, rr: true, prop: true, venda: true,
+  const [metricOn, setMetricOn] = useState<Record<ChartKey, boolean>>({
+    mql: true, rm: true, rr: true, prop: true, venda: true, fat: true,
   });
   const [selectedCloserLocal, setSelectedCloserLocal] = useState<string>("all");
   const { getMonthlyMap } = useCloserAbsoluteMetas(startDate.getFullYear());
