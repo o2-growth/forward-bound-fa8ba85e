@@ -324,7 +324,7 @@ export function CommercialPaceDashboard({
 
   const filterItems = [
     { id: "all", name: "Todos os closers" },
-    ...closers.filter(c => c.id !== "sem closer" && c.name.toLowerCase() !== "sem closer"),
+    ...closers.filter(c => c.id !== "__none__" && c.id !== "sem closer" && c.name.toLowerCase() !== "sem closer"),
   ];
 
   const overallConv = totals.rm ? totals.venda / totals.rm : 0;
