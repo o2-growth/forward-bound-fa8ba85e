@@ -580,7 +580,7 @@ export function CommercialPaceDashboard({
                   <span className="count num">{totals[m.key]}</span>
                   <span className="name">{m.label}</span>
                 </div>
-                {i < 3 && (() => {
+                {i < METRIC_DEFS.length - 1 && (() => {
                   const s = steps[i];
                   const rate = totals[s.from] ? totals[s.to] / totals[s.from] : 0;
                   const att = s.meta > 0 ? rate / s.meta : 0;
