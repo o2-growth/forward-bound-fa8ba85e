@@ -1,28 +1,26 @@
-## Mudanças no `CommercialPaceDashboard` (tela nova "Visão Meta Pace" do Comercial)
+## Problema
 
-### 1. Incluir **MQL** no funil
-- Adicionar `'mql'` ao `MetricKey` e ao `METRIC_DEFS` (cor: `--m-mql` mapeada para `hsl(var(--chart-2))` ou similar). Ordem: MQL → RM → RR → Prop → Venda.
-- Estender a interface `funnelMetas` para `{ mql, rm, rr, proposta, venda }`.
-- Atualizar `CloserAgg`, `seriesFor`, `totalsFor`, `countGoalsFor`, `widths`, `steps` (incluir conversão `mql→rm`) e o toggle de métricas para considerar MQL.
-- No `IndicatorsTab.tsx` (linha 3016), passar `mql: metaFor('mql')` no `funnelMetas` — `metaFor` já consulta `indicatorConfigs`, que vem de `useEffectiveMetas` (fonte = `funnel_metas`, ou seja, Plan Growth).
-- `itemsByIndicator.mql` já é populado em `IndicatorsTab` (`IndicatorType` inclui `'mql'`), então o agregador por dia funciona sem mudanças adicionais.
+No `CommercialPaceDashboard` (Visão Pace do Comercial), a contagem de **MQL** está menor do que o acelerômetro do indicador MQL no mesmo período.
 
-### 2. Buscar **meta do mês conforme Plan Growth**
-- `funnelMetas` já é derivada de `getMetaForIndicator` → `indicatorConfigs` → `useEffectiveMetas`, que lê `funnel_metas` (tabela onde o Plan Growth grava `leads/mqls/rms/rrs/propostas/vendas`). Confirmar comportamento adicionando `mql` ao mapeamento (item 1).
-- Atualizar a `footnote` para explicitar: "Metas do funil vêm do Plan Growth (`funnel_metas`), rateadas pelo período filtrado."
+## Causa raiz
 
-### 3. Incluir **Faturamento** na evolução diária do funil
-- Adicionar nova métrica `'fat'` ao chart (separada de `METRIC_DEFS` para não poluir o funil de contagem):
-  - Série realizado: para cada dia, somar `itemRevenue(item)` dos `itemsByIndicator.venda` cuja `item.date` cai naquele dia. Modo `cum` = acumulado, `daily` = por dia.
-  - Série meta (pace): `revenueMeta / totalDays` (acumulado ou diário), igual ao tratamento das outras métricas.
-- Adicionar chip de toggle "Faturamento" no `metric-toggles` (mesmo padrão visual, com cor `--m-fat` distinta, ex.: `hsl(var(--chart-3))`).
-- Como Faturamento é em R$ e as demais são contagens, usar **YAxis secundário** (`yAxisId="fat"`, `orientation="right"`, formatter `brl`) e ligar a `Line` do Faturamento a esse eixo.
-- Tooltip: formatar valores de `fat`/`fat_meta` com `brl`.
+Para todas as BUs (Modelo Atual, O2 TAX, Franquia, Oxy Hacker), o MQL é qualificado pela **data de criação** do card (`dataCriacao` cair no período), enquanto os demais indicadores usam `dataEntrada` (entrada na fase).
 
-### Arquivos
-- `src/components/planning/indicators/CommercialPaceDashboard.tsx` — extensões acima.
-- `src/components/planning/IndicatorsTab.tsx` — adicionar `mql` ao objeto `funnelMetas` passado na linha 3016.
+- `getRealizedForIndicator('mql')` → conta cards cujo `dataCriacao` está no período → bate com acelerômetro ✅
+- `getDetailItemsForIndicator('mql')` → retorna os mesmos cards, **mas** o `DetailItem.date` é preenchido com `dataEntrada` (não `dataCriacao`).
+- No `CommercialPaceDashboard`, o `indexOfDay(item.date)` indexa por dia dentro do período usando `item.date`. Como `dataEntrada` do MQL pode estar **fora do intervalo** (ex.: card foi criado dentro do período mas só entrou na fase MQL depois), o item retorna `idx = -1` e **não é contado** em nenhum dia → total do funil/curva fica abaixo do acelerômetro.
 
-### Fora de escopo
-- Sem alterações no `ComercialPreview.tsx` (página mock).
-- Sem mudanças em hooks/Plan Growth — apenas consumo.
+## Correção (mínima, só no componente do pace)
+
+Arquivo: `src/components/planning/indicators/CommercialPaceDashboard.tsx`
+
+1. No loop de agregação por closer (linhas ~138-146), para `def.key === "mql"`, usar **`item.dataCriacao ?? item.date`** ao calcular o índice do dia.
+2. Mesma regra ao montar a série diária do gráfico de evolução (qualquer reduce que use `item.date` para MQL) — usar `dataCriacao` como data efetiva do MQL.
+3. Itens MQL cujo `dataCriacao` ainda assim caia fora do intervalo (raro, mas possível por timezone) → atribuir ao primeiro/último dia do período para não sumir do total. Simples: se `idx < 0`, usar `0` (primeiro dia).
+
+Resultado: `sum(closers.map(c => c.mql))` passa a igualar `getRealizedForIndicator('mql')` (= valor do acelerômetro), preservando o detalhamento por closer e por dia.
+
+## Fora de escopo
+
+- Não mexer em `useModeloAtualAnalytics` / `useO2TaxAnalytics` / `useExpansaoAnalytics` (a semântica de `DetailItem.date = dataEntrada` é usada em outras telas).
+- Não alterar metas, drill-down ou outras métricas do pace (RM, RR, Prop, Venda continuam usando `dataEntrada`).
