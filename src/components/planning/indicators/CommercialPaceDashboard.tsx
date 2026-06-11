@@ -297,10 +297,12 @@ export function CommercialPaceDashboard({
           --cp-behind: hsl(var(--destructive));
           --cp-warn: hsl(var(--warning));
           --cp-hot: hsl(var(--warning));
+          --m-mql: hsl(var(--chart-2));
           --m-rm: hsl(var(--chart-1));
           --m-rr: hsl(var(--warning));
           --m-prop: hsl(var(--primary));
           --m-venda: hsl(var(--destructive));
+          --m-fat: hsl(var(--chart-3));
           color: var(--cp-chalk-1);
           font-family: 'Inter', system-ui, sans-serif;
         }
