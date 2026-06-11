@@ -131,7 +131,7 @@ type ProdutoBreakdownMetric = 'value' | 'mrr' | 'setup' | 'pontual';
 function buildProdutoBreakdown(
   items: DetailItem[],
   metric: ProdutoBreakdownMetric,
-): React.ReactNode {
+): ReactNode {
   type Agg = { produto: string; count: number; mrr: number; setup: number; pontual: number; value: number };
   const produtoMap = new Map<string, Agg>();
   items.forEach(i => {
