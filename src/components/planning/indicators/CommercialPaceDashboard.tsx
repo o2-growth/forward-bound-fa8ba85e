@@ -16,6 +16,14 @@ import { DetailItem } from "./DetailSheet";
 import { firstNameKey, useCloserAbsoluteMetas } from "@/hooks/useCloserAbsoluteMetas";
 import { getMonthFactors, prorateMonthlyMeta } from "@/lib/businessDayProrate";
 import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
+import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
+
+const BU_OPTIONS: MultiSelectOption[] = [
+  { value: 'modelo_atual', label: 'Modelo Atual' },
+  { value: 'o2_tax', label: 'O2 TAX' },
+  { value: 'oxy_hacker', label: 'Oxy Hacker' },
+  { value: 'franquia', label: 'Franquia' },
+];
 
 type MetricKey = "rm" | "rr" | "prop" | "venda";
 
