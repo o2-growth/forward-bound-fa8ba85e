@@ -2035,7 +2035,7 @@ export function IndicatorsTab() {
         setDetailSheetDescription(descricao);
         setDetailSheetKpis(kpis);
         setDetailSheetCharts(charts);
-        setDetailSheetExtraContent(null);
+        setDetailSheetExtraContent(buildProdutoBreakdown(itemsWithAging, isExpansaoBU ? 'pontual' : 'value'));
         setDetailSheetColumns(isExpansaoBU ? [
           { key: 'product', label: 'Produto', format: columnFormatters.product },
           { key: 'company', label: 'Empresa' },
