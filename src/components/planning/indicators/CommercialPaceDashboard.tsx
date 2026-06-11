@@ -25,7 +25,8 @@ const BU_OPTIONS: MultiSelectOption[] = [
   { value: 'franquia', label: 'Franquia' },
 ];
 
-type MetricKey = "rm" | "rr" | "prop" | "venda";
+type MetricKey = "mql" | "rm" | "rr" | "prop" | "venda";
+type ChartKey = MetricKey | "fat";
 
 interface CommercialPaceDashboardProps {
   startDate: Date;
@@ -37,7 +38,7 @@ interface CommercialPaceDashboardProps {
   itemsByIndicator: Record<string, DetailItem[]>;
   hotOpportunityItems: DetailItem[];
   revenueMeta: number;
-  funnelMetas: { rm: number; rr: number; proposta: number; venda: number };
+  funnelMetas: { mql: number; rm: number; rr: number; proposta: number; venda: number };
   isLoading: boolean;
   onBack: () => void;
   onDateChange?: (start: Date, end: Date) => void;
@@ -45,6 +46,7 @@ interface CommercialPaceDashboardProps {
 }
 
 const METRIC_DEFS: { key: MetricKey; label: string; varName: string; indicator: string }[] = [
+  { key: "mql", label: "MQL", varName: "--m-mql", indicator: "mql" },
   { key: "rm", label: "RM", varName: "--m-rm", indicator: "rm" },
   { key: "rr", label: "RR", varName: "--m-rr", indicator: "rr" },
   { key: "prop", label: "Prop", varName: "--m-prop", indicator: "proposta" },
