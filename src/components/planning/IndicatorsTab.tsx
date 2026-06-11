@@ -2981,6 +2981,7 @@ export function IndicatorsTab() {
         funnelMetas={{ rm: metaFor('rm'), rr: metaFor('rr'), proposta: metaFor('proposta'), venda: metaFor('venda') }}
         isLoading={isLoading || modeloAtualAnalytics.isLoading || o2TaxAnalytics.isLoading || isLoadingExpansao || isLoadingO2Tax}
         onBack={() => setCommercialPaceOpen(false)}
+        onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
       />
     );
   }
