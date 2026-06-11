@@ -20,7 +20,8 @@ export type ProductCategory =
   | 'Setup'
   | 'Turnaround'
   | 'Valuation'
-  | 'Educação';
+  | 'Educação'
+  | 'A definir';
 
 export const PRODUCT_CATEGORIES: ProductCategory[] = [
   'CaaS',
@@ -32,6 +33,7 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = [
   'Turnaround',
   'Valuation',
   'Educação',
+  'A definir',
 ];
 
 function norm(s: string): string {
