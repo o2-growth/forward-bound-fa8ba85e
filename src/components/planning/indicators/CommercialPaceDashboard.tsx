@@ -169,27 +169,28 @@ export function CommercialPaceDashboard({
     return c ? c[metric].slice() : days.map(() => 0);
   };
   const totalsFor = (closerId: string) => {
-    const t: Record<MetricKey, number> = { rm: 0, rr: 0, prop: 0, venda: 0 };
+    const t: Record<MetricKey, number> = { mql: 0, rm: 0, rr: 0, prop: 0, venda: 0 };
     METRIC_DEFS.forEach(m => (t[m.key] = sum(seriesFor(closerId, m.key))));
     return t;
   };
 
-  // Goals derived from real funnel metas (already from funnel_metas).
-  // For Faturamento, use revenueMeta. Otherwise countGoalsFor uses funnelMetas direct.
+  // Goals derived from real funnel metas (already from funnel_metas / Plan Growth).
   const funnelMetaConv = {
+    mqlrm: funnelMetas.mql > 0 ? funnelMetas.rm / funnelMetas.mql : 0,
     rmrr: funnelMetas.rm > 0 ? funnelMetas.rr / funnelMetas.rm : 0,
     rrprop: funnelMetas.rr > 0 ? funnelMetas.proposta / funnelMetas.rr : 0,
     propvenda: funnelMetas.proposta > 0 ? funnelMetas.venda / funnelMetas.proposta : 0,
   };
 
-  const countGoalsFor = (closerId: string) => {
+  const countGoalsFor = (closerId: string): Record<MetricKey, number> | null => {
     if (closerId === "all") {
-      return { rm: funnelMetas.rm, rr: funnelMetas.rr, prop: funnelMetas.proposta, venda: funnelMetas.venda };
+      return { mql: funnelMetas.mql, rm: funnelMetas.rm, rr: funnelMetas.rr, prop: funnelMetas.proposta, venda: funnelMetas.venda };
     }
     const c = closers.find(x => x.id === closerId);
     if (!c || !c.meta) return null;
     const share = revenueMeta > 0 ? c.meta / revenueMeta : 0;
     return {
+      mql: funnelMetas.mql * share,
       rm: funnelMetas.rm * share,
       rr: funnelMetas.rr * share,
       prop: funnelMetas.proposta * share,
