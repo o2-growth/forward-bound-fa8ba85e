@@ -573,6 +573,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       mrr: card.valorMRR,
       setup: card.valorSetup,
       pontual: card.valorPontual,
+      total: (card.valorMRR || 0) + (card.valorSetup || 0) + (card.valorPontual || 0),
       closer: card.closer,
       sdr: card.sdr,
       dataAssinatura: card.dataAssinatura?.toISOString() || undefined,
