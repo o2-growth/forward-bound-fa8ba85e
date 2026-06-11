@@ -1,28 +1,28 @@
-## Objetivo
-Replicar no drill-down dos acelerômetros monetários (Faturamento, MRR, Setup, Pontual) o mesmo "Detalhamento por Produto Contratado" que já existe no acelerômetro **Vendas**, em vez de mostrar tudo agregado como CaaS.
+## Mudanças no `CommercialPaceDashboard` (tela nova "Visão Meta Pace" do Comercial)
 
-## Contexto
-Hoje `IndicatorsTab.tsx` (case `'venda'`) gera um `produtoExtraContent` — uma tabela que agrupa os contratos por `item.product` (categorias devolvidas por `classifyProduto`: CaaS, OXY, Assessoria, BPO, Setup, etc.) e mostra Contratos / MRR / Setup / Pontual / TCV / Ticket Médio por produto. Os outros acelerômetros monetários (`faturamento`, `mrr`, `setup`, `pontual`) já recebem `item.product` corretamente classificado via `useModeloAtualAnalytics.toDetailItem`, mas não exibem essa tabela.
+### 1. Incluir **MQL** no funil
+- Adicionar `'mql'` ao `MetricKey` e ao `METRIC_DEFS` (cor: `--m-mql` mapeada para `hsl(var(--chart-2))` ou similar). Ordem: MQL → RM → RR → Prop → Venda.
+- Estender a interface `funnelMetas` para `{ mql, rm, rr, proposta, venda }`.
+- Atualizar `CloserAgg`, `seriesFor`, `totalsFor`, `countGoalsFor`, `widths`, `steps` (incluir conversão `mql→rm`) e o toggle de métricas para considerar MQL.
+- No `IndicatorsTab.tsx` (linha 3016), passar `mql: metaFor('mql')` no `funnelMetas` — `metaFor` já consulta `indicatorConfigs`, que vem de `useEffectiveMetas` (fonte = `funnel_metas`, ou seja, Plan Growth).
+- `itemsByIndicator.mql` já é populado em `IndicatorsTab` (`IndicatorType` inclui `'mql'`), então o agregador por dia funciona sem mudanças adicionais.
 
-## Mudanças
+### 2. Buscar **meta do mês conforme Plan Growth**
+- `funnelMetas` já é derivada de `getMetaForIndicator` → `indicatorConfigs` → `useEffectiveMetas`, que lê `funnel_metas` (tabela onde o Plan Growth grava `leads/mqls/rms/rrs/propostas/vendas`). Confirmar comportamento adicionando `mql` ao mapeamento (item 1).
+- Atualizar a `footnote` para explicitar: "Metas do funil vêm do Plan Growth (`funnel_metas`), rateadas pelo período filtrado."
 
-### `src/components/planning/IndicatorsTab.tsx`
+### 3. Incluir **Faturamento** na evolução diária do funil
+- Adicionar nova métrica `'fat'` ao chart (separada de `METRIC_DEFS` para não poluir o funil de contagem):
+  - Série realizado: para cada dia, somar `itemRevenue(item)` dos `itemsByIndicator.venda` cuja `item.date` cai naquele dia. Modo `cum` = acumulado, `daily` = por dia.
+  - Série meta (pace): `revenueMeta / totalDays` (acumulado ou diário), igual ao tratamento das outras métricas.
+- Adicionar chip de toggle "Faturamento" no `metric-toggles` (mesmo padrão visual, com cor `--m-fat` distinta, ex.: `hsl(var(--chart-3))`).
+- Como Faturamento é em R$ e as demais são contagens, usar **YAxis secundário** (`yAxisId="fat"`, `orientation="right"`, formatter `brl`) e ligar a `Line` do Faturamento a esse eixo.
+- Tooltip: formatar valores de `fat`/`fat_meta` com `brl`.
 
-1. **Extrair a função `buildProdutoBreakdown(items, metric)`** — uma única helper (logo antes do `switch (indicator.key)` da venda) que, dado o conjunto de items e a métrica primária (`'value' | 'mrr' | 'setup' | 'pontual'`), devolve:
-   - `produtoBreakdown`: array agregado `{ produto, count, mrr, setup, pontual, value, primary }` ordenado pelo valor primário desc.
-   - `produtoExtraContent`: o JSX da tabela "Detalhamento por Produto Contratado" parametrizada para destacar a coluna da métrica corrente.
+### Arquivos
+- `src/components/planning/indicators/CommercialPaceDashboard.tsx` — extensões acima.
+- `src/components/planning/IndicatorsTab.tsx` — adicionar `mql` ao objeto `funnelMetas` passado na linha 3016.
 
-2. **Reaproveitar no case `'venda'`** — substituir o bloco inline atual pela chamada `buildProdutoBreakdown(itemsWithTCV, 'value')`, mantendo o comportamento atual (TCV como métrica principal).
-
-3. **Aplicar a tabela aos outros acelerômetros monetários**, usando `setDetailSheetExtraContent(produtoExtraContent)` em cada um:
-   - `faturamento` → `buildProdutoBreakdown(items, 'value')` (Total como métrica destacada).
-   - `mrr` → `buildProdutoBreakdown(mrrItems, 'mrr')`.
-   - `setup` → `buildProdutoBreakdown(setupItems, 'setup')`.
-   - `pontual` → `buildProdutoBreakdown(pontualItems, 'pontual')`.
-
-4. **Resetar `extraContent`** no fallback (`default`) e nos drill-downs não monetários (ex.: SLA), para não vazar a tabela entre aberturas. Hoje só o case `venda` chama `setDetailSheetExtraContent` — incluir `setDetailSheetExtraContent(null)` nos outros casos que abrem o sheet.
-
-## Fora do escopo
-- Não mexer em `classifyProduto` nem na lógica de lookup `pipefy_db_clientes` (já produz as categorias corretas).
-- Não tocar nos acelerômetros não monetários (Leads, MQLs, RMs, RRs, Propostas, SLA), nem nas BUs O2 TAX / Oxy Hacker / Franquia (os items já carregam `product` próprio).
-- Sem migrações, sem novas queries, sem hooks novos.
+### Fora de escopo
+- Sem alterações no `ComercialPreview.tsx` (página mock).
+- Sem mudanças em hooks/Plan Growth — apenas consumo.

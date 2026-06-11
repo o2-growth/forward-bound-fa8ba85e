@@ -25,7 +25,8 @@ const BU_OPTIONS: MultiSelectOption[] = [
   { value: 'franquia', label: 'Franquia' },
 ];
 
-type MetricKey = "rm" | "rr" | "prop" | "venda";
+type MetricKey = "mql" | "rm" | "rr" | "prop" | "venda";
+type ChartKey = MetricKey | "fat";
 
 interface CommercialPaceDashboardProps {
   startDate: Date;
@@ -37,7 +38,7 @@ interface CommercialPaceDashboardProps {
   itemsByIndicator: Record<string, DetailItem[]>;
   hotOpportunityItems: DetailItem[];
   revenueMeta: number;
-  funnelMetas: { rm: number; rr: number; proposta: number; venda: number };
+  funnelMetas: { mql: number; rm: number; rr: number; proposta: number; venda: number };
   isLoading: boolean;
   onBack: () => void;
   onDateChange?: (start: Date, end: Date) => void;
@@ -45,6 +46,7 @@ interface CommercialPaceDashboardProps {
 }
 
 const METRIC_DEFS: { key: MetricKey; label: string; varName: string; indicator: string }[] = [
+  { key: "mql", label: "MQL", varName: "--m-mql", indicator: "mql" },
   { key: "rm", label: "RM", varName: "--m-rm", indicator: "rm" },
   { key: "rr", label: "RR", varName: "--m-rr", indicator: "rr" },
   { key: "prop", label: "Prop", varName: "--m-prop", indicator: "proposta" },
@@ -89,8 +91,8 @@ export function CommercialPaceDashboard({
 }: CommercialPaceDashboardProps) {
   const [mode, setMode] = useState<"cum" | "daily">("cum");
   const [paceOn, setPaceOn] = useState(true);
-  const [metricOn, setMetricOn] = useState<Record<MetricKey, boolean>>({
-    rm: true, rr: true, prop: true, venda: true,
+  const [metricOn, setMetricOn] = useState<Record<ChartKey, boolean>>({
+    mql: true, rm: true, rr: true, prop: true, venda: true, fat: true,
   });
   const [selectedCloserLocal, setSelectedCloserLocal] = useState<string>("all");
   const { getMonthlyMap } = useCloserAbsoluteMetas(startDate.getFullYear());
@@ -104,7 +106,7 @@ export function CommercialPaceDashboard({
 
   // Aggregate per closer
   type CloserAgg = {
-    id: string; name: string; rm: number[]; rr: number[]; prop: number[]; venda: number[];
+    id: string; name: string; mql: number[]; rm: number[]; rr: number[]; prop: number[]; venda: number[];
     propPipe: number; propHot: number; hotCount: number; meta: number;
   };
   const closers = useMemo<CloserAgg[]>(() => {
@@ -115,6 +117,7 @@ export function CommercialPaceDashboard({
       if (!agg) {
         agg = {
           id: key, name,
+          mql: Array(days.length).fill(0),
           rm: Array(days.length).fill(0),
           rr: Array(days.length).fill(0),
           prop: Array(days.length).fill(0),
@@ -166,27 +169,28 @@ export function CommercialPaceDashboard({
     return c ? c[metric].slice() : days.map(() => 0);
   };
   const totalsFor = (closerId: string) => {
-    const t: Record<MetricKey, number> = { rm: 0, rr: 0, prop: 0, venda: 0 };
+    const t: Record<MetricKey, number> = { mql: 0, rm: 0, rr: 0, prop: 0, venda: 0 };
     METRIC_DEFS.forEach(m => (t[m.key] = sum(seriesFor(closerId, m.key))));
     return t;
   };
 
-  // Goals derived from real funnel metas (already from funnel_metas).
-  // For Faturamento, use revenueMeta. Otherwise countGoalsFor uses funnelMetas direct.
+  // Goals derived from real funnel metas (already from funnel_metas / Plan Growth).
   const funnelMetaConv = {
+    mqlrm: funnelMetas.mql > 0 ? funnelMetas.rm / funnelMetas.mql : 0,
     rmrr: funnelMetas.rm > 0 ? funnelMetas.rr / funnelMetas.rm : 0,
     rrprop: funnelMetas.rr > 0 ? funnelMetas.proposta / funnelMetas.rr : 0,
     propvenda: funnelMetas.proposta > 0 ? funnelMetas.venda / funnelMetas.proposta : 0,
   };
 
-  const countGoalsFor = (closerId: string) => {
+  const countGoalsFor = (closerId: string): Record<MetricKey, number> | null => {
     if (closerId === "all") {
-      return { rm: funnelMetas.rm, rr: funnelMetas.rr, prop: funnelMetas.proposta, venda: funnelMetas.venda };
+      return { mql: funnelMetas.mql, rm: funnelMetas.rm, rr: funnelMetas.rr, prop: funnelMetas.proposta, venda: funnelMetas.venda };
     }
     const c = closers.find(x => x.id === closerId);
     if (!c || !c.meta) return null;
     const share = revenueMeta > 0 ? c.meta / revenueMeta : 0;
     return {
+      mql: funnelMetas.mql * share,
       rm: funnelMetas.rm * share,
       rr: funnelMetas.rr * share,
       prop: funnelMetas.proposta * share,
@@ -217,14 +221,16 @@ export function CommercialPaceDashboard({
   const hotPctVal = pipeTotal ? hotTotal / pipeTotal : 0;
 
   // Funnel
-  const maxStage = Math.max(totals.rm, totals.rr, totals.prop, totals.venda, 1);
+  const maxStage = Math.max(totals.mql, totals.rm, totals.rr, totals.prop, totals.venda, 1);
   const widths: Record<MetricKey, number> = {
+    mql: Math.min(Math.max(totals.mql / maxStage * 100, 16), 100),
     rm: Math.min(Math.max(totals.rm / maxStage * 100, 16), 100),
     rr: Math.min(Math.max(totals.rr / maxStage * 100, 16), 100),
     prop: Math.min(Math.max(totals.prop / maxStage * 100, 16), 100),
     venda: Math.min(Math.max(totals.venda / maxStage * 100, 16), 100),
   };
   const steps = [
+    { from: "mql" as MetricKey, to: "rm" as MetricKey, meta: funnelMetaConv.mqlrm },
     { from: "rm" as MetricKey, to: "rr" as MetricKey, meta: funnelMetaConv.rmrr },
     { from: "rr" as MetricKey, to: "prop" as MetricKey, meta: funnelMetaConv.rrprop },
     { from: "prop" as MetricKey, to: "venda" as MetricKey, meta: funnelMetaConv.propvenda },
@@ -247,6 +253,30 @@ export function CommercialPaceDashboard({
 
   // Chart data
   const goals = countGoalsFor(selectedCloserLocal);
+
+  // Daily faturamento series (from venda items, by signature date) for the active selection
+  const fatSeries = useMemo(() => {
+    const arr = Array(days.length).fill(0) as number[];
+    const indexOfDay = (iso?: string) => {
+      if (!iso) return -1;
+      const d = iso.slice(0, 10);
+      return days.findIndex(day => format(day, "yyyy-MM-dd") === d);
+    };
+    const vendas = (itemsByIndicator.venda || []).filter(i => {
+      if (selectedCloserLocal === "all") return true;
+      return firstNameKey(personName(i)) === selectedCloserLocal;
+    });
+    for (const it of vendas) {
+      const idx = indexOfDay(it.date);
+      if (idx >= 0) arr[idx] += itemRevenue(it);
+    }
+    return arr;
+  }, [days, itemsByIndicator, selectedCloserLocal]);
+
+  const fatMetaRef = selectedCloserLocal === "all"
+    ? revenueMeta
+    : (closers.find(c => c.id === selectedCloserLocal)?.meta || 0);
+
   const chartData = days.map((d, i) => {
     const row: any = { label: format(d, "dd/MM") };
     for (const m of METRIC_DEFS) {
@@ -256,6 +286,12 @@ export function CommercialPaceDashboard({
         const daily = goals[m.key] / totalDays;
         row[m.key + "_meta"] = mode === "cum" ? Math.round(daily * (i + 1) * 10) / 10 : Math.round(daily * 10) / 10;
       }
+    }
+    // Faturamento (R$) — eixo Y secundário
+    row.fat = mode === "cum" ? cum(fatSeries)[i] : fatSeries[i];
+    if (paceOn && fatMetaRef > 0) {
+      const dailyFat = fatMetaRef / totalDays;
+      row.fat_meta = mode === "cum" ? dailyFat * (i + 1) : dailyFat;
     }
     return row;
   });
@@ -291,10 +327,12 @@ export function CommercialPaceDashboard({
           --cp-behind: hsl(var(--destructive));
           --cp-warn: hsl(var(--warning));
           --cp-hot: hsl(var(--warning));
+          --m-mql: hsl(var(--chart-2));
           --m-rm: hsl(var(--chart-1));
           --m-rr: hsl(var(--warning));
           --m-prop: hsl(var(--primary));
           --m-venda: hsl(var(--destructive));
+          --m-fat: hsl(var(--chart-3));
           color: var(--cp-chalk-1);
           font-family: 'Inter', system-ui, sans-serif;
         }
@@ -574,7 +612,7 @@ export function CommercialPaceDashboard({
                   <span className="count num">{totals[m.key]}</span>
                   <span className="name">{m.label}</span>
                 </div>
-                {i < 3 && (() => {
+                {i < METRIC_DEFS.length - 1 && (() => {
                   const s = steps[i];
                   const rate = totals[s.from] ? totals[s.to] / totals[s.from] : 0;
                   const att = s.meta > 0 ? rate / s.meta : 0;
@@ -651,6 +689,14 @@ export function CommercialPaceDashboard({
                     {m.label}
                   </button>
                 ))}
+                <button
+                  key="fat"
+                  className={"metric-chip" + (metricOn.fat ? "" : " off")}
+                  onClick={() => setMetricOn(s => ({ ...s, fat: !s.fat }))}
+                >
+                  <span className="swatch" style={{ background: `var(--m-fat)` }} />
+                  Faturamento
+                </button>
               </div>
               <button className={"pace-toggle" + (paceOn ? "" : " off")} onClick={() => setPaceOn(p => !p)}>
                 <span className="dash" /> Pace esperado
@@ -666,7 +712,14 @@ export function CommercialPaceDashboard({
               <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.4)" />
                 <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis yAxisId="left" allowDecimals={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
+                  tickFormatter={(v: number) => v >= 1000 ? `R$ ${Math.round(v / 1000)}k` : `R$ ${Math.round(v)}`}
+                  width={70}
+                />
                 <Tooltip
                   contentStyle={{
                     background: "hsl(var(--popover))",
@@ -675,11 +728,17 @@ export function CommercialPaceDashboard({
                     color: "hsl(var(--popover-foreground))",
                     fontSize: 12,
                   }}
+                  formatter={(value: any, name: any) => {
+                    const isFat = typeof name === "string" && (name === "Faturamento" || name === "Meta Faturamento");
+                    if (isFat && typeof value === "number") return [brl(value), name];
+                    return [value, name];
+                  }}
                 />
                 {METRIC_DEFS.filter(m => metricOn[m.key]).flatMap(m => {
                   const lines = [
                     <Line
                       key={m.key}
+                      yAxisId="left"
                       type="monotone"
                       dataKey={m.key}
                       name={m.label}
@@ -693,6 +752,7 @@ export function CommercialPaceDashboard({
                     lines.push(
                       <Line
                         key={m.key + "_meta"}
+                        yAxisId="left"
                         type="monotone"
                         dataKey={m.key + "_meta"}
                         name={`Meta ${m.label}`}
@@ -706,6 +766,33 @@ export function CommercialPaceDashboard({
                   }
                   return lines;
                 })}
+                {metricOn.fat && (
+                  <Line
+                    key="fat"
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="fat"
+                    name="Faturamento"
+                    stroke={`var(--m-fat)`}
+                    strokeWidth={2.5}
+                    dot={false}
+                    activeDot={{ r: 4 }}
+                  />
+                )}
+                {metricOn.fat && paceOn && fatMetaRef > 0 && (
+                  <Line
+                    key="fat_meta"
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="fat_meta"
+                    name="Meta Faturamento"
+                    stroke={`var(--m-fat)`}
+                    strokeWidth={1.5}
+                    strokeDasharray="6 6"
+                    strokeOpacity={0.5}
+                    dot={false}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -713,7 +800,7 @@ export function CommercialPaceDashboard({
       </div>
 
       <p className="footnote">
-        * RM, RR e Propostas vêm do CRM. Vendas e faturamento usam a data de assinatura do contrato. Pace esperado do funil derivado das metas configuradas em Admin.
+        * MQL, RM, RR e Propostas vêm do CRM. Vendas e faturamento usam a data de assinatura do contrato. Metas do funil vêm do Plan Growth (<code>funnel_metas</code>), rateadas pelo período filtrado.
       </p>
     </div>
   );

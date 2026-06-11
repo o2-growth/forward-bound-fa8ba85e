@@ -3013,7 +3013,7 @@ export function IndicatorsTab() {
         itemsByIndicator={itemsByIndicator}
         hotOpportunityItems={hotOpportunityItems}
         revenueMeta={getMetaMonetaryForIndicator({ key: 'faturamento', label: 'Fat Incremento', shortLabel: 'Fat Inc.', format: 'currency' })}
-        funnelMetas={{ rm: metaFor('rm'), rr: metaFor('rr'), proposta: metaFor('proposta'), venda: metaFor('venda') }}
+        funnelMetas={{ mql: metaFor('mql'), rm: metaFor('rm'), rr: metaFor('rr'), proposta: metaFor('proposta'), venda: metaFor('venda') }}
         isLoading={isLoading || modeloAtualAnalytics.isLoading || o2TaxAnalytics.isLoading || isLoadingExpansao || isLoadingO2Tax}
         onBack={() => setCommercialPaceOpen(false)}
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
