@@ -2895,6 +2895,7 @@ export function IndicatorsTab() {
       );
       setDetailSheetKpis(kpis);
       setDetailSheetCharts(charts);
+      setDetailSheetExtraContent(buildProdutoBreakdown(itemsWithPct, 'setup'));
       setDetailSheetColumns([
         { key: 'product', label: 'Produto', format: columnFormatters.product },
         { key: 'company', label: 'Empresa' },
