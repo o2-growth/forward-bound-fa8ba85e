@@ -20,7 +20,8 @@ export type ProductCategory =
   | 'Setup'
   | 'Turnaround'
   | 'Valuation'
-  | 'Educação';
+  | 'Educação'
+  | 'A definir';
 
 export const PRODUCT_CATEGORIES: ProductCategory[] = [
   'CaaS',
@@ -32,6 +33,7 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = [
   'Turnaround',
   'Valuation',
   'Educação',
+  'A definir',
 ];
 
 function norm(s: string): string {
@@ -47,7 +49,7 @@ function norm(s: string): string {
  * "Assessoria Financeira", ou undefined/vazio) e devolve a categoria única.
  */
 export function classifyProduto(produtosRaw: string | null | undefined): ProductCategory {
-  if (!produtosRaw || !produtosRaw.trim()) return 'CaaS'; // fallback
+  if (!produtosRaw || !produtosRaw.trim()) return 'A definir'; // produto ainda não escolhido
 
   const n = norm(produtosRaw);
 
@@ -62,7 +64,7 @@ export function classifyProduto(produtosRaw: string | null | undefined): Product
   if (n.includes('educacao')) return 'Educação';
   if (n.includes('setup')) return 'Setup';
 
-  return 'CaaS'; // fallback final
+  return 'A definir';
 }
 
 /** Normaliza chave (título / empresa / razão social) para lookup */
