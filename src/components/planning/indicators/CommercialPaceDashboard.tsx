@@ -131,13 +131,17 @@ export function CommercialPaceDashboard({
     };
     for (const def of METRIC_DEFS) {
       for (const item of itemsByIndicator[def.indicator] || []) {
-        const agg = ensure(personName(item));
+        const name = personName(item);
+        if (!name) continue;
+        const agg = ensure(name);
         const idx = indexOfDay(item.date);
         if (idx >= 0) (agg as any)[def.key][idx] += 1;
       }
     }
     for (const item of hotOpportunityItems) {
-      const agg = ensure(personName(item));
+      const name = personName(item);
+      if (!name) continue;
+      const agg = ensure(name);
       agg.propHot += itemRevenue(item);
       agg.propPipe += itemRevenue(item);
       agg.hotCount += 1;
