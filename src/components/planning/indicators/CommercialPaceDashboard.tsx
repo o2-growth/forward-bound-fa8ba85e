@@ -420,10 +420,15 @@ export function CommercialPaceDashboard({
             Funil por closer · {format(startDate, "dd 'de' MMM", { locale: ptBR })} — {format(endDate, "dd 'de' MMM 'de' yyyy", { locale: ptBR })}
           </div>
         </div>
-        <div className="cp-month">
-          <div className="day num">Dia {elapsed} <small>/ {totalDays}</small></div>
-          <div className="cp-month-bar"><i style={{ width: `${monthPct * 100}%` }} /></div>
-          <div className="pct num">{Math.round(monthPct * 100)}% do período</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {onDateChange && (
+            <DateRangePickerGA startDate={startDate} endDate={endDate} onDateChange={onDateChange} />
+          )}
+          <div className="cp-month">
+            <div className="day num">Dia {elapsed} <small>/ {totalDays}</small></div>
+            <div className="cp-month-bar"><i style={{ width: `${monthPct * 100}%` }} /></div>
+            <div className="pct num">{Math.round(monthPct * 100)}% do período</div>
+          </div>
         </div>
       </header>
 
