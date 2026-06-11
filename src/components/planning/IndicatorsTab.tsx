@@ -44,6 +44,7 @@ import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
+import { CommercialPaceDashboard } from "./indicators/CommercialPaceDashboard";
 
 import { CardInvestigator } from "./indicators/CardInvestigator";
 
@@ -405,6 +406,7 @@ export function IndicatorsTab() {
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [cardInvestigatorOpen, setCardInvestigatorOpen] = useState(false);
+  const [commercialPaceOpen, setCommercialPaceOpen] = useState(false);
 
   // Handle date change from DateRangePickerGA
   const handleDateRangeChange = (start: Date, end: Date) => {
@@ -2939,6 +2941,50 @@ export function IndicatorsTab() {
     }
   };
 
+  const hotOpportunityItems = (() => {
+    if (!includesModeloAtual) return [];
+    const terminalPhases = new Set(['ganho', 'contrato assinado', 'perdido', 'arquivado']);
+    const latestById = new Map<string, (typeof modeloAtualAnalyticsRaw.allCards)[number]>();
+    for (const card of modeloAtualAnalyticsRaw.allCards) {
+      const current = latestById.get(card.id);
+      if (!current || card.dataEntrada > current.dataEntrada) latestById.set(card.id, card);
+    }
+    return Array.from(latestById.values())
+      .filter(card => {
+        const currentPhase = (card.faseAtual || card.fase || '').trim().toLowerCase();
+        const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer);
+        const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsavel);
+        return card.temperatura === 'Quente' && !terminalPhases.has(currentPhase) && matchCloser && matchSdr && matchesOrigemFilter(card);
+      })
+      .map(card => ({
+        ...modeloAtualAnalyticsRaw.toDetailItem(card),
+        value: card.valorMRR + card.valorSetup + card.valorPontual,
+      }));
+  })();
+
+  if (commercialPaceOpen) {
+    const metaFor = (key: IndicatorType) => {
+      const config = indicatorConfigs.find(item => item.key === key);
+      return config ? getMetaForIndicator(config) : 0;
+    };
+    return (
+      <CommercialPaceDashboard
+        startDate={startDate}
+        endDate={endDate}
+        selectedBUs={selectedBUs}
+        selectedClosers={selectedClosers}
+        selectedSDRs={selectedSDRs}
+        selectedOrigens={selectedOrigens}
+        itemsByIndicator={itemsByIndicator}
+        hotOpportunityItems={hotOpportunityItems}
+        revenueMeta={getMetaMonetaryForIndicator({ key: 'faturamento', label: 'Fat Incremento', shortLabel: 'Fat Inc.', format: 'currency' })}
+        funnelMetas={{ rm: metaFor('rm'), rr: metaFor('rr'), proposta: metaFor('proposta'), venda: metaFor('venda') }}
+        isLoading={isLoading || modeloAtualAnalytics.isLoading || o2TaxAnalytics.isLoading || isLoadingExpansao || isLoadingO2Tax}
+        onBack={() => setCommercialPaceOpen(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Filters */}
@@ -3010,6 +3056,10 @@ export function IndicatorsTab() {
                   <span className="hidden sm:inline">Atualizar</span>
                 </>
               )}
+            </Button>
+            <Button onClick={() => setCommercialPaceOpen(true)} className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Pace Comercial</span>
             </Button>
           </div>
         </div>
