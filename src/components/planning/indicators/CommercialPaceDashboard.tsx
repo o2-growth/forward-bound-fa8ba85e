@@ -59,8 +59,8 @@ const initials = (n: string) =>
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const cum = (a: number[]) => a.reduce<number[]>((acc, v, i) => (acc.push((acc[i - 1] || 0) + v), acc), []);
 
-function personName(item: DetailItem) {
-  return ((item.closer || item.responsible || "Sem Closer") as string).trim() || "Sem Closer";
+function personName(item: DetailItem): string {
+  return ((item.closer || "") as string).trim();
 }
 function itemRevenue(item: DetailItem) {
   const s = (item.mrr || 0) + (item.setup || 0) + (item.pontual || 0);
@@ -130,13 +130,17 @@ export function CommercialPaceDashboard({
     };
     for (const def of METRIC_DEFS) {
       for (const item of itemsByIndicator[def.indicator] || []) {
-        const agg = ensure(personName(item));
+        const name = personName(item);
+        if (!name) continue;
+        const agg = ensure(name);
         const idx = indexOfDay(item.date);
         if (idx >= 0) (agg as any)[def.key][idx] += 1;
       }
     }
     for (const item of hotOpportunityItems) {
-      const agg = ensure(personName(item));
+      const name = personName(item);
+      if (!name) continue;
+      const agg = ensure(name);
       agg.propHot += itemRevenue(item);
       agg.propPipe += itemRevenue(item);
       agg.hotCount += 1;
