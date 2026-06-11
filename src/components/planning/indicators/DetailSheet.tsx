@@ -309,6 +309,7 @@ export const columnFormatters = {
       'Turnaround': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
       'Valuation': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
       'Educação': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
+      'A definir': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 italic',
     };
     
     const colorClass = colorMap[value] || 'bg-gray-100 text-gray-800';
