@@ -140,7 +140,15 @@ export function CommercialPaceDashboard({
         const name = personName(item);
         if (!name) continue;
         const agg = ensure(name);
-        const idx = indexOfDay(item.date);
+        // MQL é qualificado pela data de criação (alinha com o acelerômetro),
+        // não pela data de entrada na fase MQL.
+        const effectiveDate = def.key === "mql"
+          ? ((item as any).dataCriacao || item.date)
+          : item.date;
+        let idx = indexOfDay(effectiveDate);
+        // Para MQL: se a dataCriacao cair fora do intervalo (timezone/edge),
+        // atribui ao primeiro dia do período para não sumir do total.
+        if (idx < 0 && def.key === "mql") idx = 0;
         if (idx >= 0) (agg as any)[def.key][idx] += 1;
       }
     }
