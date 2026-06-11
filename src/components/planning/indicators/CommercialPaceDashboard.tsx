@@ -800,7 +800,7 @@ export function CommercialPaceDashboard({
       </div>
 
       <p className="footnote">
-        * RM, RR e Propostas vêm do CRM. Vendas e faturamento usam a data de assinatura do contrato. Pace esperado do funil derivado das metas configuradas em Admin.
+        * MQL, RM, RR e Propostas vêm do CRM. Vendas e faturamento usam a data de assinatura do contrato. Metas do funil vêm do Plan Growth (<code>funnel_metas</code>), rateadas pelo período filtrado.
       </p>
     </div>
   );
