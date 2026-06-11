@@ -59,8 +59,12 @@ const initials = (n: string) =>
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const cum = (a: number[]) => a.reduce<number[]>((acc, v, i) => (acc.push((acc[i - 1] || 0) + v), acc), []);
 
+const EXCLUDED_CLOSERS = new Set(["matheus staruck dos reis"]);
 function personName(item: DetailItem): string {
-  return ((item.closer || "") as string).trim();
+  const name = ((item.closer || "") as string).trim();
+  if (!name) return "";
+  if (EXCLUDED_CLOSERS.has(name.toLowerCase())) return "";
+  return name;
 }
 function itemRevenue(item: DetailItem) {
   const s = (item.mrr || 0) + (item.setup || 0) + (item.pontual || 0);
