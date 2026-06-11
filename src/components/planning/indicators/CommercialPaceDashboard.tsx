@@ -71,6 +71,7 @@ export function CommercialPaceDashboard({
   funnelMetas,
   isLoading,
   onBack,
+  onDateChange,
 }: CommercialPaceDashboardProps) {
   const [mode, setMode] = useState<"cum" | "daily">("cum");
   const [paceOn, setPaceOn] = useState(true);
