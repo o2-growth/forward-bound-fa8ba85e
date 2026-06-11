@@ -2580,6 +2580,8 @@ export function IndicatorsTab() {
     const totalMrr = items.reduce((sum, i) => sum + (i.mrr || 0), 0);
     const totalSetup = items.reduce((sum, i) => sum + (i.setup || 0), 0);
     const totalPontual = items.reduce((sum, i) => sum + (i.pontual || 0), 0);
+    setDetailSheetExtraContent(null);
+    
     
     // SLA drill-down: "Estamos Respondendo Rápido?"
     if (indicator.key === 'sla') {
