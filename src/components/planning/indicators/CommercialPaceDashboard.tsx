@@ -16,6 +16,14 @@ import { DetailItem } from "./DetailSheet";
 import { firstNameKey, useCloserAbsoluteMetas } from "@/hooks/useCloserAbsoluteMetas";
 import { getMonthFactors, prorateMonthlyMeta } from "@/lib/businessDayProrate";
 import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
+import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
+
+const BU_OPTIONS: MultiSelectOption[] = [
+  { value: 'modelo_atual', label: 'Modelo Atual' },
+  { value: 'o2_tax', label: 'O2 TAX' },
+  { value: 'oxy_hacker', label: 'Oxy Hacker' },
+  { value: 'franquia', label: 'Franquia' },
+];
 
 type MetricKey = "rm" | "rr" | "prop" | "venda";
 
@@ -33,6 +41,7 @@ interface CommercialPaceDashboardProps {
   isLoading: boolean;
   onBack: () => void;
   onDateChange?: (start: Date, end: Date) => void;
+  onBUsChange?: (bus: string[]) => void;
 }
 
 const METRIC_DEFS: { key: MetricKey; label: string; varName: string; indicator: string }[] = [
@@ -72,6 +81,7 @@ export function CommercialPaceDashboard({
   isLoading,
   onBack,
   onDateChange,
+  onBUsChange,
 }: CommercialPaceDashboardProps) {
   const [mode, setMode] = useState<"cum" | "daily">("cum");
   const [paceOn, setPaceOn] = useState(true);
@@ -421,6 +431,17 @@ export function CommercialPaceDashboard({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {onBUsChange && (
+            <div style={{ minWidth: 200 }}>
+              <MultiSelect
+                options={BU_OPTIONS}
+                selected={selectedBUs}
+                onSelectionChange={onBUsChange}
+                placeholder="Selecionar BUs"
+                allLabel="Consolidado"
+              />
+            </div>
+          )}
           {onDateChange && (
             <DateRangePickerGA startDate={startDate} endDate={endDate} onDateChange={onDateChange} />
           )}

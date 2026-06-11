@@ -2982,6 +2982,7 @@ export function IndicatorsTab() {
         isLoading={isLoading || modeloAtualAnalytics.isLoading || o2TaxAnalytics.isLoading || isLoadingExpansao || isLoadingO2Tax}
         onBack={() => setCommercialPaceOpen(false)}
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+        onBUsChange={(bus) => setSelectedBUs(bus as BUType[])}
       />
     );
   }
