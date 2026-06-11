@@ -52,6 +52,11 @@ function personName(item: DetailItem) {
   return (item.closer || item.responsible || "Sem closer").trim() || "Sem closer";
 }
 
+function itemRevenue(item: DetailItem) {
+  const standardRevenue = (item.mrr || 0) + (item.setup || 0) + (item.pontual || 0);
+  return standardRevenue > 0 ? standardRevenue : (item.value || 0);
+}
+
 export function CommercialPaceDashboard({
   startDate,
   endDate,
@@ -70,7 +75,7 @@ export function CommercialPaceDashboard({
   const { getMonthlyMap } = useCloserAbsoluteMetas(startDate.getFullYear());
 
   const vendas = itemsByIndicator.venda || [];
-  const faturamento = vendas.reduce((sum, item) => sum + (item.value || 0), 0);
+  const faturamento = vendas.reduce((sum, item) => sum + itemRevenue(item), 0);
   const ticketMedio = vendas.length > 0 ? faturamento / vendas.length : 0;
   const hotTotal = hotOpportunityItems.reduce((sum, item) => sum + (item.value || 0), 0);
   const attainment = revenueMeta > 0 ? (faturamento / revenueMeta) * 100 : 0;
@@ -98,7 +103,7 @@ export function CommercialPaceDashboard({
       const key = firstNameKey(name) || name.toLowerCase();
       const current = grouped.get(key) || { name, count: 0, value: 0 };
       current.count += 1;
-      current.value += item.value || 0;
+      current.value += itemRevenue(item);
       if (name.length > current.name.length) current.name = name;
       grouped.set(key, current);
     }
@@ -113,7 +118,7 @@ export function CommercialPaceDashboard({
       const key = firstNameKey(name) || name.toLowerCase();
       const current = grouped.get(key) || { name, sales: 0, revenue: 0 };
       current.sales += 1;
-      current.revenue += item.value || 0;
+      current.revenue += itemRevenue(item);
       if (name.length > current.name.length) current.name = name;
       grouped.set(key, current);
     }
