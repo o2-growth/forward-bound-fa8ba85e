@@ -253,6 +253,30 @@ export function CommercialPaceDashboard({
 
   // Chart data
   const goals = countGoalsFor(selectedCloserLocal);
+
+  // Daily faturamento series (from venda items, by signature date) for the active selection
+  const fatSeries = useMemo(() => {
+    const arr = Array(days.length).fill(0) as number[];
+    const indexOfDay = (iso?: string) => {
+      if (!iso) return -1;
+      const d = iso.slice(0, 10);
+      return days.findIndex(day => format(day, "yyyy-MM-dd") === d);
+    };
+    const vendas = (itemsByIndicator.venda || []).filter(i => {
+      if (selectedCloserLocal === "all") return true;
+      return firstNameKey(personName(i)) === selectedCloserLocal;
+    });
+    for (const it of vendas) {
+      const idx = indexOfDay(it.date);
+      if (idx >= 0) arr[idx] += itemRevenue(it);
+    }
+    return arr;
+  }, [days, itemsByIndicator, selectedCloserLocal]);
+
+  const fatMetaRef = selectedCloserLocal === "all"
+    ? revenueMeta
+    : (closers.find(c => c.id === selectedCloserLocal)?.meta || 0);
+
   const chartData = days.map((d, i) => {
     const row: any = { label: format(d, "dd/MM") };
     for (const m of METRIC_DEFS) {
@@ -262,6 +286,12 @@ export function CommercialPaceDashboard({
         const daily = goals[m.key] / totalDays;
         row[m.key + "_meta"] = mode === "cum" ? Math.round(daily * (i + 1) * 10) / 10 : Math.round(daily * 10) / 10;
       }
+    }
+    // Faturamento (R$) — eixo Y secundário
+    row.fat = mode === "cum" ? cum(fatSeries)[i] : fatSeries[i];
+    if (paceOn && fatMetaRef > 0) {
+      const dailyFat = fatMetaRef / totalDays;
+      row.fat_meta = mode === "cum" ? dailyFat * (i + 1) : dailyFat;
     }
     return row;
   });
