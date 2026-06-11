@@ -32,6 +32,7 @@ interface CommercialPaceDashboardProps {
   funnelMetas: { rm: number; rr: number; proposta: number; venda: number };
   isLoading: boolean;
   onBack: () => void;
+  onDateChange?: (start: Date, end: Date) => void;
 }
 
 const METRIC_DEFS: { key: MetricKey; label: string; varName: string; indicator: string }[] = [
