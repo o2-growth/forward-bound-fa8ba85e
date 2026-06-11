@@ -431,6 +431,17 @@ export function CommercialPaceDashboard({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {onBUsChange && (
+            <div style={{ minWidth: 200 }}>
+              <MultiSelect
+                options={BU_OPTIONS}
+                selected={selectedBUs}
+                onSelectionChange={onBUsChange}
+                placeholder="Selecionar BUs"
+                allLabel="Consolidado"
+              />
+            </div>
+          )}
           {onDateChange && (
             <DateRangePickerGA startDate={startDate} endDate={endDate} onDateChange={onDateChange} />
           )}
