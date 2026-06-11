@@ -106,7 +106,7 @@ export function CommercialPaceDashboard({
 
   // Aggregate per closer
   type CloserAgg = {
-    id: string; name: string; rm: number[]; rr: number[]; prop: number[]; venda: number[];
+    id: string; name: string; mql: number[]; rm: number[]; rr: number[]; prop: number[]; venda: number[];
     propPipe: number; propHot: number; hotCount: number; meta: number;
   };
   const closers = useMemo<CloserAgg[]>(() => {
@@ -117,6 +117,7 @@ export function CommercialPaceDashboard({
       if (!agg) {
         agg = {
           id: key, name,
+          mql: Array(days.length).fill(0),
           rm: Array(days.length).fill(0),
           rr: Array(days.length).fill(0),
           prop: Array(days.length).fill(0),
