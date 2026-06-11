@@ -135,21 +135,38 @@ export function CommercialPaceDashboard({
       const d = iso.slice(0, 10);
       return days.findIndex(day => format(day, "yyyy-MM-dd") === d);
     };
+    // Bucket sintético para itens sem closer (ou closer excluído) — garante que
+    // os totais do funil/curva batam com os acelerômetros, que não filtram por dono.
+    const ensureNone = () => {
+      let agg = map.get("__none__");
+      if (!agg) {
+        agg = {
+          id: "__none__", name: "Sem responsável",
+          mql: Array(days.length).fill(0),
+          rm: Array(days.length).fill(0),
+          rr: Array(days.length).fill(0),
+          prop: Array(days.length).fill(0),
+          venda: Array(days.length).fill(0),
+          propPipe: 0, propHot: 0, hotCount: 0, meta: 0,
+        };
+        map.set("__none__", agg);
+      }
+      return agg;
+    };
     for (const def of METRIC_DEFS) {
       for (const item of itemsByIndicator[def.indicator] || []) {
         const name = personName(item);
-        if (!name) continue;
-        const agg = ensure(name);
+        const agg = name ? ensure(name) : ensureNone();
         // MQL é qualificado pela data de criação (alinha com o acelerômetro),
         // não pela data de entrada na fase MQL.
         const effectiveDate = def.key === "mql"
           ? ((item as any).dataCriacao || item.date)
           : item.date;
         let idx = indexOfDay(effectiveDate);
-        // Para MQL: se a dataCriacao cair fora do intervalo (timezone/edge),
+        // Fallback: se a data cair fora do intervalo (timezone/edge),
         // atribui ao primeiro dia do período para não sumir do total.
-        if (idx < 0 && def.key === "mql") idx = 0;
-        if (idx >= 0) (agg as any)[def.key][idx] += 1;
+        if (idx < 0) idx = 0;
+        (agg as any)[def.key][idx] += 1;
       }
     }
     for (const item of hotOpportunityItems) {
