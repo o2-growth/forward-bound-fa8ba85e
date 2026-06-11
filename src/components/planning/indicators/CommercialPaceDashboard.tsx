@@ -221,14 +221,16 @@ export function CommercialPaceDashboard({
   const hotPctVal = pipeTotal ? hotTotal / pipeTotal : 0;
 
   // Funnel
-  const maxStage = Math.max(totals.rm, totals.rr, totals.prop, totals.venda, 1);
+  const maxStage = Math.max(totals.mql, totals.rm, totals.rr, totals.prop, totals.venda, 1);
   const widths: Record<MetricKey, number> = {
+    mql: Math.min(Math.max(totals.mql / maxStage * 100, 16), 100),
     rm: Math.min(Math.max(totals.rm / maxStage * 100, 16), 100),
     rr: Math.min(Math.max(totals.rr / maxStage * 100, 16), 100),
     prop: Math.min(Math.max(totals.prop / maxStage * 100, 16), 100),
     venda: Math.min(Math.max(totals.venda / maxStage * 100, 16), 100),
   };
   const steps = [
+    { from: "mql" as MetricKey, to: "rm" as MetricKey, meta: funnelMetaConv.mqlrm },
     { from: "rm" as MetricKey, to: "rr" as MetricKey, meta: funnelMetaConv.rmrr },
     { from: "rr" as MetricKey, to: "prop" as MetricKey, meta: funnelMetaConv.rrprop },
     { from: "prop" as MetricKey, to: "venda" as MetricKey, meta: funnelMetaConv.propvenda },
