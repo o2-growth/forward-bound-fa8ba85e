@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -124,6 +124,90 @@ const formatCompactCurrency = (value: number): string => {
   }
   return `R$ ${Math.round(value)}`;
 };
+
+// Builds the "Detalhamento por Produto Contratado" table reused across
+// monetary accelerators (Venda / Faturamento / MRR / Setup / Pontual).
+type ProdutoBreakdownMetric = 'value' | 'mrr' | 'setup' | 'pontual';
+function buildProdutoBreakdown(
+  items: DetailItem[],
+  metric: ProdutoBreakdownMetric,
+): ReactNode {
+  type Agg = { produto: string; count: number; mrr: number; setup: number; pontual: number; value: number };
+  const produtoMap = new Map<string, Agg>();
+  items.forEach(i => {
+    const produto = (i.product as string) || 'Não informado';
+    const agg = produtoMap.get(produto) || { produto, count: 0, mrr: 0, setup: 0, pontual: 0, value: 0 };
+    agg.count += 1;
+    agg.mrr += i.mrr || 0;
+    agg.setup += i.setup || 0;
+    agg.pontual += i.pontual || 0;
+    agg.value += i.value || 0;
+    produtoMap.set(produto, agg);
+  });
+  const rows = Array.from(produtoMap.values()).sort((a, b) => (b[metric] || 0) - (a[metric] || 0));
+  if (rows.length === 0) return null;
+
+  const totals = rows.reduce(
+    (t, r) => ({
+      count: t.count + r.count,
+      mrr: t.mrr + r.mrr,
+      setup: t.setup + r.setup,
+      pontual: t.pontual + r.pontual,
+      value: t.value + r.value,
+    }),
+    { count: 0, mrr: 0, setup: 0, pontual: 0, value: 0 },
+  );
+
+  const highlightClass = (col: ProdutoBreakdownMetric) =>
+    col === metric ? 'font-semibold text-chart-2' : '';
+
+  const valueLabel = metric === 'value' ? 'Total' : metric === 'mrr' ? 'MRR' : metric === 'setup' ? 'Setup' : 'Pontual';
+
+  return (
+    <div className="mt-4 border rounded-lg overflow-hidden">
+      <div className="px-4 py-2 bg-muted/50 border-b">
+        <h4 className="text-sm font-semibold text-foreground">Detalhamento por Produto Contratado</h4>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/30">
+            <tr className="text-left text-xs text-muted-foreground">
+              <th className="px-3 py-2 font-medium">Produto</th>
+              <th className="px-3 py-2 font-medium text-right">Contratos</th>
+              <th className="px-3 py-2 font-medium text-right">MRR</th>
+              <th className="px-3 py-2 font-medium text-right">Setup</th>
+              <th className="px-3 py-2 font-medium text-right">Pontual</th>
+              <th className="px-3 py-2 font-medium text-right">Total</th>
+              <th className="px-3 py-2 font-medium text-right">{`Ticket Médio (${valueLabel})`}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(row => (
+              <tr key={row.produto} className="border-t border-border">
+                <td className="px-3 py-2">{columnFormatters.product(row.produto)}</td>
+                <td className="px-3 py-2 text-right font-medium">{row.count}</td>
+                <td className={`px-3 py-2 text-right ${highlightClass('mrr')}`}>{formatCompactCurrency(row.mrr)}</td>
+                <td className={`px-3 py-2 text-right ${highlightClass('setup')}`}>{formatCompactCurrency(row.setup)}</td>
+                <td className={`px-3 py-2 text-right ${highlightClass('pontual')}`}>{formatCompactCurrency(row.pontual)}</td>
+                <td className={`px-3 py-2 text-right ${highlightClass('value')}`}>{formatCompactCurrency(row.value)}</td>
+                <td className="px-3 py-2 text-right">{formatCompactCurrency(row.count > 0 ? (row[metric] || 0) / row.count : 0)}</td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-border bg-muted/30 font-semibold">
+              <td className="px-3 py-2">Total</td>
+              <td className="px-3 py-2 text-right">{totals.count}</td>
+              <td className={`px-3 py-2 text-right ${highlightClass('mrr')}`}>{formatCompactCurrency(totals.mrr)}</td>
+              <td className={`px-3 py-2 text-right ${highlightClass('setup')}`}>{formatCompactCurrency(totals.setup)}</td>
+              <td className={`px-3 py-2 text-right ${highlightClass('pontual')}`}>{formatCompactCurrency(totals.pontual)}</td>
+              <td className={`px-3 py-2 text-right ${highlightClass('value')}`}>{formatCompactCurrency(totals.value)}</td>
+              <td className="px-3 py-2 text-right">{formatCompactCurrency(totals.count > 0 ? (totals[metric] || 0) / totals.count : 0)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 // Format ROI multiplier (4.2x)
 const formatMultiplier = (value: number): string => {
@@ -2012,65 +2096,7 @@ export function IndicatorsTab() {
           ? Math.round(ciclosValidos.reduce((s, c) => s + c, 0) / ciclosValidos.length)
           : 0;
 
-        // Produto Contratado: agregados detalhados por produto
-        type ProdutoAgg = { produto: string; count: number; mrr: number; setup: number; pontual: number; tcv: number };
-        const produtoMap = new Map<string, ProdutoAgg>();
-        itemsWithTCV.forEach(i => {
-          const produto = i.product || 'Não informado';
-          const agg = produtoMap.get(produto) || { produto, count: 0, mrr: 0, setup: 0, pontual: 0, tcv: 0 };
-          agg.count += 1;
-          agg.mrr += i.mrr || 0;
-          agg.setup += i.setup || 0;
-          agg.pontual += i.pontual || 0;
-          agg.tcv += i.value || 0;
-          produtoMap.set(produto, agg);
-        });
-        const produtoBreakdown = Array.from(produtoMap.values()).sort((a, b) => b.tcv - a.tcv);
-
-        const produtoExtraContent = produtoBreakdown.length > 0 ? (
-          <div className="mt-4 border rounded-lg overflow-hidden">
-            <div className="px-4 py-2 bg-muted/50 border-b">
-              <h4 className="text-sm font-semibold text-foreground">Detalhamento por Produto Contratado</h4>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30">
-                  <tr className="text-left text-xs text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">Produto</th>
-                    <th className="px-3 py-2 font-medium text-right">Contratos</th>
-                    <th className="px-3 py-2 font-medium text-right">MRR</th>
-                    <th className="px-3 py-2 font-medium text-right">Setup</th>
-                    <th className="px-3 py-2 font-medium text-right">Pontual</th>
-                    <th className="px-3 py-2 font-medium text-right">TCV</th>
-                    <th className="px-3 py-2 font-medium text-right">Ticket Médio</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {produtoBreakdown.map(row => (
-                    <tr key={row.produto} className="border-t border-border">
-                      <td className="px-3 py-2">{columnFormatters.product(row.produto)}</td>
-                      <td className="px-3 py-2 text-right font-medium">{row.count}</td>
-                      <td className="px-3 py-2 text-right">{formatCompactCurrency(row.mrr)}</td>
-                      <td className="px-3 py-2 text-right">{formatCompactCurrency(row.setup)}</td>
-                      <td className="px-3 py-2 text-right">{formatCompactCurrency(row.pontual)}</td>
-                      <td className="px-3 py-2 text-right font-semibold text-chart-2">{formatCompactCurrency(row.tcv)}</td>
-                      <td className="px-3 py-2 text-right">{formatCompactCurrency(row.count > 0 ? row.tcv / row.count : 0)}</td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 border-border bg-muted/30 font-semibold">
-                    <td className="px-3 py-2">Total</td>
-                    <td className="px-3 py-2 text-right">{items.length}</td>
-                    <td className="px-3 py-2 text-right">{formatCompactCurrency(totalMrr)}</td>
-                    <td className="px-3 py-2 text-right">{formatCompactCurrency(totalSetup)}</td>
-                    <td className="px-3 py-2 text-right">{formatCompactCurrency(totalPontual)}</td>
-                    <td className="px-3 py-2 text-right text-chart-2">{formatCompactCurrency(tcv)}</td>
-                    <td className="px-3 py-2 text-right">{formatCompactCurrency(ticketMedioTCV)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : null;
+        const produtoExtraContent = buildProdutoBreakdown(itemsWithTCV, 'value');
 
         const podium = findTopPerformerByRevenue(items);
         const podiumStr = podium.map((p, i) => {
@@ -2554,6 +2580,8 @@ export function IndicatorsTab() {
     const totalMrr = items.reduce((sum, i) => sum + (i.mrr || 0), 0);
     const totalSetup = items.reduce((sum, i) => sum + (i.setup || 0), 0);
     const totalPontual = items.reduce((sum, i) => sum + (i.pontual || 0), 0);
+    setDetailSheetExtraContent(null);
+    
     
     // SLA drill-down: "Estamos Respondendo Rápido?"
     if (indicator.key === 'sla') {
@@ -2734,6 +2762,7 @@ export function IndicatorsTab() {
       );
       setDetailSheetKpis(kpis);
       setDetailSheetCharts(charts);
+      setDetailSheetExtraContent(buildProdutoBreakdown(itemsWithPct, 'value'));
       setDetailSheetColumns([
         { key: 'product', label: 'Produto', format: columnFormatters.product },
         { key: 'company', label: 'Empresa' },
@@ -2805,6 +2834,7 @@ export function IndicatorsTab() {
       );
       setDetailSheetKpis(kpis);
       setDetailSheetCharts(charts);
+      setDetailSheetExtraContent(buildProdutoBreakdown(itemsWithPct, 'mrr'));
       setDetailSheetColumns([
         { key: 'product', label: 'Produto', format: columnFormatters.product },
         { key: 'company', label: 'Empresa' },
@@ -2865,6 +2895,7 @@ export function IndicatorsTab() {
       );
       setDetailSheetKpis(kpis);
       setDetailSheetCharts(charts);
+      setDetailSheetExtraContent(buildProdutoBreakdown(itemsWithPct, 'setup'));
       setDetailSheetColumns([
         { key: 'product', label: 'Produto', format: columnFormatters.product },
         { key: 'company', label: 'Empresa' },
@@ -2925,6 +2956,7 @@ export function IndicatorsTab() {
       );
       setDetailSheetKpis(kpis);
       setDetailSheetCharts(charts);
+      setDetailSheetExtraContent(buildProdutoBreakdown(itemsWithPct, 'pontual'));
       setDetailSheetColumns([
         { key: 'product', label: 'Produto', format: columnFormatters.product },
         { key: 'company', label: 'Empresa' },

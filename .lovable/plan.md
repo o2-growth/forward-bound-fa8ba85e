@@ -1,28 +1,28 @@
 ## Objetivo
-Adicionar filtragem por período no dashboard **Pace Comercial**, mantendo o design fiel ao HTML original e usando o design system do projeto.
+Replicar no drill-down dos acelerômetros monetários (Faturamento, MRR, Setup, Pontual) o mesmo "Detalhamento por Produto Contratado" que já existe no acelerômetro **Vendas**, em vez de mostrar tudo agregado como CaaS.
+
+## Contexto
+Hoje `IndicatorsTab.tsx` (case `'venda'`) gera um `produtoExtraContent` — uma tabela que agrupa os contratos por `item.product` (categorias devolvidas por `classifyProduto`: CaaS, OXY, Assessoria, BPO, Setup, etc.) e mostra Contratos / MRR / Setup / Pontual / TCV / Ticket Médio por produto. Os outros acelerômetros monetários (`faturamento`, `mrr`, `setup`, `pontual`) já recebem `item.product` corretamente classificado via `useModeloAtualAnalytics.toDetailItem`, mas não exibem essa tabela.
 
 ## Mudanças
 
-### 1. `CommercialPaceDashboard.tsx`
-- Adicionar `DateRangePickerGA` (mesmo componente já usado nos outros indicadores) no header, ao lado direito do título — substituindo/complementando o badge "month-pace".
-- Receber `startDate` / `endDate` via props (vindos do `IndicatorsTab`, que já possui esses estados globais) **e** permitir override local através do picker.
-- Recalcular automaticamente ao mudar período:
-  - `monthFactors` via `getMonthFactors(startDate, endDate)` para ratear metas mensais por dias úteis.
-  - `paceExpected` baseado em dias úteis decorridos vs. dias úteis totais do intervalo (não mais "dia do mês").
-  - Série diária do gráfico de evolução agora cobre todos os dias do intervalo selecionado (não apenas o mês corrente).
-  - Hot opportunities, funil, ranking e gauges respeitam o filtro de data já aplicado em `useIndicatorsRealized` / `modeloAtualAnalyticsRaw`.
-- Atualizar o badge "month-pace" para exibir o intervalo selecionado (ex.: "01/03 – 15/03 • 11 du de 22") em vez de só o mês.
+### `src/components/planning/IndicatorsTab.tsx`
 
-### 2. `IndicatorsTab.tsx`
-- Passar `startDate` e `endDate` (já existentes no escopo do tab) como props para `<CommercialPaceDashboard />`.
-- Garantir que `hotOpportunityItems` e demais datasets enviados ao dashboard usam o mesmo intervalo.
+1. **Extrair a função `buildProdutoBreakdown(items, metric)`** — uma única helper (logo antes do `switch (indicator.key)` da venda) que, dado o conjunto de items e a métrica primária (`'value' | 'mrr' | 'setup' | 'pontual'`), devolve:
+   - `produtoBreakdown`: array agregado `{ produto, count, mrr, setup, pontual, value, primary }` ordenado pelo valor primário desc.
+   - `produtoExtraContent`: o JSX da tabela "Detalhamento por Produto Contratado" parametrizada para destacar a coluna da métrica corrente.
 
-## Detalhes técnicos
-- Reusar `getMonthFactors` (`src/lib/businessDayProrate.ts`) para prorratar metas (`closer_absolute_metas`, `funnel_metas`, `monetary_metas`) ao intervalo selecionado.
-- Para `paceExpected`: `min(1, businessDaysElapsed / totalBusinessDays)` onde "elapsed" = du entre `startDate` e `min(today, endDate)`.
-- Sem mudança em hooks ou queries — apenas a UI e o cálculo local de pace.
-- Sem novos endpoints, sem migração de banco.
+2. **Reaproveitar no case `'venda'`** — substituir o bloco inline atual pela chamada `buildProdutoBreakdown(itemsWithTCV, 'value')`, mantendo o comportamento atual (TCV como métrica principal).
+
+3. **Aplicar a tabela aos outros acelerômetros monetários**, usando `setDetailSheetExtraContent(produtoExtraContent)` em cada um:
+   - `faturamento` → `buildProdutoBreakdown(items, 'value')` (Total como métrica destacada).
+   - `mrr` → `buildProdutoBreakdown(mrrItems, 'mrr')`.
+   - `setup` → `buildProdutoBreakdown(setupItems, 'setup')`.
+   - `pontual` → `buildProdutoBreakdown(pontualItems, 'pontual')`.
+
+4. **Resetar `extraContent`** no fallback (`default`) e nos drill-downs não monetários (ex.: SLA), para não vazar a tabela entre aberturas. Hoje só o case `venda` chama `setDetailSheetExtraContent` — incluir `setDetailSheetExtraContent(null)` nos outros casos que abrem o sheet.
 
 ## Fora do escopo
-- Mudar lógica de metas globais ou criar filtros novos além do período.
-- Alterar outras abas/visões.
+- Não mexer em `classifyProduto` nem na lógica de lookup `pipefy_db_clientes` (já produz as categorias corretas).
+- Não tocar nos acelerômetros não monetários (Leads, MQLs, RMs, RRs, Propostas, SLA), nem nas BUs O2 TAX / Oxy Hacker / Franquia (os items já carregam `product` próprio).
+- Sem migrações, sem novas queries, sem hooks novos.
