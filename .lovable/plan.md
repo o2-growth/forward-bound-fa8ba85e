@@ -1,26 +1,33 @@
-## Problema
+## Diagnóstico
 
-No `CommercialPaceDashboard` (Visão Pace do Comercial), a contagem de **MQL** está menor do que o acelerômetro do indicador MQL no mesmo período.
+Os acelerômetros (97 MQL / 85 RM / 54 RR / 33 Prop / 0 Venda) usam diretamente `getRealizedForIndicator(...)` sobre todos os itens filtrados.
 
-## Causa raiz
+O funil e a curva do `CommercialPaceDashboard` rodam outra agregação por **closer** e descartam silenciosamente todo item cujo `closer` esteja vazio ou esteja na lista de excluídos (`CommercialPaceDashboard.tsx` linhas 65-70 e 141):
 
-Para todas as BUs (Modelo Atual, O2 TAX, Franquia, Oxy Hacker), o MQL é qualificado pela **data de criação** do card (`dataCriacao` cair no período), enquanto os demais indicadores usam `dataEntrada` (entrada na fase).
+```ts
+function personName(item) {
+  const name = (item.closer || "").trim();
+  if (!name) return "";
+  if (EXCLUDED_CLOSERS.has(name.toLowerCase())) return "";
+  return name;
+}
+...
+const name = personName(item);
+if (!name) continue;   // <- item some do total
+```
 
-- `getRealizedForIndicator('mql')` → conta cards cujo `dataCriacao` está no período → bate com acelerômetro ✅
-- `getDetailItemsForIndicator('mql')` → retorna os mesmos cards, **mas** o `DetailItem.date` é preenchido com `dataEntrada` (não `dataCriacao`).
-- No `CommercialPaceDashboard`, o `indexOfDay(item.date)` indexa por dia dentro do período usando `item.date`. Como `dataEntrada` do MQL pode estar **fora do intervalo** (ex.: card foi criado dentro do período mas só entrou na fase MQL depois), o item retorna `idx = -1` e **não é contado** em nenhum dia → total do funil/curva fica abaixo do acelerômetro.
+Como muitos MQLs/RMs ainda não têm closer atribuído, eles somem da agregação → totais do funil ficam abaixo dos acelerômetros (gap brutal em MQL: 97 → 35).
 
-## Correção (mínima, só no componente do pace)
+## Correção
 
-Arquivo: `src/components/planning/indicators/CommercialPaceDashboard.tsx`
+Em `src/components/planning/indicators/CommercialPaceDashboard.tsx`:
 
-1. No loop de agregação por closer (linhas ~138-146), para `def.key === "mql"`, usar **`item.dataCriacao ?? item.date`** ao calcular o índice do dia.
-2. Mesma regra ao montar a série diária do gráfico de evolução (qualquer reduce que use `item.date` para MQL) — usar `dataCriacao` como data efetiva do MQL.
-3. Itens MQL cujo `dataCriacao` ainda assim caia fora do intervalo (raro, mas possível por timezone) → atribuir ao primeiro/último dia do período para não sumir do total. Simples: se `idx < 0`, usar `0` (primeiro dia).
+1. Em vez de `continue` quando `personName` retornar vazio, agrupar o item em um closer sintético `"Sem responsável"` (id estável, ex.: `__none__`). Assim ele entra no total geral mas continua filtrável.
+2. Manter o fallback existente do MQL (usar `dataCriacao` e cair no dia 0 se idx<0).
+3. Não alterar o ranking de closers de forma indesejada: excluir o bucket `__none__` do `ranking` e do dropdown de seleção (continua aparecendo apenas no total "Todos").
 
-Resultado: `sum(closers.map(c => c.mql))` passa a igualar `getRealizedForIndicator('mql')` (= valor do acelerômetro), preservando o detalhamento por closer e por dia.
+Resultado esperado: com closer = "Todos", os totais do funil e os topos da curva passam a bater com os acelerômetros (MQL 97, RM 85, RR 54, Prop 33, Venda 0).
 
 ## Fora de escopo
 
-- Não mexer em `useModeloAtualAnalytics` / `useO2TaxAnalytics` / `useExpansaoAnalytics` (a semântica de `DetailItem.date = dataEntrada` é usada em outras telas).
-- Não alterar metas, drill-down ou outras métricas do pace (RM, RR, Prop, Venda continuam usando `dataEntrada`).
+Acelerômetros, hooks de analytics por BU e demais abas — sem mudanças.
