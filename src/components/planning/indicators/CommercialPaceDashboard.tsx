@@ -59,9 +59,8 @@ const initials = (n: string) =>
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 const cum = (a: number[]) => a.reduce<number[]>((acc, v, i) => (acc.push((acc[i - 1] || 0) + v), acc), []);
 
-function personName(item: DetailItem): string | null {
-  const c = ((item.closer || "") as string).trim();
-  return c || null;
+function personName(item: DetailItem): string {
+  return ((item.closer || "") as string).trim();
 }
 function itemRevenue(item: DetailItem) {
   const s = (item.mrr || 0) + (item.setup || 0) + (item.pontual || 0);
