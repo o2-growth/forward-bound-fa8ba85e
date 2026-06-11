@@ -81,6 +81,7 @@ export function CommercialPaceDashboard({
   isLoading,
   onBack,
   onDateChange,
+  onBUsChange,
 }: CommercialPaceDashboardProps) {
   const [mode, setMode] = useState<"cum" | "daily">("cum");
   const [paceOn, setPaceOn] = useState(true);
