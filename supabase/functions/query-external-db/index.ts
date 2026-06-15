@@ -861,6 +861,105 @@ Deno.serve(async (req) => {
         console.error(`pipes_active_aggregated query failed: ${msg}`);
         result = { action: "pipes_active_aggregated", rows: [], count: 0, error: msg };
       }
+    } else if (action === "lead_sdr_diagnosis") {
+      const { startDate, endDate, produto } = body;
+      const invalid = await validateTable(table);
+      if (invalid) return invalid;
+
+      const leadPhases = ["Start form", "Lead", "Tentativas de contato"];
+      const periodSql = `
+        SELECT "ID","Título","Produtos","Fase","Entrada",
+               "SDR responsável","Closer responsável","Data Criação",
+               "Origem do lead","Investimento disponível"
+        FROM ${table}
+        WHERE "Entrada" >= $1::timestamp AND "Entrada" <= $2::timestamp
+          AND "Fase" = ANY($3::text[])
+        ORDER BY "Entrada" ASC
+      `;
+      const periodRes = await client.query(periodSql, [startDate, endDate, leadPhases]);
+
+      const uniqueIds = [...new Set(periodRes.rows.map((r: any) => String(r["ID"])))];
+
+      let historyRows: any[] = [];
+      if (uniqueIds.length > 0) {
+        const histSql = `
+          SELECT "ID","SDR responsável"
+          FROM ${table}
+          WHERE "ID" = ANY($1::bigint[])
+            AND "SDR responsável" IS NOT NULL
+            AND TRIM("SDR responsável") <> ''
+        `;
+        const histRes = await client.query(histSql, [uniqueIds]);
+        historyRows = histRes.rows;
+      }
+      const sdrByCard = new Map<string, string>();
+      for (const h of historyRows) {
+        const id = String(h["ID"]);
+        const sdr = String(h["SDR responsável"] || "").trim();
+        if (sdr && !sdrByCard.has(id)) sdrByCard.set(id, sdr);
+      }
+
+      const latestByCard = new Map<string, any>();
+      for (const r of periodRes.rows) {
+        const id = String(r["ID"]);
+        const prev = latestByCard.get(id);
+        if (!prev || new Date(r["Entrada"]) > new Date(prev["Entrada"])) {
+          latestByCard.set(id, r);
+        }
+      }
+
+      const TEST_CARD_IDS = new Set(["1234567890", "1280063270"]);
+
+      const withSdr: any[] = [];
+      const withoutSdr: any[] = [];
+      for (const r of latestByCard.values()) {
+        const id = String(r["ID"]);
+        if (TEST_CARD_IDS.has(id)) continue;
+        const prodFilter = produto ? String(produto).toLowerCase() : null;
+        const cardProd = String(r["Produtos"] || "").toLowerCase();
+        if (prodFilter && !cardProd.includes(prodFilter)) continue;
+
+        const directSdr = String(r["SDR responsável"] || "").trim();
+        const effectiveSdr = directSdr || sdrByCard.get(id) || "";
+        const enriched = {
+          id,
+          titulo: r["Título"],
+          produto: r["Produtos"],
+          fase: r["Fase"],
+          entrada: r["Entrada"],
+          data_criacao: r["Data Criação"],
+          sdr_direto: directSdr || null,
+          sdr_efetivo: effectiveSdr || null,
+          closer: r["Closer responsável"],
+          origem: r["Origem do lead"],
+          investimento: r["Investimento disponível"],
+        };
+        if (effectiveSdr) withSdr.push(enriched);
+        else withoutSdr.push(enriched);
+      }
+
+      const byProduto = (list: any[]) =>
+        list.reduce((acc: Record<string, number>, x: any) => {
+          const p = x.produto || "(sem produto)";
+          acc[p] = (acc[p] || 0) + 1;
+          return acc;
+        }, {});
+
+      result = {
+        action: "lead_sdr_diagnosis",
+        table,
+        startDate,
+        endDate,
+        summary: {
+          total: withSdr.length + withoutSdr.length,
+          withSdr: withSdr.length,
+          withoutSdr: withoutSdr.length,
+          byProdutoWithoutSdr: byProduto(withoutSdr),
+          byProdutoWithSdr: byProduto(withSdr),
+        },
+        withoutSdr,
+      };
+      console.log(`lead_sdr_diagnosis: total=${withSdr.length + withoutSdr.length} withoutSdr=${withoutSdr.length}`);
     } else {
       await client.end();
       return new Response(JSON.stringify({ error: "Invalid action" }), {
