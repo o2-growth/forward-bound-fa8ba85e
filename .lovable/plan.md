@@ -1,21 +1,16 @@
 ## Objetivo
-Definir a senha `Alterar@01` para a Eduarda Rovani.
+Criar a conta do Matheus Reis com a senha `Alterar@01`.
 
-## Conta encontrada
-- **Eduarda Rovani** — eduarda.rovani@o2inc.com.br (id `a4309402-5fc2-433e-89e3-de72a8a27aec`)
-
-## Conta NÃO encontrada
-Nenhum usuário com sobrenome "Staruck" existe no banco (busca em `profiles.full_name` e `profiles.email`). O único Matheus cadastrado é Matheus da Silva Besnos.
-
-Para criar o Matheus Staruck preciso que você me passe o **email** dele — aí eu crio a conta já com a senha `Alterar@01`.
-
-## Como vou executar (Eduarda)
-Chamar a edge function `admin-reset-password` com:
-- `userId`: `a4309402-5fc2-433e-89e3-de72a8a27aec`
+## Execução
+Chamar a edge function `admin-create-user` com:
+- `email`: `matheus.reis@o2inc.com.br`
 - `password`: `Alterar@01`
+- `full_name`: `Matheus Reis`
+
+O trigger `handle_new_user` cria automaticamente `profiles` e atribui o role default `user`.
 
 ## Validação
-Confirmar resposta 200 da edge function. Avisar a Eduarda que pode logar com a nova senha.
+Confirmar resposta 200 e consultar `profiles` para garantir que o registro foi criado.
 
 ## Fora do escopo
-Nenhuma mudança de código ou schema. Matheus Staruck fica pendente até você confirmar o email.
+Atribuição de role específico (admin/cfo/etc) ou permissões de aba — pode ser feito depois pela aba Admin.
