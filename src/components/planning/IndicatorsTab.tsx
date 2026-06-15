@@ -816,7 +816,7 @@ export function IndicatorsTab() {
   // Filter function - card matches if it contains ALL tokens of any selected SDR,
   // OR if "Sem SDR" is selected and the card has no SDR value
   const matchesSdrFilter = (responsavel?: string | null): boolean => {
-    if (effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0) return true; // No filter = show all
+    if (effectiveSelectedSDRs.length === 0) return true; // No filter = show all
     const wantsEmpty = effectiveSelectedSDRs.includes(NO_SDR_VALUE);
     const isEmpty = !responsavel || !String(responsavel).trim();
     if (wantsEmpty && isEmpty) return true;
