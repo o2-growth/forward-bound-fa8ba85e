@@ -725,7 +725,8 @@ export function IndicatorsTab() {
       buSdrs.forEach(sdr => sdrsSet.add(sdr));
     });
     
-    return sdrOptions.filter(s => sdrsSet.has(s.value));
+    const filtered = sdrOptions.filter(s => sdrsSet.has(s.value));
+    return [...filtered, { value: NO_SDR_VALUE, label: 'Sem SDR' }];
   }, [selectedBUs]);
 
   // Clear selected closers that are not valid for the current BU selection
