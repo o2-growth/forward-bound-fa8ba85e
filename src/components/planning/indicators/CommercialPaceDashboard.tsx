@@ -211,13 +211,39 @@ export function CommercialPaceDashboard({
     return t;
   };
 
-  // Goals derived from real funnel metas (already from funnel_metas / Plan Growth).
-  const funnelMetaConv = {
-    mqlrm: funnelMetas.mql > 0 ? funnelMetas.rm / funnelMetas.mql : 0,
-    rmrr: funnelMetas.rm > 0 ? funnelMetas.rr / funnelMetas.rm : 0,
-    rrprop: funnelMetas.rr > 0 ? funnelMetas.proposta / funnelMetas.rr : 0,
-    propvenda: funnelMetas.proposta > 0 ? funnelMetas.venda / funnelMetas.proposta : 0,
-  };
+  // Goals: prefer % from bu_indicators_config (Admin → Indicadores por BU) for the period's month.
+  // Fallback: derive from absolute funnel metas.
+  const { getIndicators } = useBUIndicatorsConfig();
+  const funnelMetaConv = useMemo(() => {
+    const mesRef = MONTH_LABELS[startDate.getMonth()];
+    const busToUse = (selectedBUs.length > 0 ? selectedBUs : ALL_BUS) as readonly string[];
+    const accum = { mqlrm: 0, rmrr: 0, rrprop: 0, propvenda: 0 };
+    let n = 0;
+    for (const bu of busToUse) {
+      const cfg = getIndicators(bu, mesRef);
+      if (!cfg) continue;
+      const toFrac = (v: number) => (v > 1 ? v / 100 : v);
+      accum.mqlrm += toFrac(cfg.mqlToRm);
+      accum.rmrr += toFrac(cfg.rmToRr);
+      accum.rrprop += toFrac(cfg.rrToProp);
+      accum.propvenda += toFrac(cfg.propToVenda);
+      n++;
+    }
+    if (n > 0) {
+      return {
+        mqlrm: accum.mqlrm / n,
+        rmrr: accum.rmrr / n,
+        rrprop: accum.rrprop / n,
+        propvenda: accum.propvenda / n,
+      };
+    }
+    return {
+      mqlrm: funnelMetas.mql > 0 ? funnelMetas.rm / funnelMetas.mql : 0,
+      rmrr: funnelMetas.rm > 0 ? funnelMetas.rr / funnelMetas.rm : 0,
+      rrprop: funnelMetas.rr > 0 ? funnelMetas.proposta / funnelMetas.rr : 0,
+      propvenda: funnelMetas.proposta > 0 ? funnelMetas.venda / funnelMetas.proposta : 0,
+    };
+  }, [getIndicators, startDate, selectedBUs, funnelMetas]);
 
   const countGoalsFor = (closerId: string): Record<MetricKey, number> | null => {
     if (closerId === "all") {
