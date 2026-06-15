@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { DetailItem } from "./DetailSheet";
 import { firstNameKey, useCloserAbsoluteMetas } from "@/hooks/useCloserAbsoluteMetas";
+import { BU_CLOSERS, BuType } from "@/hooks/useCloserMetas";
 import { getMonthFactors, prorateMonthlyMeta } from "@/lib/businessDayProrate";
 import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
@@ -153,6 +154,13 @@ export function CommercialPaceDashboard({
       }
       return agg;
     };
+    // Seed: garante que todos os closers atribuídos às BUs selecionadas
+    // apareçam como chip mesmo sem itens no período.
+    for (const bu of selectedBUs) {
+      for (const closer of (BU_CLOSERS[bu as BuType] || [])) {
+        ensure(closer);
+      }
+    }
     for (const def of METRIC_DEFS) {
       for (const item of itemsByIndicator[def.indicator] || []) {
         const name = personName(item);
@@ -184,7 +192,7 @@ export function CommercialPaceDashboard({
       agg.meta = prorateMonthlyMeta(monthly.faturamento, factors);
     }
     return Array.from(map.values());
-  }, [days, itemsByIndicator, hotOpportunityItems, startDate, endDate, getMonthlyMap]);
+  }, [days, itemsByIndicator, hotOpportunityItems, startDate, endDate, getMonthlyMap, selectedBUs]);
 
   const seriesFor = (closerId: string, metric: MetricKey): number[] => {
     if (closerId === "all") {
