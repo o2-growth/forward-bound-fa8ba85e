@@ -154,6 +154,13 @@ export function CommercialPaceDashboard({
       }
       return agg;
     };
+    // Seed: garante que todos os closers atribuídos às BUs selecionadas
+    // apareçam como chip mesmo sem itens no período.
+    for (const bu of selectedBUs) {
+      for (const closer of (BU_CLOSERS[bu as BuType] || [])) {
+        ensure(closer);
+      }
+    }
     for (const def of METRIC_DEFS) {
       for (const item of itemsByIndicator[def.indicator] || []) {
         const name = personName(item);
