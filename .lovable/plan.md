@@ -1,20 +1,22 @@
-## Problema
+## Objetivo
 
-No painel **Pace Comercial** (aberto via botão), as chips de closer são montadas apenas a partir dos itens reais do período (`itemsByIndicator` + `hotOpportunityItems`). Se um closer não teve nenhum item naquele recorte de BU + datas, ele não aparece como opção — foi o que aconteceu com o **Daniel Trindade** ao filtrar só **Oxy Hacker + Franquia**.
+No dashboard **Pace Comercial** (resumo clicável), as % de conversão "meta" do funil (MQL→RM, RM→RR, RR→Prop, Prop→Venda) devem refletir os valores configurados em **Admin → Indicadores por BU** (`bu_indicators_config`), iguais aos prints enviados para Modelo Atual, Oxy Hacker e Franquia. Hoje essas % são derivadas dividindo metas absolutas de funil (rm/mql, etc.), o que não bate com os percentuais cadastrados.
 
-A correção no `BU_CLOSERS` (Daniel adicionado em todas as BUs) só afeta o filtro do `IndicatorsTab`. O Pace tem sua própria lógica de chips.
+Escopo restrito ao Pace Comercial — não mexe em IndicatorsTab nem em outras telas.
 
-## Mudança
+## Mudanças
 
-Arquivo: `src/components/planning/indicators/CommercialPaceDashboard.tsx`
+**Arquivo:** `src/components/planning/indicators/CommercialPaceDashboard.tsx`
 
-1. Importar `BU_CLOSERS, BuType` de `@/hooks/useCloserMetas`.
-2. Dentro do `useMemo` que monta `closers` (linha 112), **antes** de iterar pelos itens, fazer seed do `map` com um `CloserAgg` vazio (zeros) para cada closer presente em `BU_CLOSERS[bu]` para cada `bu` em `selectedBUs`. Reutilizar a função `ensure(name)` já existente.
-3. Manter o filtro atual em `filterItems` (linha 325-328) que exclui `__none__` / `sem closer` — closers seedados sem nome inválido continuam aparecendo.
+1. Importar `useBUIndicatorsConfig` e a lista `MONTHS` (Jan-Dez).
+2. Determinar o **mês de referência** a partir de `startDate` (ex.: `MONTHS[startDate.getMonth()]`).
+3. Para cada BU em `selectedBUs` (fallback: todas as 4), buscar `getIndicators(bu, mesRef)` e calcular a **média simples** das taxas `mql_to_rm`, `rm_to_rr`, `rr_to_prop`, `prop_to_venda` entre as BUs com config disponível.
+4. Substituir o cálculo atual de `funnelMetaConv` (linhas 211-216) para usar essas taxas (convertendo de % 0-100 → fração 0-1, conforme o formato salvo na tabela). Se nenhuma config existir para o mês, manter o fallback atual (derivado de metas absolutas).
+5. Não alterar os números absolutos de meta (`funnelMetas.mql`, `.rm`, etc.) nem o cálculo de `countGoalsFor` — só os percentuais exibidos nos "steps" do funil.
 
-Resultado: ao selecionar Oxy Hacker e/ou Franquia, o Daniel Trindade sempre aparece como chip (mesmo que zerado), permitindo selecioná-lo. O mesmo vale para qualquer outro closer atribuído à BU que ainda não tenha movimentação no período.
+## Validação
 
-## Fora de escopo
-
-- Lógica do `IndicatorsTab` (já corrigida no turno anterior).
-- Metas / faturamento: o seed só adiciona o closer ao mapa; a meta dele continua sendo calculada por `getMonthlyMap(agg.name)` normalmente.
+- Abrir Pace Comercial com filtro BU = Modelo Atual em Jun → ver 40% / 80% / 80% / 25%.
+- Trocar para Oxy Hacker → 40% / 60% / 75% / 15%.
+- Franquia → 19% / 79% / 83% / 11%.
+- Sem BU selecionada → média das 4 BUs do mês.
