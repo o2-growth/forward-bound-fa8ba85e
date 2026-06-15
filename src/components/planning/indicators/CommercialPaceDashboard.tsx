@@ -192,7 +192,7 @@ export function CommercialPaceDashboard({
       agg.meta = prorateMonthlyMeta(monthly.faturamento, factors);
     }
     return Array.from(map.values());
-  }, [days, itemsByIndicator, hotOpportunityItems, startDate, endDate, getMonthlyMap]);
+  }, [days, itemsByIndicator, hotOpportunityItems, startDate, endDate, getMonthlyMap, selectedBUs]);
 
   const seriesFor = (closerId: string, metric: MetricKey): number[] => {
     if (closerId === "all") {
