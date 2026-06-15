@@ -1,45 +1,39 @@
 ## Objetivo
-Listar todos os cards da BU Expansão (Franquia e Oxy Hacker) que entraram em **fases de Lead** durante **junho/2026** sem `SDR responsável` preenchido, para você corrigir no Pipefy.
+Adicionar opção **"Sem SDR"** no filtro de SDR e **"Sem Closer"** no filtro de Closer da aba Indicadores Comercial, permitindo isolar cards sem responsável atribuído.
 
-## Contexto já levantado
-Rodei o `aggregate` no Pipefy para `pipefy_cards_movements_expansao` em junho/2026:
+## Comportamento
+- Aparecem como duas opções extras no MultiSelect (sempre visíveis, independente da BU selecionada — já que cards "órfãos" podem existir em qualquer BU).
+- Selecionável junto com outros nomes (ex: "Carlos" + "Sem SDR" mostra cards do Carlos OU sem SDR).
+- Selecionar só "Sem SDR" → mostra apenas cards com `sdr` vazio/null.
+- O bypass "todos selecionados = sem filtro" continua valendo; "Sem SDR" conta como um valor a mais.
 
-- 372 cards únicos no mês
-- Fases-alvo (Leads): **Start form (45)**, **Lead (47)**, **Tentativas de contato (43)** → ~133 movimentos / ~120 cards únicos a auditar
-- Atualmente não existe ação no `query-external-db` que devolva só esses campos filtrados por SDR nulo — o `query_period` traz 100+ colunas por linha (resposta enorme, inviável de paginar no chat)
+## Implementação (apenas `src/components/planning/IndicatorsTab.tsx`)
 
-## O que vou fazer
+1. **Sentinelas** no topo do arquivo:
+   ```ts
+   const NO_SDR_VALUE = '__no_sdr__';
+   const NO_CLOSER_VALUE = '__no_closer__';
+   ```
 
-1. **Adicionar uma ação `lead_sdr_diagnosis`** na edge function `supabase/functions/query-external-db/index.ts`.
+2. **Opções extras** anexadas em `availableSDRs` e `availableClosers` (useMemo, linhas 694–724): adicionar `{ value: NO_SDR_VALUE, label: 'Sem SDR' }` e `{ value: NO_CLOSER_VALUE, label: 'Sem Closer' }` no fim de cada lista.
 
-   Comportamento:
-   - Input: `{ table, startDate, endDate, produto? }`
-   - SQL (somente leitura):
-     ```sql
-     SELECT "ID","Título","Produtos","Fase","Entrada",
-            "SDR responsável","Closer responsável","Data Criação",
-            "Origem do lead","Investimento disponível"
-     FROM pipefy_cards_movements_expansao
-     WHERE "Entrada" >= $1 AND "Entrada" <= $2
-       AND "Fase" IN ('Start form','Lead','Tentativas de contato')
-     ORDER BY "Entrada" ASC
-     ```
-   - Após receber as linhas, deduplica por `ID` (mantendo a entrada mais recente) e separa em dois buckets: `withSdr` e `withoutSdr` (string vazia ou null).
-   - Aplica o fix de **atribuição retroativa** (`useExpansaoAnalytics.ts` linhas 369–380): se o mesmo card tiver SDR preenchido em qualquer outro movimento, considera "com SDR" — isso evita falso-positivo de cards que ganharam SDR só ao chegar em "Tentativas de contato".
-   - Retorna `{ withoutSdr: [...], summary: { total, withSdr, withoutSdr, byProduto } }`.
+3. **Validação de seleção por BU** (linhas 727–746): preservar os sentinelas mesmo quando a BU muda — não removê-los dos `selectedSDRs/selectedClosers`.
 
-2. **Filtrar test cards** com a mesma lista usada em `isTestCard` (já existente).
+4. **Função `matchesSdrFilter`** (linha 801) e **`matchesCloserFilter`** (linha 787):
+   - Se `effectiveSelectedSDRs.includes(NO_SDR_VALUE)` e o card tem SDR vazio/null/whitespace → match.
+   - Idem para closer.
+   - Mantém a lógica atual de tokens para os demais valores.
 
-3. **Rodar a ação** logo após o deploy e te entregar:
-   - Tabela com **Card ID, Título, Produto, Fase, Data, link Pipefy** dos cards sem SDR
-   - Quebra Franquia × Oxy Hacker
-   - Total absoluto e % do mês
+5. **`sdrFilterForBU`** (linha 766): se o filtro ativo for **somente** `[NO_SDR_VALUE]`, retornar `undefined` (não filtra BU por nome de SDR; apenas a função `matchesSdrFilter` faz o trabalho).
+
+6. **Inclusão de BU** (linhas 1037–1046): "Sem SDR" / "Sem Closer" não restringe nenhuma BU — todas continuam incluídas quando esses sentinelas estão ativos.
+
+## O que NÃO muda
+- Metas (`sdrFilterForBU`, `getFilteredMeta`, `useSdrMetas`, `useCloserMetas`): "Sem SDR/Closer" não tem meta atribuída → essas funções ignoram os sentinelas e tratam como "sem filtro de meta" para esse subconjunto.
+- Componentes de UI dos `MultiSelect` (já renderizam dinâmico).
+- Nenhuma mudança em hooks de analytics ou edge functions.
 
 ## Arquivos tocados
-- `supabase/functions/query-external-db/index.ts` (+ ~40 linhas, novo branch `else if (action === "lead_sdr_diagnosis")`)
-
-## O que NÃO vou fazer
-- Nenhuma alteração de UI/dashboard
-- Nenhum `UPDATE` no Pipefy (a correção dos SDRs continua manual no Pipefy ou via aba admin existente)
+- `src/components/planning/IndicatorsTab.tsx` (única edição)
 
 Confirma que posso seguir?

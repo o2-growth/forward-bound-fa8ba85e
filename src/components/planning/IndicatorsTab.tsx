@@ -112,6 +112,10 @@ const sdrOptions: MultiSelectOption[] = [
   { value: 'Kethlin', label: 'Kethlin (Franquia)' },
 ];
 
+// Sentinel values to filter cards with empty SDR / Closer
+const NO_SDR_VALUE = '__no_sdr__';
+const NO_CLOSER_VALUE = '__no_closer__';
+
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
 
 // Format compact currency (R$ 1.2M, R$ 510k)
