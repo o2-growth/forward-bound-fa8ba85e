@@ -732,6 +732,7 @@ export function IndicatorsTab() {
   // Clear selected closers that are not valid for the current BU selection
   useEffect(() => {
     const validClosers = selectedClosers.filter(closer => {
+      if (closer === NO_CLOSER_VALUE) return true; // sentinela é sempre válido
       return selectedBUs.some(bu => BU_CLOSERS[bu as BuType]?.includes(closer as CloserType));
     });
     
@@ -743,6 +744,7 @@ export function IndicatorsTab() {
   // Clear selected SDRs that are not valid for the current BU selection
   useEffect(() => {
     const validSDRs = selectedSDRs.filter(sdr => {
+      if (sdr === NO_SDR_VALUE) return true; // sentinela é sempre válido
       return selectedBUs.some(bu => BU_SDRS[bu as BuType]?.includes(sdr));
     });
     
