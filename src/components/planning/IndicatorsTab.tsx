@@ -112,6 +112,10 @@ const sdrOptions: MultiSelectOption[] = [
   { value: 'Kethlin', label: 'Kethlin (Franquia)' },
 ];
 
+// Sentinel values to filter cards with empty SDR / Closer
+const NO_SDR_VALUE = '__no_sdr__';
+const NO_CLOSER_VALUE = '__no_closer__';
+
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
 
 // Format compact currency (R$ 1.2M, R$ 510k)
@@ -708,7 +712,8 @@ export function IndicatorsTab() {
       { value: 'Bruna', label: 'Bruna' },
     ];
     
-    return allClosers.filter(c => closersSet.has(c.value));
+    const filtered = allClosers.filter(c => closersSet.has(c.value));
+    return [...filtered, { value: NO_CLOSER_VALUE, label: 'Sem Closer' }];
   }, [selectedBUs]);
 
   // Calculate available SDRs based on selected BUs
@@ -720,12 +725,14 @@ export function IndicatorsTab() {
       buSdrs.forEach(sdr => sdrsSet.add(sdr));
     });
     
-    return sdrOptions.filter(s => sdrsSet.has(s.value));
+    const filtered = sdrOptions.filter(s => sdrsSet.has(s.value));
+    return [...filtered, { value: NO_SDR_VALUE, label: 'Sem SDR' }];
   }, [selectedBUs]);
 
   // Clear selected closers that are not valid for the current BU selection
   useEffect(() => {
     const validClosers = selectedClosers.filter(closer => {
+      if (closer === NO_CLOSER_VALUE) return true; // sentinela é sempre válido
       return selectedBUs.some(bu => BU_CLOSERS[bu as BuType]?.includes(closer as CloserType));
     });
     
@@ -737,6 +744,7 @@ export function IndicatorsTab() {
   // Clear selected SDRs that are not valid for the current BU selection
   useEffect(() => {
     const validSDRs = selectedSDRs.filter(sdr => {
+      if (sdr === NO_SDR_VALUE) return true; // sentinela é sempre válido
       return selectedBUs.some(bu => BU_SDRS[bu as BuType]?.includes(sdr));
     });
     
@@ -764,8 +772,11 @@ export function IndicatorsTab() {
   // Returns undefined if no SDR filter is active (no override), or [] if filter is on but
   // no selected SDR operates in this BU (caller should treat as "exclude this BU").
   const sdrFilterForBU = (bu: BuType): string[] | undefined => {
-    if (effectiveSelectedSDRs.length === 0) return undefined;
-    return effectiveSelectedSDRs.filter(s => BU_SDRS[bu]?.includes(s));
+    if (effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0) return undefined;
+    // Ignora sentinela "Sem SDR" para filtragem de metas por nome
+    const named = effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE);
+    if (named.length === 0) return undefined;
+    return named.filter(s => BU_SDRS[bu]?.includes(s));
   };
 
   // Token-based normalization: lowercase, strip diacritics, remove punctuation,
@@ -783,13 +794,18 @@ export function IndicatorsTab() {
       .filter(Boolean);
   };
 
-  // Filter function - card matches if it contains ALL tokens of any selected closer
+  // Filter function - card matches if it contains ALL tokens of any selected closer,
+  // OR if "Sem Closer" is selected and the card has no closer value
   const matchesCloserFilter = (closerValue?: string | null): boolean => {
     if (effectiveSelectedClosers.length === 0) return true; // No filter = show all
-    if (!closerValue) return false;
-    const cardTokens = tokenize(closerValue);
-    if (cardTokens.length === 0) return false;
+    const wantsEmpty = effectiveSelectedClosers.includes(NO_CLOSER_VALUE);
+    const isEmpty = !closerValue || !String(closerValue).trim();
+    if (wantsEmpty && isEmpty) return true;
+    if (isEmpty) return false;
+    const cardTokens = tokenize(closerValue!);
+    if (cardTokens.length === 0) return wantsEmpty; // tokens vazios = "sem closer"
     return effectiveSelectedClosers.some(selected => {
+      if (selected === NO_CLOSER_VALUE) return false;
       const selectedTokens = tokenize(selected);
       if (selectedTokens.length === 0) return false;
       // Card matches if it contains every token of the selected name (any order)
@@ -797,13 +813,18 @@ export function IndicatorsTab() {
     });
   };
 
-  // Filter function - card matches if it contains ALL tokens of any selected SDR
+  // Filter function - card matches if it contains ALL tokens of any selected SDR,
+  // OR if "Sem SDR" is selected and the card has no SDR value
   const matchesSdrFilter = (responsavel?: string | null): boolean => {
     if (effectiveSelectedSDRs.length === 0) return true; // No filter = show all
-    if (!responsavel) return false;
-    const cardTokens = tokenize(responsavel);
-    if (cardTokens.length === 0) return false;
+    const wantsEmpty = effectiveSelectedSDRs.includes(NO_SDR_VALUE);
+    const isEmpty = !responsavel || !String(responsavel).trim();
+    if (wantsEmpty && isEmpty) return true;
+    if (isEmpty) return false;
+    const cardTokens = tokenize(responsavel!);
+    if (cardTokens.length === 0) return wantsEmpty;
     return effectiveSelectedSDRs.some(sdr => {
+      if (sdr === NO_SDR_VALUE) return false;
       const sdrTokens = tokenize(sdr);
       if (sdrTokens.length === 0) return false;
       return sdrTokens.every(t => cardTokens.includes(t));
@@ -1043,8 +1064,8 @@ export function IndicatorsTab() {
       
       // Include BU if: no closer filter OR at least one selected closer operates here
       // AND: no SDR filter OR at least one selected SDR operates here
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         // If either filter is active, use card-level filtering
@@ -1072,8 +1093,8 @@ export function IndicatorsTab() {
         BU_SDRS.o2_tax.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0) {
@@ -1100,8 +1121,8 @@ export function IndicatorsTab() {
         BU_SDRS.oxy_hacker.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0) {
@@ -1128,8 +1149,8 @@ export function IndicatorsTab() {
         BU_SDRS.franquia.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         if (effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0) {
@@ -1475,8 +1496,8 @@ export function IndicatorsTab() {
         BU_SDRS.modelo_atual.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         const buItems = modeloAtualAnalytics.getDetailItemsForIndicator(indicatorKey);
@@ -1498,8 +1519,8 @@ export function IndicatorsTab() {
         BU_SDRS.o2_tax.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         const buItems = o2TaxAnalytics.getDetailItemsForIndicator(indicatorKey);
@@ -1521,8 +1542,8 @@ export function IndicatorsTab() {
         BU_SDRS.franquia.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         const buItems = franquiaAnalytics.getDetailItemsForIndicator(indicatorKey);
@@ -1544,8 +1565,8 @@ export function IndicatorsTab() {
         BU_SDRS.oxy_hacker.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         const buItems = oxyHackerAnalytics.getDetailItemsForIndicator(indicatorKey);
@@ -1596,8 +1617,8 @@ export function IndicatorsTab() {
         BU_SDRS.modelo_atual.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         const buItems = modeloAtualAnalytics.getDetailItemsWithFullHistory(indicatorKey);
@@ -1619,8 +1640,8 @@ export function IndicatorsTab() {
         BU_SDRS.o2_tax.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         const buItems = o2TaxAnalytics.getDetailItemsWithFullHistory(indicatorKey);
@@ -1642,8 +1663,8 @@ export function IndicatorsTab() {
         BU_SDRS.franquia.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         const buItems = franquiaAnalytics.getDetailItemsWithFullHistory(indicatorKey);
@@ -1665,8 +1686,8 @@ export function IndicatorsTab() {
         BU_SDRS.oxy_hacker.includes(s)
       );
       
-      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.length === 0;
-      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.length === 0;
+      const includeByCloser = closersForBU.length > 0 || effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0;
+      const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
         const buItems = oxyHackerAnalytics.getDetailItemsWithFullHistory(indicatorKey);
