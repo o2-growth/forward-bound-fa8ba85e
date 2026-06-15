@@ -773,7 +773,10 @@ export function IndicatorsTab() {
   // no selected SDR operates in this BU (caller should treat as "exclude this BU").
   const sdrFilterForBU = (bu: BuType): string[] | undefined => {
     if (effectiveSelectedSDRs.length === 0) return undefined;
-    return effectiveSelectedSDRs.filter(s => BU_SDRS[bu]?.includes(s));
+    // Ignora sentinela "Sem SDR" para filtragem de metas por nome
+    const named = effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE);
+    if (named.length === 0) return undefined;
+    return named.filter(s => BU_SDRS[bu]?.includes(s));
   };
 
   // Token-based normalization: lowercase, strip diacritics, remove punctuation,
