@@ -797,7 +797,7 @@ export function IndicatorsTab() {
   // Filter function - card matches if it contains ALL tokens of any selected closer,
   // OR if "Sem Closer" is selected and the card has no closer value
   const matchesCloserFilter = (closerValue?: string | null): boolean => {
-    if (effectiveSelectedClosers.filter(c => c !== NO_CLOSER_VALUE).length === 0) return true; // No filter = show all
+    if (effectiveSelectedClosers.length === 0) return true; // No filter = show all
     const wantsEmpty = effectiveSelectedClosers.includes(NO_CLOSER_VALUE);
     const isEmpty = !closerValue || !String(closerValue).trim();
     if (wantsEmpty && isEmpty) return true;
