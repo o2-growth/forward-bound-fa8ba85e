@@ -794,13 +794,18 @@ export function IndicatorsTab() {
       .filter(Boolean);
   };
 
-  // Filter function - card matches if it contains ALL tokens of any selected closer
+  // Filter function - card matches if it contains ALL tokens of any selected closer,
+  // OR if "Sem Closer" is selected and the card has no closer value
   const matchesCloserFilter = (closerValue?: string | null): boolean => {
     if (effectiveSelectedClosers.length === 0) return true; // No filter = show all
-    if (!closerValue) return false;
-    const cardTokens = tokenize(closerValue);
-    if (cardTokens.length === 0) return false;
+    const wantsEmpty = effectiveSelectedClosers.includes(NO_CLOSER_VALUE);
+    const isEmpty = !closerValue || !String(closerValue).trim();
+    if (wantsEmpty && isEmpty) return true;
+    if (isEmpty) return false;
+    const cardTokens = tokenize(closerValue!);
+    if (cardTokens.length === 0) return wantsEmpty; // tokens vazios = "sem closer"
     return effectiveSelectedClosers.some(selected => {
+      if (selected === NO_CLOSER_VALUE) return false;
       const selectedTokens = tokenize(selected);
       if (selectedTokens.length === 0) return false;
       // Card matches if it contains every token of the selected name (any order)
@@ -808,13 +813,18 @@ export function IndicatorsTab() {
     });
   };
 
-  // Filter function - card matches if it contains ALL tokens of any selected SDR
+  // Filter function - card matches if it contains ALL tokens of any selected SDR,
+  // OR if "Sem SDR" is selected and the card has no SDR value
   const matchesSdrFilter = (responsavel?: string | null): boolean => {
     if (effectiveSelectedSDRs.length === 0) return true; // No filter = show all
-    if (!responsavel) return false;
-    const cardTokens = tokenize(responsavel);
-    if (cardTokens.length === 0) return false;
+    const wantsEmpty = effectiveSelectedSDRs.includes(NO_SDR_VALUE);
+    const isEmpty = !responsavel || !String(responsavel).trim();
+    if (wantsEmpty && isEmpty) return true;
+    if (isEmpty) return false;
+    const cardTokens = tokenize(responsavel!);
+    if (cardTokens.length === 0) return wantsEmpty;
     return effectiveSelectedSDRs.some(sdr => {
+      if (sdr === NO_SDR_VALUE) return false;
       const sdrTokens = tokenize(sdr);
       if (sdrTokens.length === 0) return false;
       return sdrTokens.every(t => cardTokens.includes(t));
