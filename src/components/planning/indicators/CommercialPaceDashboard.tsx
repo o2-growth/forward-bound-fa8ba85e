@@ -18,6 +18,10 @@ import { BU_CLOSERS, BuType } from "@/hooks/useCloserMetas";
 import { getMonthFactors, prorateMonthlyMeta } from "@/lib/businessDayProrate";
 import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
+import { useBUIndicatorsConfig } from "@/hooks/useBUIndicatorsConfig";
+
+const MONTH_LABELS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] as const;
+const ALL_BUS = ['modelo_atual','o2_tax','oxy_hacker','franquia'] as const;
 
 const BU_OPTIONS: MultiSelectOption[] = [
   { value: 'modelo_atual', label: 'Modelo Atual' },
