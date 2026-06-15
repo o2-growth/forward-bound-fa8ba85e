@@ -712,7 +712,8 @@ export function IndicatorsTab() {
       { value: 'Bruna', label: 'Bruna' },
     ];
     
-    return allClosers.filter(c => closersSet.has(c.value));
+    const filtered = allClosers.filter(c => closersSet.has(c.value));
+    return [...filtered, { value: NO_CLOSER_VALUE, label: 'Sem Closer' }];
   }, [selectedBUs]);
 
   // Calculate available SDRs based on selected BUs
