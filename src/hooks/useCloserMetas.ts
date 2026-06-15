@@ -23,7 +23,7 @@ export type CloserType = typeof CLOSERS[number];
 // Mapeamento de closers por BU - define quais closers atuam em cada unidade de negócio
 export const BU_CLOSERS: Record<BuType, readonly CloserType[]> = {
   modelo_atual: ['Pedro Albite', 'Daniel Trindade', 'Thiago', 'Amanda Serafim', 'Bruna'],
-  o2_tax: ['Lucas Ilha'],
+  o2_tax: ['Lucas Ilha', 'Daniel Trindade'],
   oxy_hacker: ['Pedro Albite', 'Daniel Trindade'],
   franquia: ['Pedro Albite', 'Daniel Trindade', 'Bruna'],
 } as const;
