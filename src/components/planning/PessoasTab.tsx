@@ -326,28 +326,31 @@ export function PessoasTab() {
                 />
               </div>
 
-              {/* Custo por Pessoa e por Time (somente mapeadas) */}
+              {/* Composição por categoria + Custo por Time */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Custo por Pessoa (mapeado)</CardTitle>
+                    <CardTitle className="text-base">Composição por categoria DRE</CardTitle>
+                    <p className="text-xs text-muted-foreground">Do que é feito o custo de pessoal no período (fonte: Oxy DRE)</p>
                   </CardHeader>
                   <CardContent>
-                    {pc.custoPorPessoa.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Mapeie categorias para ver o custo por pessoa.</p>
+                    {pc.composicao.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sem categorias no período.</p>
                     ) : (
                       <div className="space-y-2">
-                        {pc.custoPorPessoa.slice(0, 12).map((p) => {
-                          const max = pc.custoPorPessoa[0]?.valor || 1;
-                          const pct = (p.valor / max) * 100;
+                        {pc.composicao.slice(0, 10).map((c) => {
+                          const max = pc.composicao[0]?.valor || 1;
+                          const width = (c.valor / max) * 100;
                           return (
-                            <div key={p.pessoa_id}>
+                            <div key={c.label}>
                               <div className="flex justify-between text-sm mb-1">
-                                <span className="text-foreground truncate pr-2">{p.pessoa_nome}</span>
-                                <span className="font-medium tabular-nums">{formatCurrencyCompact(p.valor)}</span>
+                                <span className="text-foreground truncate pr-2">{c.label}</span>
+                                <span className="font-medium tabular-nums">
+                                  {formatCurrencyCompact(c.valor)} <span className="text-muted-foreground text-xs">({c.pct.toFixed(1)}%)</span>
+                                </span>
                               </div>
                               <div className="h-2 bg-muted rounded overflow-hidden">
-                                <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                                <div className="h-full bg-primary" style={{ width: `${width}%` }} />
                               </div>
                             </div>
                           );
@@ -359,11 +362,12 @@ export function PessoasTab() {
 
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Custo por Time (mapeado)</CardTitle>
+                    <CardTitle className="text-base">Custo por Time</CardTitle>
+                    <p className="text-xs text-muted-foreground">Aplicando o rateio % das categorias mapeadas</p>
                   </CardHeader>
                   <CardContent>
                     {pc.custoPorTime.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Mapeie categorias para ver o custo por time.</p>
+                      <p className="text-sm text-muted-foreground">Distribua categorias entre Times no painel abaixo para visualizar.</p>
                     ) : (
                       <div className="space-y-2">
                         {pc.custoPorTime.map((t) => {
@@ -386,6 +390,50 @@ export function PessoasTab() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Custo médio por pessoa (por Time) */}
+              <Card className="mt-4">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Custo médio por pessoa (por Time)</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Estimativa: custo do Time ÷ headcount ativo. A Oxy não expõe fornecedor por lançamento, então este valor é uma média — não o salário real individual.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {pc.custoPorTime.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Mapeie categorias primeiro.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border text-[11px] text-muted-foreground text-left">
+                            <th className="py-2 pr-3 font-medium">Time</th>
+                            <th className="py-2 px-3 font-medium text-right">Headcount ativo</th>
+                            <th className="py-2 px-3 font-medium text-right">Custo total</th>
+                            <th className="py-2 pl-3 font-medium text-right">Custo médio / pessoa</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pc.custoPorTime.map((t) => {
+                            const headcountTime = hr.headcountByTime.find((h) => h.group === t.time)?.count || 0;
+                            const medio = headcountTime > 0 ? t.valor / headcountTime : 0;
+                            return (
+                              <tr key={t.time} className="border-b border-border/50">
+                                <td className="py-2 pr-3 text-foreground">{t.time}</td>
+                                <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">{headcountTime || "—"}</td>
+                                <td className="py-2 px-3 text-right tabular-nums text-foreground">{formatCurrencyCompact(t.valor)}</td>
+                                <td className="py-2 pl-3 text-right tabular-nums font-medium text-foreground">
+                                  {headcountTime > 0 ? formatCurrencyCompact(medio) : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </>
           );
         })()}
