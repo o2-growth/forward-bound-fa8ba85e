@@ -80,6 +80,8 @@ export function PessoasTab() {
   const oxy = useOxyFinance();
   const pc = usePersonnelCostByBu({ startDate: dateRange.from, endDate: dateRange.to });
   const [openBu, setOpenBu] = useState<string | null>(null);
+  const [openCat, setOpenCat] = useState<string | null>(null);
+
 
   // Receita do período (Oxy Finance) — soma dos meses cobertos no range
   const receitaPeriodo = useMemo(() => {
@@ -364,21 +366,100 @@ export function PessoasTab() {
                               </div>
                             </button>
                             {isOpen && b.categorias.length > 0 && (
-                              <div className="px-3 pb-3 pt-1 border-t border-border/40 bg-muted/20">
-                                <table className="w-full text-xs">
-                                  <tbody>
-                                    {b.categorias.map((c) => (
-                                      <tr key={c.label} className="border-b border-border/30 last:border-0">
-                                        <td className="py-1.5 text-muted-foreground">{c.label}</td>
-                                        <td className="py-1.5 text-right tabular-nums text-foreground">
-                                          {formatCurrencyCompact(c.valor)}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                              <div className="px-3 pb-3 pt-1 border-t border-border/40 bg-muted/20 space-y-1">
+                                {b.categorias.map((c) => {
+                                  const catKey = `${b.bu}::${c.label}`;
+                                  const catOpen = openCat === catKey;
+                                  // Pessoas do Pipefy nesse BU
+                                  const pessoasBu = b.bu === "Corporativo"
+                                    ? hr.rawPessoas.filter((p) => {
+                                        const sit = (p["Situação"] || "").toLowerCase();
+                                        if (sit && sit !== "ativo") return false;
+                                        return timeToBu(p.Time || "") === "Outros";
+                                      })
+                                    : hr.rawPessoas.filter((p) => {
+                                        const sit = (p["Situação"] || "").toLowerCase();
+                                        if (sit && sit !== "ativo") return false;
+                                        return timeToBu(p.Time || "") === b.bu;
+                                      });
+                                  const mesesNaSerie = c.serie.length || 1;
+                                  const mediaPorPessoaMes = pessoasBu.length > 0
+                                    ? (c.valor / mesesNaSerie) / pessoasBu.length
+                                    : 0;
+                                  const maxMes = Math.max(...c.serie.map((s) => s.value), 1);
+                                  return (
+                                    <div key={c.label} className="border border-border/30 rounded bg-background/50">
+                                      <button
+                                        type="button"
+                                        className="w-full flex justify-between items-center px-2 py-1.5 text-xs hover:bg-muted/40"
+                                        onClick={(e) => { e.stopPropagation(); setOpenCat(catOpen ? null : catKey); }}
+                                      >
+                                        <span className="flex items-center gap-1 text-muted-foreground">
+                                          {catOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                          {c.label}
+                                        </span>
+                                        <span className="tabular-nums text-foreground">{formatCurrencyCompact(c.valor)}</span>
+                                      </button>
+                                      {catOpen && (
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-3 border-t border-border/30">
+                                          {/* Painel A: evolução mensal */}
+                                          <div>
+                                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Evolução mensal (Oxy)</p>
+                                            {c.serie.length === 0 ? (
+                                              <p className="text-xs text-muted-foreground">Sem dados mensais.</p>
+                                            ) : (
+                                              <div className="space-y-1">
+                                                {c.serie.map((s) => (
+                                                  <div key={s.period}>
+                                                    <div className="flex justify-between text-[11px] mb-0.5">
+                                                      <span className="text-muted-foreground">{s.period}</span>
+                                                      <span className="tabular-nums text-foreground">{formatCurrencyCompact(s.value)}</span>
+                                                    </div>
+                                                    <div className="h-1.5 bg-muted rounded overflow-hidden">
+                                                      <div className="h-full bg-primary/80" style={{ width: `${(s.value / maxMes) * 100}%` }} />
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                          {/* Painel B: pessoas do Pipefy */}
+                                          <div>
+                                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
+                                              Pessoas no Pipefy ({pessoasBu.length}) · média ~{formatCurrencyCompact(mediaPorPessoaMes)}/mês por pessoa
+                                            </p>
+                                            <p className="text-[10px] text-amber-700 dark:text-amber-400 mb-2 italic">
+                                              Oxy não expõe lançamento individual. Valor por pessoa é média aritmética.
+                                            </p>
+                                            {pessoasBu.length === 0 ? (
+                                              <p className="text-xs text-muted-foreground">Nenhuma pessoa do Pipefy mapeada para {b.bu}.</p>
+                                            ) : (
+                                              <div className="max-h-48 overflow-y-auto">
+                                                <table className="w-full text-[11px]">
+                                                  <tbody>
+                                                    {pessoasBu.slice(0, 50).map((p) => (
+                                                      <tr key={p.ID} className="border-b border-border/20 last:border-0">
+                                                        <td className="py-1 text-foreground truncate max-w-[140px]">{p.Nome || p["Título"]}</td>
+                                                        <td className="py-1 text-muted-foreground truncate">{p.Cargo || "—"}</td>
+                                                        <td className="py-1 text-right text-muted-foreground whitespace-nowrap">{p.Time || "—"}</td>
+                                                      </tr>
+                                                    ))}
+                                                  </tbody>
+                                                </table>
+                                                {pessoasBu.length > 50 && (
+                                                  <p className="text-[10px] text-muted-foreground mt-1">+ {pessoasBu.length - 50} pessoas</p>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
+
                           </div>
                         );
                       })}

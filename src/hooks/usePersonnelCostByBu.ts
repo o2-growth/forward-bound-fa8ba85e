@@ -63,7 +63,9 @@ export interface CategoriaPessoal {
   label: string;
   valor: number;
   groupLabel: string;
+  serie: { period: string; value: number }[];
 }
+
 
 export interface BuCusto {
   bu: BuKey;
@@ -145,19 +147,21 @@ export function usePersonnelCostByBu({ startDate, endDate }: UseParams) {
       if (cat.type !== "category") continue;
       if (!PERSONNEL_RE.test(cat.label)) continue;
 
-      // Somar valores do período
-      const valor = (cat.data || [])
+      // Série mensal (sem TOTAL) dentro do range
+      const serie = (cat.data || [])
         .filter((d) => d.period !== "TOTAL" && periodInRange(d.period, startDate, endDate))
-        .reduce((s, d) => s + (d.value || 0), 0);
+        .map((d) => ({ period: d.period, value: d.value || 0 }))
+        .sort((a, b) => a.period.localeCompare(b.period));
 
+      const valor = serie.reduce((s, d) => s + d.value, 0);
       if (valor === 0) continue;
 
-      // Detectar BU pelo nome da categoria; se nada → Corporativo
       const bu = detectBuFromLabel(cat.label) || "Corporativo";
       const bucket = ensure(bu);
       bucket.total += valor;
-      bucket.categorias.push({ label: cat.label, valor, groupLabel: "" });
+      bucket.categorias.push({ label: cat.label, valor, groupLabel: "", serie });
     }
+
 
     // Ordenar categorias dentro de cada BU
     for (const b of buckets.values()) {
