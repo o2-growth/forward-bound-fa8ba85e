@@ -52,10 +52,21 @@ export interface PersonnelCategoryRow {
   status: "mapeada" | "ignorada" | "pendente";
 }
 
+export interface DreGroupOption {
+  id: string;
+  label: string;
+  code: string;
+}
+
 export interface PersonnelCostFromDREResult {
   isLoading: boolean;
   error: Error | null;
   gruposPessoal: PersonnelGroupInfo[];
+  allDreGroups: DreGroupOption[];
+  autoDetectedGroupIds: string[];
+  selectedGroupIds: string[];
+  saveSelectedGroups: (ids: string[]) => Promise<void>;
+  isSavingGroups: boolean;
   categorias: PersonnelCategoryRow[];
   pendentes: PersonnelCategoryRow[];
   mapeadas: PersonnelCategoryRow[];
@@ -77,21 +88,47 @@ export function usePersonnelCostFromDRE({ startDate, endDate }: UseParams): Pers
   const year = startDate.getFullYear();
   const oxy = useOxyFinance(year);
   const mappingHook = usePersonnelDreMapping();
+  const groupsConfig = usePersonnelDreGroupsConfig();
 
-  const gruposPessoal = useMemo<PersonnelGroupInfo[]>(() => {
+  // Todos os grupos DRE disponíveis (para UI de seleção manual)
+  const allDreGroups = useMemo<DreGroupOption[]>(() => {
     const groups: any[] = oxy.dreRaw?.groups || [];
-    const found: PersonnelGroupInfo[] = [];
+    const out: DreGroupOption[] = [];
+    const seen = new Set<string>();
     for (const g of groups) {
       const label = g?.label || "";
-      const norm = normalize(label);
-      if (!PERSONNEL_GROUP_PATTERNS.some((re) => re.test(norm))) continue;
       const ids: string[] = Array.isArray(g?.ids) ? g.ids : [];
       for (const id of ids) {
-        if (id) found.push({ id, label, code: g?.code || "" });
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          out.push({ id, label, code: g?.code || "" });
+        }
       }
     }
-    return found;
+    return out.sort((a, b) => a.label.localeCompare(b.label));
   }, [oxy.dreRaw]);
+
+  // Auto-detect via regex (fallback inicial)
+  const autoDetectedGroupIds = useMemo<string[]>(() => {
+    const groups: any[] = oxy.dreRaw?.groups || [];
+    const ids: string[] = [];
+    for (const g of groups) {
+      const norm = normalize(g?.label || "");
+      if (!PERSONNEL_GROUP_PATTERNS.some((re) => re.test(norm))) continue;
+      for (const id of (g?.ids || [])) if (id) ids.push(String(id));
+    }
+    return ids;
+  }, [oxy.dreRaw]);
+
+  // Grupos efetivamente usados: config persistida ou fallback regex
+  const effectiveGroupIds = groupsConfig.selectedGroupIds.length > 0
+    ? groupsConfig.selectedGroupIds
+    : autoDetectedGroupIds;
+
+  const gruposPessoal = useMemo<PersonnelGroupInfo[]>(() => {
+    const set = new Set(effectiveGroupIds);
+    return allDreGroups.filter(g => set.has(g.id));
+  }, [allDreGroups, effectiveGroupIds.join(",")]);
 
   const groupIdsKey = gruposPessoal.map((g) => g.id).sort().join(",");
   const startStr = format(startDate, "yyyy-MM-dd");
