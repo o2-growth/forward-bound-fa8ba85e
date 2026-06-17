@@ -1,69 +1,48 @@
 ## Contexto
 
-Você pediu para abrir as sub-categorias até "lançamento pessoa a pessoa". Testei toda a superfície conhecida da API Oxy (`/v2/dre/*`, `/v2/launches*`, `/v2/movements`, `/widgets/cash-flow/*` com `movimentType=D` e `categoryIds[]`) — nenhuma devolve lançamento por pessoa. A Oxy só expõe **grupo → categoria** com totais mensais.
+Hoje a regra de "motivo de perda que desqualifica MQL" (`MQL_EXCLUDED_LOSS_REASONS` em `useModeloAtualMetas.ts`: Duplicado, Pessoa física / fora do ICP, Não é demanda real, Buscando parceria, Quer soluções para cliente, Não é MQL mas entrou como MQL, Email/Telefone Inválido) é aplicada **apenas** na contagem de MQL — em **Modelo Atual** (`useModeloAtualAnalytics`) e **O2 TAX** (`useO2TaxAnalytics`).
 
-Se você tiver o path correto (cole o link do doc ou abra o DevTools do app oxy.finance, clique numa categoria pra ver os lançamentos, e me passe a URL da chamada), eu adiciono em 5min. Sem isso, este é o melhor drill possível com o que existe hoje.
+Esses mesmos cards, se passaram por "Reunião agendada / Qualificado", "Reunião Realizada", "Proposta enviada / Follow Up" ou "Contrato assinado" antes de cair em Perdido, **continuam contando** em RM, RR, Proposta e Venda. Isso bagunça a leitura do funil — se o lead não vale como MQL, não pode aparecer como reunião/proposta também.
 
-## O que vai aparecer dentro de cada BU (3 níveis)
+## Parte 1 — Investigar os MQLs do mês atual
 
-Hoje BU → Categoria. Vou adicionar **Categoria → 2 painéis lado a lado:**
+Os cards que você listou (Paiêfilho, Google, Leonardo, G4 PicPay, G4) provavelmente são os MQLs criados em Jun/2026 no Modelo Atual. O histórico de fases já está disponível na UI via **drill-down do acelerômetro MQL** → o `DetailSheet` abre o `CardInvestigator`, que mostra todas as movimentações (Fase Origem → Fase Destino + Entrada + Motivo de Perda) buscando de `pipefy_moviment_cfos` via `query-external-db`.
 
-### Painel A — Evolução mensal da categoria (vem 100% da Oxy)
+Se você quiser, na mesma entrega:
+- Adiciono no `CardInvestigator` uma timeline visual (Fase → Fase com data) já ordenada cronologicamente.
+- Logo um JSON dos MQLs do mês atual no console para você conferir os 5 nomes citados.
 
-Mini-gráfico de barras com o valor mês a mês dentro do período selecionado. Os dados já vêm no payload de `dre_categories` (`data[].period`, `data[].value`) — zero chamada extra.
+## Parte 2 — Aplicar exclusão por motivo de perda em todo o funil
 
-```text
-Equipe CaaS                                 R$ 203k
-─────────────────────────────────────────────
-Mar │████████░░░░ R$ 65k
-Abr │██████████░░ R$ 70k
-Mai │█████████░░░ R$ 68k
-```
+### Arquivos a editar
 
-### Painel B — Pessoas do Pipefy alocadas naquela BU (fallback de lançamento)
+**`src/hooks/useModeloAtualAnalytics.ts`** — `getCardsForIndicator`:
+- Onde hoje o filtro `excludedMqlIds.has(card.id)` só existe no branch `indicator === 'mql'`, estender para **rm, rr, proposta, venda**: descartar `card` se `excludedMqlIds.has(card.id)`.
+- Mesma exclusão em `firstEntryByCardAndIndicator` (linhas ~405–440).
+- Aplicar também no chart agregado de movimentações (`useMemo` que monta `cards.filter` por mês).
 
-Lista nominal vinda da DB de Pessoas (Pipefy) cruzando `Time` ↔ BU pelo mapeamento que já temos em `timeToBu()`. Para cada pessoa: nome, cargo, data de admissão, tempo de casa.
+**`src/hooks/useO2TaxAnalytics.ts`** — análogo:
+- O `excludedMqlIds` já existe (linha 266). Aplicar `excludedMqlIds.has(id)` nos branches de rm/rr/proposta/venda em `getCardsForIndicator` (hoje só usado em `mql`, linha 378).
+- Aplicar no agregado mensal.
 
-**Sem valor por pessoa** — a Oxy não devolve. Mostro só o custo médio = `total da categoria ÷ headcount do Time`. Banner azul deixa explícito: "valor por pessoa é média aritmética, Oxy não expõe lançamento individual".
+**`src/hooks/useIndicatorsRealized.ts`** — o `excludedMqlIds` já é construído (linha 211); estender o mesmo filtro às contagens de rm/rr/proposta/venda do Modelo Atual e O2 TAX (manter Expansão sem exclusão — Expansão não usa essas regras de motivo de perda).
 
-```text
-Equipe CaaS  ·  6 pessoas · média R$ 33,8k/mês
-─────────────────────────────────────────────
-Ana Silva       Tech Lead       3a 2m
-João Pedro      Dev Senior      1a 8m
-Carla Souza     Dev Pleno       8m
-...
-```
+**`src/components/planning/IndicatorsTab.tsx`** — atualizar o copy do tooltip do MQL (linha 1774) e replicar a mesma nota nos cards de RM/RR/Proposta/Venda: "Exclui leads cujo motivo de perda invalida o MQL (Duplicado, ICP fora, etc.)".
 
-## Implementação
+### O que NÃO muda
 
-### `usePersonnelCostByBu.ts`
-- Já retorna `data[].period` e `data[].value` por categoria. Não muda fetch — só exponho a serie mensal junto com `valor` total no tipo `CategoriaPessoal`:
-  ```ts
-  interface CategoriaPessoal {
-    label: string;
-    valor: number;
-    serie: { period: string; value: number }[]; // novo
-  }
-  ```
+- Lista de motivos (`MQL_EXCLUDED_LOSS_REASONS`) — fica como está.
+- Expansão e Outbound — não compartilham essa regra de exclusão.
+- Valores monetários (MRR/Setup/Pontual) realizados via Oxy Finance — fora desse fluxo.
+- Lock de funnel_metas / consolidated metas — intocados.
 
-### `PessoasTab.tsx`
-- Drill já tem 2 níveis (BU → categoria). Adiciono `openCategoria: string | null` para abrir o 3º nível.
-- Ao expandir uma categoria, renderiza um grid `lg:grid-cols-2`:
-  - **Painel A**: sparkline/barras mensais usando `Recharts` (já no projeto).
-  - **Painel B**: filtra `hr.headcountByTime` por substring que mapeia pra mesma BU + casa com a lista de pessoas (`useHrData` já devolve `pessoas[]` se eu expor — checar/expor).
+### Validação
 
-### Cruzamento Time→BU
-- Reusa `timeToBu()` que já existe em `PessoasTab.tsx`.
-- Para a categoria "Equipe CaaS" → BU "CaaS" → filtra pessoas onde `timeToBu(pessoa.time) === "CaaS"`.
+Após o deploy, abrir Indicadores → Comercial → Modelo Atual no mês atual:
+- Acelerômetro MQL: número não muda.
+- RM/RR/Proposta: devem **cair** pelo total de cards excluídos (badge "X excluídos" do MQL).
+- Drill-down de cada card excluído: aparece em "Perdidos por motivo" mas **não** mais em RM/RR/Proposta.
 
-### Sem mudança de DB / sem nova edge function
-Todos os dados já estão no payload existente. Zero migração.
+## Pergunta antes de implementar
 
-## O que NÃO vou prometer
-- ❌ Valor exato por pessoa (Oxy não devolve).
-- ❌ Lançamentos contábeis individuais (Oxy não devolve).
-- ❌ Quebra abaixo de "categoria" (Oxy não devolve).
-
-## Se você conseguir o endpoint depois
-Mando a 4ª camada (Lançamento) em 5min: adiciono `dre_launches` na `fetch-oxy-finance` apontando pro path certo, e troco o Painel B por tabela real `Pessoa | Valor | Data`.
+Você quer que eu também adicione a timeline de fases visual no `CardInvestigator` (Parte 1, item opcional), ou só aplico a regra de exclusão downstream (Parte 2)?
