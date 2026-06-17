@@ -294,7 +294,11 @@ export function DreMappingPanel({ categorias, pendentes, mapeadas, ignoradas, pe
           <TabsContent value="pendentes" className="mt-3">
             {pendentes.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
-                Tudo mapeado! 🎉
+                {!hasGroupsConfigured
+                  ? "Configure os grupos DRE de Pessoal acima para listar categorias."
+                  : categorias.length === 0
+                  ? "Sem lançamentos de pessoal no período selecionado."
+                  : "Tudo mapeado! 🎉"}
               </p>
             ) : (
               <>
