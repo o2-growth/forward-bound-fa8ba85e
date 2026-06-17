@@ -1,48 +1,34 @@
-## Objetivo
-Substituir o match heurístico por **vínculo direto entre lançamento financeiro (Oxy) e funcionário (pipefy_db_pessoas)** via nome/CNPJ, gerando "Lançamentos sem match" pra revisão manual.
-
-## Descobertas que mudam o plano original
-
-- `cashflow_details` da Oxy retorna `{ label, type: "customer"|"supplier", data:[{period,value}] }` — **só nome, sem CNPJ no payload**. Match será por nome normalizado.
-- `pipefy_db_pessoas` tem CNPJ formatado (`XX.XXX.XXX/XXXX-XX`), CPF, Nome e Título.
-- `movimentType=D` retornou vazio no teste — precisa ajustar formato de CNPJ na request (tentar `CNPJ_CLEAN` em vez de `CNPJ_FORMATTED`, e/ou tentar sem `isLate`).
+## Por que está zerado
+A Oxy `cashflow_details?movimentType=D` retorna `data: []` (testei nos dois formatos de CNPJ). Esse endpoint não tem os lançamentos de despesa por fornecedor. Vamos pelo caminho que você escolheu: **`dre-table-categories`** com o(s) groupId(s) de Pessoal.
 
 ## Implementação
 
-### 1. Edge Function `fetch-oxy-finance`
-- Ajustar `cashflow_details`: tentar primeiro com `CNPJ_CLEAN`; se voltar vazio, fallback pra `CNPJ_FORMATTED`. Logar o que funcionou.
-- Aceitar `movimentType` "D" sem exigir `isLate` (deixar opcional, sem default `false`).
+### 1. Listar grupos do DRE pra achar o(s) "Pessoal"
+- Já temos `dre` que retorna todos os grupos com `code`, `label` e `id` (uuid).
+- Filtrar no client os grupos cujo label normalizado bata em padrões de pessoal: `pessoal`, `pessoa`, `folha`, `rh`, `colaborador`, `equipe`. Pegar o `id` (uuid) deles → array `personnelGroupIds`.
+- Mostrar no UI quais grupos foram pegos (auditoria + ajuste fino).
 
-### 2. Hook novo: `src/hooks/usePersonnelCostByPerson.ts`
-- Chama `fetch-oxy-finance` com `action: 'cashflow_details', movimentType: 'D'` pro range selecionado.
-- Carrega `pipefy_db_pessoas` (via `query-external-db` action `pessoas_all` já existente).
-- Constrói índice de pessoas por **nome normalizado** (trim + lowercase + sem acento, também removendo sufixos comuns: "ltda", "me", "eireli", "consultoria", "servicos"). Indexa tanto `Nome` quanto `Título`.
-- Pra cada `label` (fornecedor) do cashflow_details:
-  - Normaliza o label.
-  - Tenta match exato. Se não, tenta **match por token** (todos os tokens do nome da pessoa presentes no label, mínimo 2 tokens significativos pra evitar falso positivo).
-- Retorna:
-  - `lancamentosComMatch: Array<{ pessoaId, pessoaNome, pessoaTime, fornecedorLabel, valor }>` — soma do período.
-  - `lancamentosSemMatch: Array<{ fornecedorLabel, valor }>` ordenado desc.
-  - `custoTotalComMatch`, `custoTotalSemMatch`, `custoTotalGeral`.
-  - `custoPorPessoa`, `custoPorTime` (agregações).
-  - `isLoading`, `error`.
+### 2. Buscar categorias desses grupos
+- Reusar `action: 'dre_categories'` que já existe no edge function — chamar com `groupIds: personnelGroupIds` e o range do filtro.
+- Resposta vem como `{ categories: [{ label, data: [{period, value}] }] }`. **Cada categoria é um lançamento agregado** — o label muitas vezes é o nome da pessoa/fornecedor (ex: "DOUGLAS PINHEIRO SCHOSSLER" ou "53.385.723/0001-12 - Douglas...").
 
-### 3. UI — `PessoasTab.tsx` (seção 3.2 reescrita)
-Substituir os cards atuais por:
-- **4 KPIs:**
-  - Custo de pessoal (com match) — soma dos lançamentos vinculados a funcionário.
-  - Custo / Receita — `custoComMatch ÷ receitaPeriodo`.
-  - Custo per capita — `custoComMatch ÷ headcountMédio`.
-  - Lançamentos sem match — total R$ + contagem (badge amarelo se > 10% do total).
-- **Tabela "Custo por pessoa"** (top 20): Nome · Time · Cargo · R$ no período · % do total.
-- **Tabela "Custo por time"**: agrega por `Time` da pipefy.
-- **Bloco colapsável "Lançamentos sem match"** (com badge laranja): lista fornecedor + valor, pra você ver se é despesa não-pessoal ou se faltou cadastro/grafia divergente.
+### 3. Match com `pipefy_db_pessoas`
+- Reaproveitar a lógica de match por nome normalizado + tokens que está no `usePersonnelCostByPerson`.
+- Adicionar match por **CNPJ**: se a string da categoria contiver o CNPJ formatado ou só dígitos, comparar com `pessoa.CNPJ`. (Útil porque a Oxy frequentemente coloca CNPJ no label.)
+- Saída: `lancamentosComMatch`, `lancamentosSemMatch`, `custoPorPessoa`, `custoPorTime` — mesma forma que já tem.
 
-A heurística antiga por bucket (Folha/Encargos/etc) some — você escolheu "Listar separado pra revisão", então tudo que não casar com pessoa cai no bloco de não-match.
+### 4. Refatorar `usePersonnelCostByPerson`
+- Trocar `fetchCashflowDetails` (que retorna vazio) por uma nova `fetchPersonnelCategories`:
+  - 1ª query: `useOxyFinance(year).dreRaw` → derivar `personnelGroupIds`.
+  - 2ª query: `supabase.functions.invoke('fetch-oxy-finance', { body: { action: 'dre_categories', groupIds: personnelGroupIds, startDate, endDate } })`.
+- Manter o mesmo shape de retorno → **zero mudança na UI do 3.2**.
 
-### 4. Sem mexer
-- Schema do banco, RLS, outras tabs, outras edge functions.
+### 5. Auditoria visual no 3.2
+- Adicionar uma linha pequena acima dos KPIs: "Grupos DRE de Pessoal incluídos: Folha Modelo Atual · Pessoal Tax · …" (chips). Se a heurística pegar algo errado, dá pra ver na hora.
 
-## Risco / próximos passos
-- Se `cashflow_details` continuar vazio pra `D` mesmo com `CNPJ_CLEAN`, vou logar o erro e te avisar pra a gente testar outro endpoint da Oxy (provavelmente `/v2/dre/dre-table-categories` por grupo de Pessoal).
-- Match por nome pode errar em casos como "Maria Silva ME" vs "Maria Silva Consultoria" — a lista de "sem match" + a tabela "com match" te deixam auditar e a gente refina.
+### Não vou mexer
+- Schema, RLS, outras tabs.
+- O warning "Maximum update depth" em `PlanGrowthDataLoader`/`MediaMetasContext` (não tem relação com Pessoas — pré-existente).
+
+## Risco
+- Se o label da categoria for genérico (ex: "Salários CLT") sem nome da pessoa, vai cair em "sem match" e a gente decide se soma como custo de equipe (rateio) ou ignora. Vou listar tudo separado pra você ver primeiro.
