@@ -1,55 +1,48 @@
 ## Objetivo
-Calcular **Custo de Pessoal** (3.2) usando o DRE Oxy Finance que já está sendo consumido — sem depender de uma lista exata vinda do usuário. Faço o match dos grupos/categorias do DRE por **padrões de label normalizados** (mesma estratégia que `useOxyFinance` já usa pra "Expansão" e produtos OXY).
+Substituir o match heurístico por **vínculo direto entre lançamento financeiro (Oxy) e funcionário (pipefy_db_pessoas)** via nome/CNPJ, gerando "Lançamentos sem match" pra revisão manual.
 
-## Mapeamento proposto (heurístico, baseado em DRE padrão)
+## Descobertas que mudam o plano original
 
-Os grupos do DRE Oxy hoje vêm com `code` (`RB` = Receita Bruta) + `label`. Pra despesa de pessoal, normalmente o código fica em **`DP`** (Despesas Pessoal) ou similar — mas como não dá pra garantir sem ver o payload bruto agora, faço fallback duplo:
-
-1. **Match por code**: aceitar qualquer grupo cujo `code` comece com `DP`, `CP`, `DEP` ou contenha `PESSO`.
-2. **Match por label normalizado** (trim + lowercase + sem acento) — buckets:
-
-| Bucket interno | Padrões aceitos no label |
-|---|---|
-| `folha` | "folha", "salario", "salarios", "ordenado" |
-| `encargos` | "encargo", "inss", "fgts", "iss pessoal" |
-| `beneficios` | "beneficio", "vale ", "vr", "va", "plano de saude", "convenio" |
-| `prolabore` | "pro labore", "prolabore", "pro-labore" |
-| `rescisao` | "rescisao", "rescisão", "demissao", "aviso previo" |
-
-Tudo que matchar qualquer um dos buckets entra no **Custo de Pessoal total**. `rescisao` é exposto separado pra o card "Custo de turnover".
-
-> Se na hora de rodar o DRE algum grupo não bater nenhum padrão, ele aparece num bloco "Não classificado (revisar)" no rodapé da 3.2 com o label cru, pra a gente afinar o regex sem cegueira.
+- `cashflow_details` da Oxy retorna `{ label, type: "customer"|"supplier", data:[{period,value}] }` — **só nome, sem CNPJ no payload**. Match será por nome normalizado.
+- `pipefy_db_pessoas` tem CNPJ formatado (`XX.XXX.XXX/XXXX-XX`), CPF, Nome e Título.
+- `movimentType=D` retornou vazio no teste — precisa ajustar formato de CNPJ na request (tentar `CNPJ_CLEAN` em vez de `CNPJ_FORMATTED`, e/ou tentar sem `isLate`).
 
 ## Implementação
 
-### Backend
-- Sem mudança. Já temos `action: 'dre'` em `fetch-oxy-finance` que retorna **todos** os grupos (só estou filtrando `code === 'RB'` no parser). Vou parar de filtrar pra também conseguir ler grupos de despesa.
+### 1. Edge Function `fetch-oxy-finance`
+- Ajustar `cashflow_details`: tentar primeiro com `CNPJ_CLEAN`; se voltar vazio, fallback pra `CNPJ_FORMATTED`. Logar o que funcionou.
+- Aceitar `movimentType` "D" sem exigir `isLate` (deixar opcional, sem default `false`).
 
-### Hook novo: `src/hooks/usePersonnelCost.ts`
-- Reusa `useOxyFinance(year).dreRaw`.
-- Percorre `dreRaw.groups`, classifica cada grupo no bucket (`folha`/`encargos`/`beneficios`/`prolabore`/`rescisao`/`outros_pessoal`/`nao_classificado`).
-- Soma `data[].value` por mês (mesmo `parseMonthFromDate` já existente).
-- Filtra pelo range `[startDate, endDate]` que vem da `PessoasTab`.
+### 2. Hook novo: `src/hooks/usePersonnelCostByPerson.ts`
+- Chama `fetch-oxy-finance` com `action: 'cashflow_details', movimentType: 'D'` pro range selecionado.
+- Carrega `pipefy_db_pessoas` (via `query-external-db` action `pessoas_all` já existente).
+- Constrói índice de pessoas por **nome normalizado** (trim + lowercase + sem acento, também removendo sufixos comuns: "ltda", "me", "eireli", "consultoria", "servicos"). Indexa tanto `Nome` quanto `Título`.
+- Pra cada `label` (fornecedor) do cashflow_details:
+  - Normaliza o label.
+  - Tenta match exato. Se não, tenta **match por token** (todos os tokens do nome da pessoa presentes no label, mínimo 2 tokens significativos pra evitar falso positivo).
 - Retorna:
-  - `custoTotalPeriodo`
-  - `custoPorBucket` (objeto com os 5 buckets + valores)
-  - `custoRescisaoPeriodo`
-  - `gruposNaoClassificados` (array `{label, codigo, total}` pra debug)
-  - `custoPorMes` (Record mês→valor) pra um mini gráfico de evolução
+  - `lancamentosComMatch: Array<{ pessoaId, pessoaNome, pessoaTime, fornecedorLabel, valor }>` — soma do período.
+  - `lancamentosSemMatch: Array<{ fornecedorLabel, valor }>` ordenado desc.
+  - `custoTotalComMatch`, `custoTotalSemMatch`, `custoTotalGeral`.
+  - `custoPorPessoa`, `custoPorTime` (agregações).
+  - `isLoading`, `error`.
 
-### UI: `PessoasTab.tsx` (3.2)
-Substituir o bloco "Aguardando configuração" por:
-- 4 KPI cards:
-  - **Custo de pessoal total** = soma dos 5 buckets
-  - **Custo / Receita** = total ÷ receita do período (já temos via `useOxyFinance.cashflowByMonth` ou `dreByBU`)
-  - **Custo per capita** = total ÷ `headcountTotal` (do `useHrData`)
-  - **Custo de turnover** = bucket `rescisao`
-- Mini bar chart "Custo por bucket no período"
-- Bloco colapsável "Grupos DRE não classificados" listando o que sobrou pra revisão (só aparece se `gruposNaoClassificados.length > 0`)
+### 3. UI — `PessoasTab.tsx` (seção 3.2 reescrita)
+Substituir os cards atuais por:
+- **4 KPIs:**
+  - Custo de pessoal (com match) — soma dos lançamentos vinculados a funcionário.
+  - Custo / Receita — `custoComMatch ÷ receitaPeriodo`.
+  - Custo per capita — `custoComMatch ÷ headcountMédio`.
+  - Lançamentos sem match — total R$ + contagem (badge amarelo se > 10% do total).
+- **Tabela "Custo por pessoa"** (top 20): Nome · Time · Cargo · R$ no período · % do total.
+- **Tabela "Custo por time"**: agrega por `Time` da pipefy.
+- **Bloco colapsável "Lançamentos sem match"** (com badge laranja): lista fornecedor + valor, pra você ver se é despesa não-pessoal ou se faltou cadastro/grafia divergente.
 
-### Sem mexer
-- Edge functions, RLS, schema, outras tabs.
+A heurística antiga por bucket (Folha/Encargos/etc) some — você escolheu "Listar separado pra revisão", então tudo que não casar com pessoa cai no bloco de não-match.
 
-## Riscos / próximo passo natural
-- A heurística pode pegar um grupo errado (ex.: "Benefícios Fiscais"). Por isso o bloco de "não classificados" + o detalhe por bucket — se algo aparecer torto, ajusto os padrões na hora.
-- Se o DRE Oxy não expõe despesas pelo mesmo endpoint `dre-table` (só receita), o hook vai retornar zerado e a gente troca pra `dre_categories` com um `groupIds[]` específico de Pessoal (precisaria do UUID — me passa depois).
+### 4. Sem mexer
+- Schema do banco, RLS, outras tabs, outras edge functions.
+
+## Risco / próximos passos
+- Se `cashflow_details` continuar vazio pra `D` mesmo com `CNPJ_CLEAN`, vou logar o erro e te avisar pra a gente testar outro endpoint da Oxy (provavelmente `/v2/dre/dre-table-categories` por grupo de Pessoal).
+- Match por nome pode errar em casos como "Maria Silva ME" vs "Maria Silva Consultoria" — a lista de "sem match" + a tabela "com match" te deixam auditar e a gente refina.
