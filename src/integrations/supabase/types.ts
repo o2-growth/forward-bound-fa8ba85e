@@ -1056,6 +1056,27 @@ export type Database = {
         }
         Relationships: []
       }
+      personnel_dre_groups_config: {
+        Row: {
+          group_ids: Json
+          id: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          group_ids?: Json
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          group_ids?: Json
+          id?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       personnel_dre_mapping: {
         Row: {
           created_at: string

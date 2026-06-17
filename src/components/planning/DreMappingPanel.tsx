@@ -91,6 +91,7 @@ interface Props {
   mapeadas: PersonnelCategoryRow[];
   ignoradas: PersonnelCategoryRow[];
   pessoas: PessoaRow[];
+  hasGroupsConfigured?: boolean;
 }
 
 // Auto-sugestão: encontra pessoa cujo nome (token) aparece na label
@@ -110,7 +111,7 @@ function suggestPessoa(label: string, pessoas: PessoaRow[]): PessoaRow | null {
   return best?.p || null;
 }
 
-export function DreMappingPanel({ categorias, pendentes, mapeadas, ignoradas, pessoas }: Props) {
+export function DreMappingPanel({ categorias, pendentes, mapeadas, ignoradas, pessoas, hasGroupsConfigured = true }: Props) {
   const { upsert, remove, isSaving } = usePersonnelDreMapping();
   const { toast } = useToast();
   const [tab, setTab] = useState<"pendentes" | "mapeadas" | "ignoradas">(pendentes.length > 0 ? "pendentes" : "mapeadas");
@@ -293,7 +294,11 @@ export function DreMappingPanel({ categorias, pendentes, mapeadas, ignoradas, pe
           <TabsContent value="pendentes" className="mt-3">
             {pendentes.length === 0 ? (
               <p className="text-sm text-muted-foreground py-6 text-center">
-                Tudo mapeado! 🎉
+                {!hasGroupsConfigured
+                  ? "Configure os grupos DRE de Pessoal acima para listar categorias."
+                  : categorias.length === 0
+                  ? "Sem lançamentos de pessoal no período selecionado."
+                  : "Tudo mapeado! 🎉"}
               </p>
             ) : (
               <>
