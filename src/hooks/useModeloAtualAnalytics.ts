@@ -479,6 +479,8 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       for (const card of allMovements) {
         const cardIndicator = PHASE_TO_INDICATOR[card.fase];
         if (!cardIndicator || !indicatorsToCheck.includes(cardIndicator)) continue;
+        // Excluir cards desqualificados como MQL (mesmo motivo de perda) em todo o funil
+        if (excludedMqlIds.has(card.id)) continue;
         
         // For venda: use dataAssinatura as effective date when available
         const effectiveTime = (cardIndicator === 'venda' && card.dataAssinatura)
