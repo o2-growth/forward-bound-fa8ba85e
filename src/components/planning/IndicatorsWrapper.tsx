@@ -2,12 +2,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IndicatorsTab } from "@/components/planning/IndicatorsTab";
 import { MarketingIndicatorsTab } from "@/components/planning/MarketingIndicatorsTab";
 import { GrowthTab } from "@/components/planning/GrowthTab";
-import { BarChart3, TrendingUp, Rocket } from "lucide-react";
+import { PessoasTab } from "@/components/planning/PessoasTab";
+import { BarChart3, TrendingUp, Rocket, Users } from "lucide-react";
 
 export function IndicatorsWrapper() {
   return (
     <Tabs defaultValue="comercial" className="w-full">
-      <TabsList className="grid w-full max-w-lg grid-cols-3 mb-6">
+      <TabsList className="grid w-full max-w-2xl grid-cols-4 mb-6">
         <TabsTrigger value="comercial" className="gap-2">
           <BarChart3 className="h-4 w-4" />
           <span className="hidden sm:inline">Comercial</span>
@@ -19,6 +20,10 @@ export function IndicatorsWrapper() {
         <TabsTrigger value="growth" className="gap-2">
           <Rocket className="h-4 w-4" />
           <span className="hidden sm:inline">Growth</span>
+        </TabsTrigger>
+        <TabsTrigger value="pessoas" className="gap-2">
+          <Users className="h-4 w-4" />
+          <span className="hidden sm:inline">Pessoas</span>
         </TabsTrigger>
       </TabsList>
 
@@ -32,6 +37,10 @@ export function IndicatorsWrapper() {
 
       <TabsContent value="growth" className="mt-0">
         <GrowthTab />
+      </TabsContent>
+
+      <TabsContent value="pessoas" className="mt-0">
+        <PessoasTab />
       </TabsContent>
     </Tabs>
   );
