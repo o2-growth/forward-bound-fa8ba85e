@@ -255,7 +255,7 @@ export function PessoasTab() {
           const custoTotal = pc.custoTotalPeriodo;
           const custoSobreReceita = receitaPeriodo > 0 ? (custoTotal / receitaPeriodo) * 100 : 0;
           const custoPerCapita = headcountMedio > 0 ? custoTotal / headcountMedio : 0;
-          const maxCategoria = pc.categorias[0]?.valor || 1;
+          
 
           return (
             <>
