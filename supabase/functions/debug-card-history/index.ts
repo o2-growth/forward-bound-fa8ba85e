@@ -46,11 +46,12 @@ Deno.serve(async (req) => {
     const ids = matches.rows.map((r: any) => String(r.id));
 
     let history: any[] = [];
+    let columns: any[] = [];
     if (ids.length > 0) {
+      const colsRes = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name='pipefy_moviment_cfos' ORDER BY ordinal_position`);
+      columns = colsRes.rows;
       const histSql = `
-        SELECT "ID" AS id, "Título" AS titulo,
-               "Fase Origem" AS fase_origem, "Fase" AS fase, "Fase Atual" AS fase_atual,
-               "Entrada" AS entrada, "Motivo da perda" AS motivo_perda
+        SELECT *
         FROM pipefy_moviment_cfos
         WHERE "ID" = ANY($1::text[])
         ORDER BY "ID", "Entrada";
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
     }
 
     await client.end();
-    return new Response(JSON.stringify({ monthStart, monthEnd, matches: matches.rows, history }, null, 2), {
+    return new Response(JSON.stringify({ monthStart, monthEnd, columns, matches: matches.rows, history }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
