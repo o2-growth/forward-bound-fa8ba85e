@@ -399,6 +399,8 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
       for (const card of allMovements) {
         const cardIndicator = PHASE_TO_INDICATOR[card.fase];
         if (!cardIndicator || !indicatorsToCheck.includes(cardIndicator)) continue;
+        // Excluir cards desqualificados como MQL em todo o funil
+        if (excludedMqlIds.has(card.id)) continue;
         
         const effectiveTime = (cardIndicator === 'venda' && card.dataAssinatura)
           ? card.dataAssinatura.getTime()
