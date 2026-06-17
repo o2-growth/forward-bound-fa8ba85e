@@ -66,7 +66,7 @@ export function PessoasTab() {
 
   const hr = useHrData({ startDate: dateRange.from, endDate: dateRange.to });
   const oxy = useOxyFinance();
-  const pc = usePersonnelCostByPerson({ startDate: dateRange.from, endDate: dateRange.to });
+  const pc = usePersonnelCostFromDRE({ startDate: dateRange.from, endDate: dateRange.to });
 
   // Receita do período (Oxy Finance) — soma dos meses cobertos no range
   const receitaPeriodo = useMemo(() => {
