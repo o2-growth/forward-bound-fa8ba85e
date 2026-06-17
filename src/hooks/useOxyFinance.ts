@@ -211,7 +211,8 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
       // Primary: parse groups format { groups: [{ label, code, data: [{ period, value }] }] }
       if (dreData?.groups && Array.isArray(dreData.groups)) {
         for (const group of dreData.groups) {
-          // Filter only Receita Bruta (code "RB")
+          // Para a parte de receita/expansão por BU, considerar somente Receita Bruta.
+          // Outros grupos (despesas, pessoal etc) ficam disponíveis em `dreRaw` para hooks específicos.
           if (group.code !== 'RB') continue;
 
           const label = group.label || '';
