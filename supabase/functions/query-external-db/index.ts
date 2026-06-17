@@ -960,6 +960,16 @@ Deno.serve(async (req) => {
         withoutSdr,
       };
       console.log(`lead_sdr_diagnosis: total=${withSdr.length + withoutSdr.length} withoutSdr=${withoutSdr.length}`);
+    } else if (action === "pessoas_all") {
+      const sql = `
+        SELECT "ID","Título","Fase","Nome","Cargo","Time","Situação",
+               "Data de contratação","Data de nascimento","E-mail O2","CPF","CNPJ",
+               created_at, updated_at
+        FROM pipefy_db_pessoas
+      `;
+      const res = await client.query(sql);
+      result = { action: "pessoas_all", count: res.rows.length, rows: res.rows };
+      console.log(`pessoas_all: ${res.rows.length} rows`);
     } else {
       await client.end();
       return new Response(JSON.stringify({ error: "Invalid action" }), {
