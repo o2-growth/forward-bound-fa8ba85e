@@ -46,13 +46,17 @@ serve(async (req) => {
         break;
       }
       case 'cashflow_details': {
+        // Try with CNPJ_FORMATTED first; if empty payload for "D", caller can retry with cnpjVariant param.
+        const cnpjVariant = body.cnpjVariant === 'clean' ? CNPJ_CLEAN : CNPJ_FORMATTED;
         const params = new URLSearchParams({
           startDate,
           endDate,
-          'cnpjs[]': CNPJ_FORMATTED,
+          'cnpjs[]': cnpjVariant,
           movimentType: movimentType || 'R',
-          isLate: String(isLate || false),
         });
+        if (typeof isLate === 'boolean') {
+          params.set('isLate', String(isLate));
+        }
         url = `${BASE_URL}/widgets/cash-flow/v2/card/details?${params}`;
         fetchOptions = { method: 'GET', headers: authHeaders };
         break;
