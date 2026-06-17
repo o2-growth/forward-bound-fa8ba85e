@@ -111,7 +111,7 @@ function suggestPessoa(label: string, pessoas: PessoaRow[]): PessoaRow | null {
   return best?.p || null;
 }
 
-export function DreMappingPanel({ categorias, pendentes, mapeadas, ignoradas, pessoas }: Props) {
+export function DreMappingPanel({ categorias, pendentes, mapeadas, ignoradas, pessoas, hasGroupsConfigured = true }: Props) {
   const { upsert, remove, isSaving } = usePersonnelDreMapping();
   const { toast } = useToast();
   const [tab, setTab] = useState<"pendentes" | "mapeadas" | "ignoradas">(pendentes.length > 0 ? "pendentes" : "mapeadas");
