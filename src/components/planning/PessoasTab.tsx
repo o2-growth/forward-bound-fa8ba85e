@@ -271,32 +271,22 @@ export function PessoasTab() {
 
           return (
             <>
-              {/* Seletor de grupos DRE */}
-              <div className="mb-3">
-                <DreGroupsSelector
-                  allGroups={pc.allDreGroups}
-                  selectedIds={pc.selectedGroupIds}
-                  autoDetectedIds={pc.autoDetectedGroupIds}
-                  onSave={pc.saveSelectedGroups}
-                  isSaving={pc.isSavingGroups}
-                  forceOpen={pc.gruposPessoal.length === 0 && pc.allDreGroups.length > 0}
-                />
+              {/* Banner: origem dos números */}
+              <div className="mb-3 rounded border border-blue-500/40 bg-blue-500/5 p-3 text-xs text-blue-700 dark:text-blue-400 flex items-start gap-2">
+                <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  <strong>Origem dos números:</strong> custo por BU vem direto das categorias da Oxy DRE (ex: "Equipe CaaS", "Benefícios - SaaS").
+                  Categorias dentro de "Despesas com Pessoal" (Pró-labore sócios, Terceiros, etc.) entram em <strong>Corporativo</strong>.
+                  Zero rateio inventado.
+                </div>
               </div>
 
-              {/* Banner: nenhum grupo detectado */}
-              {pc.gruposPessoal.length === 0 && pc.allDreGroups.length > 0 && (
-                <div className="mb-3 rounded border border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400">
-                  <strong>Nenhum grupo de Pessoal detectado automaticamente.</strong> Abra o painel acima e marque manualmente quais grupos da DRE representam custo de pessoal.
-                </div>
-              )}
-
-
-
+              {/* KPIs */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
-                  subtitle={`${formatCurrencyCompact(pc.custoMapeado)} mapeado · ${formatCurrencyCompact(pc.custoPendente)} pendente`}
+                  subtitle={`${pc.porBu.length} BUs + Corporativo`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
                 />
@@ -316,82 +306,164 @@ export function PessoasTab() {
                   isLoading={pc.isLoading || hr.isLoading}
                 />
                 <Kpi
-                  title="Custo de turnover"
-                  value={formatCurrencyCompact(pc.custoRescisaoPeriodo)}
-                  subtitle="Categoria Rescisões (DRE)"
-                  icon={AlertTriangle}
-                  tone={pc.custoRescisaoPeriodo > 0 ? "warning" : "default"}
+                  title="Corporativo (não-BU)"
+                  value={formatCurrencyCompact(pc.corporativo.total)}
+                  subtitle="Pró-labore, terceiros, RH/Fin/C-level"
+                  icon={Building2}
                   isLoading={pc.isLoading}
                 />
               </div>
 
-              {/* Mapeamento DRE → Pessoa */}
-              <div className="mt-4">
-                <DreMappingPanel
-                  categorias={pc.categorias}
-                  pendentes={pc.pendentes}
-                  mapeadas={pc.mapeadas}
-                  ignoradas={pc.ignoradas}
-                  pessoas={hr.rawPessoas}
-                  hasGroupsConfigured={pc.gruposPessoal.length > 0}
-                />
-              </div>
+              {/* Card 1: Custo de pessoal por BU (com drill-down) */}
+              <Card className="mt-4">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Custo de pessoal por BU</CardTitle>
+                  <p className="text-xs text-muted-foreground">Click numa BU para ver as categorias reais da Oxy</p>
+                </CardHeader>
+                <CardContent>
+                  {pc.isLoading ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : pc.porBu.length === 0 && pc.corporativo.total === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sem dados de pessoal no período.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {[...pc.porBu, pc.corporativo].map((b) => {
+                        const max = Math.max(...[...pc.porBu, pc.corporativo].map((x) => x.total), 1);
+                        const width = (b.total / max) * 100;
+                        const isOpen = openBu === b.bu;
+                        return (
+                          <div key={b.bu} className="border border-border/40 rounded">
+                            <button
+                              type="button"
+                              className="w-full p-2 hover:bg-muted/40 transition-colors"
+                              onClick={() => setOpenBu(isOpen ? null : b.bu)}
+                            >
+                              <div className="flex justify-between text-sm mb-1 items-center">
+                                <span className="flex items-center gap-1 text-foreground">
+                                  {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                  {b.bu}
+                                  <span className="text-xs text-muted-foreground">({b.categorias.length} categorias)</span>
+                                </span>
+                                <span className="font-medium tabular-nums">
+                                  {formatCurrencyCompact(b.total)}
+                                  {custoTotal > 0 && (
+                                    <span className="text-muted-foreground text-xs ml-1">
+                                      ({((b.total / custoTotal) * 100).toFixed(1)}%)
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                              <div className="h-2 bg-muted rounded overflow-hidden">
+                                <div
+                                  className={cn(
+                                    "h-full",
+                                    b.bu === "Corporativo" ? "bg-muted-foreground/60" : "bg-primary"
+                                  )}
+                                  style={{ width: `${width}%` }}
+                                />
+                              </div>
+                            </button>
+                            {isOpen && b.categorias.length > 0 && (
+                              <div className="px-3 pb-3 pt-1 border-t border-border/40 bg-muted/20">
+                                <table className="w-full text-xs">
+                                  <tbody>
+                                    {b.categorias.map((c) => (
+                                      <tr key={c.label} className="border-b border-border/30 last:border-0">
+                                        <td className="py-1.5 text-muted-foreground">{c.label}</td>
+                                        <td className="py-1.5 text-right tabular-nums text-foreground">
+                                          {formatCurrencyCompact(c.valor)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-              {/* Composição por categoria + Custo por Time */}
+              {/* Card 2 + 3: Custo médio por pessoa + Composição corporativa */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Composição por categoria DRE</CardTitle>
-                    <p className="text-xs text-muted-foreground">Do que é feito o custo de pessoal no período (fonte: Oxy DRE)</p>
+                    <CardTitle className="text-base">Custo médio por pessoa (por BU)</CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      Custo da BU (Oxy) ÷ headcount do Time (Pipefy). Times mapeados por substring do nome.
+                    </p>
                   </CardHeader>
                   <CardContent>
-                    {pc.composicao.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Sem categorias no período.</p>
+                    {pc.isLoading || hr.isLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-border text-[11px] text-muted-foreground text-left">
+                              <th className="py-2 pr-3 font-medium">BU</th>
+                              <th className="py-2 px-3 font-medium text-right">Headcount</th>
+                              <th className="py-2 px-3 font-medium text-right">Custo</th>
+                              <th className="py-2 pl-3 font-medium text-right">/ pessoa</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...pc.porBu, pc.corporativo].map((b) => {
+                              // Headcount = soma dos Times cujo nome casa com a BU
+                              const hc = hr.headcountByTime
+                                .filter((h) => {
+                                  const bu = timeToBu(h.group);
+                                  if (b.bu === "Corporativo") return bu === "Outros";
+                                  return bu === b.bu;
+                                })
+                                .reduce((s, h) => s + h.count, 0);
+                              const medio = hc > 0 ? b.total / hc : 0;
+                              return (
+                                <tr key={b.bu} className="border-b border-border/50">
+                                  <td className="py-2 pr-3 text-foreground">{b.bu}</td>
+                                  <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">{hc || "—"}</td>
+                                  <td className="py-2 px-3 text-right tabular-nums text-foreground">{formatCurrencyCompact(b.total)}</td>
+                                  <td className="py-2 pl-3 text-right tabular-nums font-medium text-foreground">
+                                    {hc > 0 ? formatCurrencyCompact(medio) : "—"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Composição Corporativo</CardTitle>
+                    <p className="text-xs text-muted-foreground">Categorias dentro de "Despesas com Pessoal" (não-BU)</p>
+                  </CardHeader>
+                  <CardContent>
+                    {pc.corporativo.categorias.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sem categorias corporativas no período.</p>
                     ) : (
                       <div className="space-y-2">
-                        {pc.composicao.slice(0, 10).map((c) => {
-                          const max = pc.composicao[0]?.valor || 1;
+                        {pc.corporativo.categorias.map((c) => {
+                          const max = pc.corporativo.categorias[0]?.valor || 1;
                           const width = (c.valor / max) * 100;
+                          const pct = pc.corporativo.total > 0 ? (c.valor / pc.corporativo.total) * 100 : 0;
                           return (
                             <div key={c.label}>
                               <div className="flex justify-between text-sm mb-1">
                                 <span className="text-foreground truncate pr-2">{c.label}</span>
                                 <span className="font-medium tabular-nums">
-                                  {formatCurrencyCompact(c.valor)} <span className="text-muted-foreground text-xs">({c.pct.toFixed(1)}%)</span>
+                                  {formatCurrencyCompact(c.valor)}{" "}
+                                  <span className="text-muted-foreground text-xs">({pct.toFixed(1)}%)</span>
                                 </span>
                               </div>
                               <div className="h-2 bg-muted rounded overflow-hidden">
-                                <div className="h-full bg-primary" style={{ width: `${width}%` }} />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Custo por Time</CardTitle>
-                    <p className="text-xs text-muted-foreground">Aplicando o rateio % das categorias mapeadas</p>
-                  </CardHeader>
-                  <CardContent>
-                    {pc.custoPorTime.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Distribua categorias entre Times no painel abaixo para visualizar.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {pc.custoPorTime.map((t) => {
-                          const max = pc.custoPorTime[0]?.valor || 1;
-                          const pct = (t.valor / max) * 100;
-                          return (
-                            <div key={t.time}>
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="text-foreground truncate pr-2">{t.time}</span>
-                                <span className="font-medium tabular-nums">{formatCurrencyCompact(t.valor)}</span>
-                              </div>
-                              <div className="h-2 bg-muted rounded overflow-hidden">
-                                <div className="h-full bg-chart-2" style={{ width: `${pct}%` }} />
+                                <div className="h-full bg-muted-foreground/60" style={{ width: `${width}%` }} />
                               </div>
                             </div>
                           );
@@ -401,50 +473,6 @@ export function PessoasTab() {
                   </CardContent>
                 </Card>
               </div>
-
-              {/* Custo médio por pessoa (por Time) */}
-              <Card className="mt-4">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Custo médio por pessoa (por Time)</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Estimativa: custo do Time ÷ headcount ativo. A Oxy não expõe fornecedor por lançamento, então este valor é uma média — não o salário real individual.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  {pc.custoPorTime.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Mapeie categorias primeiro.</p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-border text-[11px] text-muted-foreground text-left">
-                            <th className="py-2 pr-3 font-medium">Time</th>
-                            <th className="py-2 px-3 font-medium text-right">Headcount ativo</th>
-                            <th className="py-2 px-3 font-medium text-right">Custo total</th>
-                            <th className="py-2 pl-3 font-medium text-right">Custo médio / pessoa</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pc.custoPorTime.map((t) => {
-                            const headcountTime = hr.headcountByTime.find((h) => h.group === t.time)?.count || 0;
-                            const medio = headcountTime > 0 ? t.valor / headcountTime : 0;
-                            return (
-                              <tr key={t.time} className="border-b border-border/50">
-                                <td className="py-2 pr-3 text-foreground">{t.time}</td>
-                                <td className="py-2 px-3 text-right tabular-nums text-muted-foreground">{headcountTime || "—"}</td>
-                                <td className="py-2 px-3 text-right tabular-nums text-foreground">{formatCurrencyCompact(t.valor)}</td>
-                                <td className="py-2 pl-3 text-right tabular-nums font-medium text-foreground">
-                                  {headcountTime > 0 ? formatCurrencyCompact(medio) : "—"}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </>
           );
         })()}
