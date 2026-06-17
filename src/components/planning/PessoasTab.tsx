@@ -275,7 +275,7 @@ export function PessoasTab() {
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
-                  subtitle={`${pc.categorias.length} categorias DRE no período`}
+                  subtitle={`${formatCurrencyCompact(pc.custoMapeado)} mapeado · ${formatCurrencyCompact(pc.custoPendente)} pendente`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
                 />
@@ -304,53 +304,77 @@ export function PessoasTab() {
                 />
               </div>
 
-              {/* Categorias DRE */}
-              <Card className="mt-4">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Custo por categoria DRE no período</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {pc.isLoading ? (
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  ) : pc.categorias.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Sem lançamentos de pessoal no período.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {pc.categorias.map((c) => {
-                        const pct = (c.valor / maxCategoria) * 100;
-                        const pctTotal = custoTotal > 0 ? (c.valor / custoTotal) * 100 : 0;
-                        return (
-                          <div key={c.label}>
-                            <div className="flex justify-between text-sm mb-1">
-                              <span className="text-foreground">{c.label}</span>
-                              <span className="font-medium tabular-nums whitespace-nowrap">
-                                {formatCurrencyCompact(c.valor)} · {formatPct(pctTotal)}
-                              </span>
-                            </div>
-                            <div className="h-2 bg-muted rounded overflow-hidden">
-                              <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Mapeamento DRE → Pessoa */}
+              <div className="mt-4">
+                <DreMappingPanel
+                  categorias={pc.categorias}
+                  pendentes={pc.pendentes}
+                  mapeadas={pc.mapeadas}
+                  ignoradas={pc.ignoradas}
+                  pessoas={hr.rawPessoas}
+                />
+              </div>
 
-              {/* Aviso sobre match por pessoa */}
-              <Card className="mt-4 border-blue-500/30 bg-blue-500/5">
-                <CardContent className="pt-4">
-                  <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                    <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                    <p>
-                      Dados vêm da DRE Oxy Finance no nível de <strong className="text-foreground">categoria</strong> (Salários, Benefícios, FGTS, INSS, Pró-labore, Rescisões…). 
-                      A Oxy não expõe lançamento individual por fornecedor/CNPJ neste endpoint, então o cruzamento direto com cada pessoa do Pipefy DB Pessoas não é possível por aqui.
-                      Pra ter match por pessoa precisaríamos de outro endpoint de transações ou um relatório CSV.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Custo por Pessoa e por Time (somente mapeadas) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Custo por Pessoa (mapeado)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {pc.custoPorPessoa.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Mapeie categorias para ver o custo por pessoa.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {pc.custoPorPessoa.slice(0, 12).map((p) => {
+                          const max = pc.custoPorPessoa[0]?.valor || 1;
+                          const pct = (p.valor / max) * 100;
+                          return (
+                            <div key={p.pessoa_id}>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="text-foreground truncate pr-2">{p.pessoa_nome}</span>
+                                <span className="font-medium tabular-nums">{formatCurrencyCompact(p.valor)}</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded overflow-hidden">
+                                <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Custo por Time (mapeado)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {pc.custoPorTime.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Mapeie categorias para ver o custo por time.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {pc.custoPorTime.map((t) => {
+                          const max = pc.custoPorTime[0]?.valor || 1;
+                          const pct = (t.valor / max) * 100;
+                          return (
+                            <div key={t.time}>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="text-foreground truncate pr-2">{t.time}</span>
+                                <span className="font-medium tabular-nums">{formatCurrencyCompact(t.valor)}</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded overflow-hidden">
+                                <div className="h-full bg-chart-2" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </>
           );
         })()}
