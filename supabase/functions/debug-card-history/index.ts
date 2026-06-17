@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
       const histSql = `
         SELECT *
         FROM pipefy_moviment_cfos
-        WHERE "ID" = ANY($1::text[])
+        WHERE "ID"::text = ANY($1::text[])
         ORDER BY "ID", "Entrada";
       `;
       const histRes = await client.query(histSql, [ids]);
