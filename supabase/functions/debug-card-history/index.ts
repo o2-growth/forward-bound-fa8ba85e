@@ -33,9 +33,9 @@ Deno.serve(async (req) => {
     const matchSql = `
       SELECT DISTINCT "ID" AS id, "Título" AS titulo,
              MIN("Data Criação") AS data_criacao,
-             MAX("Fase atual") AS fase_atual,
+             MAX("Fase Atual") AS fase_atual,
              MAX("Faixa de faturamento mensal") AS faixa,
-             MAX("Motivo de Perda") AS motivo_perda
+             MAX("Motivo da perda") AS motivo_perda
       FROM pipefy_moviment_cfos
       WHERE "Data Criação" >= $1 AND "Data Criação" <= ($2::date + INTERVAL '1 day')
         AND (${ilikeClauses})
@@ -45,13 +45,12 @@ Deno.serve(async (req) => {
     const matches = await client.query(matchSql, params);
     const ids = matches.rows.map((r: any) => String(r.id));
 
-    // 2) Full phase history for those IDs (all time)
     let history: any[] = [];
     if (ids.length > 0) {
       const histSql = `
         SELECT "ID" AS id, "Título" AS titulo,
-               "Fase Origem" AS fase_origem, "Fase" AS fase, "Fase atual" AS fase_atual,
-               "Entrada" AS entrada, "Motivo de Perda" AS motivo_perda
+               "Fase Origem" AS fase_origem, "Fase" AS fase, "Fase Atual" AS fase_atual,
+               "Entrada" AS entrada, "Motivo da perda" AS motivo_perda
         FROM pipefy_moviment_cfos
         WHERE "ID" = ANY($1::text[])
         ORDER BY "ID", "Entrada";
