@@ -210,9 +210,14 @@ export function usePersonnelCostFromDRE({ startDate, endDate }: UseParams): Pers
     }
 
     return {
-      isLoading: oxy.isLoading || categoriesQuery.isLoading || mappingHook.isLoading,
+      isLoading: oxy.isLoading || categoriesQuery.isLoading || mappingHook.isLoading || groupsConfig.isLoading,
       error: (oxy.error as Error) || (categoriesQuery.error as Error) || mappingHook.error,
       gruposPessoal,
+      allDreGroups,
+      autoDetectedGroupIds,
+      selectedGroupIds: groupsConfig.selectedGroupIds,
+      saveSelectedGroups: groupsConfig.save,
+      isSavingGroups: groupsConfig.isSaving,
       categorias: rows,
       pendentes,
       mapeadas,
@@ -226,5 +231,5 @@ export function usePersonnelCostFromDRE({ startDate, endDate }: UseParams): Pers
         .map(([time, valor]) => ({ time, valor }))
         .sort((a, b) => b.valor - a.valor),
     };
-  }, [categoriesQuery.data, categoriesQuery.isLoading, categoriesQuery.error, oxy.isLoading, oxy.error, gruposPessoal, startDate, endDate, mappingHook.mappings, mappingHook.isLoading, mappingHook.error]);
+  }, [categoriesQuery.data, categoriesQuery.isLoading, categoriesQuery.error, oxy.isLoading, oxy.error, gruposPessoal, allDreGroups, autoDetectedGroupIds, groupsConfig.selectedGroupIds, groupsConfig.isLoading, groupsConfig.isSaving, groupsConfig.save, startDate, endDate, mappingHook.mappings, mappingHook.isLoading, mappingHook.error]);
 }
