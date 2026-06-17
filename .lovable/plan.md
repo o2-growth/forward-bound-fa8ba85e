@@ -1,11 +1,10 @@
-## Plano
+## Atualizar MRR Base de Maio/2026
 
-Vou usar o valor que você já informou: **R$ 722.605,00**.
+Inserir o valor de MRR Base de Maio/2026 = **R$ 692.582,00** na tabela `mrr_base_monthly`, com `is_total_override = true` para impedir que o sync automático sobrescreva.
 
-### O que será feito
-1. Inserir/atualizar o registro faltante em `mrr_base_monthly` para **Mai/2026 = 722605**.
-2. Marcar como override manual para não ser sobrescrito automaticamente.
-3. Conferir se a tela de Operação passa a usar esse valor quando o filtro de data cair em Maio/2026.
+Junho/2026 (R$ 722.605) já está correto e os demais meses permanecem inalterados.
 
-### Resultado esperado
-O MRR Base histórico no filtro de data deixa de cair em fallback e passa a mostrar o valor correto informado.
+### Passos
+1. `INSERT ... ON CONFLICT (month, year) DO UPDATE` em `mrr_base_monthly` para Maio/2026 = 692582, `is_total_override = true`.
+2. Verificar com `SELECT` que Maio retorna 692.582 e Junho continua 722.605.
+3. Confirmar na view de Operação que o filtro de data em Maio/2026 passa a refletir R$ 692.582 (sem fallback para Junho).
