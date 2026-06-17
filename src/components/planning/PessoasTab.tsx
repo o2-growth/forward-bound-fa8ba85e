@@ -251,38 +251,26 @@ export function PessoasTab() {
 
         {(() => {
           const headcountMedio = (hr.headcountTotal + Math.max(hr.headcountTotal - hr.admissoesNoPeriodo + hr.desligadosNoPeriodo, 0)) / 2;
-          const custoSobreReceita = receitaPeriodo > 0 ? (pc.custoTotalPeriodo / receitaPeriodo) * 100 : 0;
-          const custoPerCapita = headcountMedio > 0 ? pc.custoTotalPeriodo / headcountMedio : 0;
-
-          const bucketLabels: Record<PersonnelBucket, string> = {
-            folha: "Folha",
-            encargos: "Encargos",
-            beneficios: "Benefícios",
-            prolabore: "Pró-labore",
-            rescisao: "Rescisão",
-            outros_pessoal: "Outros (pessoal)",
-          };
-
-          const bucketsOrdered = (Object.keys(bucketLabels) as PersonnelBucket[])
-            .map(k => ({ key: k, label: bucketLabels[k], value: pc.custoPorBucket[k] }))
-            .filter(b => b.value > 0)
-            .sort((a, b) => b.value - a.value);
-
-          const maxBucket = bucketsOrdered[0]?.value || 1;
+          const custoComMatch = pc.custoTotalComMatch;
+          const custoSobreReceita = receitaPeriodo > 0 ? (custoComMatch / receitaPeriodo) * 100 : 0;
+          const custoPerCapita = headcountMedio > 0 ? custoComMatch / headcountMedio : 0;
+          const pctSemMatch = pc.custoTotalGeral > 0 ? (pc.custoTotalSemMatch / pc.custoTotalGeral) * 100 : 0;
+          const topPessoa = pc.custoPorPessoa.slice(0, 20);
+          const maxValorPessoa = topPessoa[0]?.valor || 1;
 
           return (
             <>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Kpi
-                  title="Custo de pessoal total"
-                  value={formatCurrencyCompact(pc.custoTotalPeriodo)}
-                  subtitle="Folha + Encargos + Benefícios + Pró-labore + Rescisão"
+                  title="Custo de pessoal (com match)"
+                  value={formatCurrencyCompact(custoComMatch)}
+                  subtitle={`${pc.custoPorPessoa.length} pessoas vinculadas`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
                 />
                 <Kpi
                   title="Custo / Receita"
-                  value={pc.custoTotalPeriodo > 0 && receitaPeriodo > 0 ? formatPct(custoSobreReceita) : "—"}
+                  value={custoComMatch > 0 && receitaPeriodo > 0 ? formatPct(custoSobreReceita) : "—"}
                   subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)}`}
                   icon={Percent}
                   tone={custoSobreReceita > 60 ? "negative" : custoSobreReceita > 40 ? "warning" : "positive"}
@@ -296,37 +284,44 @@ export function PessoasTab() {
                   isLoading={pc.isLoading || hr.isLoading}
                 />
                 <Kpi
-                  title="Custo de turnover"
-                  value={formatCurrencyCompact(pc.custoRescisaoPeriodo)}
-                  subtitle="Bucket Rescisão (DRE)"
-                  icon={UserMinus}
-                  tone={pc.custoRescisaoPeriodo > 0 ? "warning" : "default"}
+                  title="Lançamentos sem match"
+                  value={formatCurrencyCompact(pc.custoTotalSemMatch)}
+                  subtitle={`${pc.lancamentosSemMatch.length} fornecedores · ${formatPct(pctSemMatch)} do total`}
+                  icon={AlertTriangle}
+                  tone={pctSemMatch > 10 ? "warning" : "default"}
                   isLoading={pc.isLoading}
                 />
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                {/* Custo por bucket */}
+                {/* Custo por pessoa */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Custo por categoria no período</CardTitle>
+                    <CardTitle className="text-base">Top 20 — Custo por pessoa</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {pc.isLoading ? (
                       <Loader2 className="h-6 w-6 animate-spin" />
-                    ) : bucketsOrdered.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Nenhum grupo de pessoal classificado no DRE pra este período.</p>
+                    ) : topPessoa.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum lançamento vinculado a funcionário no período.</p>
                     ) : (
-                      <div className="space-y-2">
-                        {bucketsOrdered.map(b => {
-                          const pct = (b.value / maxBucket) * 100;
+                      <div className="space-y-2 max-h-96 overflow-auto">
+                        {topPessoa.map((p) => {
+                          const pct = (p.valor / maxValorPessoa) * 100;
+                          const pctTotal = custoComMatch > 0 ? (p.valor / custoComMatch) * 100 : 0;
                           return (
-                            <div key={b.key}>
+                            <div key={p.pessoaId}>
                               <div className="flex justify-between text-sm mb-1">
-                                <span className="text-foreground">{b.label}</span>
-                                <span className="font-medium tabular-nums">{formatCurrencyCompact(b.value)}</span>
+                                <div className="truncate pr-2">
+                                  <span className="text-foreground font-medium">{p.pessoaNome}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">{p.pessoaTime} · {p.pessoaCargo}</span>
+                                </div>
+                                <div className="text-right tabular-nums whitespace-nowrap">
+                                  <span className="font-medium">{formatCurrencyCompact(p.valor)}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">{formatPct(pctTotal)}</span>
+                                </div>
                               </div>
-                              <div className="h-2 bg-muted rounded overflow-hidden">
+                              <div className="h-1.5 bg-muted rounded overflow-hidden">
                                 <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
                               </div>
                             </div>
@@ -337,57 +332,62 @@ export function PessoasTab() {
                   </CardContent>
                 </Card>
 
-                {/* Grupos classificados (auditoria) */}
+                {/* Custo por time */}
                 <Card>
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Grupos DRE incluídos</CardTitle>
+                    <CardTitle className="text-base">Custo por Time</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {pc.isLoading ? (
                       <Loader2 className="h-6 w-6 animate-spin" />
-                    ) : pc.gruposClassificados.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Nenhum grupo identificado.</p>
+                    ) : pc.custoPorTime.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Sem dados.</p>
                     ) : (
-                      <div className="space-y-1 text-sm max-h-64 overflow-auto">
-                        {pc.gruposClassificados.map((g, i) => (
-                          <div key={`${g.code}-${i}`} className="flex justify-between items-center border-b border-border pb-1">
-                            <div className="truncate pr-2">
-                              <span className="text-foreground">{g.label}</span>
-                              <span className="ml-2 text-xs text-muted-foreground">→ {bucketLabels[g.bucket]}</span>
+                      <div className="space-y-2">
+                        {pc.custoPorTime.map((t) => {
+                          const pct = custoComMatch > 0 ? (t.valor / custoComMatch) * 100 : 0;
+                          return (
+                            <div key={t.time}>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="text-foreground">{t.time} <span className="text-xs text-muted-foreground">({t.pessoas})</span></span>
+                                <span className="font-medium tabular-nums">{formatCurrencyCompact(t.valor)} · {formatPct(pct)}</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded overflow-hidden">
+                                <div className="h-full bg-chart-2" style={{ width: `${pct}%` }} />
+                              </div>
                             </div>
-                            <span className="font-medium tabular-nums text-xs">{formatCurrencyCompact(g.total)}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Grupos não classificados — só aparece se tiver algo */}
-              {pc.gruposNaoClassificados.length > 0 && (
+              {/* Lançamentos sem match */}
+              {pc.lancamentosSemMatch.length > 0 && (
                 <Card className="mt-4 border-amber-500/40 bg-amber-500/5">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <Info className="h-4 w-4 text-amber-500" />
-                      Grupos DRE não classificados ({pc.gruposNaoClassificados.length})
+                      Lançamentos sem match ({pc.lancamentosSemMatch.length}) · {formatCurrencyCompact(pc.custoTotalSemMatch)}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-xs text-muted-foreground mb-2">
-                      Estes grupos não bateram em nenhum bucket de pessoal (Folha/Encargos/Benefícios/Pró-labore/Rescisão).
-                      Se algum deveria entrar, me avisa pra eu ajustar a regra.
+                      Fornecedores que não casaram com nenhum funcionário do Pipefy DB Pessoas pelo nome.
+                      Pode ser despesa não-pessoal (fornecedor real) ou divergência de grafia / cadastro faltando.
                     </p>
-                    <div className="space-y-1 text-sm max-h-48 overflow-auto">
-                      {pc.gruposNaoClassificados.slice(0, 30).map((g, i) => (
-                        <div key={`${g.code}-${i}`} className="flex justify-between items-center border-b border-border pb-1">
-                          <div className="truncate pr-2">
-                            <span className="text-foreground">{g.label}</span>
-                            {g.code && <span className="ml-2 text-xs text-muted-foreground">[{g.code}]</span>}
-                          </div>
-                          <span className="font-medium tabular-nums text-xs">{formatCurrencyCompact(g.total)}</span>
+                    <div className="space-y-1 text-sm max-h-64 overflow-auto">
+                      {pc.lancamentosSemMatch.slice(0, 50).map((g, i) => (
+                        <div key={`${g.fornecedorLabel}-${i}`} className="flex justify-between items-center border-b border-border pb-1">
+                          <span className="truncate pr-2 text-foreground">{g.fornecedorLabel}</span>
+                          <span className="font-medium tabular-nums text-xs">{formatCurrencyCompact(g.valor)}</span>
                         </div>
                       ))}
+                      {pc.lancamentosSemMatch.length > 50 && (
+                        <p className="text-xs text-muted-foreground pt-2">… +{pc.lancamentosSemMatch.length - 50} fornecedores</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
