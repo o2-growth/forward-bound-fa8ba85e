@@ -251,26 +251,36 @@ export function PessoasTab() {
 
         {(() => {
           const headcountMedio = (hr.headcountTotal + Math.max(hr.headcountTotal - hr.admissoesNoPeriodo + hr.desligadosNoPeriodo, 0)) / 2;
-          const custoComMatch = pc.custoTotalComMatch;
-          const custoSobreReceita = receitaPeriodo > 0 ? (custoComMatch / receitaPeriodo) * 100 : 0;
-          const custoPerCapita = headcountMedio > 0 ? custoComMatch / headcountMedio : 0;
-          const pctSemMatch = pc.custoTotalGeral > 0 ? (pc.custoTotalSemMatch / pc.custoTotalGeral) * 100 : 0;
-          const topPessoa = pc.custoPorPessoa.slice(0, 20);
-          const maxValorPessoa = topPessoa[0]?.valor || 1;
+          const custoTotal = pc.custoTotalPeriodo;
+          const custoSobreReceita = receitaPeriodo > 0 ? (custoTotal / receitaPeriodo) * 100 : 0;
+          const custoPerCapita = headcountMedio > 0 ? custoTotal / headcountMedio : 0;
+          const maxCategoria = pc.categorias[0]?.valor || 1;
 
           return (
             <>
+              {/* Grupos DRE incluídos (auditoria) */}
+              {pc.gruposPessoal.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
+                  <span className="text-muted-foreground">Grupos DRE incluídos:</span>
+                  {pc.gruposPessoal.map((g) => (
+                    <span key={g.id} className="rounded border border-border bg-card px-2 py-0.5 text-foreground">
+                      {g.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Kpi
-                  title="Custo de pessoal (com match)"
-                  value={formatCurrencyCompact(custoComMatch)}
-                  subtitle={`${pc.custoPorPessoa.length} pessoas vinculadas`}
+                  title="Custo de pessoal total"
+                  value={formatCurrencyCompact(custoTotal)}
+                  subtitle={`${pc.categorias.length} categorias DRE no período`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
                 />
                 <Kpi
                   title="Custo / Receita"
-                  value={custoComMatch > 0 && receitaPeriodo > 0 ? formatPct(custoSobreReceita) : "—"}
+                  value={custoTotal > 0 && receitaPeriodo > 0 ? formatPct(custoSobreReceita) : "—"}
                   subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)}`}
                   icon={Percent}
                   tone={custoSobreReceita > 60 ? "negative" : custoSobreReceita > 40 ? "warning" : "positive"}
@@ -284,114 +294,62 @@ export function PessoasTab() {
                   isLoading={pc.isLoading || hr.isLoading}
                 />
                 <Kpi
-                  title="Lançamentos sem match"
-                  value={formatCurrencyCompact(pc.custoTotalSemMatch)}
-                  subtitle={`${pc.lancamentosSemMatch.length} fornecedores · ${formatPct(pctSemMatch)} do total`}
+                  title="Custo de turnover"
+                  value={formatCurrencyCompact(pc.custoRescisaoPeriodo)}
+                  subtitle="Categoria Rescisões (DRE)"
                   icon={AlertTriangle}
-                  tone={pctSemMatch > 10 ? "warning" : "default"}
+                  tone={pc.custoRescisaoPeriodo > 0 ? "warning" : "default"}
                   isLoading={pc.isLoading}
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
-                {/* Custo por pessoa */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Top 20 — Custo por pessoa</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {pc.isLoading ? (
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    ) : topPessoa.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Nenhum lançamento vinculado a funcionário no período.</p>
-                    ) : (
-                      <div className="space-y-2 max-h-96 overflow-auto">
-                        {topPessoa.map((p) => {
-                          const pct = (p.valor / maxValorPessoa) * 100;
-                          const pctTotal = custoComMatch > 0 ? (p.valor / custoComMatch) * 100 : 0;
-                          return (
-                            <div key={p.pessoaId}>
-                              <div className="flex justify-between text-sm mb-1">
-                                <div className="truncate pr-2">
-                                  <span className="text-foreground font-medium">{p.pessoaNome}</span>
-                                  <span className="ml-2 text-xs text-muted-foreground">{p.pessoaTime} · {p.pessoaCargo}</span>
-                                </div>
-                                <div className="text-right tabular-nums whitespace-nowrap">
-                                  <span className="font-medium">{formatCurrencyCompact(p.valor)}</span>
-                                  <span className="ml-2 text-xs text-muted-foreground">{formatPct(pctTotal)}</span>
-                                </div>
-                              </div>
-                              <div className="h-1.5 bg-muted rounded overflow-hidden">
-                                <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
-                              </div>
+              {/* Categorias DRE */}
+              <Card className="mt-4">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Custo por categoria DRE no período</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {pc.isLoading ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  ) : pc.categorias.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Sem lançamentos de pessoal no período.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {pc.categorias.map((c) => {
+                        const pct = (c.valor / maxCategoria) * 100;
+                        const pctTotal = custoTotal > 0 ? (c.valor / custoTotal) * 100 : 0;
+                        return (
+                          <div key={c.label}>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-foreground">{c.label}</span>
+                              <span className="font-medium tabular-nums whitespace-nowrap">
+                                {formatCurrencyCompact(c.valor)} · {formatPct(pctTotal)}
+                              </span>
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Custo por time */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Custo por Time</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {pc.isLoading ? (
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    ) : pc.custoPorTime.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Sem dados.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {pc.custoPorTime.map((t) => {
-                          const pct = custoComMatch > 0 ? (t.valor / custoComMatch) * 100 : 0;
-                          return (
-                            <div key={t.time}>
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="text-foreground">{t.time} <span className="text-xs text-muted-foreground">({t.pessoas})</span></span>
-                                <span className="font-medium tabular-nums">{formatCurrencyCompact(t.valor)} · {formatPct(pct)}</span>
-                              </div>
-                              <div className="h-2 bg-muted rounded overflow-hidden">
-                                <div className="h-full bg-chart-2" style={{ width: `${pct}%` }} />
-                              </div>
+                            <div className="h-2 bg-muted rounded overflow-hidden">
+                              <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
                             </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Lançamentos sem match */}
-              {pc.lancamentosSemMatch.length > 0 && (
-                <Card className="mt-4 border-amber-500/40 bg-amber-500/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Info className="h-4 w-4 text-amber-500" />
-                      Lançamentos sem match ({pc.lancamentosSemMatch.length}) · {formatCurrencyCompact(pc.custoTotalSemMatch)}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Fornecedores que não casaram com nenhum funcionário do Pipefy DB Pessoas pelo nome.
-                      Pode ser despesa não-pessoal (fornecedor real) ou divergência de grafia / cadastro faltando.
-                    </p>
-                    <div className="space-y-1 text-sm max-h-64 overflow-auto">
-                      {pc.lancamentosSemMatch.slice(0, 50).map((g, i) => (
-                        <div key={`${g.fornecedorLabel}-${i}`} className="flex justify-between items-center border-b border-border pb-1">
-                          <span className="truncate pr-2 text-foreground">{g.fornecedorLabel}</span>
-                          <span className="font-medium tabular-nums text-xs">{formatCurrencyCompact(g.valor)}</span>
-                        </div>
-                      ))}
-                      {pc.lancamentosSemMatch.length > 50 && (
-                        <p className="text-xs text-muted-foreground pt-2">… +{pc.lancamentosSemMatch.length - 50} fornecedores</p>
-                      )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Aviso sobre match por pessoa */}
+              <Card className="mt-4 border-blue-500/30 bg-blue-500/5">
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <p>
+                      Dados vêm da DRE Oxy Finance no nível de <strong className="text-foreground">categoria</strong> (Salários, Benefícios, FGTS, INSS, Pró-labore, Rescisões…). 
+                      A Oxy não expõe lançamento individual por fornecedor/CNPJ neste endpoint, então o cruzamento direto com cada pessoa do Pipefy DB Pessoas não é possível por aqui.
+                      Pra ter match por pessoa precisaríamos de outro endpoint de transações ou um relatório CSV.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </>
           );
         })()}
