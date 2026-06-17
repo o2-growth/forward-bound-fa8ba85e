@@ -103,8 +103,9 @@ export function PessoasTab() {
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Período:</span>
               <DateRangePickerGA
-                dateRange={dateRange}
-                onDateRangeChange={(r) => r?.from && r?.to && setDateRange({ from: r.from, to: r.to })}
+                startDate={dateRange.from}
+                endDate={dateRange.to}
+                onDateChange={(start, end) => setDateRange({ from: start, to: end })}
               />
             </div>
           </div>
