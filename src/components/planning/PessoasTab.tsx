@@ -1,15 +1,25 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, AlertTriangle } from "lucide-react";
+import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, Building2, ChevronDown, ChevronRight, Info } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useHrData } from "@/hooks/useHrData";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
-import { usePersonnelCostFromDRE } from "@/hooks/usePersonnelCostFromDRE";
-import { DreMappingPanel } from "./DreMappingPanel";
-import { DreGroupsSelector } from "./DreGroupsSelector";
+import { usePersonnelCostByBu, type BuKey } from "@/hooks/usePersonnelCostByBu";
 import { cn } from "@/lib/utils";
+
+// Heurística Time(Pipefy) → BU pela substring do nome do Time.
+function timeToBu(time: string): BuKey | "Outros" {
+  const n = (time || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/caas/.test(n)) return "CaaS";
+  if (/saas/.test(n)) return "SaaS";
+  if (/\btax\b/.test(n)) return "TAX";
+  if (/expansao|franquia/.test(n)) return "Expansão";
+  if (/\bcs\b|customer\s*success|sucesso\s+do\s+cliente/.test(n)) return "CS";
+  if (/education|educac/.test(n)) return "Education";
+  return "Outros";
+}
 
 const formatNumber = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
 const formatPct = (n: number) => `${n.toFixed(1)}%`;
