@@ -1090,6 +1090,7 @@ export type Database = {
           pessoa_id: string | null
           pessoa_nome: string | null
           pessoa_time: string | null
+          team_split: Json
           tipo: string
           updated_at: string
         }
@@ -1105,6 +1106,7 @@ export type Database = {
           pessoa_id?: string | null
           pessoa_nome?: string | null
           pessoa_time?: string | null
+          team_split?: Json
           tipo?: string
           updated_at?: string
         }
@@ -1120,6 +1122,7 @@ export type Database = {
           pessoa_id?: string | null
           pessoa_nome?: string | null
           pessoa_time?: string | null
+          team_split?: Json
           tipo?: string
           updated_at?: string
         }

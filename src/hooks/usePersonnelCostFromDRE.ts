@@ -75,7 +75,9 @@ export interface PersonnelCostFromDREResult {
   custoMapeado: number;
   custoPendente: number;
   custoRescisaoPeriodo: number;
-  custoPorPessoa: { pessoa_id: string; pessoa_nome: string; pessoa_time: string | null; valor: number }[];
+  /** Composição: cada categoria DRE com valor e share % do total */
+  composicao: { label: string; valor: number; pct: number }[];
+  /** Custo agregado por Time aplicando team_split das categorias mapeadas */
   custoPorTime: { time: string; valor: number }[];
 }
 
@@ -190,24 +192,28 @@ export function usePersonnelCostFromDRE({ startDate, endDate }: UseParams): Pers
     const mapeadas = rows.filter(r => r.status === "mapeada");
     const ignoradas = rows.filter(r => r.status === "ignorada");
 
-    // Agregação por pessoa / time
-    const porPessoaMap = new Map<string, { pessoa_id: string; pessoa_nome: string; pessoa_time: string | null; valor: number }>();
+    // Agregação por Time aplicando team_split (%) das categorias mapeadas
     const porTimeMap = new Map<string, number>();
     for (const r of mapeadas) {
-      const m = r.mapping!;
-      if (m.pessoa_id) {
-        const cur = porPessoaMap.get(m.pessoa_id);
-        if (cur) cur.valor += r.valor;
-        else porPessoaMap.set(m.pessoa_id, {
-          pessoa_id: m.pessoa_id,
-          pessoa_nome: m.pessoa_nome || "—",
-          pessoa_time: m.pessoa_time,
-          valor: r.valor,
-        });
+      const split = r.mapping?.team_split || {};
+      let sum = 0;
+      for (const v of Object.values(split)) sum += Number(v) || 0;
+      if (sum <= 0) continue;
+      for (const [team, pctRaw] of Object.entries(split)) {
+        const pct = Number(pctRaw) || 0;
+        if (pct <= 0) continue;
+        const share = r.valor * (pct / sum);
+        const t = (team || "Não informado").trim() || "Não informado";
+        porTimeMap.set(t, (porTimeMap.get(t) || 0) + share);
       }
-      const t = (m.pessoa_time || "Não informado").trim() || "Não informado";
-      porTimeMap.set(t, (porTimeMap.get(t) || 0) + r.valor);
     }
+
+    // Composição: cada categoria DRE com share % do total
+    const composicao = rows.map((r) => ({
+      label: r.label,
+      valor: r.valor,
+      pct: total > 0 ? (r.valor / total) * 100 : 0,
+    }));
 
     return {
       isLoading: oxy.isLoading || categoriesQuery.isLoading || mappingHook.isLoading || groupsConfig.isLoading,
@@ -226,7 +232,7 @@ export function usePersonnelCostFromDRE({ startDate, endDate }: UseParams): Pers
       custoMapeado: mapeadas.reduce((s, r) => s + r.valor, 0),
       custoPendente: pendentes.reduce((s, r) => s + r.valor, 0),
       custoRescisaoPeriodo: rescisao,
-      custoPorPessoa: Array.from(porPessoaMap.values()).sort((a, b) => b.valor - a.valor),
+      composicao,
       custoPorTime: Array.from(porTimeMap.entries())
         .map(([time, valor]) => ({ time, valor }))
         .sort((a, b) => b.valor - a.valor),
