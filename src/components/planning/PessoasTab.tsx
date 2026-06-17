@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, AlertCircle, Info } from "lucide-react";
+import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, AlertCircle, Info, DollarSign, Percent, UserMinus, Wallet } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useHrData } from "@/hooks/useHrData";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
+import { usePersonnelCost, type PersonnelBucket } from "@/hooks/usePersonnelCost";
 import { cn } from "@/lib/utils";
 
 const formatNumber = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
@@ -65,6 +66,7 @@ export function PessoasTab() {
 
   const hr = useHrData({ startDate: dateRange.from, endDate: dateRange.to });
   const oxy = useOxyFinance();
+  const pc = usePersonnelCost({ startDate: dateRange.from, endDate: dateRange.to });
 
   // Receita do período (Oxy Finance) — soma dos meses cobertos no range
   const receitaPeriodo = useMemo(() => {
@@ -247,44 +249,152 @@ export function PessoasTab() {
       <div>
         <h3 className="text-lg font-semibold mb-3">3.2 Custo de pessoal</h3>
 
-        <Card className="border-amber-500/40 bg-amber-500/5">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <Info className="h-5 w-5 text-amber-500 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium text-foreground mb-1">Aguardando mapeamento de categorias</p>
-                <p className="text-muted-foreground">
-                  Pra calcular Custo de pessoal total / per capita / sobre receita / turnover precisamos
-                  da lista exata de categorias do DRE Oxy Finance que representam <span className="font-medium text-foreground">Folha, Encargos, Benefícios, Pró-labore</span> e <span className="font-medium text-foreground">Rescisão</span>.
-                  Conforme combinado, vamos refinar esse mapeamento juntos no próximo passo.
-                </p>
-                <div className="mt-3 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                  <div className="rounded border border-border bg-card px-3 py-2">
-                    <div className="text-muted-foreground">Receita do período (DRE)</div>
-                    <div className="font-semibold text-foreground">{formatCurrencyCompact(receitaPeriodo)}</div>
-                  </div>
-                  <div className="rounded border border-border bg-card px-3 py-2">
-                    <div className="text-muted-foreground">Headcount médio</div>
-                    <div className="font-semibold text-foreground">
-                      {formatNumber((hr.headcountTotal + Math.max(hr.headcountTotal - hr.admissoesNoPeriodo + hr.desligadosNoPeriodo, 0)) / 2)}
-                    </div>
-                  </div>
-                  <div className="rounded border border-border bg-card px-3 py-2">
-                    <div className="text-muted-foreground">Pronto para usar</div>
-                    <div className="font-semibold text-foreground">Custo ÷ Receita · Custo per capita</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {(() => {
+          const headcountMedio = (hr.headcountTotal + Math.max(hr.headcountTotal - hr.admissoesNoPeriodo + hr.desligadosNoPeriodo, 0)) / 2;
+          const custoSobreReceita = receitaPeriodo > 0 ? (pc.custoTotalPeriodo / receitaPeriodo) * 100 : 0;
+          const custoPerCapita = headcountMedio > 0 ? pc.custoTotalPeriodo / headcountMedio : 0;
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 opacity-60">
-          <Kpi title="Custo de pessoal total" value="—" subtitle="Folha + Encargos + Benefícios + Pró-labore" icon={AlertCircle} />
-          <Kpi title="Custo / Receita" value="—" subtitle="Custo pessoal ÷ Receita total" icon={AlertCircle} />
-          <Kpi title="Custo per capita" value="—" subtitle="Custo pessoal ÷ Headcount médio" icon={AlertCircle} />
-          <Kpi title="Custo de turnover" value="—" subtitle="Categoria Rescisão" icon={AlertCircle} />
-        </div>
+          const bucketLabels: Record<PersonnelBucket, string> = {
+            folha: "Folha",
+            encargos: "Encargos",
+            beneficios: "Benefícios",
+            prolabore: "Pró-labore",
+            rescisao: "Rescisão",
+            outros_pessoal: "Outros (pessoal)",
+          };
+
+          const bucketsOrdered = (Object.keys(bucketLabels) as PersonnelBucket[])
+            .map(k => ({ key: k, label: bucketLabels[k], value: pc.custoPorBucket[k] }))
+            .filter(b => b.value > 0)
+            .sort((a, b) => b.value - a.value);
+
+          const maxBucket = bucketsOrdered[0]?.value || 1;
+
+          return (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Kpi
+                  title="Custo de pessoal total"
+                  value={formatCurrencyCompact(pc.custoTotalPeriodo)}
+                  subtitle="Folha + Encargos + Benefícios + Pró-labore + Rescisão"
+                  icon={DollarSign}
+                  isLoading={pc.isLoading}
+                />
+                <Kpi
+                  title="Custo / Receita"
+                  value={pc.custoTotalPeriodo > 0 && receitaPeriodo > 0 ? formatPct(custoSobreReceita) : "—"}
+                  subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)}`}
+                  icon={Percent}
+                  tone={custoSobreReceita > 60 ? "negative" : custoSobreReceita > 40 ? "warning" : "positive"}
+                  isLoading={pc.isLoading || oxy.isLoading}
+                />
+                <Kpi
+                  title="Custo per capita"
+                  value={custoPerCapita > 0 ? formatCurrencyCompact(custoPerCapita) : "—"}
+                  subtitle={`Headcount médio: ${formatNumber(headcountMedio)}`}
+                  icon={Wallet}
+                  isLoading={pc.isLoading || hr.isLoading}
+                />
+                <Kpi
+                  title="Custo de turnover"
+                  value={formatCurrencyCompact(pc.custoRescisaoPeriodo)}
+                  subtitle="Bucket Rescisão (DRE)"
+                  icon={UserMinus}
+                  tone={pc.custoRescisaoPeriodo > 0 ? "warning" : "default"}
+                  isLoading={pc.isLoading}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                {/* Custo por bucket */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Custo por categoria no período</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {pc.isLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : bucketsOrdered.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum grupo de pessoal classificado no DRE pra este período.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {bucketsOrdered.map(b => {
+                          const pct = (b.value / maxBucket) * 100;
+                          return (
+                            <div key={b.key}>
+                              <div className="flex justify-between text-sm mb-1">
+                                <span className="text-foreground">{b.label}</span>
+                                <span className="font-medium tabular-nums">{formatCurrencyCompact(b.value)}</span>
+                              </div>
+                              <div className="h-2 bg-muted rounded overflow-hidden">
+                                <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Grupos classificados (auditoria) */}
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Grupos DRE incluídos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {pc.isLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : pc.gruposClassificados.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">Nenhum grupo identificado.</p>
+                    ) : (
+                      <div className="space-y-1 text-sm max-h-64 overflow-auto">
+                        {pc.gruposClassificados.map((g, i) => (
+                          <div key={`${g.code}-${i}`} className="flex justify-between items-center border-b border-border pb-1">
+                            <div className="truncate pr-2">
+                              <span className="text-foreground">{g.label}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">→ {bucketLabels[g.bucket]}</span>
+                            </div>
+                            <span className="font-medium tabular-nums text-xs">{formatCurrencyCompact(g.total)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Grupos não classificados — só aparece se tiver algo */}
+              {pc.gruposNaoClassificados.length > 0 && (
+                <Card className="mt-4 border-amber-500/40 bg-amber-500/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Info className="h-4 w-4 text-amber-500" />
+                      Grupos DRE não classificados ({pc.gruposNaoClassificados.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Estes grupos não bateram em nenhum bucket de pessoal (Folha/Encargos/Benefícios/Pró-labore/Rescisão).
+                      Se algum deveria entrar, me avisa pra eu ajustar a regra.
+                    </p>
+                    <div className="space-y-1 text-sm max-h-48 overflow-auto">
+                      {pc.gruposNaoClassificados.slice(0, 30).map((g, i) => (
+                        <div key={`${g.code}-${i}`} className="flex justify-between items-center border-b border-border pb-1">
+                          <div className="truncate pr-2">
+                            <span className="text-foreground">{g.label}</span>
+                            {g.code && <span className="ml-2 text-xs text-muted-foreground">[{g.code}]</span>}
+                          </div>
+                          <span className="font-medium tabular-nums text-xs">{formatCurrencyCompact(g.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
+        })()}
       </div>
     </div>
   );
