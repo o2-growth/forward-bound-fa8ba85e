@@ -322,6 +322,7 @@ export function PessoasTab() {
                   mapeadas={pc.mapeadas}
                   ignoradas={pc.ignoradas}
                   pessoas={hr.rawPessoas}
+                  hasGroupsConfigured={pc.gruposPessoal.length > 0}
                 />
               </div>
 
