@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useHrData } from "@/hooks/useHrData";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
-import { usePersonnelCostByPerson } from "@/hooks/usePersonnelCostByPerson";
+import { usePersonnelCostFromDRE } from "@/hooks/usePersonnelCostFromDRE";
 import { cn } from "@/lib/utils";
 
 const formatNumber = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
