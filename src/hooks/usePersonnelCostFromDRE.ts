@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
+import { usePersonnelDreGroupsConfig } from "@/hooks/usePersonnelDreGroupsConfig";
 import { usePersonnelDreMapping, normalizeLabel, type PersonnelDreMappingRow } from "@/hooks/usePersonnelDreMapping";
 
 interface CategoryEntry { period: string; value: number; }
