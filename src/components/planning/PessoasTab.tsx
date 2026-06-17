@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, AlertCircle, Info, DollarSign, Percent, UserMinus, Wallet } from "lucide-react";
+import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, AlertTriangle, Info } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useHrData } from "@/hooks/useHrData";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
-import { usePersonnelCost, type PersonnelBucket } from "@/hooks/usePersonnelCost";
+import { usePersonnelCostByPerson } from "@/hooks/usePersonnelCostByPerson";
 import { cn } from "@/lib/utils";
 
 const formatNumber = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
@@ -66,7 +66,7 @@ export function PessoasTab() {
 
   const hr = useHrData({ startDate: dateRange.from, endDate: dateRange.to });
   const oxy = useOxyFinance();
-  const pc = usePersonnelCost({ startDate: dateRange.from, endDate: dateRange.to });
+  const pc = usePersonnelCostByPerson({ startDate: dateRange.from, endDate: dateRange.to });
 
   // Receita do período (Oxy Finance) — soma dos meses cobertos no range
   const receitaPeriodo = useMemo(() => {
