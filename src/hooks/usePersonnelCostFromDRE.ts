@@ -75,7 +75,9 @@ export interface PersonnelCostFromDREResult {
   custoMapeado: number;
   custoPendente: number;
   custoRescisaoPeriodo: number;
-  custoPorPessoa: { pessoa_id: string; pessoa_nome: string; pessoa_time: string | null; valor: number }[];
+  /** Composição: cada categoria DRE com valor e share % do total */
+  composicao: { label: string; valor: number; pct: number }[];
+  /** Custo agregado por Time aplicando team_split das categorias mapeadas */
   custoPorTime: { time: string; valor: number }[];
 }
 
