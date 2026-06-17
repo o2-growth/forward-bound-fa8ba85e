@@ -1056,6 +1056,54 @@ export type Database = {
         }
         Relationships: []
       }
+      personnel_dre_mapping: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dre_label: string
+          dre_label_original: string
+          group_id: string | null
+          group_label: string | null
+          id: string
+          is_ignored: boolean
+          pessoa_id: string | null
+          pessoa_nome: string | null
+          pessoa_time: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dre_label: string
+          dre_label_original: string
+          group_id?: string | null
+          group_label?: string | null
+          id?: string
+          is_ignored?: boolean
+          pessoa_id?: string | null
+          pessoa_nome?: string | null
+          pessoa_time?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dre_label?: string
+          dre_label_original?: string
+          group_id?: string | null
+          group_label?: string | null
+          id?: string
+          is_ignored?: boolean
+          pessoa_id?: string | null
+          pessoa_nome?: string | null
+          pessoa_time?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
