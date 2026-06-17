@@ -264,7 +264,7 @@ export function PessoasTab() {
 
         {(() => {
           const headcountMedio = (hr.headcountTotal + Math.max(hr.headcountTotal - hr.admissoesNoPeriodo + hr.desligadosNoPeriodo, 0)) / 2;
-          const custoTotal = pc.custoTotalPeriodo;
+          const custoTotal = pc.total;
           const custoSobreReceita = receitaPeriodo > 0 ? (custoTotal / receitaPeriodo) * 100 : 0;
           const custoPerCapita = headcountMedio > 0 ? custoTotal / headcountMedio : 0;
           
