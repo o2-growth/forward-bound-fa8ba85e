@@ -1,41 +1,34 @@
-# Plano: Detecção de grupos DRE de Pessoal + visibilidade do painel
+# Plano: Sondar endpoints Oxy em busca de lançamento individual
 
-## Diagnóstico
-- `personnel_dre_mapping` tem 0 linhas → cards "Custo por Pessoa/Time" estão corretamente vazios.
-- Usuário não viu o painel de Mapeamento → provavelmente `gruposPessoal = []` porque o regex (`despesas com pessoal`, `pessoal`, `rh`, `folha de pagamento`) não casa com os labels reais da DRE Oxy desse projeto. Sem grupo detectado, `categorias = []` e a aba Pendentes renderiza "Tudo mapeado".
+## Objetivo
+Antes de construir UI ou tabela de salários, descobrir se a API da Oxy expõe lançamentos individuais com fornecedor/CNPJ — o que tornaria o match por pessoa automático.
 
-## Mudanças
+## Estratégia
+Adicionar uma única action genérica `probe` no edge function `fetch-oxy-finance` que aceita `{ path, queryParams }` e devolve `{ status, body (truncado em 8KB) }`. Não muda nenhum endpoint existente. Em seguida, eu rodo via `supabase--curl_edge_functions` uma bateria de paths candidatos e te mostro o resultado bruto.
 
-### 1. Sempre renderizar o painel, mesmo sem grupos
-Em `PessoasTab.tsx`, garantir que `DreMappingPanel` apareça mesmo com 0 categorias e mostre um estado vazio explicativo (em vez de "Tudo mapeado!" que confunde).
+### Paths a testar (com `startDate=2026-05-01&endDate=2026-05-31&cnpjs[]=<CNPJ>`)
+1. `/v2/bills/paid` — contas pagas
+2. `/v2/bills/payable` — contas a pagar
+3. `/v2/bills/paid/details` — detalhe linha-a-linha
+4. `/v2/transactions` — lançamentos
+5. `/v2/suppliers` — fornecedores cadastrados
+6. `/widgets/cash-flow/v2/card/details?movimentType=D&groupBy=supplier`
+7. `/v2/dre/dre-table-categories-details?groupIds[]=<pessoal_id>` — detalhe por categoria
+8. `/v2/payroll` ou `/v2/folha` — folha (chute)
+9. `/v2/cost-centers` — centros de custo (pode ter "Pessoa")
 
-### 2. Seletor manual de grupos DRE
-Adicionar um bloco "Grupos DRE considerados como Pessoal" no topo do 3.2 com:
-- Lista de **todos** os grupos da DRE (de `oxy.dreRaw.groups`) com checkbox.
-- Pré-marca os que casam com o regex atual.
-- Seleção é persistida em uma nova tabela `personnel_dre_groups_config` (key `groups` = array de group ids) — vale pra todos os usuários.
-- O hook `usePersonnelCostFromDRE` passa a usar a seleção persistida (com fallback pro regex se a config estiver vazia).
+Cada um é testado tanto com CNPJ formatado quanto limpo, GET e (se 405) POST com body vazio.
 
-### 3. Banner de diagnóstico
-Quando `gruposPessoal.length === 0`, mostrar card amarelo no topo do 3.2:
-> "Nenhum grupo de Pessoal foi detectado automaticamente na DRE. Selecione manualmente abaixo quais grupos representam custo de pessoal."
+## Critério de sucesso
+Pelo menos um endpoint retorna 200 com array contendo `supplierName`/`fornecedor`/`partnerCpfCnpj` ou similar.
 
-Com botão "Selecionar grupos" que abre o seletor.
+## Próximos passos pós-teste
+- **Achou endpoint com CNPJ/fornecedor:** próxima task vira "construir matcher CNPJ↔pessoa usando esse endpoint". Apago a tela de mapeamento manual.
+- **Nenhum endpoint útil:** voltamos pro plano A (tabela `personnel_salaries` no DB com tela de edição mensal).
 
-### 4. Mostrar categorias detectadas mesmo sem mapping
-No `DreMappingPanel`, melhorar o estado vazio da aba Pendentes:
-- Se `categorias.length === 0` E `gruposPessoal.length === 0`: "Configure os grupos DRE de Pessoal acima."
-- Se `categorias.length === 0` E `gruposPessoal.length > 0`: "Sem lançamentos no período selecionado."
-- Se há categorias e tudo já mapeado: "Tudo mapeado 🎉"
-
-## Arquivos
-- `supabase/migrations/*` — nova tabela `personnel_dre_groups_config` (singleton key/value JSONB)
-- `src/hooks/usePersonnelDreGroupsConfig.ts` (novo) — load/save da config
-- `src/hooks/usePersonnelCostFromDRE.ts` (editar) — usar config persistida com fallback regex
-- `src/components/planning/DreGroupsSelector.tsx` (novo) — UI do seletor com checkboxes
-- `src/components/planning/PessoasTab.tsx` (editar) — banner + seletor + sempre renderizar painel
-- `src/components/planning/DreMappingPanel.tsx` (editar) — mensagens vazias contextuais
+## Arquivos alterados
+- `supabase/functions/fetch-oxy-finance/index.ts` — adicionar case `probe`.
 
 ## Fora de escopo
-- Mudar o regex de auto-detect (continua como fallback inicial).
-- Histórico de quem mudou a config.
+- Nenhuma mudança de UI, hooks ou banco nesse passo.
+- A action `probe` é só pra diagnóstico; depois que decidirmos o caminho, removo ou mantenho.

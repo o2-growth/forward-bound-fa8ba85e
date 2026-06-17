@@ -82,6 +82,33 @@ serve(async (req) => {
         fetchOptions = { method: 'GET', headers: authHeaders };
         break;
       }
+      case 'probe': {
+        // Generic diagnostic probe — does NOT mutate any existing behavior.
+        // body: { path: "/v2/foo", queryParams?: Record<string,string|string[]>, method?: "GET"|"POST", reqBody?: any }
+        const probePath: string = body.path;
+        if (!probePath || typeof probePath !== 'string') {
+          return new Response(JSON.stringify({ error: 'probe requires "path"' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const params = new URLSearchParams();
+        const qp = body.queryParams || {};
+        for (const [k, v] of Object.entries(qp)) {
+          if (Array.isArray(v)) for (const item of v) params.append(k, String(item));
+          else if (v !== undefined && v !== null) params.append(k, String(v));
+        }
+        const qs = params.toString();
+        url = `${BASE_URL}${probePath}${qs ? `?${qs}` : ''}`;
+        const method = (body.method || 'GET').toUpperCase();
+        fetchOptions = {
+          method,
+          headers: authHeaders,
+          ...(method !== 'GET' && body.reqBody !== undefined
+            ? { body: JSON.stringify(body.reqBody) }
+            : {}),
+        };
+        break;
+      }
       default:
         return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
