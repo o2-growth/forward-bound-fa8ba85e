@@ -228,6 +228,8 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
       const t = m.dataEntrada.getTime();
       if (t >= startTime && t <= endTime) {
         const mi = MA_PHASE_TO_INDICATOR[m.fase];
+        // Excluir cards desqualificados como MQL (motivo de perda) em todas as fases
+        if (excludedMqlIds.has(m.id)) continue;
         if (indicator === 'leads') {
           if (mi === 'leads' || mi === 'mql') seenIds.add(m.id);
         } else if (mi === indicator) {
