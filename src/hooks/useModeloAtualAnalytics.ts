@@ -415,6 +415,10 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       // Special validation for MQL (requires revenue >= 200k) - card-level exclusion
       if (indicator === 'mql' && !isMqlQualified(card.faixa)) continue;
       
+      // Cards excluded por motivo de perda do MQL não contam em nenhuma fase do funil
+      // (RM, RR, Proposta, Venda também são suprimidos para manter consistência com o MQL).
+      if (excludedMqlIds.has(card.id)) continue;
+      
       if (!firstEntries.has(card.id)) {
         firstEntries.set(card.id, new Map());
       }
