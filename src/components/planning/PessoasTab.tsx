@@ -8,6 +8,7 @@ import { useHrData } from "@/hooks/useHrData";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { usePersonnelCostFromDRE } from "@/hooks/usePersonnelCostFromDRE";
 import { DreMappingPanel } from "./DreMappingPanel";
+import { DreGroupsSelector } from "./DreGroupsSelector";
 import { cn } from "@/lib/utils";
 
 const formatNumber = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
