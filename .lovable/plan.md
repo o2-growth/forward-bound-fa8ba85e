@@ -1,57 +1,64 @@
-# Plano: Custo de Pessoal por Categoria + Time (com Oxy DRE)
+## Descoberta
 
-Como a Oxy só expõe DRE consolidada e categorias agregadas (sem fornecedor/CNPJ), pivotamos o painel atual: ao invés de "categoria → 1 pessoa" (impossível), passa a ser "categoria → split entre Times %" + composição por natureza. Custo individual fica como média estimada.
+A Oxy DRE **já entrega custo de pessoal por BU de forma nativa**, via nomes de categoria com sufixo da BU. Exemplo Mar/2026:
 
-## Entregas (aba Pessoas → 3.2 Custo de pessoal)
+**Dentro de Custos Variáveis → Custos CaaS:**
+- Equipe CaaS — R$ 203.644
+- Benefícios - CaaS — R$ 6.190
+- Remuneração de Estagiários - CaaS — R$ 3.500
+- Alimentação CaaS — R$ 7.695
+- Deslocamento CaaS — R$ 9.310
+- Viagens e Estadias CaaS — R$ 587
 
-### Card 1 — Composição do custo de pessoal
-Donut/stacked bar consumindo `dre_categories` do grupo "Despesas com Pessoal":
-- Salários CLT, Pró-labore, FGTS, INSS, Benefícios (VR/VA/saúde), Rescisões, PLR/Bônus, Treinamentos, Outros.
-- Mostra valor absoluto e % do total.
-- Filtro de período herdado da página.
+**Dentro de Despesas Fixas → Despesas com Pessoal (corporativo, não-BU):**
+- Pró-labore sócios — R$ 41.500
+- Serviços de Terceiros — R$ 20.500
+- Benefícios — R$ 4.900
+- Salários / FGTS / INSS / Férias / 13º / Rescisões / Seguro de Vida — R$ 0 nesse mês
+- Estagiários — R$ 120
 
-### Card 2 — Custo por Time
-Bar chart horizontal com R$ por Time (Comercial, Marketing, Tech, Ops, …) baseado no rateio configurado.
-- Cada Time mostra: total R$, headcount ativo no mês, custo médio/pessoa.
-- Click no Time → drawer com breakdown por categoria DRE.
+**Conclusão:** não inventamos % nenhum. O custo de pessoal por BU sai direto da API, e o "Corporativo" entra como linha separada.
 
-### Card 3 — Custo médio por pessoa (por Time)
-Tabela: Time | Headcount ativo (Pipefy DB Pessoas) | Custo total | Custo médio/pessoa.
-- Banner explicativo: "Média por Time — a Oxy não expõe fornecedor por lançamento, então usamos rateio configurado dividido pelo headcount ativo do mês".
+## O que vamos construir (e descartar)
 
-### Painel de mapeamento (reformulado)
-Substitui o painel atual `DreMappingPanel`. Para cada categoria DRE pendente:
-- Listar todos os Times ativos (vindos de `pipefy_db_pessoas` distinct).
-- Inputs de % para cada Time, com validação de soma = 100%.
-- Botão **"Sugerir por headcount"**: preenche % proporcional ao número de pessoas ativas em cada Time.
-- Botão **"Copiar de outra categoria"**: ex: encargos costumam seguir o split de Salários CLT.
-- Tabs: Pendentes / Mapeadas / Ignoradas (como hoje).
+### Descartar
+- `personnel_dre_mapping` com `team_split` JSONB (rateio manual virou desnecessário).
+- Botões "Sugerir por headcount" / "Distribuir pendentes".
+- O `DreMappingPanel` inteiro na forma atual.
 
-## Banco
+Migration nova: drop da coluna `team_split` e da tabela (ou marcar deprecated). Confirmar com você se prefere drop ou manter desabilitada.
 
-Reaproveitar `personnel_dre_mapping`:
-- Adicionar coluna `team_split JSONB` formato `{ "Comercial": 35, "Marketing": 20, "Tech": 30, "Ops": 15 }`.
-- Manter `person_id` nullable (para futuro, se a Oxy expor por pessoa).
-- Tornar a chave única `(category_id, period)` ao invés de `(category_id, person_id)`.
+### Construir
 
-Migration adiciona coluna + drop da unique antiga + nova unique.
+**Novo hook** `src/hooks/usePersonnelCostByBu.ts`:
+- Busca em paralelo `dre_categories` para os 6 grupos de Custos Variáveis (Custos CaaS, SaaS, TAX, Expansão, CS, Education) + grupo "Despesas com Pessoal".
+- Classifica cada categoria como "pessoal" via regex de keywords: `Equipe|Benefícios|Estagiário|Alimentação|Deslocamento|Viagens|Pró-labore|Salário|FGTS|INSS|Rescis|Férias|13º|Cursos|Treinamento|Seguro de Vida|Distribuição de Lucros|Terceiros`.
+- Extrai a BU do nome da categoria (sufixo " CaaS", " - SaaS", "Tax", "Expansão", "CS"). Sem sufixo + vier de "Despesas com Pessoal" → bucket "Corporativo".
+- Retorna:
+  ```
+  porBu: [{ bu: 'CaaS', total, categorias: [{label, valor}] }, ...]
+  corporativo: { total, categorias: [...] }
+  total: number
+  ```
 
-## Arquivos
+**Reformular `PessoasTab.tsx`** — 3 cards substituindo a UI atual de rateio:
 
-- `supabase/migrations/*` — alterar `personnel_dre_mapping`
-- `src/hooks/usePersonnelDreMapping.ts` — adaptar para `team_split`
-- `src/hooks/usePersonnelCostByTeam.ts` (novo) — calcula custo por Time aplicando rateio sobre categorias
-- `src/components/planning/DreMappingPanel.tsx` — reformular UI (% por Time, sugestões)
-- `src/components/planning/CustoComposicaoCard.tsx` (novo) — donut de composição
-- `src/components/planning/CustoPorTimeCard.tsx` (novo) — bar chart + drawer
-- `src/components/planning/CustoMedioPessoaCard.tsx` (novo) — tabela média
-- `src/components/planning/PessoasTab.tsx` — substituir os 2 cards vazios pelos 3 novos
-- `src/hooks/usePersonnelCostByPerson.ts` — **remover** (não é viável)
+1. **Custo de pessoal por BU** — barra horizontal: CaaS / SaaS / TAX / Expansão / CS / Corporativo. Click expande drawer com lista de categorias reais da Oxy (ex: Equipe CaaS R$ 203k, Benefícios CaaS R$ 6k…).
+2. **Custo médio por pessoa por BU** — tabela: BU | Headcount (Pipefy, filtrado por `Time` mapeado pra BU) | Custo total | Custo/pessoa. "Corporativo" mostra headcount de Times corporativos (RH, Fin, C-level) com headcount Pipefy correspondente. Banner explicando origem dos números.
+3. **Composição corporativa** — donut do que está em "Despesas com Pessoal" (Pró-labore, Terceiros, Benefícios, etc.) — para entender o que sobra fora das BUs.
 
-## Fora de escopo
-- Custo real individual por pessoa (não viável com a API atual).
-- Tabela `personnel_salaries`, importador CSV (descartados).
-- Endpoint `cashflow_details` para despesas (retorna vazio).
+**Mapeamento Time(Pipefy) → BU** (só para o "custo por pessoa"):
+- Pequeno painel admin novo em `PessoasTab` (ou settings): tabela `team_to_bu_mapping` (team TEXT PK, bu TEXT). Vem zerada; usuário marca "Time X → CaaS". É só para dividir headcount entre BUs (não afeta o custo, que já vem por BU da Oxy).
 
-## Saída esperada
-Você vê: "Maio/26 custou R$ 540k de pessoal → 60% CLT, 18% encargos, 15% benefícios, 7% outros. Por Time: Comercial R$ 190k (8 pessoas, média R$ 23k), Tech R$ 162k (10 pessoas, R$ 16k), …". Sem precisar de mais nenhuma fonte de dado nova.
+**Cleanup:**
+- Remover `usePersonnelCostFromDRE.ts` (substituído por `usePersonnelCostByBu.ts`).
+- Remover `DreMappingPanel.tsx` ou esvaziar.
+- Migration: drop `personnel_dre_mapping` e `personnel_dre_groups_config` (ou manter como histórico — você decide).
+
+### Edge function
+`fetch-oxy-finance` action `dre_categories` já existe e aceita `groupIds[]`. Vou chamar uma vez por mês com todos os groupIds de Custos Variáveis + Pessoal. Sem nova edge function.
+
+### Dúvidas pra confirmar antes de codar
+1. **Dropar `personnel_dre_mapping` e `personnel_dre_groups_config`** ou só parar de usar?
+2. **Mapeamento Time→BU**: criar painel admin agora ou começar sem custo/pessoa (só custo total por BU) e adicionar depois?
+3. **Education**: incluir como BU separada no card, ou agrupar com Corporativo (já que é zero)?
