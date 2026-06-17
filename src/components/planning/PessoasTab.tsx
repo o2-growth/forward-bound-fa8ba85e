@@ -260,17 +260,26 @@ export function PessoasTab() {
 
           return (
             <>
-              {/* Grupos DRE incluídos (auditoria) */}
-              {pc.gruposPessoal.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
-                  <span className="text-muted-foreground">Grupos DRE incluídos:</span>
-                  {pc.gruposPessoal.map((g) => (
-                    <span key={g.id} className="rounded border border-border bg-card px-2 py-0.5 text-foreground">
-                      {g.label}
-                    </span>
-                  ))}
+              {/* Seletor de grupos DRE */}
+              <div className="mb-3">
+                <DreGroupsSelector
+                  allGroups={pc.allDreGroups}
+                  selectedIds={pc.selectedGroupIds}
+                  autoDetectedIds={pc.autoDetectedGroupIds}
+                  onSave={pc.saveSelectedGroups}
+                  isSaving={pc.isSavingGroups}
+                  forceOpen={pc.gruposPessoal.length === 0 && pc.allDreGroups.length > 0}
+                />
+              </div>
+
+              {/* Banner: nenhum grupo detectado */}
+              {pc.gruposPessoal.length === 0 && pc.allDreGroups.length > 0 && (
+                <div className="mb-3 rounded border border-amber-500/40 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400">
+                  <strong>Nenhum grupo de Pessoal detectado automaticamente.</strong> Abra o painel acima e marque manualmente quais grupos da DRE representam custo de pessoal.
                 </div>
               )}
+
+
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <Kpi
