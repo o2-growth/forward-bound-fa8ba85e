@@ -91,6 +91,7 @@ interface Props {
   mapeadas: PersonnelCategoryRow[];
   ignoradas: PersonnelCategoryRow[];
   pessoas: PessoaRow[];
+  hasGroupsConfigured?: boolean;
 }
 
 // Auto-sugestão: encontra pessoa cujo nome (token) aparece na label
