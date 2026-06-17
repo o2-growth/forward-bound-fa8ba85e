@@ -1,69 +1,41 @@
-# Plano: Mapeamento manual Categoria DRE → Pessoa
+# Plano: Detecção de grupos DRE de Pessoal + visibilidade do painel
 
-## Objetivo
-Permitir vincular cada categoria/lançamento de Pessoal vinda do Oxy (via `dre-table-categories`) a uma pessoa do `pipefy_db_pessoas`, salvando o vínculo para reuso automático nos próximos meses.
+## Diagnóstico
+- `personnel_dre_mapping` tem 0 linhas → cards "Custo por Pessoa/Time" estão corretamente vazios.
+- Usuário não viu o painel de Mapeamento → provavelmente `gruposPessoal = []` porque o regex (`despesas com pessoal`, `pessoal`, `rh`, `folha de pagamento`) não casa com os labels reais da DRE Oxy desse projeto. Sem grupo detectado, `categorias = []` e a aba Pendentes renderiza "Tudo mapeado".
 
-## 1. Banco — nova tabela `personnel_dre_mapping`
-Migration cria:
-- `id` uuid pk
-- `dre_label` text (normalizado: trim + lowercase + sem acento) — chave de match
-- `dre_label_original` text (para exibição)
-- `group_id` text (id do grupo DRE de origem, opcional)
-- `pessoa_id` text (id no `pipefy_db_pessoas`) — nullable = "ignorar"
-- `pessoa_nome` text (snapshot para display)
-- `time` text (snapshot)
-- `tipo` text enum livre: `salario | beneficio | encargo | rescisao | pro_labore | outro` (default `outro`) — útil para totalizadores
-- `is_ignored` boolean default false (lançamento não-pessoal, ex: software de RH)
-- `created_at`, `updated_at`, `created_by` uuid
+## Mudanças
 
-Índice único em `(dre_label)`.
-RLS: leitura/escrita só para `authenticated` com role `admin` ou `user` autorizado.
-GRANTs padrão + service_role.
+### 1. Sempre renderizar o painel, mesmo sem grupos
+Em `PessoasTab.tsx`, garantir que `DreMappingPanel` apareça mesmo com 0 categorias e mostre um estado vazio explicativo (em vez de "Tudo mapeado!" que confunde).
 
-## 2. Hook `usePersonnelDreMapping`
-- Carrega todos mapeamentos.
-- Expõe: `getMappingFor(label)`, `upsertMapping(...)`, `removeMapping(label)`, `bulkAutoSuggest(labels, pessoas)` (sugestão por similaridade de nome — só sugere, não salva).
+### 2. Seletor manual de grupos DRE
+Adicionar um bloco "Grupos DRE considerados como Pessoal" no topo do 3.2 com:
+- Lista de **todos** os grupos da DRE (de `oxy.dreRaw.groups`) com checkbox.
+- Pré-marca os que casam com o regex atual.
+- Seleção é persistida em uma nova tabela `personnel_dre_groups_config` (key `groups` = array de group ids) — vale pra todos os usuários.
+- O hook `usePersonnelCostFromDRE` passa a usar a seleção persistida (com fallback pro regex se a config estiver vazia).
 
-## 3. Refactor de `usePersonnelCostFromDRE`
-Após buscar as categorias, junta com mapeamento:
-- Para cada categoria, procura match exato pelo `dre_label` normalizado.
-- Retorna 3 buckets:
-  - `mapeadas` (com pessoa)
-  - `ignoradas`
-  - `pendentes` (sem mapping) — destaque na UI
-- Soma `custoPorPessoa` e `custoPorTime` usando só `mapeadas`.
+### 3. Banner de diagnóstico
+Quando `gruposPessoal.length === 0`, mostrar card amarelo no topo do 3.2:
+> "Nenhum grupo de Pessoal foi detectado automaticamente na DRE. Selecione manualmente abaixo quais grupos representam custo de pessoal."
 
-## 4. UI — nova seção em `PessoasTab.tsx`
-**Bloco "Mapeamento de Categorias DRE"** (collapsible, abre se houver pendentes):
+Com botão "Selecionar grupos" que abre o seletor.
 
-```text
-[Pendentes: 12]  [Mapeadas: 47]  [Ignoradas: 5]      [Auto-sugerir]
-
-┌─ Pendentes ──────────────────────────────────────────────┐
-│ Categoria DRE          Valor médio    Pessoa     Tipo  ⏷ │
-│ SALARIO DOUGLAS PI...  R$ 12.300      [Buscar▾] [Sal▾] ✓ │
-│ FGTS MARIANA           R$    980      [Buscar▾] [Enc▾] ✓ │
-│ ZENKLUB                R$  1.450      [Ignorar]          │
-└──────────────────────────────────────────────────────────┘
-```
-
-- Dropdown de pessoas: combobox com busca por nome (usa `pipefy_db_pessoas` já carregado).
-- Botão **Auto-sugerir**: roda matcher de tokens (nome normalizado contido na label) e pré-preenche os dropdowns com sugestão (badge "sugestão" — usuário confirma com ✓).
-- Salvar é por linha (debounce 500ms) — feedback toast.
-- Aba secundária "Mapeadas" permite editar/remover vínculos antigos.
-
-## 5. KPIs e gráficos
-- KPI "Custo total" passa a ter sub-linha: `R$ X mapeado · R$ Y pendente`.
-- Card de aviso só aparece se `pendentes > 0`.
-- Gráfico "Custo por categoria DRE" ganha cor diferente para pendentes.
+### 4. Mostrar categorias detectadas mesmo sem mapping
+No `DreMappingPanel`, melhorar o estado vazio da aba Pendentes:
+- Se `categorias.length === 0` E `gruposPessoal.length === 0`: "Configure os grupos DRE de Pessoal acima."
+- Se `categorias.length === 0` E `gruposPessoal.length > 0`: "Sem lançamentos no período selecionado."
+- Se há categorias e tudo já mapeado: "Tudo mapeado 🎉"
 
 ## Arquivos
-- `supabase/migrations/*` — nova tabela + RLS + grants
-- `src/hooks/usePersonnelDreMapping.ts` (novo)
-- `src/hooks/usePersonnelCostFromDRE.ts` (editar — juntar com mapping)
-- `src/components/planning/PessoasTab.tsx` (editar — nova seção)
-- `src/components/planning/DreMappingTable.tsx` (novo)
+- `supabase/migrations/*` — nova tabela `personnel_dre_groups_config` (singleton key/value JSONB)
+- `src/hooks/usePersonnelDreGroupsConfig.ts` (novo) — load/save da config
+- `src/hooks/usePersonnelCostFromDRE.ts` (editar) — usar config persistida com fallback regex
+- `src/components/planning/DreGroupsSelector.tsx` (novo) — UI do seletor com checkboxes
+- `src/components/planning/PessoasTab.tsx` (editar) — banner + seletor + sempre renderizar painel
+- `src/components/planning/DreMappingPanel.tsx` (editar) — mensagens vazias contextuais
 
 ## Fora de escopo
-- Importação CSV em massa (pode virar v2 se quiser depois).
-- Match por CNPJ (Oxy não expõe CNPJ por categoria nesse endpoint — só nome na label).
+- Mudar o regex de auto-detect (continua como fallback inicial).
+- Histórico de quem mudou a config.
