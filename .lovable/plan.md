@@ -1,47 +1,55 @@
 ## Objetivo
+Calcular **Custo de Pessoal** (3.2) usando o DRE Oxy Finance que já está sendo consumido — sem depender de uma lista exata vinda do usuário. Faço o match dos grupos/categorias do DRE por **padrões de label normalizados** (mesma estratégia que `useOxyFinance` já usa pra "Expansão" e produtos OXY).
 
-Criar a sub-aba **Pessoas** dentro de Indicadores (ao lado de Comercial / Marketing / NPS / Growth) com os indicadores da Fase 1: Headcount & movimentação (3.1) e Custo de pessoal (3.2).
+## Mapeamento proposto (heurístico, baseado em DRE padrão)
 
-## Fontes de dados (já existentes)
+Os grupos do DRE Oxy hoje vêm com `code` (`RB` = Receita Bruta) + `label`. Pra despesa de pessoal, normalmente o código fica em **`DP`** (Despesas Pessoal) ou similar — mas como não dá pra garantir sem ver o payload bruto agora, faço fallback duplo:
 
-| Indicador | Fonte | Como pegamos |
-|---|---|---|
-| Headcount atual, por área/time, Tempo de casa, Turnover | `pipefy_db_pessoas` (banco externo Pipefy) — campos `status`, `area`, `time`, `data_admissao`, `data_desligamento` | Nova `action: "pessoas_aggregated"` na edge function `query-external-db` (que já lista `pipefy_db_pessoas` como tabela válida) |
-| Custo de pessoal total / Custo per capita / Custo / Receita / Custo de turnover | DRE Oxy Finance (já integrado em `useOxyFinance` + `dre-mapping-logic-v2`) | Novo hook `useCustoPessoal` que filtra as linhas/grupos: Folha, Encargos, Benefícios, Pró-labore, Rescisão (mapeamento exato a refinar depois com você) |
-| Denominador "Custo / Receita" | Receita total Oxy Finance do período | Mesma fonte do DRE atual (Financeiro) |
+1. **Match por code**: aceitar qualquer grupo cujo `code` comece com `DP`, `CP`, `DEP` ou contenha `PESSO`.
+2. **Match por label normalizado** (trim + lowercase + sem acento) — buckets:
 
-## O que vou construir
+| Bucket interno | Padrões aceitos no label |
+|---|---|
+| `folha` | "folha", "salario", "salarios", "ordenado" |
+| `encargos` | "encargo", "inss", "fgts", "iss pessoal" |
+| `beneficios` | "beneficio", "vale ", "vr", "va", "plano de saude", "convenio" |
+| `prolabore` | "pro labore", "prolabore", "pro-labore" |
+| `rescisao` | "rescisao", "rescisão", "demissao", "aviso previo" |
 
-### 1. Backend
-- Adicionar `action: "pessoas_aggregated"` em `supabase/functions/query-external-db/index.ts`. Retorna em uma única chamada:
-  - Lista de ativos (id, nome, área, time, data_admissao)
-  - Lista de desligados no período (data_desligamento dentro do range)
-  - Agregações por área e por time
-- Mantém validação de JWT e role já existente.
+Tudo que matchar qualquer um dos buckets entra no **Custo de Pessoal total**. `rescisao` é exposto separado pra o card "Custo de turnover".
 
-### 2. Hooks
-- `src/hooks/useHrData.ts` — invoca a action acima; expõe `headcountTotal`, `headcountPorArea`, `headcountPorTime`, `tempoMedioDeCasa`, `desligadosNoPeriodo`, `turnoverGeral`, `turnoverPorArea`.
-- `src/hooks/useCustoPessoal.ts` — consome `useOxyFinance` filtrando categorias de pessoal; expõe `custoTotal`, `custoFolha`, `custoEncargos`, `custoBeneficios`, `custoProLabore`, `custoRescisao`, `custoPorReceita`, `custoPerCapita` (cruza com headcount médio do período).
+> Se na hora de rodar o DRE algum grupo não bater nenhum padrão, ele aparece num bloco "Não classificado (revisar)" no rodapé da 3.2 com o label cru, pra a gente afinar o regex sem cegueira.
 
-### 3. UI
-- `src/components/planning/PessoasTab.tsx` — nova sub-aba dentro de `IndicatorsTab.tsx`.
-- Seções:
-  - **3.1 Headcount & movimentação**
-    - 5 KPI cards: Headcount atual, Tempo médio de casa, Turnover geral %, Desligados no período, Admissões no período
-    - Tabela/gráfico de barras: Headcount por área e time
-    - Mini-card: Turnover por área (top 5)
-  - **3.2 Custo de pessoal**
-    - 4 KPI cards: Custo total, Custo / Receita %, Custo per capita, Custo de turnover (rescisões)
-    - Breakdown por categoria (Folha / Encargos / Benefícios / Pró-labore)
-- Filtro de período reutilizando o seletor mensal/range padrão da aba.
+## Implementação
 
-### 4. Permissões
-- Adicionar a tab "pessoas" em `user_tab_permissions` defaults (admin por padrão; você libera para outros depois).
+### Backend
+- Sem mudança. Já temos `action: 'dre'` em `fetch-oxy-finance` que retorna **todos** os grupos (só estou filtrando `code === 'RB'` no parser). Vou parar de filtrar pra também conseguir ler grupos de despesa.
 
-## Fora de escopo agora
-- Mapeamento detalhado das categorias DRE de Custo de pessoal — vamos refinar juntos depois que a UI estiver no ar (você confirmou "depois vamos ver detalhado"). Vou começar com um mapeamento provisório baseado nos nomes mais comuns do DRE atual e marco no card o que está sendo somado, pra você corrigir rápido.
-- Indicadores fora da Fase 1 (engajamento, performance, etc.).
+### Hook novo: `src/hooks/usePersonnelCost.ts`
+- Reusa `useOxyFinance(year).dreRaw`.
+- Percorre `dreRaw.groups`, classifica cada grupo no bucket (`folha`/`encargos`/`beneficios`/`prolabore`/`rescisao`/`outros_pessoal`/`nao_classificado`).
+- Soma `data[].value` por mês (mesmo `parseMonthFromDate` já existente).
+- Filtra pelo range `[startDate, endDate]` que vem da `PessoasTab`.
+- Retorna:
+  - `custoTotalPeriodo`
+  - `custoPorBucket` (objeto com os 5 buckets + valores)
+  - `custoRescisaoPeriodo`
+  - `gruposNaoClassificados` (array `{label, codigo, total}` pra debug)
+  - `custoPorMes` (Record mês→valor) pra um mini gráfico de evolução
 
-## Próximo passo após aprovar
-1. Inspecionar schema real de `pipefy_db_pessoas` (nomes exatos das colunas) antes de codar a action.
-2. Implementar nessa ordem: action → hooks → UI → ajuste de permissões.
+### UI: `PessoasTab.tsx` (3.2)
+Substituir o bloco "Aguardando configuração" por:
+- 4 KPI cards:
+  - **Custo de pessoal total** = soma dos 5 buckets
+  - **Custo / Receita** = total ÷ receita do período (já temos via `useOxyFinance.cashflowByMonth` ou `dreByBU`)
+  - **Custo per capita** = total ÷ `headcountTotal` (do `useHrData`)
+  - **Custo de turnover** = bucket `rescisao`
+- Mini bar chart "Custo por bucket no período"
+- Bloco colapsável "Grupos DRE não classificados" listando o que sobrou pra revisão (só aparece se `gruposNaoClassificados.length > 0`)
+
+### Sem mexer
+- Edge functions, RLS, schema, outras tabs.
+
+## Riscos / próximo passo natural
+- A heurística pode pegar um grupo errado (ex.: "Benefícios Fiscais"). Por isso o bloco de "não classificados" + o detalhe por bucket — se algo aparecer torto, ajusto os padrões na hora.
+- Se o DRE Oxy não expõe despesas pelo mesmo endpoint `dre-table` (só receita), o hook vai retornar zerado e a gente troca pra `dre_categories` com um `groupIds[]` específico de Pessoal (precisaria do UUID — me passa depois).
