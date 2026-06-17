@@ -228,6 +228,8 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
       const t = m.dataEntrada.getTime();
       if (t >= startTime && t <= endTime) {
         const mi = MA_PHASE_TO_INDICATOR[m.fase];
+        // Excluir cards desqualificados como MQL (motivo de perda) em todas as fases
+        if (excludedMqlIds.has(m.id)) continue;
         if (indicator === 'leads') {
           if (mi === 'leads' || mi === 'mql') seenIds.add(m.id);
         } else if (mi === indicator) {
@@ -242,7 +244,7 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
   const cardValues = new Map<string, number>();
   for (const m of movements) {
     const t = m.dataEntrada.getTime();
-    if (t >= startTime && t <= endTime && MA_PHASE_TO_INDICATOR[m.fase] === 'venda') {
+    if (t >= startTime && t <= endTime && MA_PHASE_TO_INDICATOR[m.fase] === 'venda' && !excludedMqlIds.has(m.id)) {
       const existing = cardValues.get(m.id);
       if (!existing || m.valor > existing) {
         cardValues.set(m.id, m.valor > 0 ? m.valor : 17000);

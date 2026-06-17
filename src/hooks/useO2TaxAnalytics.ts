@@ -279,6 +279,8 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
     for (const card of historyToUse) {
       const indicator = PHASE_TO_INDICATOR[card.fase];
       if (!indicator) continue;
+      // Cards desqualificados como MQL (motivo de perda) são suprimidos de todo o funil
+      if (excludedMqlIds.has(card.id)) continue;
       
       if (!firstEntries.has(card.id)) {
         firstEntries.set(card.id, new Map());
@@ -295,7 +297,7 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
     
     console.log(`[O2 TAX Analytics] Built first entry map for ${firstEntries.size} cards`);
     return firstEntries;
-  }, [cards, fullHistory]);
+  }, [cards, fullHistory, excludedMqlIds]);
 
   // Get unique cards by current phase
   const getCardsByPhase = useMemo((): PhaseData[] => {
@@ -397,6 +399,8 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
       for (const card of allMovements) {
         const cardIndicator = PHASE_TO_INDICATOR[card.fase];
         if (!cardIndicator || !indicatorsToCheck.includes(cardIndicator)) continue;
+        // Excluir cards desqualificados como MQL em todo o funil
+        if (excludedMqlIds.has(card.id)) continue;
         
         const effectiveTime = (cardIndicator === 'venda' && card.dataAssinatura)
           ? card.dataAssinatura.getTime()

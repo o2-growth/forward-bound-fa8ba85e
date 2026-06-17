@@ -415,6 +415,10 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       // Special validation for MQL (requires revenue >= 200k) - card-level exclusion
       if (indicator === 'mql' && !isMqlQualified(card.faixa)) continue;
       
+      // Cards excluded por motivo de perda do MQL não contam em nenhuma fase do funil
+      // (RM, RR, Proposta, Venda também são suprimidos para manter consistência com o MQL).
+      if (excludedMqlIds.has(card.id)) continue;
+      
       if (!firstEntries.has(card.id)) {
         firstEntries.set(card.id, new Map());
       }
@@ -475,6 +479,8 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       for (const card of allMovements) {
         const cardIndicator = PHASE_TO_INDICATOR[card.fase];
         if (!cardIndicator || !indicatorsToCheck.includes(cardIndicator)) continue;
+        // Excluir cards desqualificados como MQL (mesmo motivo de perda) em todo o funil
+        if (excludedMqlIds.has(card.id)) continue;
         
         // For venda: use dataAssinatura as effective date when available
         const effectiveTime = (cardIndicator === 'venda' && card.dataAssinatura)
