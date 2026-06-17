@@ -1,12 +1,13 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, AlertTriangle, Info } from "lucide-react";
+import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, AlertTriangle } from "lucide-react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useHrData } from "@/hooks/useHrData";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { usePersonnelCostFromDRE } from "@/hooks/usePersonnelCostFromDRE";
+import { DreMappingPanel } from "./DreMappingPanel";
 import { cn } from "@/lib/utils";
 
 const formatNumber = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
