@@ -1,34 +1,69 @@
-## Por que está zerado
-A Oxy `cashflow_details?movimentType=D` retorna `data: []` (testei nos dois formatos de CNPJ). Esse endpoint não tem os lançamentos de despesa por fornecedor. Vamos pelo caminho que você escolheu: **`dre-table-categories`** com o(s) groupId(s) de Pessoal.
+# Plano: Mapeamento manual Categoria DRE → Pessoa
 
-## Implementação
+## Objetivo
+Permitir vincular cada categoria/lançamento de Pessoal vinda do Oxy (via `dre-table-categories`) a uma pessoa do `pipefy_db_pessoas`, salvando o vínculo para reuso automático nos próximos meses.
 
-### 1. Listar grupos do DRE pra achar o(s) "Pessoal"
-- Já temos `dre` que retorna todos os grupos com `code`, `label` e `id` (uuid).
-- Filtrar no client os grupos cujo label normalizado bata em padrões de pessoal: `pessoal`, `pessoa`, `folha`, `rh`, `colaborador`, `equipe`. Pegar o `id` (uuid) deles → array `personnelGroupIds`.
-- Mostrar no UI quais grupos foram pegos (auditoria + ajuste fino).
+## 1. Banco — nova tabela `personnel_dre_mapping`
+Migration cria:
+- `id` uuid pk
+- `dre_label` text (normalizado: trim + lowercase + sem acento) — chave de match
+- `dre_label_original` text (para exibição)
+- `group_id` text (id do grupo DRE de origem, opcional)
+- `pessoa_id` text (id no `pipefy_db_pessoas`) — nullable = "ignorar"
+- `pessoa_nome` text (snapshot para display)
+- `time` text (snapshot)
+- `tipo` text enum livre: `salario | beneficio | encargo | rescisao | pro_labore | outro` (default `outro`) — útil para totalizadores
+- `is_ignored` boolean default false (lançamento não-pessoal, ex: software de RH)
+- `created_at`, `updated_at`, `created_by` uuid
 
-### 2. Buscar categorias desses grupos
-- Reusar `action: 'dre_categories'` que já existe no edge function — chamar com `groupIds: personnelGroupIds` e o range do filtro.
-- Resposta vem como `{ categories: [{ label, data: [{period, value}] }] }`. **Cada categoria é um lançamento agregado** — o label muitas vezes é o nome da pessoa/fornecedor (ex: "DOUGLAS PINHEIRO SCHOSSLER" ou "53.385.723/0001-12 - Douglas...").
+Índice único em `(dre_label)`.
+RLS: leitura/escrita só para `authenticated` com role `admin` ou `user` autorizado.
+GRANTs padrão + service_role.
 
-### 3. Match com `pipefy_db_pessoas`
-- Reaproveitar a lógica de match por nome normalizado + tokens que está no `usePersonnelCostByPerson`.
-- Adicionar match por **CNPJ**: se a string da categoria contiver o CNPJ formatado ou só dígitos, comparar com `pessoa.CNPJ`. (Útil porque a Oxy frequentemente coloca CNPJ no label.)
-- Saída: `lancamentosComMatch`, `lancamentosSemMatch`, `custoPorPessoa`, `custoPorTime` — mesma forma que já tem.
+## 2. Hook `usePersonnelDreMapping`
+- Carrega todos mapeamentos.
+- Expõe: `getMappingFor(label)`, `upsertMapping(...)`, `removeMapping(label)`, `bulkAutoSuggest(labels, pessoas)` (sugestão por similaridade de nome — só sugere, não salva).
 
-### 4. Refatorar `usePersonnelCostByPerson`
-- Trocar `fetchCashflowDetails` (que retorna vazio) por uma nova `fetchPersonnelCategories`:
-  - 1ª query: `useOxyFinance(year).dreRaw` → derivar `personnelGroupIds`.
-  - 2ª query: `supabase.functions.invoke('fetch-oxy-finance', { body: { action: 'dre_categories', groupIds: personnelGroupIds, startDate, endDate } })`.
-- Manter o mesmo shape de retorno → **zero mudança na UI do 3.2**.
+## 3. Refactor de `usePersonnelCostFromDRE`
+Após buscar as categorias, junta com mapeamento:
+- Para cada categoria, procura match exato pelo `dre_label` normalizado.
+- Retorna 3 buckets:
+  - `mapeadas` (com pessoa)
+  - `ignoradas`
+  - `pendentes` (sem mapping) — destaque na UI
+- Soma `custoPorPessoa` e `custoPorTime` usando só `mapeadas`.
 
-### 5. Auditoria visual no 3.2
-- Adicionar uma linha pequena acima dos KPIs: "Grupos DRE de Pessoal incluídos: Folha Modelo Atual · Pessoal Tax · …" (chips). Se a heurística pegar algo errado, dá pra ver na hora.
+## 4. UI — nova seção em `PessoasTab.tsx`
+**Bloco "Mapeamento de Categorias DRE"** (collapsible, abre se houver pendentes):
 
-### Não vou mexer
-- Schema, RLS, outras tabs.
-- O warning "Maximum update depth" em `PlanGrowthDataLoader`/`MediaMetasContext` (não tem relação com Pessoas — pré-existente).
+```text
+[Pendentes: 12]  [Mapeadas: 47]  [Ignoradas: 5]      [Auto-sugerir]
 
-## Risco
-- Se o label da categoria for genérico (ex: "Salários CLT") sem nome da pessoa, vai cair em "sem match" e a gente decide se soma como custo de equipe (rateio) ou ignora. Vou listar tudo separado pra você ver primeiro.
+┌─ Pendentes ──────────────────────────────────────────────┐
+│ Categoria DRE          Valor médio    Pessoa     Tipo  ⏷ │
+│ SALARIO DOUGLAS PI...  R$ 12.300      [Buscar▾] [Sal▾] ✓ │
+│ FGTS MARIANA           R$    980      [Buscar▾] [Enc▾] ✓ │
+│ ZENKLUB                R$  1.450      [Ignorar]          │
+└──────────────────────────────────────────────────────────┘
+```
+
+- Dropdown de pessoas: combobox com busca por nome (usa `pipefy_db_pessoas` já carregado).
+- Botão **Auto-sugerir**: roda matcher de tokens (nome normalizado contido na label) e pré-preenche os dropdowns com sugestão (badge "sugestão" — usuário confirma com ✓).
+- Salvar é por linha (debounce 500ms) — feedback toast.
+- Aba secundária "Mapeadas" permite editar/remover vínculos antigos.
+
+## 5. KPIs e gráficos
+- KPI "Custo total" passa a ter sub-linha: `R$ X mapeado · R$ Y pendente`.
+- Card de aviso só aparece se `pendentes > 0`.
+- Gráfico "Custo por categoria DRE" ganha cor diferente para pendentes.
+
+## Arquivos
+- `supabase/migrations/*` — nova tabela + RLS + grants
+- `src/hooks/usePersonnelDreMapping.ts` (novo)
+- `src/hooks/usePersonnelCostFromDRE.ts` (editar — juntar com mapping)
+- `src/components/planning/PessoasTab.tsx` (editar — nova seção)
+- `src/components/planning/DreMappingTable.tsx` (novo)
+
+## Fora de escopo
+- Importação CSV em massa (pode virar v2 se quiser depois).
+- Match por CNPJ (Oxy não expõe CNPJ por categoria nesse endpoint — só nome na label).
