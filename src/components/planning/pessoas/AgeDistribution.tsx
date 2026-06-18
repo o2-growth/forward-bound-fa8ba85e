@@ -7,7 +7,6 @@ import { ageStats, ageByBu, AGE_BUCKET_ORDER, type AgeBucket } from "./helpers";
 
 interface Props {
   rows: PessoaRow[];
-  timeToBu: (t: string) => string;
   onDrill?: (bucket: AgeBucket) => void;
 }
 
@@ -21,11 +20,12 @@ const BUCKET_COLOR: Record<AgeBucket, string> = {
   "N/I": "hsl(var(--muted-foreground))",
 };
 
-export function AgeDistribution({ rows, timeToBu }: Props) {
+export function AgeDistribution({ rows }: Props) {
   const stats = useMemo(() => ageStats(rows), [rows]);
-  const byBu = useMemo(() => ageByBu(rows, timeToBu), [rows, timeToBu]);
+  const byBu = useMemo(() => ageByBu(rows), [rows]);
 
   if (stats.total === 0) return null;
+
 
   return (
     <Card>
