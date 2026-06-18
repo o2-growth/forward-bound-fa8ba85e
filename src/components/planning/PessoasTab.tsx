@@ -566,7 +566,7 @@ export function PessoasTab() {
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
-                  subtitle={`${pc.porBu.length} BUs + Corporativo`}
+                  subtitle={`${pc.porBu.length} BU${pc.porBu.length === 1 ? "" : "s"}`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
                   delta={<DeltaChip current={custoTotal} previous={pcPrev.total} invert />}
