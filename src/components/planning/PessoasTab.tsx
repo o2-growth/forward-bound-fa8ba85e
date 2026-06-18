@@ -558,6 +558,7 @@ export function PessoasTab() {
                   subtitle={`${pc.porBu.length} BUs + Corporativo`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
+                  delta={<DeltaChip current={custoTotal} previous={pcPrev.total} invert />}
                 />
                 <Kpi
                   title="Custo / Receita"
@@ -573,6 +574,7 @@ export function PessoasTab() {
                   subtitle={`Headcount médio: ${formatNumber(headcountMedio)}`}
                   icon={Wallet}
                   isLoading={pc.isLoading || hr.isLoading}
+                  delta={<DeltaChip current={custoPerCapita} previous={pcPrev.total / Math.max(hrPrev.headcountTotal, 1)} invert />}
                 />
                 <Kpi
                   title="Custo de turnover"
@@ -588,6 +590,7 @@ export function PessoasTab() {
                     custoTotal > 0 && (pc.custoTurnover.total / custoTotal) > 0.05 ? "negative" : "warning"
                   }
                   isLoading={pc.isLoading}
+                  delta={<DeltaChip current={pc.custoTurnover.total} previous={pcPrev.custoTurnover.total} invert />}
                 />
                 <Kpi
                   title="Corporativo (não-BU)"
