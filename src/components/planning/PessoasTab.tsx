@@ -498,7 +498,7 @@ export function PessoasTab() {
               </div>
 
               {/* KPIs */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
@@ -522,6 +522,21 @@ export function PessoasTab() {
                   isLoading={pc.isLoading || hr.isLoading}
                 />
                 <Kpi
+                  title="Custo de turnover"
+                  value={formatCurrencyCompact(pc.custoTurnover.total)}
+                  subtitle={
+                    pc.custoTurnover.total > 0
+                      ? `${hr.desligadosNoPeriodo} desligado(s) · ${custoTotal > 0 ? ((pc.custoTurnover.total / custoTotal) * 100).toFixed(1) : "0"}% do custo`
+                      : "Sem rescisões no período"
+                  }
+                  icon={LogOut}
+                  tone={
+                    pc.custoTurnover.total === 0 ? "default" :
+                    custoTotal > 0 && (pc.custoTurnover.total / custoTotal) > 0.05 ? "negative" : "warning"
+                  }
+                  isLoading={pc.isLoading}
+                />
+                <Kpi
                   title="Corporativo (não-BU)"
                   value={formatCurrencyCompact(pc.corporativo.total)}
                   subtitle="Pró-labore, terceiros, RH/Fin/C-level"
@@ -529,6 +544,7 @@ export function PessoasTab() {
                   isLoading={pc.isLoading}
                 />
               </div>
+
 
               {/* Card 1: Custo de pessoal por BU (com drill-down) */}
               <Card className="mt-4">
