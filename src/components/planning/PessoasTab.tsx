@@ -812,7 +812,7 @@ export function PessoasTab() {
         <h3 className="text-lg font-semibold mb-3">Evolução 12 meses</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <TwelveMonthMovementChart rows={hr.rawPessoas} />
-          <TwelveMonthCostByBu porBu={pc.porBu} corporativo={pc.corporativo} receitaPorMes={receitaPorMes} />
+          <TwelveMonthCostByBu porBu={pc12m.porBu} corporativo={pc12m.corporativo} receitaPorMes={receitaPorMes} />
         </div>
       </div>
 
