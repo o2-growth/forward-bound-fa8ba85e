@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, Building2, ChevronDown, ChevronRight, Info } from "lucide-react";
-import { startOfMonth, endOfMonth, format } from "date-fns";
+import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, Building2, ChevronDown, ChevronRight, Info, ExternalLink } from "lucide-react";
+import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useHrData } from "@/hooks/useHrData";
@@ -9,6 +9,18 @@ import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { usePersonnelCostByBu, type BuKey } from "@/hooks/usePersonnelCostByBu";
 import { useDreDrillDown } from "@/hooks/useDreDrillDown";
 import { cn } from "@/lib/utils";
+import {
+  AlertsBanner,
+  TwelveMonthMovementChart,
+  TwelveMonthCostByBu,
+  CompositionCards,
+  EfficiencyByBu,
+  TenureExtremes,
+  PeopleDrillSheet,
+  usePeopleDrill,
+  DeltaChip,
+} from "./pessoas/PessoasExtras";
+import { tenureDistribution, previousRange } from "./pessoas/helpers";
 
 // Heurística Time(Pipefy) → BU pela substring do nome do Time.
 function timeToBu(time: string): BuKey | "Outros" {
@@ -41,13 +53,14 @@ const formatCurrencyCompact = (v: number) => {
 interface KpiProps {
   title: string;
   value: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
+  delta?: React.ReactNode;
   icon: React.ComponentType<{ className?: string }>;
   tone?: "default" | "positive" | "warning" | "negative";
   isLoading?: boolean;
 }
 
-function Kpi({ title, value, subtitle, icon: Icon, tone = "default", isLoading }: KpiProps) {
+function Kpi({ title, value, subtitle, delta, icon: Icon, tone = "default", isLoading }: KpiProps) {
   const toneClass =
     tone === "positive" ? "text-chart-2" :
     tone === "warning" ? "text-amber-500" :
@@ -63,7 +76,10 @@ function Kpi({ title, value, subtitle, icon: Icon, tone = "default", isLoading }
         {isLoading ? (
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         ) : (
-          <div className={cn("text-2xl font-bold", toneClass)}>{value}</div>
+          <div className="flex items-baseline gap-2">
+            <div className={cn("text-2xl font-bold", toneClass)}>{value}</div>
+            {delta}
+          </div>
         )}
         {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
       </CardContent>
@@ -202,6 +218,31 @@ export function PessoasTab() {
   const pc = usePersonnelCostByBu({ startDate: dateRange.from, endDate: dateRange.to });
   const [openBu, setOpenBu] = useState<string | null>(null);
   const [openCat, setOpenCat] = useState<string | null>(null);
+  const drill = usePeopleDrill();
+
+  // Período anterior (mesmo tamanho) — para Δ% nos KPIs
+  const prevRange = useMemo(() => previousRange(dateRange.from, dateRange.to), [dateRange]);
+  const hrPrev = useHrData({ startDate: prevRange.from, endDate: prevRange.to });
+  const pcPrev = usePersonnelCostByBu({ startDate: prevRange.from, endDate: prevRange.to });
+
+  // Receita mensal por "yyyy-MM" — para o stacked area 12m
+  const receitaPorMes = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!oxy.dreByBU) return map;
+    const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
+    const today = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = subMonths(today, i);
+      const m = months[d.getMonth()];
+      const key = format(d, "yyyy-MM");
+      let total = 0;
+      for (const bu of ["modelo_atual", "o2_tax", "oxy_hacker", "franquia"] as const) {
+        total += (oxy.dreByBU as any)?.[bu]?.[m] || 0;
+      }
+      map[key] = total;
+    }
+    return map;
+  }, [oxy.dreByBU]);
 
 
   // Receita do período (Oxy Finance) — soma dos meses cobertos no range
@@ -280,6 +321,18 @@ export function PessoasTab() {
         </CardHeader>
       </Card>
 
+      {/* Alertas e insights automáticos */}
+      <AlertsBanner
+        turnoverGeral={hr.turnoverGeral}
+        custoSobreReceita={receitaPeriodo > 0 ? (pc.total / receitaPeriodo) * 100 : 0}
+        tempoMedioDias={hr.tempoMedioDeCasaDias}
+        topTurnoverArea={turnoverByArea}
+        desligadosNoPeriodo={hr.desligadosNoPeriodo}
+        tenureBuckets={tenureDistribution(hr.rawPessoas).map(t => ({ bucket: t.bucket, count: t.count }))}
+        headcountTotal={hr.headcountTotal}
+      />
+
+
       {/* 3.1 Headcount & movimentação */}
       <div>
         <h3 className="text-lg font-semibold mb-3">3.1 Headcount e movimentação</h3>
@@ -306,6 +359,7 @@ export function PessoasTab() {
             icon={LogIn}
             tone="positive"
             isLoading={hr.isLoading}
+            delta={<DeltaChip current={hr.admissoesNoPeriodo} previous={hrPrev.admissoesNoPeriodo} />}
           />
           <Kpi
             title="Desligados no período"
@@ -314,6 +368,7 @@ export function PessoasTab() {
             icon={LogOut}
             tone={hr.desligadosNoPeriodo > 0 ? "negative" : "default"}
             isLoading={hr.isLoading}
+            delta={<DeltaChip current={hr.desligadosNoPeriodo} previous={hrPrev.desligadosNoPeriodo} invert />}
           />
           <Kpi
             title="Turnover geral"
@@ -322,6 +377,7 @@ export function PessoasTab() {
             icon={TrendingDown}
             tone={hr.turnoverGeral > 5 ? "negative" : hr.turnoverGeral > 2 ? "warning" : "positive"}
             isLoading={hr.isLoading}
+            delta={<DeltaChip current={hr.turnoverGeral} previous={hrPrev.turnoverGeral} invert formatter={(n) => `${n.toFixed(1)}%`} />}
           />
         </div>
 
@@ -505,6 +561,7 @@ export function PessoasTab() {
                   subtitle={`${pc.porBu.length} BUs + Corporativo`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
+                  delta={<DeltaChip current={custoTotal} previous={pcPrev.total} invert />}
                 />
                 <Kpi
                   title="Custo / Receita"
@@ -520,6 +577,7 @@ export function PessoasTab() {
                   subtitle={`Headcount médio: ${formatNumber(headcountMedio)}`}
                   icon={Wallet}
                   isLoading={pc.isLoading || hr.isLoading}
+                  delta={<DeltaChip current={custoPerCapita} previous={pcPrev.total / Math.max(hrPrev.headcountTotal, 1)} invert />}
                 />
                 <Kpi
                   title="Custo de turnover"
@@ -535,6 +593,7 @@ export function PessoasTab() {
                     custoTotal > 0 && (pc.custoTurnover.total / custoTotal) > 0.05 ? "negative" : "warning"
                   }
                   isLoading={pc.isLoading}
+                  delta={<DeltaChip current={pc.custoTurnover.total} previous={pcPrev.custoTurnover.total} invert />}
                 />
                 <Kpi
                   title="Corporativo (não-BU)"
@@ -739,6 +798,87 @@ export function PessoasTab() {
           );
         })()}
       </div>
+
+      {/* ─── Bloco 1: Evolução 12 meses ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Evolução 12 meses</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <TwelveMonthMovementChart rows={hr.rawPessoas} />
+          <TwelveMonthCostByBu porBu={pc.porBu} corporativo={pc.corporativo} receitaPorMes={receitaPorMes} />
+        </div>
+      </div>
+
+      {/* ─── Bloco 2: Composição do time ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Composição do time</h3>
+        <CompositionCards rows={hr.rawPessoas} monthDate={dateRange.from} />
+      </div>
+
+      {/* ─── Bloco 3: Eficiência por BU ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Eficiência por BU</h3>
+        <EfficiencyByBu
+          rows={[...pc.porBu, pc.corporativo].map((b) => {
+            const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
+            const buToOxy: Record<string, string[]> = {
+              CaaS: ["modelo_atual"],
+              SaaS: ["modelo_atual"],
+              TAX: ["o2_tax"],
+              "Expansão": ["oxy_hacker", "franquia"],
+            };
+            const oxyKeys = buToOxy[b.bu] || [];
+            let receita = 0;
+            if (oxy.dreByBU && dateRange.from.getFullYear() === dateRange.to.getFullYear()) {
+              for (let i = dateRange.from.getMonth(); i <= dateRange.to.getMonth(); i++) {
+                const m = months[i];
+                for (const k of oxyKeys) receita += (oxy.dreByBU as any)?.[k]?.[m] || 0;
+              }
+            }
+            const hc = hr.headcountByTime
+              .filter((h) => {
+                const bu = timeToBu(h.group);
+                if (b.bu === "Corporativo") return bu === "Outros";
+                return bu === b.bu;
+              })
+              .reduce((s, h) => s + h.count, 0);
+            return { bu: b.bu, headcount: hc, receita, custo: b.total };
+          })}
+        />
+      </div>
+
+      {/* ─── Bloco 4: Top tenure / mais recentes + drill-down ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Reconhecimento e onboarding</h3>
+        <TenureExtremes rows={hr.rawPessoas} />
+      </div>
+
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Explorar pessoas por Time / Área</h3>
+        <Card>
+          <CardContent className="p-4 flex flex-wrap gap-2">
+            {headcountByArea.map((a) => (
+              <button
+                key={`area-${a.group}`}
+                onClick={() => drill.open("area", a.group)}
+                className="text-xs px-2.5 py-1 rounded border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary inline-flex items-center gap-1"
+              >
+                {a.group} · {a.count} <ExternalLink className="h-3 w-3" />
+              </button>
+            ))}
+            {hr.headcountByTime.map((t) => (
+              <button
+                key={`time-${t.group}`}
+                onClick={() => drill.open("time", t.group)}
+                className="text-xs px-2.5 py-1 rounded border border-border hover:bg-muted inline-flex items-center gap-1"
+              >
+                {t.group} · {t.count} <ExternalLink className="h-3 w-3" />
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <PeopleDrillSheet state={drill.state} onClose={drill.close} rows={hr.rawPessoas} timeToBu={(t) => timeToBu(t)} />
     </div>
   );
 }
