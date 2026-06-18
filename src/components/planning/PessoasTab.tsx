@@ -226,6 +226,36 @@ export function PessoasTab() {
   const top5Cargo = hr.headcountByCargo.slice(0, 8);
   const topTurnover = hr.turnoverByTime.filter(t => t.desligados > 0).slice(0, 5);
 
+  // Headcount e turnover por Área (derivado de Time → BU, já que Pipefy não expõe Área)
+  const headcountByArea = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const h of hr.headcountByTime) {
+      const area = timeToBu(h.group);
+      map.set(area, (map.get(area) || 0) + h.count);
+    }
+    return Array.from(map.entries())
+      .map(([group, count]) => ({ group, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [hr.headcountByTime]);
+
+  const turnoverByArea = useMemo(() => {
+    const desl = new Map<string, number>();
+    const head = new Map<string, number>();
+    for (const t of hr.turnoverByTime) {
+      const area = timeToBu(t.group);
+      desl.set(area, (desl.get(area) || 0) + t.desligados);
+      head.set(area, (head.get(area) || 0) + t.headcount);
+    }
+    const all = new Set<string>([...desl.keys(), ...head.keys()]);
+    return Array.from(all).map((group) => {
+      const desligados = desl.get(group) || 0;
+      const headcount = head.get(group) || 0;
+      const denom = (headcount + desligados) / 2 || headcount;
+      return { group, desligados, headcount, pct: denom > 0 ? (desligados / denom) * 100 : 0 };
+    }).sort((a, b) => b.pct - a.pct);
+  }, [hr.turnoverByTime]);
+  const topTurnoverArea = turnoverByArea.filter(t => t.desligados > 0);
+
   return (
     <div className="space-y-6">
       {/* Header + filtro */}
