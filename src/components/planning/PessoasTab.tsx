@@ -556,8 +556,7 @@ export function PessoasTab() {
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
                 <div>
                   <strong>Origem dos números:</strong> custo por BU vem direto das categorias da Oxy DRE (ex: "Equipe CaaS", "Benefícios - SaaS").
-                  Categorias dentro de "Despesas com Pessoal" (Pró-labore sócios, Terceiros, etc.) entram em <strong>Corporativo</strong>.
-                  Zero rateio inventado.
+                  CS é considerado parte de <strong>CaaS</strong>, e categorias corporativas (Pró-labore, Terceiros, RH/Fin/C-level) também são roladas em <strong>CaaS</strong>. Zero rateio inventado.
                 </div>
               </div>
 
