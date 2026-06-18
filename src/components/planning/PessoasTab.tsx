@@ -21,6 +21,9 @@ import {
   DeltaChip,
 } from "./pessoas/PessoasExtras";
 import { tenureDistribution, previousRange } from "./pessoas/helpers";
+import { AgeDistribution } from "./pessoas/AgeDistribution";
+import { FaseDoisRoadmap } from "./pessoas/FaseDoisRoadmap";
+import { SaneamentoCard } from "./pessoas/SaneamentoCard";
 
 // Heurística Time(Pipefy) → BU pela substring do nome do Time.
 // CS é fundido em CaaS, e Times sem BU clara ("Outros") também viram CaaS (corporativo).
@@ -853,6 +856,12 @@ export function PessoasTab() {
         />
       </div>
 
+      {/* ─── Bloco: Distribuição etária ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Perfil demográfico</h3>
+        <AgeDistribution rows={hr.rawPessoas} timeToBu={(t) => timeToBu(t)} />
+      </div>
+
       {/* ─── Bloco 4: Top tenure / mais recentes + drill-down ─── */}
       <div>
         <h3 className="text-lg font-semibold mb-3">Reconhecimento e onboarding</h3>
@@ -883,6 +892,24 @@ export function PessoasTab() {
             ))}
           </CardContent>
         </Card>
+      </div>
+
+      {/* ─── Fase 2: Roadmap + Saneamento ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-1">Fase 2 — o que falta para fechar o painel</h3>
+        <p className="text-xs text-muted-foreground mb-3">
+          Indicadores planejados que ainda dependem de dados ou processos. Use o saneamento para destravar o turnover voluntário/involuntário.
+        </p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <FaseDoisRoadmap
+              desligadosNoPeriodo={hr.desligadosNoPeriodo}
+              headcountAtual={hr.headcountTotal}
+              custoPessoalTotal={pc.total}
+            />
+          </div>
+          <SaneamentoCard rows={hr.rawPessoas} />
+        </div>
       </div>
 
       <PeopleDrillSheet state={drill.state} onClose={drill.close} rows={hr.rawPessoas} timeToBu={(t) => timeToBu(t)} />

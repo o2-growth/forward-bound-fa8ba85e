@@ -1,38 +1,66 @@
-# Correções aba Pessoas
+# Aba Pessoas — alinhar ao plano oficial (até Bloco B)
 
-## 1. Bug: gráfico "Custo de pessoal por BU — 12 meses" mostra só 1 mês
+Escopo 100% pessoas. Sem CLT×PJ (todos são PJ). Sem cruzamento comercial.
 
-**Causa:** `usePersonnelCostByBu` é chamado com o range do filtro (1 mês na maioria das vezes) e o filtro `periodInRange` corta a série ao range do filtro. O gráfico 12m herda essa série truncada.
+## Status vs. plano
 
-**Fix:** chamar o hook uma segunda vez em paralelo com range fixo dos últimos 12 meses, exclusivamente para alimentar o `TwelveMonthCostByBu`. O card de "Custo Total Pessoal" e demais KPIs continuam usando o range do filtro normal.
+**Fase 1 (9 indicadores) já está toda na tela:** headcount atual / por área / por time, tempo médio de casa, turnover geral, turnover por área, custo de pessoal total, custo/receita, custo per capita, custo de turnover. Não mexo nessa parte.
 
-- `PessoasTab.tsx`: adicionar `const pc12m = usePersonnelCostByBu({ startDate: subMonths(endOfMonth(dateRange.to), 11), endDate: endOfMonth(dateRange.to) })` e passar `pc12m.porBu` / `pc12m.corporativo` para `TwelveMonthCostByBu`.
-- `receitaPorMes`: estender o map para cobrir os 12 meses (já existe lógica similar, só ajustar range).
+## O que entra agora
 
-## 2. CS e Corporativo devem virar CaaS (decisão aprovada)
+### Bloco A — Distribuição etária (dado novo já disponível)
 
-**Onde:** `src/hooks/usePersonnelCostByBu.ts`
+`pipefy_db_pessoas.Data de nascimento` está populado mas não usado. Adicionar 1 card:
 
-- Remover `"CS"` de `BU_KEYS` (continua sendo detectado internamente mas é remapeado).
-- Em `detectBuFromLabel`: manter o reconhecimento de CS (regex `\bcs\b|customer success`), mas retornar `"CaaS"`.
-- No loop que classifica categorias: quando bucket = `"Corporativo"`, redirecionar para `"CaaS"` (somar em CaaS em vez de criar bucket separado).
-- O objeto `corporativo` retornado pelo hook passa a vir sempre vazio (`total: 0`, `categorias: []`) — mantido para não quebrar a interface de quem consome.
-- Resultado: cards "Custo Corporativo", listagem de categorias corporativas, e fatia "Corporativo" do gráfico 12m ficam zeradas/ocultas naturalmente.
+- **Idade média** e **mediana** (KPIs no topo do card).
+- Histograma por faixa: `<25`, `25–30`, `30–35`, `35–40`, `40–50`, `>50`.
+- Quebra por BU (Time→BU) em barras empilhadas pequenas embaixo.
+- Tooltip: contagem + % do total. Click em barra → `PeopleDrillSheet` com a lista.
 
-**Limpeza visual em `PessoasTab.tsx`:**
-- Esconder o card "Custo Corporativo (não-BU)" quando `pc.corporativo.total === 0`.
-- Esconder o bloco de listagem de categorias corporativas quando vazio.
-- Ajustar o subtítulo "X BUs + Corporativo" para apenas "X BUs".
+Arquivos:
+- `useHrData.ts` — expor `dataNascimento` em `PessoaRow`; helper `idade`.
+- `pessoas/helpers.ts` — `ageBucket(idade)`, `ageDistribution(rows)`, `ageByBu(rows)`.
+- `pessoas/AgeDistribution.tsx` (novo).
 
-**Em `PessoasExtras.tsx` (`TwelveMonthCostByBu`):**
-- Remover `"CS"` do `buColors` (não vai mais aparecer).
-- Manter `"Corporativo"` no map mas só renderiza se houver série (já tem guard via `porBu.some(...) || bu === "Corporativo"` — trocar para checar série real).
+### Bloco B — Painel "Fase 2 — Roadmap de indicadores"
 
-## 3. Memória
+Card de roadmap visível na própria aba, espelhando exatamente a tabela da seção 4 do documento. Para cada linha: nome, blocker, responsável, status (🟡 Falta dado / 🟠 Em definição), e — quando o dado parcial existe — um valor preliminar.
 
-Adicionar regra em `mem://logic/financial/dre-mapping-logic-v2` (ou criar nova `mem://logic/pessoas/bu-rollup`):
-> Custo de pessoal: CS é considerado parte de CaaS. Categorias corporativas (sem sufixo de BU) também são roladas em CaaS. Não existem buckets independentes "CS" nem "Corporativo" no painel Pessoas.
+Linhas e o que dá pra entregar **parcialmente já hoje**:
+
+| Indicador Fase 2 | Entrega agora | Falta para versão final |
+|---|---|---|
+| Turnover voluntário × involuntário | Total de desligados no período (sem split) | Campo "motivo de desligamento" no Pipefy |
+| Custo de pessoal por área | — | Centro de custo por área no Conta Azul |
+| Headcount vs. orçado | Headcount atual (sem orçado) | Plano de headcount formalizado |
+| Folha vs. orçado | Custo de pessoal atual (sem orçado) | Orçamento de folha |
+| % OKRs definidos / atingidos | — | Fonte dos OKRs |
+| eNPS / clima | — | Ferramenta de pesquisa |
+| % 1:1 realizados | — | Registro padronizado |
+| PDI / treinamento / promoções | — | Pipe de desenvolvimento |
+| Time to hire / custo por contratação | — | Pipe de recrutamento |
+| Absenteísmo | — | Fonte de frequência |
+
+Implementação: componente de tabela `FaseDoisRoadmap.tsx` com array estático tipado (`indicador`, `blocker`, `responsavel`, `status`, `valorParcial?`). Linhas com `valorParcial` mostram o número + badge "parcial"; linhas sem mostram "—" + badge "falta dado". Sem cor agressiva; usa os mesmos tokens das outras tabelas da aba.
+
+Bônus dentro do Bloco B (zero custo de dado):
+- **Subcard "Saneamento de dados"** com 2 alertas que destravam a Fase 2:
+  - "N pessoa(s) sem `Data de contratação`" (impede turnover/tempo de casa).
+  - "N Inativa(s) sem `Data de desligamento` (proxy `updated_at` em uso)" — primeiro passo para destravar turnover voluntário × involuntário.
+
+Arquivos:
+- `pessoas/FaseDoisRoadmap.tsx` (novo).
+- `pessoas/SaneamentoCard.tsx` (novo) — usa `useHrData` direto.
+
+### Integração
+
+- `PessoasTab.tsx` — inserir Bloco A após o card de tempo médio de casa; inserir Bloco B (Roadmap + Saneamento) como última seção da aba, antes do rodapé.
 
 ## Fora de escopo
-- Refator de outros painéis que ainda usam CS/Corporativo como BU separada (DRE, financeiro, etc).
-- Mudança no edge function `fetch-oxy-finance` (a fusão é feita no client, mantendo a fonte intacta).
+- CLT vs PJ (todos PJ — confirmado).
+- Qualquer indicador comercial (SDR, Closer, CFO, NPS, jornada, marketing).
+- Salário individual, banda salarial, manager, gênero, raça — sem dado.
+
+## Memória
+- `mem://logic/pessoas/all-pj` — "Todos os colaboradores da O2 são PJ. Não diferenciar CLT/PJ na aba Pessoas."
+- `mem://features/pessoas/fase-2-roadmap` — referência ao documento oficial e à lista dos 9 indicadores pendentes com seus blockers.
