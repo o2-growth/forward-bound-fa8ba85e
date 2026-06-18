@@ -28,8 +28,8 @@ interface DreGroup {
 // Categorias consideradas "pessoal" (regex no label normalizado)
 const PERSONNEL_RE = /equipe|beneficio|estagiari|alimentac|deslocament|viage|pro[\s-]?labore|salari|fgts|inss|rescis|feria|13|cursos|treinament|seguro de vida|distribuic[aã]o de lucros|terceiros|menor aprendiz/i;
 
-// BUs que aparecem na DRE Oxy
-export const BU_KEYS = ["CaaS", "SaaS", "TAX", "Expansão", "CS", "Education"] as const;
+// BUs visíveis no painel (CS foi fundido em CaaS conforme regra de negócio)
+export const BU_KEYS = ["CaaS", "SaaS", "TAX", "Expansão", "Education"] as const;
 export type BuKey = typeof BU_KEYS[number] | "Corporativo";
 
 function normalize(s: string): string {
@@ -38,12 +38,12 @@ function normalize(s: string): string {
 
 function detectBuFromLabel(label: string): BuKey | null {
   const n = normalize(label);
-  // ordem importa: Expansão antes de CS para não confundir, etc.
   if (/\bcaas\b/.test(n)) return "CaaS";
   if (/\bsaas\b/.test(n)) return "SaaS";
   if (/\btax\b/.test(n)) return "TAX";
   if (/expansao/.test(n)) return "Expansão";
-  if (/\bcs\b|customer success/.test(n)) return "CS";
+  // CS é parte de CaaS — não existe como BU própria
+  if (/\bcs\b|customer success/.test(n)) return "CaaS";
   if (/education/.test(n)) return "Education";
   return null;
 }
