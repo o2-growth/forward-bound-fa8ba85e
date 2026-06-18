@@ -49,12 +49,27 @@ interface UseHrDataParams {
   endDate: Date;
 }
 
+function normalizeStr(s: string | null | undefined): string {
+  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+/** Exclui registros não relevantes para a aba Pessoas (SDR AI, Almoxarifado). */
+function isExcludedRow(p: PessoaRow): boolean {
+  const cargo = normalizeStr(p.Cargo);
+  const time = normalizeStr(p.Time);
+  if (/\bsdr ai\b/.test(cargo)) return true;
+  if (cargo.includes("almoxarifado")) return true;
+  if (time.includes("almoxarifado")) return true;
+  return false;
+}
+
 async function fetchPessoas(): Promise<PessoaRow[]> {
   const { data, error } = await supabase.functions.invoke("query-external-db", {
     body: { table: "pipefy_db_pessoas", action: "pessoas_all" },
   });
   if (error) throw error;
-  return (data?.rows || []) as PessoaRow[];
+  const rows = (data?.rows || []) as PessoaRow[];
+  return rows.filter((p) => !isExcludedRow(p));
 }
 
 function isAtivo(p: PessoaRow): boolean {
