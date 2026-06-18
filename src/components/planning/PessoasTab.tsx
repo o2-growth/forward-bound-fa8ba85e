@@ -20,22 +20,18 @@ import {
   usePeopleDrill,
   DeltaChip,
 } from "./pessoas/PessoasExtras";
-import { tenureDistribution, previousRange } from "./pessoas/helpers";
+import { tenureDistribution, previousRange, personToBu, headcountByBu, turnoverByBu, allActiveWithBu, admissoesIn, desligadosIn, pessoasOfBu, type PessoaBu, PESSOA_BU_ORDER } from "./pessoas/helpers";
 import { AgeDistribution } from "./pessoas/AgeDistribution";
 import { FaseDoisRoadmap } from "./pessoas/FaseDoisRoadmap";
 import { SaneamentoCard } from "./pessoas/SaneamentoCard";
 
-// Heurística Time(Pipefy) → BU pela substring do nome do Time.
-// CS é fundido em CaaS, e Times sem BU clara ("Outros") também viram CaaS (corporativo).
+// Compat: alguns componentes ainda recebem só o nome do Time.
+// Roteia via personToBu sem cargo (heurística por substring de Time).
 function timeToBu(time: string): BuKey | "Outros" {
-  const n = (time || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (/caas/.test(n)) return "CaaS";
-  if (/saas/.test(n)) return "SaaS";
-  if (/\btax\b/.test(n)) return "TAX";
-  if (/expansao|franquia/.test(n)) return "Expansão";
-  if (/\bcs\b|customer\s*success|sucesso\s+do\s+cliente/.test(n)) return "CaaS";
-  if (/education|educac/.test(n)) return "Education";
-  return "Outros";
+  const bu = personToBu(time, "");
+  // PessoaBu → BuKey: mapeia "Corporativo" para "Outros" pra manter as APIs antigas
+  if (bu === "Corporativo") return "Outros";
+  return bu as BuKey;
 }
 
 const formatNumber = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
@@ -62,16 +58,24 @@ interface KpiProps {
   icon: React.ComponentType<{ className?: string }>;
   tone?: "default" | "positive" | "warning" | "negative";
   isLoading?: boolean;
+  onClick?: () => void;
 }
 
-function Kpi({ title, value, subtitle, delta, icon: Icon, tone = "default", isLoading }: KpiProps) {
+function Kpi({ title, value, subtitle, delta, icon: Icon, tone = "default", isLoading, onClick }: KpiProps) {
   const toneClass =
     tone === "positive" ? "text-chart-2" :
     tone === "warning" ? "text-amber-500" :
     tone === "negative" ? "text-destructive" :
     "text-foreground";
+  const interactive = !!onClick;
   return (
-    <Card>
+    <Card
+      onClick={onClick}
+      className={cn(interactive && "cursor-pointer hover:bg-muted/30 hover:border-primary/40 transition-colors")}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } } : undefined}
+    >
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         <Icon className="h-4 w-4 text-muted-foreground" />
@@ -90,6 +94,7 @@ function Kpi({ title, value, subtitle, delta, icon: Icon, tone = "default", isLo
     </Card>
   );
 }
+
 
 interface CategoryDrillDownPanelProps {
   category: string;
@@ -278,35 +283,24 @@ export function PessoasTab() {
   const top5Cargo = hr.headcountByCargo.slice(0, 8);
   const topTurnover = hr.turnoverByTime.filter(t => t.desligados > 0).slice(0, 5);
 
-  // Headcount e turnover por Área (derivado de Time → BU, já que Pipefy não expõe Área)
-  const headcountByArea = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const h of hr.headcountByTime) {
-      const area = timeToBu(h.group);
-      map.set(area, (map.get(area) || 0) + h.count);
-    }
-    return Array.from(map.entries())
-      .map(([group, count]) => ({ group, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [hr.headcountByTime]);
+  // Headcount por BU usando personToBu (Time + Cargo)
+  const headcountByArea = useMemo(
+    () => headcountByBu(hr.rawPessoas).map((h) => ({ group: h.bu as string, count: h.count })),
+    [hr.rawPessoas]
+  );
 
-  const turnoverByArea = useMemo(() => {
-    const desl = new Map<string, number>();
-    const head = new Map<string, number>();
-    for (const t of hr.turnoverByTime) {
-      const area = timeToBu(t.group);
-      desl.set(area, (desl.get(area) || 0) + t.desligados);
-      head.set(area, (head.get(area) || 0) + t.headcount);
-    }
-    const all = new Set<string>([...desl.keys(), ...head.keys()]);
-    return Array.from(all).map((group) => {
-      const desligados = desl.get(group) || 0;
-      const headcount = head.get(group) || 0;
-      const denom = (headcount + desligados) / 2 || headcount;
-      return { group, desligados, headcount, pct: denom > 0 ? (desligados / denom) * 100 : 0 };
-    }).sort((a, b) => b.pct - a.pct);
-  }, [hr.turnoverByTime]);
+  // Turnover por BU usando personToBu (Time + Cargo)
+  const turnoverByArea = useMemo(
+    () => turnoverByBu(hr.rawPessoas, dateRange.from, dateRange.to).map((t) => ({
+      group: t.bu as string,
+      desligados: t.desligados,
+      headcount: t.headcount,
+      pct: t.pct,
+    })),
+    [hr.rawPessoas, dateRange]
+  );
   const topTurnoverArea = turnoverByArea.filter(t => t.desligados > 0);
+
 
   return (
     <div className="space-y-6">
@@ -352,45 +346,92 @@ export function PessoasTab() {
           <Kpi
             title="Headcount atual"
             value={formatNumber(hr.headcountTotal)}
-            subtitle="Pessoas com Situação = Ativo"
+            subtitle="Pessoas com Situação = Ativo · clique p/ ver lista"
             icon={Users}
             isLoading={hr.isLoading}
+            onClick={() => drill.open({
+              kind: "people",
+              title: "Headcount atual",
+              subtitle: `${hr.headcountTotal} pessoa(s) ativa(s)`,
+              people: allActiveWithBu(hr.rawPessoas),
+            })}
           />
           <Kpi
             title="Tempo médio de casa"
             value={formatYearsMonths(hr.tempoMedioDeCasaDias)}
-            subtitle={`${Math.round(hr.tempoMedioDeCasaDias)} dias em média`}
+            subtitle={`${Math.round(hr.tempoMedioDeCasaDias)} dias em média · clique p/ ranking`}
             icon={Clock}
             isLoading={hr.isLoading}
+            onClick={() => drill.open({
+              kind: "people",
+              title: "Tempo de casa — ranking",
+              subtitle: "Pessoas ativas ordenadas por tempo na empresa (desc)",
+              people: allActiveWithBu(hr.rawPessoas),
+            })}
           />
           <Kpi
             title="Admissões no período"
             value={formatNumber(hr.admissoesNoPeriodo)}
-            subtitle={`${format(dateRange.from, "dd/MM", { locale: ptBR })} – ${format(dateRange.to, "dd/MM", { locale: ptBR })}`}
+            subtitle={`${format(dateRange.from, "dd/MM", { locale: ptBR })} – ${format(dateRange.to, "dd/MM", { locale: ptBR })} · clique p/ ver`}
             icon={LogIn}
             tone="positive"
             isLoading={hr.isLoading}
             delta={<DeltaChip current={hr.admissoesNoPeriodo} previous={hrPrev.admissoesNoPeriodo} />}
+            onClick={() => drill.open({
+              kind: "people",
+              title: "Admissões no período",
+              subtitle: `${hr.admissoesNoPeriodo} pessoa(s) admitida(s) entre ${format(dateRange.from, "dd/MM/yy")} e ${format(dateRange.to, "dd/MM/yy")}`,
+              people: admissoesIn(hr.rawPessoas, dateRange.from, dateRange.to).map((p) => ({
+                ...p,
+                extra: p.dataContratacao ? `Admitido em ${format(new Date(p.dataContratacao), "dd/MM/yyyy")}` : undefined,
+              })),
+            })}
           />
           <Kpi
             title="Desligados no período"
             value={formatNumber(hr.desligadosNoPeriodo)}
-            subtitle="Situação = Inativo (aprox. via updated_at)"
+            subtitle="Situação = Inativo (proxy updated_at) · clique p/ ver"
             icon={LogOut}
             tone={hr.desligadosNoPeriodo > 0 ? "negative" : "default"}
             isLoading={hr.isLoading}
             delta={<DeltaChip current={hr.desligadosNoPeriodo} previous={hrPrev.desligadosNoPeriodo} invert />}
+            onClick={() => drill.open({
+              kind: "people",
+              title: "Desligados no período",
+              subtitle: `${hr.desligadosNoPeriodo} desligado(s) entre ${format(dateRange.from, "dd/MM/yy")} e ${format(dateRange.to, "dd/MM/yy")}`,
+              people: desligadosIn(hr.rawPessoas, dateRange.from, dateRange.to).map((p) => ({
+                ...p,
+                extra: p.updatedAt ? `Última atualização ${format(new Date(p.updatedAt), "dd/MM/yyyy")}` : undefined,
+              })),
+            })}
           />
           <Kpi
             title="Turnover geral"
             value={formatPct(hr.turnoverGeral)}
-            subtitle="Desligados ÷ Headcount médio"
+            subtitle="Desligados ÷ Headcount médio · clique p/ ver por BU"
             icon={TrendingDown}
             tone={hr.turnoverGeral > 5 ? "negative" : hr.turnoverGeral > 2 ? "warning" : "positive"}
             isLoading={hr.isLoading}
             delta={<DeltaChip current={hr.turnoverGeral} previous={hrPrev.turnoverGeral} invert formatter={(n) => `${n.toFixed(1)}%`} />}
+            onClick={() => {
+              const tByBu = turnoverByBu(hr.rawPessoas, dateRange.from, dateRange.to);
+              drill.open({
+                kind: "metrics",
+                title: "Turnover por BU",
+                subtitle: `Período: ${format(dateRange.from, "dd/MM/yy")} – ${format(dateRange.to, "dd/MM/yy")}`,
+                rows: tByBu.map((t) => ({
+                  label: t.bu,
+                  value: formatPct(t.pct),
+                  hint: `${t.desligados} desligado(s) · headcount ${t.headcount}`,
+                  pct: Math.min(100, t.pct * 5),
+                  tone: t.pct > 10 ? "negative" : t.pct > 5 ? "warning" : t.pct > 0 ? "default" : "positive",
+                })),
+                footer: "Denominador = (headcount + desligados) ÷ 2 por BU. Mapeamento Time+Cargo via personToBu (Hipótese A).",
+              });
+            }}
           />
         </div>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
           {/* Headcount por Time */}
@@ -568,27 +609,103 @@ export function PessoasTab() {
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
-                  subtitle={`${pc.porBu.length} BU${pc.porBu.length === 1 ? "" : "s"}`}
+                  subtitle={`${pc.porBu.length} BU${pc.porBu.length === 1 ? "" : "s"} · clique p/ breakdown`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
                   delta={<DeltaChip current={custoTotal} previous={pcPrev.total} invert />}
+                  onClick={() => {
+                    const buRows = [...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])];
+                    drill.open({
+                      kind: "metrics",
+                      title: "Custo de pessoal — por BU",
+                      subtitle: `Total ${formatCurrencyCompact(custoTotal)} · fonte: Oxy DRE`,
+                      rows: buRows.map((b) => ({
+                        label: b.bu,
+                        value: formatCurrencyCompact(b.total),
+                        hint: `${b.categorias.length} categoria(s)`,
+                        secondary: custoTotal > 0 ? `${((b.total / custoTotal) * 100).toFixed(1)}% do total` : undefined,
+                        pct: custoTotal > 0 ? (b.total / custoTotal) * 100 : 0,
+                      })),
+                      footer: "Categorias detalhadas no card 'Custo de pessoal por BU' abaixo.",
+                    });
+                  }}
                 />
                 <Kpi
                   title="Custo / Receita"
                   value={custoTotal > 0 && receitaPeriodo > 0 ? formatPct(custoSobreReceita) : "—"}
-                  subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)}`}
+                  subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)} · clique p/ ver por BU`}
                   icon={Percent}
                   tone={custoSobreReceita > 60 ? "negative" : custoSobreReceita > 40 ? "warning" : "positive"}
                   isLoading={pc.isLoading || oxy.isLoading}
+                  onClick={() => {
+                    const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
+                    const buToOxy: Record<string, string[]> = {
+                      CaaS: ["modelo_atual"],
+                      SaaS: ["modelo_atual"],
+                      TAX: ["o2_tax"],
+                      "Expansão": ["oxy_hacker", "franquia"],
+                    };
+                    const buRows = [...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])];
+                    const rows = buRows.map((b) => {
+                      const oxyKeys = buToOxy[b.bu] || [];
+                      let rec = 0;
+                      if (oxy.dreByBU && dateRange.from.getFullYear() === dateRange.to.getFullYear()) {
+                        for (let i = dateRange.from.getMonth(); i <= dateRange.to.getMonth(); i++) {
+                          const m = months[i];
+                          for (const k of oxyKeys) rec += (oxy.dreByBU as any)?.[k]?.[m] || 0;
+                        }
+                      }
+                      const ratio = rec > 0 ? (b.total / rec) * 100 : 0;
+                      return {
+                        label: b.bu,
+                        value: rec > 0 ? formatPct(ratio) : "—",
+                        hint: `Custo ${formatCurrencyCompact(b.total)} ÷ Receita ${formatCurrencyCompact(rec)}`,
+                        pct: Math.min(100, ratio),
+                        tone: (ratio > 60 ? "negative" : ratio > 40 ? "warning" : ratio > 0 ? "positive" : "default") as "default" | "positive" | "warning" | "negative",
+                      };
+                    });
+                    drill.open({
+                      kind: "metrics",
+                      title: "Custo / Receita por BU",
+                      subtitle: `Total: ${formatPct(custoSobreReceita)}`,
+                      rows,
+                      footer: "Receita via Oxy DRE. Corporativo não tem receita atribuída.",
+                    });
+                  }}
                 />
                 <Kpi
                   title="Custo per capita"
                   value={custoPerCapita > 0 ? formatCurrencyCompact(custoPerCapita) : "—"}
-                  subtitle={`Headcount médio: ${formatNumber(headcountMedio)}`}
+                  subtitle={`Headcount médio: ${formatNumber(headcountMedio)} · clique p/ ver por BU`}
                   icon={Wallet}
                   isLoading={pc.isLoading || hr.isLoading}
                   delta={<DeltaChip current={custoPerCapita} previous={pcPrev.total / Math.max(hrPrev.headcountTotal, 1)} invert />}
+                  onClick={() => {
+                    const buRows = [...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])];
+                    const hcMap = new Map(headcountByBu(hr.rawPessoas).map((h) => [h.bu as string, h.count]));
+                    drill.open({
+                      kind: "metrics",
+                      title: "Custo per capita por BU",
+                      subtitle: `Média geral: ${formatCurrencyCompact(custoPerCapita)}`,
+                      rows: buRows.map((b) => {
+                        const hc = hcMap.get(b.bu) || 0;
+                        const perCap = hc > 0 ? b.total / hc : 0;
+                        return {
+                          label: b.bu,
+                          value: perCap > 0 ? formatCurrencyCompact(perCap) : "—",
+                          hint: `${hc} pessoa(s) · custo ${formatCurrencyCompact(b.total)}`,
+                          pct: custoPerCapita > 0 ? (perCap / (custoPerCapita * 2)) * 100 : 0,
+                        };
+                      }).sort((a, b) => {
+                        const va = parseFloat(a.value.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+                        const vb = parseFloat(b.value.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+                        return vb - va;
+                      }),
+                      footer: "Headcount por BU calculado via personToBu (Time + Cargo).",
+                    });
+                  }}
                 />
+
                 <Kpi
                   title="Custo de turnover"
                   value={formatCurrencyCompact(pc.custoTurnover.total)}
@@ -859,7 +976,7 @@ export function PessoasTab() {
       {/* ─── Bloco: Distribuição etária ─── */}
       <div>
         <h3 className="text-lg font-semibold mb-3">Perfil demográfico</h3>
-        <AgeDistribution rows={hr.rawPessoas} timeToBu={(t) => timeToBu(t)} />
+        <AgeDistribution rows={hr.rawPessoas} />
       </div>
 
       {/* ─── Bloco 4: Top tenure / mais recentes + drill-down ─── */}
@@ -869,13 +986,18 @@ export function PessoasTab() {
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-3">Explorar pessoas por Time / Área</h3>
+        <h3 className="text-lg font-semibold mb-3">Explorar pessoas por Time / BU</h3>
         <Card>
           <CardContent className="p-4 flex flex-wrap gap-2">
             {headcountByArea.map((a) => (
               <button
                 key={`area-${a.group}`}
-                onClick={() => drill.open("area", a.group)}
+                onClick={() => drill.open({
+                  kind: "people",
+                  title: `BU: ${a.group}`,
+                  subtitle: `${a.count} pessoa(s) ativa(s)`,
+                  people: pessoasOfBu(hr.rawPessoas, a.group as PessoaBu),
+                })}
                 className="text-xs px-2.5 py-1 rounded border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary inline-flex items-center gap-1"
               >
                 {a.group} · {a.count} <ExternalLink className="h-3 w-3" />
@@ -884,7 +1006,12 @@ export function PessoasTab() {
             {hr.headcountByTime.map((t) => (
               <button
                 key={`time-${t.group}`}
-                onClick={() => drill.open("time", t.group)}
+                onClick={() => drill.open({
+                  kind: "people",
+                  title: `Time: ${t.group}`,
+                  subtitle: `${t.count} pessoa(s) ativa(s)`,
+                  people: allActiveWithBu(hr.rawPessoas).filter((p) => p.time === t.group),
+                })}
                 className="text-xs px-2.5 py-1 rounded border border-border hover:bg-muted inline-flex items-center gap-1"
               >
                 {t.group} · {t.count} <ExternalLink className="h-3 w-3" />
@@ -912,7 +1039,7 @@ export function PessoasTab() {
         </div>
       </div>
 
-      <PeopleDrillSheet state={drill.state} onClose={drill.close} rows={hr.rawPessoas} timeToBu={(t) => timeToBu(t)} />
+      <PeopleDrillSheet state={drill.state} onClose={drill.close} />
     </div>
   );
 }

@@ -210,6 +210,177 @@ export function pessoasOfArea(rows: PessoaRow[], area: string, timeToBu: (t: str
     .sort((a, b) => b.dias - a.dias);
 }
 
+// ─────────── Mapeamento Pessoa → BU (Hipótese A: Time + Cargo) ───────────
+// Documentação: mem://logic/pessoas/person-to-bu-mapping
+
+export type PessoaBu = "CaaS" | "SaaS" | "TAX" | "Expansão" | "Corporativo";
+export const PESSOA_BU_ORDER: PessoaBu[] = ["CaaS", "SaaS", "TAX", "Expansão", "Corporativo"];
+
+function normalize(s: string | null | undefined): string {
+  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+/**
+ * Mapeia uma pessoa (Time + Cargo) numa das 5 BUs.
+ * Regra:
+ *  - Operação → CaaS (CFOaaS, FP&A, CS, BPO, Projetos rolam aqui)
+ *  - Tecnologia → SaaS
+ *  - TAX → TAX
+ *  - Comercial → CaaS por padrão; Expansão quando o Cargo contém "expansao"/"account executive"
+ *  - Growth → Expansão quando o Cargo contém "expansao"; senão Corporativo
+ *  - Marketing, Diretoria, qualquer outro → Corporativo
+ */
+export function personToBu(time: string | null | undefined, cargo: string | null | undefined): PessoaBu {
+  const t = normalize(time);
+  const c = normalize(cargo);
+
+  // Refinamento por cargo (vale em qualquer Time)
+  if (/expansao/.test(c)) return "Expansão";
+
+  if (/operacao|operações|operacoes/.test(t)) return "CaaS";
+  if (/tecnologia|tech|engenharia/.test(t)) return "SaaS";
+  if (/\btax\b/.test(t)) return "TAX";
+
+  if (/comercial|sales|vendas/.test(t)) {
+    // "Sales Account Executive" sem expansão no cargo → CaaS (closer principal)
+    return "CaaS";
+  }
+
+  if (/growth/.test(t)) return "Corporativo";
+  if (/marketing/.test(t)) return "Corporativo";
+  if (/diretoria|directors?|board/.test(t)) return "Corporativo";
+
+  return "Corporativo";
+}
+
+export function pessoasOfBu(rows: PessoaRow[], bu: PessoaBu) {
+  const today = new Date();
+  return rows
+    .filter(isAtivoRow)
+    .filter((p) => personToBu(p.Time, p.Cargo) === bu)
+    .map((p) => ({
+      id: String(p.ID),
+      nome: p.Nome || p["Título"] || "—",
+      cargo: p.Cargo || "—",
+      time: p.Time || "—",
+      email: p["E-mail O2"] || "",
+      dias: p["Data de contratação"] ? differenceInDays(today, new Date(p["Data de contratação"])) : 0,
+      dataContratacao: p["Data de contratação"],
+      situacao: p["Situação"] || "—",
+      bu,
+    }))
+    .sort((a, b) => b.dias - a.dias);
+}
+
+export function headcountByBu(rows: PessoaRow[]): Array<{ bu: PessoaBu; count: number }> {
+  const counts = new Map<PessoaBu, number>(PESSOA_BU_ORDER.map((b) => [b, 0]));
+  for (const p of rows.filter(isAtivoRow)) {
+    const bu = personToBu(p.Time, p.Cargo);
+    counts.set(bu, (counts.get(bu) || 0) + 1);
+  }
+  return PESSOA_BU_ORDER.map((bu) => ({ bu, count: counts.get(bu) || 0 })).filter((x) => x.count > 0);
+}
+
+export function turnoverByBu(
+  rows: PessoaRow[],
+  startDate: Date,
+  endDate: Date
+): Array<{ bu: PessoaBu; desligados: number; headcount: number; pct: number }> {
+  const ativos = rows.filter(isAtivoRow);
+  const inativos = rows.filter(isInativoRow);
+  const desl = inativos.filter((p) => {
+    if (!p.updated_at) return false;
+    const dt = new Date(p.updated_at);
+    return dt >= startDate && dt <= endDate;
+  });
+  const hcMap = new Map<PessoaBu, number>();
+  const dMap = new Map<PessoaBu, number>();
+  for (const p of ativos) {
+    const bu = personToBu(p.Time, p.Cargo);
+    hcMap.set(bu, (hcMap.get(bu) || 0) + 1);
+  }
+  for (const p of desl) {
+    const bu = personToBu(p.Time, p.Cargo);
+    dMap.set(bu, (dMap.get(bu) || 0) + 1);
+  }
+  const all = new Set<PessoaBu>([...hcMap.keys(), ...dMap.keys()]);
+  return Array.from(all)
+    .map((bu) => {
+      const headcount = hcMap.get(bu) || 0;
+      const desligados = dMap.get(bu) || 0;
+      const denom = (headcount + desligados) / 2 || headcount;
+      return { bu, headcount, desligados, pct: denom > 0 ? (desligados / denom) * 100 : 0 };
+    })
+    .sort((a, b) => b.pct - a.pct);
+}
+
+/** Lista pessoas admitidas dentro do range, ordenado por data desc. */
+export function admissoesIn(rows: PessoaRow[], start: Date, end: Date) {
+  const today = new Date();
+  return rows
+    .filter((p) => {
+      const d = p["Data de contratação"];
+      if (!d) return false;
+      const dt = new Date(d);
+      return dt >= start && dt <= end;
+    })
+    .map((p) => ({
+      id: String(p.ID),
+      nome: p.Nome || p["Título"] || "—",
+      cargo: p.Cargo || "—",
+      time: p.Time || "—",
+      email: p["E-mail O2"] || "",
+      dias: p["Data de contratação"] ? differenceInDays(today, new Date(p["Data de contratação"])) : 0,
+      dataContratacao: p["Data de contratação"],
+      situacao: p["Situação"] || "—",
+      bu: personToBu(p.Time, p.Cargo),
+    }))
+    .sort((a, b) => new Date(b.dataContratacao!).getTime() - new Date(a.dataContratacao!).getTime());
+}
+
+/** Lista desligados (Inativo cujo updated_at caiu no range), ordenado por data desc. */
+export function desligadosIn(rows: PessoaRow[], start: Date, end: Date) {
+  const today = new Date();
+  return rows
+    .filter(isInativoRow)
+    .filter((p) => {
+      if (!p.updated_at) return false;
+      const dt = new Date(p.updated_at);
+      return dt >= start && dt <= end;
+    })
+    .map((p) => ({
+      id: String(p.ID),
+      nome: p.Nome || p["Título"] || "—",
+      cargo: p.Cargo || "—",
+      time: p.Time || "—",
+      email: p["E-mail O2"] || "",
+      dias: p["Data de contratação"] ? differenceInDays(today, new Date(p["Data de contratação"])) : 0,
+      dataContratacao: p["Data de contratação"],
+      updatedAt: p.updated_at,
+      bu: personToBu(p.Time, p.Cargo),
+    }))
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+}
+
+/** Lista todos ativos com BU resolvida. */
+export function allActiveWithBu(rows: PessoaRow[]) {
+  const today = new Date();
+  return rows
+    .filter(isAtivoRow)
+    .map((p) => ({
+      id: String(p.ID),
+      nome: p.Nome || p["Título"] || "—",
+      cargo: p.Cargo || "—",
+      time: p.Time || "—",
+      email: p["E-mail O2"] || "",
+      dias: p["Data de contratação"] ? differenceInDays(today, new Date(p["Data de contratação"])) : 0,
+      dataContratacao: p["Data de contratação"],
+      bu: personToBu(p.Time, p.Cargo),
+    }))
+    .sort((a, b) => b.dias - a.dias);
+}
+
+
 export function formatTenureShort(days: number): string {
   if (!days || days <= 0) return "—";
   const y = Math.floor(days / 365);
@@ -299,11 +470,11 @@ export interface AgeByBuRow {
   buckets: Record<AgeBucket, number>;
 }
 
-export function ageByBu(rows: PessoaRow[], timeToBu: (t: string) => string): AgeByBuRow[] {
+export function ageByBu(rows: PessoaRow[]): AgeByBuRow[] {
   const ativos = rows.filter(isAtivoRow);
   const map = new Map<string, AgeByBuRow>();
   for (const p of ativos) {
-    const bu = timeToBu(p.Time || "");
+    const bu = personToBu(p.Time, p.Cargo);
     if (!map.has(bu)) {
       const empty = Object.fromEntries(AGE_BUCKET_ORDER.map((b) => [b, 0])) as Record<AgeBucket, number>;
       map.set(bu, { bu, total: 0, buckets: empty });
@@ -315,6 +486,7 @@ export function ageByBu(rows: PessoaRow[], timeToBu: (t: string) => string): Age
   }
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
+
 
 // ─────────── Saneamento ───────────
 
