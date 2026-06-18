@@ -7,6 +7,7 @@ import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useHrData } from "@/hooks/useHrData";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { usePersonnelCostByBu, type BuKey } from "@/hooks/usePersonnelCostByBu";
+import { useDreDrillDown } from "@/hooks/useDreDrillDown";
 import { cn } from "@/lib/utils";
 
 // Heurística Time(Pipefy) → BU pela substring do nome do Time.
