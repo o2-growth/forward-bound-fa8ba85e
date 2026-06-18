@@ -12,6 +12,9 @@ export interface PessoaRow {
   Fase: string | null; // Pipefy phase (Ativo, Concluído, etc.)
   "Situação": string | null; // Ativo / Inativo
   "Data de contratação": string | null;
+  "Data de nascimento": string | null;
+  CPF: string | null;
+  CNPJ: string | null;
   "E-mail O2": string | null;
   created_at: string;
   updated_at: string;
