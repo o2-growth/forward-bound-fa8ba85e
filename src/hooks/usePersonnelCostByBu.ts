@@ -167,7 +167,8 @@ export function usePersonnelCostByBu({ startDate, endDate }: UseParams) {
       const valor = serie.reduce((s, d) => s + d.value, 0);
       if (valor === 0) continue;
 
-      const bu = detectBuFromLabel(cat.label) || "Corporativo";
+      // CS e Corporativo (sem sufixo) são fundidos em CaaS
+      const bu: BuKey = detectBuFromLabel(cat.label) || "CaaS";
       const bucket = ensure(bu);
       bucket.total += valor;
       bucket.categorias.push({ label: cat.label, valor, groupLabel: "", serie });
