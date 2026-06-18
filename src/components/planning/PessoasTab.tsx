@@ -217,6 +217,13 @@ export function PessoasTab() {
   const hr = useHrData({ startDate: dateRange.from, endDate: dateRange.to });
   const oxy = useOxyFinance();
   const pc = usePersonnelCostByBu({ startDate: dateRange.from, endDate: dateRange.to });
+  // Série fixa de 12 meses, independente do filtro — alimenta o gráfico 12m
+  const range12m = useMemo(() => {
+    const to = endOfMonth(dateRange.to);
+    const from = startOfMonth(subMonths(to, 11));
+    return { from, to };
+  }, [dateRange.to]);
+  const pc12m = usePersonnelCostByBu({ startDate: range12m.from, endDate: range12m.to });
   const [openBu, setOpenBu] = useState<string | null>(null);
   const [openCat, setOpenCat] = useState<string | null>(null);
   const drill = usePeopleDrill();
