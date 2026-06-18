@@ -609,27 +609,103 @@ export function PessoasTab() {
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
-                  subtitle={`${pc.porBu.length} BU${pc.porBu.length === 1 ? "" : "s"}`}
+                  subtitle={`${pc.porBu.length} BU${pc.porBu.length === 1 ? "" : "s"} · clique p/ breakdown`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
                   delta={<DeltaChip current={custoTotal} previous={pcPrev.total} invert />}
+                  onClick={() => {
+                    const buRows = [...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])];
+                    drill.open({
+                      kind: "metrics",
+                      title: "Custo de pessoal — por BU",
+                      subtitle: `Total ${formatCurrencyCompact(custoTotal)} · fonte: Oxy DRE`,
+                      rows: buRows.map((b) => ({
+                        label: b.bu,
+                        value: formatCurrencyCompact(b.total),
+                        hint: `${b.categorias.length} categoria(s)`,
+                        secondary: custoTotal > 0 ? `${((b.total / custoTotal) * 100).toFixed(1)}% do total` : undefined,
+                        pct: custoTotal > 0 ? (b.total / custoTotal) * 100 : 0,
+                      })),
+                      footer: "Categorias detalhadas no card 'Custo de pessoal por BU' abaixo.",
+                    });
+                  }}
                 />
                 <Kpi
                   title="Custo / Receita"
                   value={custoTotal > 0 && receitaPeriodo > 0 ? formatPct(custoSobreReceita) : "—"}
-                  subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)}`}
+                  subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)} · clique p/ ver por BU`}
                   icon={Percent}
                   tone={custoSobreReceita > 60 ? "negative" : custoSobreReceita > 40 ? "warning" : "positive"}
                   isLoading={pc.isLoading || oxy.isLoading}
+                  onClick={() => {
+                    const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
+                    const buToOxy: Record<string, string[]> = {
+                      CaaS: ["modelo_atual"],
+                      SaaS: ["modelo_atual"],
+                      TAX: ["o2_tax"],
+                      "Expansão": ["oxy_hacker", "franquia"],
+                    };
+                    const buRows = [...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])];
+                    const rows = buRows.map((b) => {
+                      const oxyKeys = buToOxy[b.bu] || [];
+                      let rec = 0;
+                      if (oxy.dreByBU && dateRange.from.getFullYear() === dateRange.to.getFullYear()) {
+                        for (let i = dateRange.from.getMonth(); i <= dateRange.to.getMonth(); i++) {
+                          const m = months[i];
+                          for (const k of oxyKeys) rec += (oxy.dreByBU as any)?.[k]?.[m] || 0;
+                        }
+                      }
+                      const ratio = rec > 0 ? (b.total / rec) * 100 : 0;
+                      return {
+                        label: b.bu,
+                        value: rec > 0 ? formatPct(ratio) : "—",
+                        hint: `Custo ${formatCurrencyCompact(b.total)} ÷ Receita ${formatCurrencyCompact(rec)}`,
+                        pct: Math.min(100, ratio),
+                        tone: (ratio > 60 ? "negative" : ratio > 40 ? "warning" : ratio > 0 ? "positive" : "default") as "default" | "positive" | "warning" | "negative",
+                      };
+                    });
+                    drill.open({
+                      kind: "metrics",
+                      title: "Custo / Receita por BU",
+                      subtitle: `Total: ${formatPct(custoSobreReceita)}`,
+                      rows,
+                      footer: "Receita via Oxy DRE. Corporativo não tem receita atribuída.",
+                    });
+                  }}
                 />
                 <Kpi
                   title="Custo per capita"
                   value={custoPerCapita > 0 ? formatCurrencyCompact(custoPerCapita) : "—"}
-                  subtitle={`Headcount médio: ${formatNumber(headcountMedio)}`}
+                  subtitle={`Headcount médio: ${formatNumber(headcountMedio)} · clique p/ ver por BU`}
                   icon={Wallet}
                   isLoading={pc.isLoading || hr.isLoading}
                   delta={<DeltaChip current={custoPerCapita} previous={pcPrev.total / Math.max(hrPrev.headcountTotal, 1)} invert />}
+                  onClick={() => {
+                    const buRows = [...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])];
+                    const hcMap = new Map(headcountByBu(hr.rawPessoas).map((h) => [h.bu as string, h.count]));
+                    drill.open({
+                      kind: "metrics",
+                      title: "Custo per capita por BU",
+                      subtitle: `Média geral: ${formatCurrencyCompact(custoPerCapita)}`,
+                      rows: buRows.map((b) => {
+                        const hc = hcMap.get(b.bu) || 0;
+                        const perCap = hc > 0 ? b.total / hc : 0;
+                        return {
+                          label: b.bu,
+                          value: perCap > 0 ? formatCurrencyCompact(perCap) : "—",
+                          hint: `${hc} pessoa(s) · custo ${formatCurrencyCompact(b.total)}`,
+                          pct: custoPerCapita > 0 ? (perCap / (custoPerCapita * 2)) * 100 : 0,
+                        };
+                      }).sort((a, b) => {
+                        const va = parseFloat(a.value.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+                        const vb = parseFloat(b.value.replace(/[^\d.,]/g, "").replace(",", ".")) || 0;
+                        return vb - va;
+                      }),
+                      footer: "Headcount por BU calculado via personToBu (Time + Cargo).",
+                    });
+                  }}
                 />
+
                 <Kpi
                   title="Custo de turnover"
                   value={formatCurrencyCompact(pc.custoTurnover.total)}
