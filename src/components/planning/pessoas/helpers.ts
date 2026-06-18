@@ -470,11 +470,11 @@ export interface AgeByBuRow {
   buckets: Record<AgeBucket, number>;
 }
 
-export function ageByBu(rows: PessoaRow[], timeToBu: (t: string) => string): AgeByBuRow[] {
+export function ageByBu(rows: PessoaRow[]): AgeByBuRow[] {
   const ativos = rows.filter(isAtivoRow);
   const map = new Map<string, AgeByBuRow>();
   for (const p of ativos) {
-    const bu = timeToBu(p.Time || "");
+    const bu = personToBu(p.Time, p.Cargo);
     if (!map.has(bu)) {
       const empty = Object.fromEntries(AGE_BUCKET_ORDER.map((b) => [b, 0])) as Record<AgeBucket, number>;
       map.set(bu, { bu, total: 0, buckets: empty });
@@ -486,6 +486,7 @@ export function ageByBu(rows: PessoaRow[], timeToBu: (t: string) => string): Age
   }
   return Array.from(map.values()).sort((a, b) => b.total - a.total);
 }
+
 
 // ─────────── Saneamento ───────────
 
