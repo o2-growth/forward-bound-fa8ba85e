@@ -21,6 +21,9 @@ import {
   DeltaChip,
 } from "./pessoas/PessoasExtras";
 import { tenureDistribution, previousRange } from "./pessoas/helpers";
+import { AgeDistribution } from "./pessoas/AgeDistribution";
+import { FaseDoisRoadmap } from "./pessoas/FaseDoisRoadmap";
+import { SaneamentoCard } from "./pessoas/SaneamentoCard";
 
 // Heurística Time(Pipefy) → BU pela substring do nome do Time.
 // CS é fundido em CaaS, e Times sem BU clara ("Outros") também viram CaaS (corporativo).
