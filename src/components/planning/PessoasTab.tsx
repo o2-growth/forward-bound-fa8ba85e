@@ -628,8 +628,8 @@ export function PessoasTab() {
                     <p className="text-sm text-muted-foreground">Sem dados de pessoal no período.</p>
                   ) : (
                     <div className="space-y-2">
-                      {[...pc.porBu, pc.corporativo].map((b) => {
-                        const max = Math.max(...[...pc.porBu, pc.corporativo].map((x) => x.total), 1);
+                      {[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((b) => {
+                        const max = Math.max(...[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((x) => x.total), 1);
                         const width = (b.total / max) * 100;
                         const isOpen = openBu === b.bu;
                         return (
@@ -742,7 +742,7 @@ export function PessoasTab() {
                             </tr>
                           </thead>
                           <tbody>
-                            {[...pc.porBu, pc.corporativo].map((b) => {
+                            {[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((b) => {
                               // Headcount = soma dos Times cujo nome casa com a BU
                               const hc = hr.headcountByTime
                                 .filter((h) => {
@@ -828,7 +828,7 @@ export function PessoasTab() {
       <div>
         <h3 className="text-lg font-semibold mb-3">Eficiência por BU</h3>
         <EfficiencyByBu
-          rows={[...pc.porBu, pc.corporativo].map((b) => {
+          rows={[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((b) => {
             const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
             const buToOxy: Record<string, string[]> = {
               CaaS: ["modelo_atual"],
