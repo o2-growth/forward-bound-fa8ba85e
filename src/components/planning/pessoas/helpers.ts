@@ -217,3 +217,119 @@ export function formatTenureShort(days: number): string {
   if (y === 0) return `${m}m`;
   return m === 0 ? `${y}a` : `${y}a ${m}m`;
 }
+
+// ─────────── Distribuição etária ───────────
+
+export type AgeBucket = "<25" | "25–30" | "30–35" | "35–40" | "40–50" | ">50" | "N/I";
+export const AGE_BUCKET_ORDER: AgeBucket[] = ["<25", "25–30", "30–35", "35–40", "40–50", ">50", "N/I"];
+
+export function calcIdade(dataNascimento: string | null | undefined): number | null {
+  if (!dataNascimento) return null;
+  const dt = new Date(dataNascimento);
+  if (isNaN(dt.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dt.getFullYear();
+  const m = today.getMonth() - dt.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dt.getDate())) age--;
+  return age >= 0 && age < 120 ? age : null;
+}
+
+export function ageBucket(age: number | null): AgeBucket {
+  if (age === null) return "N/I";
+  if (age < 25) return "<25";
+  if (age < 30) return "25–30";
+  if (age < 35) return "30–35";
+  if (age < 40) return "35–40";
+  if (age < 50) return "40–50";
+  return ">50";
+}
+
+export interface AgeStats {
+  total: number;
+  comDado: number;
+  semDado: number;
+  media: number;
+  mediana: number;
+  min: number;
+  max: number;
+  distribuicao: { bucket: AgeBucket; count: number; pct: number }[];
+}
+
+export function ageStats(rows: PessoaRow[]): AgeStats {
+  const ativos = rows.filter(isAtivoRow);
+  const idades = ativos
+    .map((p) => calcIdade(p["Data de nascimento"]))
+    .filter((v): v is number => v !== null);
+  const comDado = idades.length;
+  const semDado = ativos.length - comDado;
+  const sorted = [...idades].sort((a, b) => a - b);
+  const media = comDado ? idades.reduce((a, b) => a + b, 0) / comDado : 0;
+  const mediana = comDado
+    ? sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)]
+    : 0;
+  const counts = new Map<AgeBucket, number>();
+  AGE_BUCKET_ORDER.forEach((b) => counts.set(b, 0));
+  for (const p of ativos) {
+    const b = ageBucket(calcIdade(p["Data de nascimento"]));
+    counts.set(b, (counts.get(b) || 0) + 1);
+  }
+  const total = ativos.length || 1;
+  const distribuicao = AGE_BUCKET_ORDER.map((b) => ({
+    bucket: b,
+    count: counts.get(b) || 0,
+    pct: ((counts.get(b) || 0) / total) * 100,
+  })).filter((d) => d.count > 0);
+  return {
+    total: ativos.length,
+    comDado,
+    semDado,
+    media,
+    mediana,
+    min: comDado ? sorted[0] : 0,
+    max: comDado ? sorted[sorted.length - 1] : 0,
+    distribuicao,
+  };
+}
+
+export interface AgeByBuRow {
+  bu: string;
+  total: number;
+  buckets: Record<AgeBucket, number>;
+}
+
+export function ageByBu(rows: PessoaRow[], timeToBu: (t: string) => string): AgeByBuRow[] {
+  const ativos = rows.filter(isAtivoRow);
+  const map = new Map<string, AgeByBuRow>();
+  for (const p of ativos) {
+    const bu = timeToBu(p.Time || "");
+    if (!map.has(bu)) {
+      const empty = Object.fromEntries(AGE_BUCKET_ORDER.map((b) => [b, 0])) as Record<AgeBucket, number>;
+      map.set(bu, { bu, total: 0, buckets: empty });
+    }
+    const row = map.get(bu)!;
+    const b = ageBucket(calcIdade(p["Data de nascimento"]));
+    row.buckets[b]++;
+    row.total++;
+  }
+  return Array.from(map.values()).sort((a, b) => b.total - a.total);
+}
+
+// ─────────── Saneamento ───────────
+
+export interface SaneamentoStats {
+  semContratacao: PessoaRow[];
+  inativosSemDesligamento: PessoaRow[];
+  semNascimento: PessoaRow[];
+}
+
+export function saneamentoStats(rows: PessoaRow[]): SaneamentoStats {
+  return {
+    semContratacao: rows.filter((p) => isAtivoRow(p) && !p["Data de contratação"]),
+    // Sem campo dedicado de "Data de desligamento" — proxy via updated_at; flag todos inativos
+    inativosSemDesligamento: rows.filter(isInativoRow),
+    semNascimento: rows.filter((p) => isAtivoRow(p) && !p["Data de nascimento"]),
+  };
+}
+
