@@ -1,66 +1,75 @@
-# Aba Pessoas — alinhar ao plano oficial (até Bloco B)
+# Mapear pessoas → BU + tornar KPIs do topo clicáveis
 
-Escopo 100% pessoas. Sem CLT×PJ (todos são PJ). Sem cruzamento comercial.
+## Problema 1 — Headcount CaaS/SaaS/Expansão vazio
 
-## Status vs. plano
+`pipefy_db_pessoas` não tem campo de BU. Só temos `Time` (7 valores) + `Cargo`. O regex atual (`/caas/`, `/saas/`, `/expansao/`) não bate em nada porque os Times reais são: Operação (30), Comercial (8), Tecnologia (7), Growth (3), Diretoria (3), Marketing (2), TAX (1).
 
-**Fase 1 (9 indicadores) já está toda na tela:** headcount atual / por área / por time, tempo médio de casa, turnover geral, turnover por área, custo de pessoal total, custo/receita, custo per capita, custo de turnover. Não mexo nessa parte.
+### Hipóteses de mapeamento — escolha 1 (sigo a A se não responder)
 
-## O que entra agora
+**Hipótese A — Híbrida (Time + Cargo, recomendada)**
 
-### Bloco A — Distribuição etária (dado novo já disponível)
+Aplica regra por Time, refinando com Cargo quando o Cargo é inequívoco:
 
-`pipefy_db_pessoas.Data de nascimento` está populado mas não usado. Adicionar 1 card:
+| Time         | Cargo                                | BU final            |
+|--------------|--------------------------------------|---------------------|
+| Operação     | qualquer (CFOaaS, FP&A, CS, BPO, Projetos) | **CaaS** (30)  |
+| Tecnologia   | qualquer                             | **SaaS** (7)        |
+| TAX          | qualquer                             | **TAX** (1)         |
+| Comercial    | `Closer` / `Sales Account Executive` | **CaaS** (closer CaaS) ou **Expansão** se cargo contém "Expansão" |
+| Comercial    | `BDR/SDR`                            | **CaaS** (default; SDR atende prospect novo, majoritariamente CaaS) |
+| Growth       | `Head Expansão`                      | **Expansão**        |
+| Growth       | resto (Captação, Comunicação)        | **Corporativo**     |
+| Marketing    | qualquer                             | **Corporativo**     |
+| Diretoria    | CEO/CMO/COO                          | **Corporativo**     |
 
-- **Idade média** e **mediana** (KPIs no topo do card).
-- Histograma por faixa: `<25`, `25–30`, `30–35`, `35–40`, `40–50`, `>50`.
-- Quebra por BU (Time→BU) em barras empilhadas pequenas embaixo.
-- Tooltip: contagem + % do total. Click em barra → `PeopleDrillSheet` com a lista.
+Resultado estimado: CaaS≈38, SaaS≈7, TAX≈1, Expansão≈1, Corporativo≈8. (Expansão fica baixo — reflete a realidade do quadro atual; cresce quando contratar mais closer/SDR Expansão.)
 
-Arquivos:
-- `useHrData.ts` — expor `dataNascimento` em `PessoaRow`; helper `idade`.
-- `pessoas/helpers.ts` — `ageBucket(idade)`, `ageDistribution(rows)`, `ageByBu(rows)`.
-- `pessoas/AgeDistribution.tsx` (novo).
+**Hipótese B — Só por Time (simples)**
 
-### Bloco B — Painel "Fase 2 — Roadmap de indicadores"
+Operação→CaaS, Tecnologia→SaaS, TAX→TAX, Comercial→CaaS, todo o resto→Corporativo. Expansão fica zero porque não há Time "Expansão". CaaS=38, SaaS=7, TAX=1, Expansão=0, Corporativo=8.
 
-Card de roadmap visível na própria aba, espelhando exatamente a tabela da seção 4 do documento. Para cada linha: nome, blocker, responsável, status (🟡 Falta dado / 🟠 Em definição), e — quando o dado parcial existe — um valor preliminar.
+**Hipótese C — Rateio por Cargo conhecido (mais agressiva)**
 
-Linhas e o que dá pra entregar **parcialmente já hoje**:
+Igual à A, mas divide os 8 do Comercial e os 30 da Operação **proporcionalmente** entre CaaS/SaaS/TAX usando uma chave (ex.: faturamento de cada BU ou peso configurável). Mais "realista" para custo/receita, porém ninguém aparece "inteiro" numa BU — quebra o drill-down de pessoas. Não recomendo.
 
-| Indicador Fase 2 | Entrega agora | Falta para versão final |
-|---|---|---|
-| Turnover voluntário × involuntário | Total de desligados no período (sem split) | Campo "motivo de desligamento" no Pipefy |
-| Custo de pessoal por área | — | Centro de custo por área no Conta Azul |
-| Headcount vs. orçado | Headcount atual (sem orçado) | Plano de headcount formalizado |
-| Folha vs. orçado | Custo de pessoal atual (sem orçado) | Orçamento de folha |
-| % OKRs definidos / atingidos | — | Fonte dos OKRs |
-| eNPS / clima | — | Ferramenta de pesquisa |
-| % 1:1 realizados | — | Registro padronizado |
-| PDI / treinamento / promoções | — | Pipe de desenvolvimento |
-| Time to hire / custo por contratação | — | Pipe de recrutamento |
-| Absenteísmo | — | Fonte de frequência |
+### Implementação (Hipótese A)
 
-Implementação: componente de tabela `FaseDoisRoadmap.tsx` com array estático tipado (`indicador`, `blocker`, `responsavel`, `status`, `valorParcial?`). Linhas com `valorParcial` mostram o número + badge "parcial"; linhas sem mostram "—" + badge "falta dado". Sem cor agressiva; usa os mesmos tokens das outras tabelas da aba.
+- Substituir `timeToBu(time)` por `personToBu(time, cargo)` em `PessoasTab.tsx` — assinatura passa a receber a pessoa inteira.
+- Atualizar todos os call-sites: `timeToBu(h.group)` vira `personToBu(p.Time, p.Cargo)` e os agregados de headcount por BU recalculam direto sobre `rawPessoas` (não sobre `headcountByTime`).
+- Adicionar helper `headcountByBu(rows, personToBu)` em `pessoas/helpers.ts`.
+- Propagar para `AgeDistribution` (já recebe `timeToBu` — vira `personToBu`), `PeopleDrillSheet` e cards de eficiência por BU (`EfficiencyByBu`).
+- Memória: salvar a regra em `mem://logic/pessoas/person-to-bu-mapping`.
 
-Bônus dentro do Bloco B (zero custo de dado):
-- **Subcard "Saneamento de dados"** com 2 alertas que destravam a Fase 2:
-  - "N pessoa(s) sem `Data de contratação`" (impede turnover/tempo de casa).
-  - "N Inativa(s) sem `Data de desligamento` (proxy `updated_at` em uso)" — primeiro passo para destravar turnover voluntário × involuntário.
+## Problema 2 — Drill-down em todos os KPIs do topo
 
-Arquivos:
-- `pessoas/FaseDoisRoadmap.tsx` (novo).
-- `pessoas/SaneamentoCard.tsx` (novo) — usa `useHrData` direto.
+Hoje só os botões de Time/Área no fim da página abrem o `PeopleDrillSheet`. Vou tornar os 8 KPIs solicitados clicáveis:
 
-### Integração
+| KPI                          | Drill abre                                                                 |
+|------------------------------|----------------------------------------------------------------------------|
+| **Headcount atual**          | Lista completa de ativos, agrupada por BU, com Cargo/Time/Tempo de casa    |
+| **Tempo médio de casa**      | Lista ordenada por dias na empresa (asc/desc), com histograma por bucket   |
+| **Admissões no período**     | Pessoas com `Data de contratação` dentro do range, ordenadas por data      |
+| **Desligados no período**    | Inativos com `updated_at` no range, com Time/Cargo/Última atualização      |
+| **Turnover geral %**         | Tabela turnover por Time + lista de desligados que entram no numerador     |
+| **Custo total**              | Breakdown por categoria DRE (já existe — vira drawer); link por BU         |
+| **Custo / Receita %**        | Mostra numerador (custo por BU) e denominador (receita por BU) lado a lado |
+| **Custo per capita**         | Tabela custo/headcount por BU com ranking                                  |
 
-- `PessoasTab.tsx` — inserir Bloco A após o card de tempo médio de casa; inserir Bloco B (Roadmap + Saneamento) como última seção da aba, antes do rodapé.
+### Implementação
+
+- Estender `usePeopleDrill` para aceitar novos `type`s: `"all-active" | "tenure" | "admissions" | "terminations" | "turnover" | "cost-breakdown" | "cost-revenue" | "cost-per-capita"`.
+- Estender `PeopleDrillSheet` para renderizar visual apropriado por tipo (tabela de pessoas para os 5 primeiros; tabela de números para os 3 de custo).
+- Trocar `<Card>` por `<button onClick>` no componente `Kpi` (manter visual, só adicionar `cursor-pointer hover:bg-muted/30` quando houver `onClick`).
+- Passar handler em cada um dos 8 KPIs do header da aba.
 
 ## Fora de escopo
-- CLT vs PJ (todos PJ — confirmado).
-- Qualquer indicador comercial (SDR, Closer, CFO, NPS, jornada, marketing).
-- Salário individual, banda salarial, manager, gênero, raça — sem dado.
+- Drill-down nas barras/cards de composição (perguntei, não foi escolhido).
+- Drill nas linhas do roadmap Fase 2.
+- Edição manual de BU por pessoa (cria UI/CRUD — fora do pedido).
 
-## Memória
-- `mem://logic/pessoas/all-pj` — "Todos os colaboradores da O2 são PJ. Não diferenciar CLT/PJ na aba Pessoas."
-- `mem://features/pessoas/fase-2-roadmap` — referência ao documento oficial e à lista dos 9 indicadores pendentes com seus blockers.
+## Arquivos tocados
+- `src/components/planning/PessoasTab.tsx` (mapping + handlers KPIs)
+- `src/components/planning/pessoas/PessoasExtras.tsx` (`Kpi` clicável, `PeopleDrillSheet` multi-tipo, `usePeopleDrill` estendido)
+- `src/components/planning/pessoas/helpers.ts` (`headcountByBu`, tipos de drill)
+- `src/components/planning/pessoas/AgeDistribution.tsx` (assinatura `personToBu`)
+- `.lovable/memory/logic/pessoas/person-to-bu-mapping.md` (regra A)
