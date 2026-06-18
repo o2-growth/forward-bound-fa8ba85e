@@ -439,14 +439,46 @@ export function TenureExtremes({ rows }: { rows: PessoaRow[] }) {
   );
 }
 
-// ─────────── Drill-down: lista de pessoas em Time/Área ───────────
+// ─────────── Drill-down universal (pessoas + breakdowns numéricos) ───────────
 
-interface DrillState { open: boolean; type: "time" | "area"; key: string; }
+export interface PersonRow {
+  id: string;
+  nome: string;
+  cargo: string;
+  time: string;
+  email: string;
+  dias: number;
+  bu?: string;
+  dataContratacao?: string | null;
+  updatedAt?: string;
+  situacao?: string;
+  extra?: string;
+}
+
+export interface MetricRow {
+  label: string;
+  value: string;
+  hint?: string;
+  /** Optional 0-100 bar fill */
+  pct?: number;
+  /** Optional secondary value (e.g. denominador) */
+  secondary?: string;
+  tone?: "default" | "positive" | "warning" | "negative";
+}
+
+export type DrillSpec =
+  | { kind: "people"; title: string; subtitle?: string; people: PersonRow[] }
+  | { kind: "metrics"; title: string; subtitle?: string; rows: MetricRow[]; footer?: string };
+
+interface DrillState {
+  open: boolean;
+  spec: DrillSpec | null;
+}
 
 export function usePeopleDrill() {
-  const [state, setState] = useState<DrillState>({ open: false, type: "time", key: "" });
+  const [state, setState] = useState<DrillState>({ open: false, spec: null });
   return {
-    open: (type: "time" | "area", key: string) => setState({ open: true, type, key }),
+    open: (spec: DrillSpec) => setState({ open: true, spec }),
     close: () => setState((s) => ({ ...s, open: false })),
     state,
   };
@@ -455,66 +487,114 @@ export function usePeopleDrill() {
 interface DrillSheetProps {
   state: DrillState;
   onClose: () => void;
-  rows: PessoaRow[];
-  timeToBu: (t: string) => string;
 }
 
-export function PeopleDrillSheet({ state, onClose, rows, timeToBu }: DrillSheetProps) {
-  const list = useMemo(() => {
-    if (!state.open) return [];
-    return state.type === "time" ? pessoasOfTime(rows, state.key) : pessoasOfArea(rows, state.key, timeToBu);
-  }, [state, rows, timeToBu]);
+export function PeopleDrillSheet({ state, onClose }: DrillSheetProps) {
+  const spec = state.spec;
 
   const copyEmails = async () => {
-    const emails = list.map((p) => p.email).filter(Boolean).join("; ");
+    if (!spec || spec.kind !== "people") return;
+    const emails = spec.people.map((p) => p.email).filter(Boolean).join("; ");
     if (!emails) {
       toast({ title: "Sem e-mails", description: "Ninguém da lista tem E-mail O2 cadastrado." });
       return;
     }
     await navigator.clipboard.writeText(emails);
-    toast({ title: "E-mails copiados", description: `${list.filter((p) => p.email).length} endereços para o clipboard.` });
+    toast({ title: "E-mails copiados", description: `${spec.people.filter((p) => p.email).length} endereços para o clipboard.` });
   };
 
   return (
     <Sheet open={state.open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{state.type === "time" ? "Time" : "Área"}: {state.key}</SheetTitle>
-          <SheetDescription>{list.length} pessoa(s) ativa(s)</SheetDescription>
-        </SheetHeader>
-        <div className="mt-4 flex items-center justify-end">
-          <Button size="sm" variant="outline" onClick={copyEmails}><Copy className="h-3 w-3 mr-1" /> Copiar e-mails</Button>
-        </div>
-        <div className="mt-3">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-border text-[10px] uppercase text-muted-foreground text-left">
-                <th className="py-2 pr-2">Nome</th>
-                <th className="py-2 px-1">Cargo</th>
-                <th className="py-2 px-1">Time</th>
-                <th className="py-2 px-1 text-right">Casa</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((p) => (
-                <tr key={p.id} className="border-b border-border/30">
-                  <td className="py-2 pr-2 text-foreground">
-                    <div className="font-medium">{p.nome}</div>
-                    {p.email && <div className="text-[10px] text-muted-foreground">{p.email}</div>}
-                  </td>
-                  <td className="py-2 px-1 text-muted-foreground">{p.cargo}</td>
-                  <td className="py-2 px-1 text-muted-foreground">{p.time}</td>
-                  <td className="py-2 px-1 text-right tabular-nums">{formatTenureShort(p.dias)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {list.length === 0 && <p className="text-sm text-muted-foreground mt-4 text-center">Sem pessoas.</p>}
-        </div>
+      <SheetContent className="sm:max-w-2xl overflow-y-auto">
+        {spec && (
+          <>
+            <SheetHeader>
+              <SheetTitle>{spec.title}</SheetTitle>
+              {spec.subtitle && <SheetDescription>{spec.subtitle}</SheetDescription>}
+            </SheetHeader>
+
+            {spec.kind === "people" && (
+              <>
+                <div className="mt-4 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{spec.people.length} pessoa(s)</span>
+                  <Button size="sm" variant="outline" onClick={copyEmails}>
+                    <Copy className="h-3 w-3 mr-1" /> Copiar e-mails
+                  </Button>
+                </div>
+                <div className="mt-3">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-[10px] uppercase text-muted-foreground text-left">
+                        <th className="py-2 pr-2">Nome</th>
+                        <th className="py-2 px-1">Cargo</th>
+                        <th className="py-2 px-1">Time</th>
+                        <th className="py-2 px-1">BU</th>
+                        <th className="py-2 px-1 text-right">Casa</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {spec.people.map((p) => (
+                        <tr key={p.id} className="border-b border-border/30">
+                          <td className="py-2 pr-2 text-foreground">
+                            <div className="font-medium">{p.nome}</div>
+                            {p.email && <div className="text-[10px] text-muted-foreground">{p.email}</div>}
+                            {p.extra && <div className="text-[10px] text-muted-foreground">{p.extra}</div>}
+                          </td>
+                          <td className="py-2 px-1 text-muted-foreground">{p.cargo}</td>
+                          <td className="py-2 px-1 text-muted-foreground">{p.time}</td>
+                          <td className="py-2 px-1 text-muted-foreground">{p.bu || "—"}</td>
+                          <td className="py-2 px-1 text-right tabular-nums">{formatTenureShort(p.dias)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {spec.people.length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-4 text-center">Sem pessoas.</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {spec.kind === "metrics" && (
+              <div className="mt-4 space-y-2">
+                {spec.rows.map((r) => {
+                  const toneCls =
+                    r.tone === "negative" ? "text-destructive"
+                    : r.tone === "warning" ? "text-amber-500"
+                    : r.tone === "positive" ? "text-chart-2"
+                    : "text-foreground";
+                  return (
+                    <div key={r.label} className="rounded border border-border p-3">
+                      <div className="flex justify-between items-baseline gap-2">
+                        <div>
+                          <div className="text-sm font-medium text-foreground">{r.label}</div>
+                          {r.hint && <div className="text-[11px] text-muted-foreground mt-0.5">{r.hint}</div>}
+                        </div>
+                        <div className="text-right">
+                          <div className={`text-base font-semibold tabular-nums ${toneCls}`}>{r.value}</div>
+                          {r.secondary && <div className="text-[11px] text-muted-foreground">{r.secondary}</div>}
+                        </div>
+                      </div>
+                      {typeof r.pct === "number" && (
+                        <div className="mt-2 h-1.5 bg-muted rounded overflow-hidden">
+                          <div className="h-full bg-primary" style={{ width: `${Math.min(100, Math.max(0, r.pct))}%` }} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {spec.footer && (
+                  <p className="text-[11px] text-muted-foreground mt-2">{spec.footer}</p>
+                )}
+              </div>
+            )}
+          </>
+        )}
       </SheetContent>
     </Sheet>
   );
 }
+
 
 // ─────────── KPI delta chip ───────────
 
