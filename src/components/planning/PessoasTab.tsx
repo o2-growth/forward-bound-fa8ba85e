@@ -23,13 +23,14 @@ import {
 import { tenureDistribution, previousRange } from "./pessoas/helpers";
 
 // Heurística Time(Pipefy) → BU pela substring do nome do Time.
+// CS é fundido em CaaS, e Times sem BU clara ("Outros") também viram CaaS (corporativo).
 function timeToBu(time: string): BuKey | "Outros" {
   const n = (time || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (/caas/.test(n)) return "CaaS";
   if (/saas/.test(n)) return "SaaS";
   if (/\btax\b/.test(n)) return "TAX";
   if (/expansao|franquia/.test(n)) return "Expansão";
-  if (/\bcs\b|customer\s*success|sucesso\s+do\s+cliente/.test(n)) return "CS";
+  if (/\bcs\b|customer\s*success|sucesso\s+do\s+cliente/.test(n)) return "CaaS";
   if (/education|educac/.test(n)) return "Education";
   return "Outros";
 }
