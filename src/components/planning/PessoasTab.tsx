@@ -58,16 +58,24 @@ interface KpiProps {
   icon: React.ComponentType<{ className?: string }>;
   tone?: "default" | "positive" | "warning" | "negative";
   isLoading?: boolean;
+  onClick?: () => void;
 }
 
-function Kpi({ title, value, subtitle, delta, icon: Icon, tone = "default", isLoading }: KpiProps) {
+function Kpi({ title, value, subtitle, delta, icon: Icon, tone = "default", isLoading, onClick }: KpiProps) {
   const toneClass =
     tone === "positive" ? "text-chart-2" :
     tone === "warning" ? "text-amber-500" :
     tone === "negative" ? "text-destructive" :
     "text-foreground";
+  const interactive = !!onClick;
   return (
-    <Card>
+    <Card
+      onClick={onClick}
+      className={cn(interactive && "cursor-pointer hover:bg-muted/30 hover:border-primary/40 transition-colors")}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={interactive ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } } : undefined}
+    >
       <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         <Icon className="h-4 w-4 text-muted-foreground" />
@@ -86,6 +94,7 @@ function Kpi({ title, value, subtitle, delta, icon: Icon, tone = "default", isLo
     </Card>
   );
 }
+
 
 interface CategoryDrillDownPanelProps {
   category: string;
