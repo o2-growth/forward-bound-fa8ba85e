@@ -226,6 +226,36 @@ export function PessoasTab() {
   const top5Cargo = hr.headcountByCargo.slice(0, 8);
   const topTurnover = hr.turnoverByTime.filter(t => t.desligados > 0).slice(0, 5);
 
+  // Headcount e turnover por Área (derivado de Time → BU, já que Pipefy não expõe Área)
+  const headcountByArea = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const h of hr.headcountByTime) {
+      const area = timeToBu(h.group);
+      map.set(area, (map.get(area) || 0) + h.count);
+    }
+    return Array.from(map.entries())
+      .map(([group, count]) => ({ group, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [hr.headcountByTime]);
+
+  const turnoverByArea = useMemo(() => {
+    const desl = new Map<string, number>();
+    const head = new Map<string, number>();
+    for (const t of hr.turnoverByTime) {
+      const area = timeToBu(t.group);
+      desl.set(area, (desl.get(area) || 0) + t.desligados);
+      head.set(area, (head.get(area) || 0) + t.headcount);
+    }
+    const all = new Set<string>([...desl.keys(), ...head.keys()]);
+    return Array.from(all).map((group) => {
+      const desligados = desl.get(group) || 0;
+      const headcount = head.get(group) || 0;
+      const denom = (headcount + desligados) / 2 || headcount;
+      return { group, desligados, headcount, pct: denom > 0 ? (desligados / denom) * 100 : 0 };
+    }).sort((a, b) => b.pct - a.pct);
+  }, [hr.turnoverByTime]);
+  const topTurnoverArea = turnoverByArea.filter(t => t.desligados > 0);
+
   return (
     <div className="space-y-6">
       {/* Header + filtro */}
@@ -378,8 +408,71 @@ export function PessoasTab() {
               )}
             </CardContent>
           </Card>
+
+          {/* Headcount por Área (derivado de Time → BU) */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Headcount por Área</CardTitle>
+              <p className="text-xs text-muted-foreground">Área inferida do Time (Pipefy não expõe Área).</p>
+            </CardHeader>
+            <CardContent>
+              {hr.isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : headcountByArea.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem dados</p>
+              ) : (
+                <div className="space-y-2">
+                  {headcountByArea.map(({ group, count }) => {
+                    const pct = hr.headcountTotal > 0 ? (count / hr.headcountTotal) * 100 : 0;
+                    return (
+                      <div key={group}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-foreground">{group}</span>
+                          <span className="font-medium">{count} <span className="text-muted-foreground text-xs">({pct.toFixed(0)}%)</span></span>
+                        </div>
+                        <div className="h-2 bg-muted rounded overflow-hidden">
+                          <div className="h-full bg-chart-2" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Turnover por Área */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Turnover por Área</CardTitle>
+              <p className="text-xs text-muted-foreground">Área inferida do Time.</p>
+            </CardHeader>
+            <CardContent>
+              {hr.isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : topTurnoverArea.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum desligamento no período</p>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  {topTurnoverArea.map(t => (
+                    <div key={t.group} className="flex justify-between items-center border-b border-border pb-1">
+                      <span className="text-foreground truncate pr-2">{t.group}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{t.desligados}/{t.headcount}</span>
+                        <span className={cn(
+                          "font-medium tabular-nums",
+                          t.pct > 10 ? "text-destructive" : t.pct > 5 ? "text-amber-500" : "text-chart-2"
+                        )}>{formatPct(t.pct)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
+
 
       {/* 3.2 Custo de pessoal */}
       <div>
@@ -405,7 +498,7 @@ export function PessoasTab() {
               </div>
 
               {/* KPIs */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
@@ -429,6 +522,21 @@ export function PessoasTab() {
                   isLoading={pc.isLoading || hr.isLoading}
                 />
                 <Kpi
+                  title="Custo de turnover"
+                  value={formatCurrencyCompact(pc.custoTurnover.total)}
+                  subtitle={
+                    pc.custoTurnover.total > 0
+                      ? `${hr.desligadosNoPeriodo} desligado(s) · ${custoTotal > 0 ? ((pc.custoTurnover.total / custoTotal) * 100).toFixed(1) : "0"}% do custo`
+                      : "Sem rescisões no período"
+                  }
+                  icon={LogOut}
+                  tone={
+                    pc.custoTurnover.total === 0 ? "default" :
+                    custoTotal > 0 && (pc.custoTurnover.total / custoTotal) > 0.05 ? "negative" : "warning"
+                  }
+                  isLoading={pc.isLoading}
+                />
+                <Kpi
                   title="Corporativo (não-BU)"
                   value={formatCurrencyCompact(pc.corporativo.total)}
                   subtitle="Pró-labore, terceiros, RH/Fin/C-level"
@@ -436,6 +544,7 @@ export function PessoasTab() {
                   isLoading={pc.isLoading}
                 />
               </div>
+
 
               {/* Card 1: Custo de pessoal por BU (com drill-down) */}
               <Card className="mt-4">

@@ -73,6 +73,12 @@ export interface BuCusto {
   categorias: CategoriaPessoal[];
 }
 
+export interface CustoTurnover {
+  total: number;
+  serie: { period: string; value: number }[];
+  categorias: CategoriaPessoal[];
+}
+
 async function fetchDreGroups(start: string, end: string): Promise<DreGroup[]> {
   const { data, error } = await supabase.functions.invoke("fetch-oxy-finance", {
     body: { action: "dre", startDate: start, endDate: end },
@@ -143,6 +149,11 @@ export function usePersonnelCostByBu({ startDate, endDate }: UseParams) {
       return b;
     };
 
+    // Acumulador de turnover (Rescisão) — agrega série mensal entre categorias
+    const turnoverSerieMap = new Map<string, number>();
+    const turnoverCats: CategoriaPessoal[] = [];
+    let turnoverTotal = 0;
+
     for (const cat of cats) {
       if (cat.type !== "category") continue;
       if (!PERSONNEL_RE.test(cat.label)) continue;
@@ -160,19 +171,38 @@ export function usePersonnelCostByBu({ startDate, endDate }: UseParams) {
       const bucket = ensure(bu);
       bucket.total += valor;
       bucket.categorias.push({ label: cat.label, valor, groupLabel: "", serie });
-    }
 
+      // Custo de turnover = categorias de "Rescisão"
+      if (/rescis/i.test(cat.label)) {
+        turnoverTotal += valor;
+        turnoverCats.push({ label: cat.label, valor, groupLabel: bu, serie });
+        for (const s of serie) {
+          turnoverSerieMap.set(s.period, (turnoverSerieMap.get(s.period) || 0) + s.value);
+        }
+      }
+    }
 
     // Ordenar categorias dentro de cada BU
     for (const b of buckets.values()) {
       b.categorias.sort((a, b) => b.valor - a.valor);
     }
+    turnoverCats.sort((a, b) => b.valor - a.valor);
+
+    const turnoverSerie = Array.from(turnoverSerieMap.entries())
+      .map(([period, value]) => ({ period, value }))
+      .sort((a, b) => a.period.localeCompare(b.period));
 
     const porBu: BuCusto[] = BU_KEYS.map((bu) => buckets.get(bu)).filter((b): b is BuCusto => !!b);
     const corporativo: BuCusto = buckets.get("Corporativo") || { bu: "Corporativo", total: 0, categorias: [] };
     const total = [...porBu, corporativo].reduce((s, b) => s + b.total, 0);
 
-    return { porBu, corporativo, total };
+    const custoTurnover: CustoTurnover = {
+      total: turnoverTotal,
+      serie: turnoverSerie,
+      categorias: turnoverCats,
+    };
+
+    return { porBu, corporativo, total, custoTurnover };
   }, [catsQ.data, startDate, endDate]);
 
   return {

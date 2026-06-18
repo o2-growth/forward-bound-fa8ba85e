@@ -1,45 +1,37 @@
-## Objetivo
+## Indicadores faltantes na aba Pessoas
 
-Substituir a aproximação "média aritmética por pessoa" no drill-down de categoria (ex.: "Equipe CaaS") pelos lançamentos reais — fornecedor por fornecedor, mês a mês — usando o novo endpoint `dre-drill-down`. Resolve o gap atual em que Oxy não expunha lançamento individual.
+Comparando o que já está em `PessoasTab.tsx` com a especificação (imagens 3.1 e 3.2), faltam **3 indicadores** e **1 subgrupo**. Todo o resto já está implementado.
 
-## Onde aparece
+### O que falta
 
-Em `PessoasTab` → seção "3.2 Custo de pessoal" → card "Custo de pessoal por BU" → expandir uma BU → expandir uma categoria.
+**3.1 Headcount e movimentação**
+1. **Headcount por Área** (hoje só temos por Time e Cargo)
+2. **Turnover por Área** (hoje só temos por Time)
 
-Hoje esse painel mostra:
-- Painel A: evolução mensal da categoria (Oxy)
-- Painel B: pessoas do Pipefy do BU + valor médio aritmético
+**3.2 Custo de pessoal**
+3. **Custo de turnover** = soma de lançamentos categorizados como "Rescisão" no período (Oxy DRE)
 
-Vai virar:
-- Painel A: evolução mensal da categoria (Oxy) — mantém
-- Painel B: **Lançamentos reais por fornecedor** (novo) — vem do `dre-drill-down`, com valores reais mês a mês + total. Removemos a média inventada e o aviso amarelo.
-- Painel C (colapsado/aside): pessoas do Pipefy do BU (mantido como referência cruzada, sem valor monetário).
+### Implementação
 
-## Mudanças técnicas
+**`src/hooks/useHrData.ts`**
+- Adicionar campo opcional `Área` (string) em `PessoaRow`.
+- Novos retornos no objeto de métricas:
+  - `headcountByArea: HeadcountByGroup[]`
+  - `headcountByAreaTime: { area: string; time: string; count: number }[]` (agrupamento composto Área × Time, para o card "Headcount por área e time")
+  - `turnoverByArea: { group: string; desligados: number; headcount: number; pct: number }[]`
+- Mesma lógica de `groupCount` e `turnoverByTime`, trocando a chave para `Área`.
+- Fallback: se a coluna `Área` vier vazia/inexistente no Pipefy, usar `timeToBu(Time)` como aproximação para não quebrar a UI.
 
-1. `supabase/functions/fetch-oxy-finance/index.ts` — adicionar action `dre_drill_down`:
-   - Input: `{ category: string, startDate, endDate }` (CNPJ fixo `23.813.779/0001-60`).
-   - Chama `GET /v2/dre/dre-drill-down?startDate=…&endDate=…&cnpjs[]=23.813.779%2F0001-60&category=<encoded>`.
-   - Repassa resposta `{ period, periods, data: [{ label, type, data: [{ period, value }] }] }`.
-   - Trata 500 ("out of memory" quando categoria não existe) → retorna 404 com mensagem amigável.
+**`src/hooks/usePersonnelCostByBu.ts`**
+- Expor `custoTurnover: number` e `custoTurnoverSerie: { period; value }[]` a partir das categorias cujo label casa com `/rescis/i` (já filtradas hoje em `PERSONNEL_RE`, basta segregar).
+- Manter o total atual (Rescisão continua contando dentro do `total` agregado, como já faz hoje).
 
-2. `src/hooks/useDreDrillDown.ts` (novo) — `useQuery` por `(category, start, end)`, `enabled` só quando categoria está aberta, `staleTime` 10min. Retorna `{ items: [{ label, type, valor, serie }], total, isLoading, error }`.
+**`src/components/planning/PessoasTab.tsx`**
+- Em **3.1**, adicionar um 4º card ao grid de breakdown: **"Headcount por Área"** (mesmo visual do "Headcount por Time"), e trocar o card atual **"Turnover por Time"** por uma versão com toggle Time / Área (ou empilhar Área como card adicional, decidido visualmente — defaultmente Área aparece e Time vira segundo).
+- Em **3.2**, adicionar um 5º KPI ao grid (passando de `md:grid-cols-4` para `md:grid-cols-5`): **"Custo de turnover"** mostrando `formatCurrencyCompact(pc.custoTurnover)` e como subtitle a quantidade de desligados no período (`hr.desligadosNoPeriodo`).
+- Tom do KPI: `negative` se > 0 e representar > 5% do custo total, senão `warning`/`default`.
 
-3. `src/components/planning/PessoasTab.tsx`:
-   - Quando o usuário expande uma categoria (`openCat`), dispara o hook com o `c.label`.
-   - Substitui Painel B pelo novo "Lançamentos por fornecedor" (tabela: Fornecedor · valor total · % do total · mini-série mensal opcional).
-   - Mantém pessoas do Pipefy como info secundária menor (sem média monetária).
-   - Remove o aviso amarelo "Oxy não expõe lançamento individual".
-
-## Não muda
-
-- DRE por BU, CashflowChart, MetaVsRealized, FinancialTab.
-- `usePersonnelCostByBu` (continua agregando categorias do `dre_categories`).
-- `dreByBU`, regras de BU, categorias corporativas.
-- Categorias que não sejam de "Pessoal" continuam não tendo drill-down (escopo limitado ao painel de Pessoas).
-
-## Validação
-
-- Abrir "Equipe CaaS" em mar/2026 → lista de fornecedores deve somar exatamente o valor mostrado da categoria (regime de competência).
-- Período multi-mês: cada fornecedor mostra só os meses em que houve lançamento + total.
-- Categoria com label errado → toast/erro tratado, não quebra a UI.
+### Fora do escopo
+- Periodicidade "Diária" para Headcount (hoje é snapshot na carga da página — suficiente).
+- Indicadores da Fase 2 (que segundo o PDF "dependem de ajuste de processo").
+- Nenhum refactor do drill-down já existente.
