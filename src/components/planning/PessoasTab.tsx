@@ -20,22 +20,18 @@ import {
   usePeopleDrill,
   DeltaChip,
 } from "./pessoas/PessoasExtras";
-import { tenureDistribution, previousRange } from "./pessoas/helpers";
+import { tenureDistribution, previousRange, personToBu, headcountByBu, turnoverByBu, allActiveWithBu, admissoesIn, desligadosIn, pessoasOfBu, type PessoaBu, PESSOA_BU_ORDER } from "./pessoas/helpers";
 import { AgeDistribution } from "./pessoas/AgeDistribution";
 import { FaseDoisRoadmap } from "./pessoas/FaseDoisRoadmap";
 import { SaneamentoCard } from "./pessoas/SaneamentoCard";
 
-// Heurística Time(Pipefy) → BU pela substring do nome do Time.
-// CS é fundido em CaaS, e Times sem BU clara ("Outros") também viram CaaS (corporativo).
+// Compat: alguns componentes ainda recebem só o nome do Time.
+// Roteia via personToBu sem cargo (heurística por substring de Time).
 function timeToBu(time: string): BuKey | "Outros" {
-  const n = (time || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (/caas/.test(n)) return "CaaS";
-  if (/saas/.test(n)) return "SaaS";
-  if (/\btax\b/.test(n)) return "TAX";
-  if (/expansao|franquia/.test(n)) return "Expansão";
-  if (/\bcs\b|customer\s*success|sucesso\s+do\s+cliente/.test(n)) return "CaaS";
-  if (/education|educac/.test(n)) return "Education";
-  return "Outros";
+  const bu = personToBu(time, "");
+  // PessoaBu → BuKey: mapeia "Corporativo" para "Outros" pra manter as APIs antigas
+  if (bu === "Corporativo") return "Outros";
+  return bu as BuKey;
 }
 
 const formatNumber = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
