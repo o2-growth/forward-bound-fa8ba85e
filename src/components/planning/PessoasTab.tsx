@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, Building2, ChevronDown, ChevronRight, Info } from "lucide-react";
-import { startOfMonth, endOfMonth, format } from "date-fns";
+import { Loader2, Users, Clock, LogIn, LogOut, TrendingDown, DollarSign, Percent, Wallet, Building2, ChevronDown, ChevronRight, Info, ExternalLink } from "lucide-react";
+import { startOfMonth, endOfMonth, format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { useHrData } from "@/hooks/useHrData";
@@ -9,6 +9,18 @@ import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { usePersonnelCostByBu, type BuKey } from "@/hooks/usePersonnelCostByBu";
 import { useDreDrillDown } from "@/hooks/useDreDrillDown";
 import { cn } from "@/lib/utils";
+import {
+  AlertsBanner,
+  TwelveMonthMovementChart,
+  TwelveMonthCostByBu,
+  CompositionCards,
+  EfficiencyByBu,
+  TenureExtremes,
+  PeopleDrillSheet,
+  usePeopleDrill,
+  DeltaChip,
+} from "./pessoas/PessoasExtras";
+import { tenureDistribution, previousRange } from "./pessoas/helpers";
 
 // Heurística Time(Pipefy) → BU pela substring do nome do Time.
 function timeToBu(time: string): BuKey | "Outros" {
