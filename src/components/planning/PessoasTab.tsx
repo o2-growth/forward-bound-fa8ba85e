@@ -214,6 +214,31 @@ export function PessoasTab() {
   const pc = usePersonnelCostByBu({ startDate: dateRange.from, endDate: dateRange.to });
   const [openBu, setOpenBu] = useState<string | null>(null);
   const [openCat, setOpenCat] = useState<string | null>(null);
+  const drill = usePeopleDrill();
+
+  // Período anterior (mesmo tamanho) — para Δ% nos KPIs
+  const prevRange = useMemo(() => previousRange(dateRange.from, dateRange.to), [dateRange]);
+  const hrPrev = useHrData({ startDate: prevRange.from, endDate: prevRange.to });
+  const pcPrev = usePersonnelCostByBu({ startDate: prevRange.from, endDate: prevRange.to });
+
+  // Receita mensal por "yyyy-MM" — para o stacked area 12m
+  const receitaPorMes = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (!oxy.dreByBU) return map;
+    const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
+    const today = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = subMonths(today, i);
+      const m = months[d.getMonth()];
+      const key = format(d, "yyyy-MM");
+      let total = 0;
+      for (const bu of ["modelo_atual", "o2_tax", "oxy_hacker", "franquia"] as const) {
+        total += (oxy.dreByBU as any)?.[bu]?.[m] || 0;
+      }
+      map[key] = total;
+    }
+    return map;
+  }, [oxy.dreByBU]);
 
 
   // Receita do período (Oxy Finance) — soma dos meses cobertos no range
