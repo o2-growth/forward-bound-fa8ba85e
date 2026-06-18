@@ -1,32 +1,20 @@
-## Objetivo
-Criar acesso para `bruno.mendes@o2inc.com.br` que veja **somente a aba Operação**, com **todas as sub-abas exceto CFOs**.
+## Excluir "SDR AI" e "Administrativo - Almoxarifado" da aba Pessoas
 
-## Por que não precisa mexer em código
-A lógica já existe:
-- `useUserPermissions` libera apenas as abas presentes em `user_tab_permissions` (não-admin não vê nada além do que tem permissão).
-- Em `CustomerSuccessTab`, `canViewCfoTab = isAdmin && !isCfo` — portanto, qualquer usuário que **não seja admin** já não vê a sub-aba CFOs automaticamente.
-- Não vou usar a role `cfo`, pois ela trava filtros pelo `cfo_user_mapping` (Bruno não é CFO).
+### O quê
+Remover essas pessoas/cargos de todos os indicadores da aba Pessoas (headcount, admissões, desligados, turnover, tempo de casa, distribuições, drill-downs).
 
-## Passos
+### Como
+Aplicar o filtro no ponto único de carregamento: `fetchPessoas` em `src/hooks/useHrData.ts`. Assim todos os helpers (`isAtivoRow`, `headcountByBu`, `tenureDistribution`, etc.) consomem a lista já saneada — sem precisar mexer em cada componente.
 
-1. **Criar o usuário** via edge function `admin-create-user`:
-   - email: `bruno.mendes@o2inc.com.br`
-   - full_name: `Bruno Mendes`
-   - senha temporária aleatória forte (gerada na hora; mostro no chat após criação)
-   - role: `user` (padrão atribuído por `handle_new_user`)
+Regra de exclusão (case-insensitive, com normalização de acento/espaço):
+- `Cargo` contém "sdr ai", **ou**
+- `Cargo` contém "almoxarifado", **ou**
+- `Time` contém "almoxarifado"
 
-2. **Conceder permissão de Operação** inserindo em `user_tab_permissions`:
-   - `tab_key = 'cs'` (a aba Operação)
-   - Bruno NÃO recebe `admin`, então a sub-aba CFOs ficará oculta automaticamente.
-   - Demais sub-abas (Visão Geral, Pipeline, Clientes, Reuniões, Alertas, NPS) ficam visíveis.
+Cobre as variações "SDR AI", "Administrativo - Almoxarifado", "Administrativo – Almoxarifado", etc.
 
-3. **Entregar credenciais** no chat: email + senha temporária + instrução para trocar a senha no primeiro login (via "Alterar senha" no header).
+### Arquivos
+- `src/hooks/useHrData.ts` — adicionar função `isExcludedRow(p)` e filtrar o retorno de `fetchPessoas` antes de devolver para o React Query.
 
-## Sem mudanças de código
-Nenhum arquivo será editado. Tudo é configuração de dados (auth + 1 linha em `user_tab_permissions`).
-
-## Verificação
-Após criação, confirmo via `supabase--read_query`:
-- usuário existe em `auth.users` e em `profiles`
-- `user_roles` contém só `'user'`
-- `user_tab_permissions` contém `('<user_id>', 'cs')`
+### Fora de escopo
+- Custo por BU (`usePersonnelCost*`) usa outra fonte (planilha) — não mexer agora. Se aparecerem nessas planilhas e o usuário quiser excluir lá também, faço num passo seguinte.
