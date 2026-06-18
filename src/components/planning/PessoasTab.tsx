@@ -317,6 +317,18 @@ export function PessoasTab() {
         </CardHeader>
       </Card>
 
+      {/* Alertas e insights automáticos */}
+      <AlertsBanner
+        turnoverGeral={hr.turnoverGeral}
+        custoSobreReceita={receitaPeriodo > 0 ? (pc.total / receitaPeriodo) * 100 : 0}
+        tempoMedioDias={hr.tempoMedioDeCasaDias}
+        topTurnoverArea={turnoverByArea}
+        desligadosNoPeriodo={hr.desligadosNoPeriodo}
+        tenureBuckets={tenureDistribution(hr.rawPessoas).map(t => ({ bucket: t.bucket, count: t.count }))}
+        headcountTotal={hr.headcountTotal}
+      />
+
+
       {/* 3.1 Headcount & movimentação */}
       <div>
         <h3 className="text-lg font-semibold mb-3">3.1 Headcount e movimentação</h3>
