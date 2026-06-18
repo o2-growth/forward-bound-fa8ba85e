@@ -53,7 +53,8 @@ const formatCurrencyCompact = (v: number) => {
 interface KpiProps {
   title: string;
   value: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
+  delta?: React.ReactNode;
   icon: React.ComponentType<{ className?: string }>;
   tone?: "default" | "positive" | "warning" | "negative";
   isLoading?: boolean;
