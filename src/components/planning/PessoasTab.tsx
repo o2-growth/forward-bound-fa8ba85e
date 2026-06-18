@@ -408,8 +408,71 @@ export function PessoasTab() {
               )}
             </CardContent>
           </Card>
+
+          {/* Headcount por Área (derivado de Time → BU) */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Headcount por Área</CardTitle>
+              <p className="text-xs text-muted-foreground">Área inferida do Time (Pipefy não expõe Área).</p>
+            </CardHeader>
+            <CardContent>
+              {hr.isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : headcountByArea.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem dados</p>
+              ) : (
+                <div className="space-y-2">
+                  {headcountByArea.map(({ group, count }) => {
+                    const pct = hr.headcountTotal > 0 ? (count / hr.headcountTotal) * 100 : 0;
+                    return (
+                      <div key={group}>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-foreground">{group}</span>
+                          <span className="font-medium">{count} <span className="text-muted-foreground text-xs">({pct.toFixed(0)}%)</span></span>
+                        </div>
+                        <div className="h-2 bg-muted rounded overflow-hidden">
+                          <div className="h-full bg-chart-2" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Turnover por Área */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Turnover por Área</CardTitle>
+              <p className="text-xs text-muted-foreground">Área inferida do Time.</p>
+            </CardHeader>
+            <CardContent>
+              {hr.isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin" />
+              ) : topTurnoverArea.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Nenhum desligamento no período</p>
+              ) : (
+                <div className="space-y-2 text-sm">
+                  {topTurnoverArea.map(t => (
+                    <div key={t.group} className="flex justify-between items-center border-b border-border pb-1">
+                      <span className="text-foreground truncate pr-2">{t.group}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{t.desligados}/{t.headcount}</span>
+                        <span className={cn(
+                          "font-medium tabular-nums",
+                          t.pct > 10 ? "text-destructive" : t.pct > 5 ? "text-amber-500" : "text-chart-2"
+                        )}>{formatPct(t.pct)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
+
 
       {/* 3.2 Custo de pessoal */}
       <div>
