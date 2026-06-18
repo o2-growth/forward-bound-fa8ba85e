@@ -603,13 +603,15 @@ export function PessoasTab() {
                   isLoading={pc.isLoading}
                   delta={<DeltaChip current={pc.custoTurnover.total} previous={pcPrev.custoTurnover.total} invert />}
                 />
-                <Kpi
-                  title="Corporativo (não-BU)"
-                  value={formatCurrencyCompact(pc.corporativo.total)}
-                  subtitle="Pró-labore, terceiros, RH/Fin/C-level"
-                  icon={Building2}
-                  isLoading={pc.isLoading}
-                />
+                {pc.corporativo.total > 0 && (
+                  <Kpi
+                    title="Corporativo (não-BU)"
+                    value={formatCurrencyCompact(pc.corporativo.total)}
+                    subtitle="Pró-labore, terceiros, RH/Fin/C-level"
+                    icon={Building2}
+                    isLoading={pc.isLoading}
+                  />
+                )}
               </div>
 
 
