@@ -82,6 +82,31 @@ serve(async (req) => {
         fetchOptions = { method: 'GET', headers: authHeaders };
         break;
       }
+      case 'dre_drill_down': {
+        const category = body.category;
+        if (!category || typeof category !== 'string') {
+          return new Response(JSON.stringify({ error: 'dre_drill_down requires "category"' }), {
+            status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        const params = new URLSearchParams({ startDate, endDate, category });
+        params.append('cnpjs[]', CNPJ_FORMATTED);
+        url = `${BASE_URL}/v2/dre/dre-drill-down?${params}`;
+        fetchOptions = { method: 'GET', headers: authHeaders };
+        const r = await fetch(url, fetchOptions);
+        const txt = await r.text();
+        console.log(`drill-down status: ${r.status}, category: ${category}`);
+        if (r.status >= 500) {
+          return new Response(JSON.stringify({
+            error: `Categoria "${category}" não encontrada na DRE Oxy (verifique o nome exato).`,
+            upstreamStatus: r.status,
+          }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        return new Response(txt, {
+          status: r.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       case 'probe': {
         // Generic diagnostic probe — does NOT mutate any existing behavior.
         // body: { path: "/v2/foo", queryParams?: Record<string,string|string[]>, method?: "GET"|"POST", reqBody?: any }
