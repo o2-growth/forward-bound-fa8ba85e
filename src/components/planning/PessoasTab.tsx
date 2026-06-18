@@ -359,6 +359,7 @@ export function PessoasTab() {
             icon={LogIn}
             tone="positive"
             isLoading={hr.isLoading}
+            delta={<DeltaChip current={hr.admissoesNoPeriodo} previous={hrPrev.admissoesNoPeriodo} />}
           />
           <Kpi
             title="Desligados no período"
@@ -367,6 +368,7 @@ export function PessoasTab() {
             icon={LogOut}
             tone={hr.desligadosNoPeriodo > 0 ? "negative" : "default"}
             isLoading={hr.isLoading}
+            delta={<DeltaChip current={hr.desligadosNoPeriodo} previous={hrPrev.desligadosNoPeriodo} invert />}
           />
           <Kpi
             title="Turnover geral"
@@ -375,6 +377,7 @@ export function PessoasTab() {
             icon={TrendingDown}
             tone={hr.turnoverGeral > 5 ? "negative" : hr.turnoverGeral > 2 ? "warning" : "positive"}
             isLoading={hr.isLoading}
+            delta={<DeltaChip current={hr.turnoverGeral} previous={hrPrev.turnoverGeral} invert formatter={(n) => `${n.toFixed(1)}%`} />}
           />
         </div>
 
