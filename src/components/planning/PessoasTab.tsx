@@ -770,15 +770,13 @@ export function PessoasTab() {
                   </CardContent>
                 </Card>
 
+                {pc.corporativo.categorias.length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Composição Corporativo</CardTitle>
                     <p className="text-xs text-muted-foreground">Categorias dentro de "Despesas com Pessoal" (não-BU)</p>
                   </CardHeader>
                   <CardContent>
-                    {pc.corporativo.categorias.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Sem categorias corporativas no período.</p>
-                    ) : (
                       <div className="space-y-2">
                         {pc.corporativo.categorias.map((c) => {
                           const max = pc.corporativo.categorias[0]?.valor || 1;
@@ -800,9 +798,9 @@ export function PessoasTab() {
                           );
                         })}
                       </div>
-                    )}
                   </CardContent>
                 </Card>
+                )}
               </div>
             </>
           );
