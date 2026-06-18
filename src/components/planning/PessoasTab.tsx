@@ -788,6 +788,87 @@ export function PessoasTab() {
           );
         })()}
       </div>
+
+      {/* ─── Bloco 1: Evolução 12 meses ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Evolução 12 meses</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <TwelveMonthMovementChart rows={hr.rawPessoas} />
+          <TwelveMonthCostByBu porBu={pc.porBu} corporativo={pc.corporativo} receitaPorMes={receitaPorMes} />
+        </div>
+      </div>
+
+      {/* ─── Bloco 2: Composição do time ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Composição do time</h3>
+        <CompositionCards rows={hr.rawPessoas} monthDate={dateRange.from} />
+      </div>
+
+      {/* ─── Bloco 3: Eficiência por BU ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Eficiência por BU</h3>
+        <EfficiencyByBu
+          rows={[...pc.porBu, pc.corporativo].map((b) => {
+            const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
+            const buToOxy: Record<string, string[]> = {
+              CaaS: ["modelo_atual"],
+              SaaS: ["modelo_atual"],
+              TAX: ["o2_tax"],
+              "Expansão": ["oxy_hacker", "franquia"],
+            };
+            const oxyKeys = buToOxy[b.bu] || [];
+            let receita = 0;
+            if (oxy.dreByBU && dateRange.from.getFullYear() === dateRange.to.getFullYear()) {
+              for (let i = dateRange.from.getMonth(); i <= dateRange.to.getMonth(); i++) {
+                const m = months[i];
+                for (const k of oxyKeys) receita += (oxy.dreByBU as any)?.[k]?.[m] || 0;
+              }
+            }
+            const hc = hr.headcountByTime
+              .filter((h) => {
+                const bu = timeToBu(h.group);
+                if (b.bu === "Corporativo") return bu === "Outros";
+                return bu === b.bu;
+              })
+              .reduce((s, h) => s + h.count, 0);
+            return { bu: b.bu, headcount: hc, receita, custo: b.total };
+          })}
+        />
+      </div>
+
+      {/* ─── Bloco 4: Top tenure / mais recentes + drill-down ─── */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Reconhecimento e onboarding</h3>
+        <TenureExtremes rows={hr.rawPessoas} />
+      </div>
+
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Explorar pessoas por Time / Área</h3>
+        <Card>
+          <CardContent className="p-4 flex flex-wrap gap-2">
+            {headcountByArea.map((a) => (
+              <button
+                key={`area-${a.group}`}
+                onClick={() => drill.open("area", a.group)}
+                className="text-xs px-2.5 py-1 rounded border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary inline-flex items-center gap-1"
+              >
+                {a.group} · {a.count} <ExternalLink className="h-3 w-3" />
+              </button>
+            ))}
+            {hr.headcountByTime.map((t) => (
+              <button
+                key={`time-${t.group}`}
+                onClick={() => drill.open("time", t.group)}
+                className="text-xs px-2.5 py-1 rounded border border-border hover:bg-muted inline-flex items-center gap-1"
+              >
+                {t.group} · {t.count} <ExternalLink className="h-3 w-3" />
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <PeopleDrillSheet state={drill.state} onClose={drill.close} rows={hr.rawPessoas} timeToBu={(t) => timeToBu(t)} />
     </div>
   );
 }
