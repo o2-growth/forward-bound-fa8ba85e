@@ -73,6 +73,12 @@ export interface BuCusto {
   categorias: CategoriaPessoal[];
 }
 
+export interface CustoTurnover {
+  total: number;
+  serie: { period: string; value: number }[];
+  categorias: CategoriaPessoal[];
+}
+
 async function fetchDreGroups(start: string, end: string): Promise<DreGroup[]> {
   const { data, error } = await supabase.functions.invoke("fetch-oxy-finance", {
     body: { action: "dre", startDate: start, endDate: end },
