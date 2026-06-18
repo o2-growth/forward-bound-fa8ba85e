@@ -859,7 +859,7 @@ export function PessoasTab() {
       {/* ─── Bloco: Distribuição etária ─── */}
       <div>
         <h3 className="text-lg font-semibold mb-3">Perfil demográfico</h3>
-        <AgeDistribution rows={hr.rawPessoas} timeToBu={(t) => timeToBu(t)} />
+        <AgeDistribution rows={hr.rawPessoas} />
       </div>
 
       {/* ─── Bloco 4: Top tenure / mais recentes + drill-down ─── */}
