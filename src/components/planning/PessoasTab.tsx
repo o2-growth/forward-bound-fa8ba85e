@@ -854,13 +854,18 @@ export function PessoasTab() {
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-3">Explorar pessoas por Time / Área</h3>
+        <h3 className="text-lg font-semibold mb-3">Explorar pessoas por Time / BU</h3>
         <Card>
           <CardContent className="p-4 flex flex-wrap gap-2">
             {headcountByArea.map((a) => (
               <button
                 key={`area-${a.group}`}
-                onClick={() => drill.open("area", a.group)}
+                onClick={() => drill.open({
+                  kind: "people",
+                  title: `BU: ${a.group}`,
+                  subtitle: `${a.count} pessoa(s) ativa(s)`,
+                  people: pessoasOfBu(hr.rawPessoas, a.group as PessoaBu),
+                })}
                 className="text-xs px-2.5 py-1 rounded border border-primary/30 bg-primary/5 hover:bg-primary/10 text-primary inline-flex items-center gap-1"
               >
                 {a.group} · {a.count} <ExternalLink className="h-3 w-3" />
@@ -869,7 +874,12 @@ export function PessoasTab() {
             {hr.headcountByTime.map((t) => (
               <button
                 key={`time-${t.group}`}
-                onClick={() => drill.open("time", t.group)}
+                onClick={() => drill.open({
+                  kind: "people",
+                  title: `Time: ${t.group}`,
+                  subtitle: `${t.count} pessoa(s) ativa(s)`,
+                  people: allActiveWithBu(hr.rawPessoas).filter((p) => p.time === t.group),
+                })}
                 className="text-xs px-2.5 py-1 rounded border border-border hover:bg-muted inline-flex items-center gap-1"
               >
                 {t.group} · {t.count} <ExternalLink className="h-3 w-3" />
@@ -897,7 +907,7 @@ export function PessoasTab() {
         </div>
       </div>
 
-      <PeopleDrillSheet state={drill.state} onClose={drill.close} rows={hr.rawPessoas} timeToBu={(t) => timeToBu(t)} />
+      <PeopleDrillSheet state={drill.state} onClose={drill.close} />
     </div>
   );
 }
