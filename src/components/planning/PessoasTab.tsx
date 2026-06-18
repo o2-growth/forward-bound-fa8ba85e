@@ -346,45 +346,92 @@ export function PessoasTab() {
           <Kpi
             title="Headcount atual"
             value={formatNumber(hr.headcountTotal)}
-            subtitle="Pessoas com Situação = Ativo"
+            subtitle="Pessoas com Situação = Ativo · clique p/ ver lista"
             icon={Users}
             isLoading={hr.isLoading}
+            onClick={() => drill.open({
+              kind: "people",
+              title: "Headcount atual",
+              subtitle: `${hr.headcountTotal} pessoa(s) ativa(s)`,
+              people: allActiveWithBu(hr.rawPessoas),
+            })}
           />
           <Kpi
             title="Tempo médio de casa"
             value={formatYearsMonths(hr.tempoMedioDeCasaDias)}
-            subtitle={`${Math.round(hr.tempoMedioDeCasaDias)} dias em média`}
+            subtitle={`${Math.round(hr.tempoMedioDeCasaDias)} dias em média · clique p/ ranking`}
             icon={Clock}
             isLoading={hr.isLoading}
+            onClick={() => drill.open({
+              kind: "people",
+              title: "Tempo de casa — ranking",
+              subtitle: "Pessoas ativas ordenadas por tempo na empresa (desc)",
+              people: allActiveWithBu(hr.rawPessoas),
+            })}
           />
           <Kpi
             title="Admissões no período"
             value={formatNumber(hr.admissoesNoPeriodo)}
-            subtitle={`${format(dateRange.from, "dd/MM", { locale: ptBR })} – ${format(dateRange.to, "dd/MM", { locale: ptBR })}`}
+            subtitle={`${format(dateRange.from, "dd/MM", { locale: ptBR })} – ${format(dateRange.to, "dd/MM", { locale: ptBR })} · clique p/ ver`}
             icon={LogIn}
             tone="positive"
             isLoading={hr.isLoading}
             delta={<DeltaChip current={hr.admissoesNoPeriodo} previous={hrPrev.admissoesNoPeriodo} />}
+            onClick={() => drill.open({
+              kind: "people",
+              title: "Admissões no período",
+              subtitle: `${hr.admissoesNoPeriodo} pessoa(s) admitida(s) entre ${format(dateRange.from, "dd/MM/yy")} e ${format(dateRange.to, "dd/MM/yy")}`,
+              people: admissoesIn(hr.rawPessoas, dateRange.from, dateRange.to).map((p) => ({
+                ...p,
+                extra: p.dataContratacao ? `Admitido em ${format(new Date(p.dataContratacao), "dd/MM/yyyy")}` : undefined,
+              })),
+            })}
           />
           <Kpi
             title="Desligados no período"
             value={formatNumber(hr.desligadosNoPeriodo)}
-            subtitle="Situação = Inativo (aprox. via updated_at)"
+            subtitle="Situação = Inativo (proxy updated_at) · clique p/ ver"
             icon={LogOut}
             tone={hr.desligadosNoPeriodo > 0 ? "negative" : "default"}
             isLoading={hr.isLoading}
             delta={<DeltaChip current={hr.desligadosNoPeriodo} previous={hrPrev.desligadosNoPeriodo} invert />}
+            onClick={() => drill.open({
+              kind: "people",
+              title: "Desligados no período",
+              subtitle: `${hr.desligadosNoPeriodo} desligado(s) entre ${format(dateRange.from, "dd/MM/yy")} e ${format(dateRange.to, "dd/MM/yy")}`,
+              people: desligadosIn(hr.rawPessoas, dateRange.from, dateRange.to).map((p) => ({
+                ...p,
+                extra: p.updatedAt ? `Última atualização ${format(new Date(p.updatedAt), "dd/MM/yyyy")}` : undefined,
+              })),
+            })}
           />
           <Kpi
             title="Turnover geral"
             value={formatPct(hr.turnoverGeral)}
-            subtitle="Desligados ÷ Headcount médio"
+            subtitle="Desligados ÷ Headcount médio · clique p/ ver por BU"
             icon={TrendingDown}
             tone={hr.turnoverGeral > 5 ? "negative" : hr.turnoverGeral > 2 ? "warning" : "positive"}
             isLoading={hr.isLoading}
             delta={<DeltaChip current={hr.turnoverGeral} previous={hrPrev.turnoverGeral} invert formatter={(n) => `${n.toFixed(1)}%`} />}
+            onClick={() => {
+              const tByBu = turnoverByBu(hr.rawPessoas, dateRange.from, dateRange.to);
+              drill.open({
+                kind: "metrics",
+                title: "Turnover por BU",
+                subtitle: `Período: ${format(dateRange.from, "dd/MM/yy")} – ${format(dateRange.to, "dd/MM/yy")}`,
+                rows: tByBu.map((t) => ({
+                  label: t.bu,
+                  value: formatPct(t.pct),
+                  hint: `${t.desligados} desligado(s) · headcount ${t.headcount}`,
+                  pct: Math.min(100, t.pct * 5),
+                  tone: t.pct > 10 ? "negative" : t.pct > 5 ? "warning" : t.pct > 0 ? "default" : "positive",
+                })),
+                footer: "Denominador = (headcount + desligados) ÷ 2 por BU. Mapeamento Time+Cargo via personToBu (Hipótese A).",
+              });
+            }}
           />
         </div>
+
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
           {/* Headcount por Time */}
