@@ -23,13 +23,14 @@ import {
 import { tenureDistribution, previousRange } from "./pessoas/helpers";
 
 // Heurística Time(Pipefy) → BU pela substring do nome do Time.
+// CS é fundido em CaaS, e Times sem BU clara ("Outros") também viram CaaS (corporativo).
 function timeToBu(time: string): BuKey | "Outros" {
   const n = (time || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (/caas/.test(n)) return "CaaS";
   if (/saas/.test(n)) return "SaaS";
   if (/\btax\b/.test(n)) return "TAX";
   if (/expansao|franquia/.test(n)) return "Expansão";
-  if (/\bcs\b|customer\s*success|sucesso\s+do\s+cliente/.test(n)) return "CS";
+  if (/\bcs\b|customer\s*success|sucesso\s+do\s+cliente/.test(n)) return "CaaS";
   if (/education|educac/.test(n)) return "Education";
   return "Outros";
 }
@@ -216,6 +217,13 @@ export function PessoasTab() {
   const hr = useHrData({ startDate: dateRange.from, endDate: dateRange.to });
   const oxy = useOxyFinance();
   const pc = usePersonnelCostByBu({ startDate: dateRange.from, endDate: dateRange.to });
+  // Série fixa de 12 meses, independente do filtro — alimenta o gráfico 12m
+  const range12m = useMemo(() => {
+    const to = endOfMonth(dateRange.to);
+    const from = startOfMonth(subMonths(to, 11));
+    return { from, to };
+  }, [dateRange.to]);
+  const pc12m = usePersonnelCostByBu({ startDate: range12m.from, endDate: range12m.to });
   const [openBu, setOpenBu] = useState<string | null>(null);
   const [openCat, setOpenCat] = useState<string | null>(null);
   const drill = usePeopleDrill();
@@ -548,8 +556,7 @@ export function PessoasTab() {
                 <Info className="h-4 w-4 mt-0.5 shrink-0" />
                 <div>
                   <strong>Origem dos números:</strong> custo por BU vem direto das categorias da Oxy DRE (ex: "Equipe CaaS", "Benefícios - SaaS").
-                  Categorias dentro de "Despesas com Pessoal" (Pró-labore sócios, Terceiros, etc.) entram em <strong>Corporativo</strong>.
-                  Zero rateio inventado.
+                  CS é considerado parte de <strong>CaaS</strong>, e categorias corporativas (Pró-labore, Terceiros, RH/Fin/C-level) também são roladas em <strong>CaaS</strong>. Zero rateio inventado.
                 </div>
               </div>
 
@@ -558,7 +565,7 @@ export function PessoasTab() {
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
-                  subtitle={`${pc.porBu.length} BUs + Corporativo`}
+                  subtitle={`${pc.porBu.length} BU${pc.porBu.length === 1 ? "" : "s"}`}
                   icon={DollarSign}
                   isLoading={pc.isLoading}
                   delta={<DeltaChip current={custoTotal} previous={pcPrev.total} invert />}
@@ -595,13 +602,15 @@ export function PessoasTab() {
                   isLoading={pc.isLoading}
                   delta={<DeltaChip current={pc.custoTurnover.total} previous={pcPrev.custoTurnover.total} invert />}
                 />
-                <Kpi
-                  title="Corporativo (não-BU)"
-                  value={formatCurrencyCompact(pc.corporativo.total)}
-                  subtitle="Pró-labore, terceiros, RH/Fin/C-level"
-                  icon={Building2}
-                  isLoading={pc.isLoading}
-                />
+                {pc.corporativo.total > 0 && (
+                  <Kpi
+                    title="Corporativo (não-BU)"
+                    value={formatCurrencyCompact(pc.corporativo.total)}
+                    subtitle="Pró-labore, terceiros, RH/Fin/C-level"
+                    icon={Building2}
+                    isLoading={pc.isLoading}
+                  />
+                )}
               </div>
 
 
@@ -618,8 +627,8 @@ export function PessoasTab() {
                     <p className="text-sm text-muted-foreground">Sem dados de pessoal no período.</p>
                   ) : (
                     <div className="space-y-2">
-                      {[...pc.porBu, pc.corporativo].map((b) => {
-                        const max = Math.max(...[...pc.porBu, pc.corporativo].map((x) => x.total), 1);
+                      {[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((b) => {
+                        const max = Math.max(...[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((x) => x.total), 1);
                         const width = (b.total / max) * 100;
                         const isOpen = openBu === b.bu;
                         return (
@@ -732,7 +741,7 @@ export function PessoasTab() {
                             </tr>
                           </thead>
                           <tbody>
-                            {[...pc.porBu, pc.corporativo].map((b) => {
+                            {[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((b) => {
                               // Headcount = soma dos Times cujo nome casa com a BU
                               const hc = hr.headcountByTime
                                 .filter((h) => {
@@ -760,15 +769,13 @@ export function PessoasTab() {
                   </CardContent>
                 </Card>
 
+                {pc.corporativo.categorias.length > 0 && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="text-base">Composição Corporativo</CardTitle>
                     <p className="text-xs text-muted-foreground">Categorias dentro de "Despesas com Pessoal" (não-BU)</p>
                   </CardHeader>
                   <CardContent>
-                    {pc.corporativo.categorias.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Sem categorias corporativas no período.</p>
-                    ) : (
                       <div className="space-y-2">
                         {pc.corporativo.categorias.map((c) => {
                           const max = pc.corporativo.categorias[0]?.valor || 1;
@@ -790,9 +797,9 @@ export function PessoasTab() {
                           );
                         })}
                       </div>
-                    )}
                   </CardContent>
                 </Card>
+                )}
               </div>
             </>
           );
@@ -804,7 +811,7 @@ export function PessoasTab() {
         <h3 className="text-lg font-semibold mb-3">Evolução 12 meses</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <TwelveMonthMovementChart rows={hr.rawPessoas} />
-          <TwelveMonthCostByBu porBu={pc.porBu} corporativo={pc.corporativo} receitaPorMes={receitaPorMes} />
+          <TwelveMonthCostByBu porBu={pc12m.porBu} corporativo={pc12m.corporativo} receitaPorMes={receitaPorMes} />
         </div>
       </div>
 
@@ -818,7 +825,7 @@ export function PessoasTab() {
       <div>
         <h3 className="text-lg font-semibold mb-3">Eficiência por BU</h3>
         <EfficiencyByBu
-          rows={[...pc.porBu, pc.corporativo].map((b) => {
+          rows={[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((b) => {
             const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
             const buToOxy: Record<string, string[]> = {
               CaaS: ["modelo_atual"],
