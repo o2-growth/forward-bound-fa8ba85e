@@ -60,7 +60,7 @@ interface KpiProps {
   isLoading?: boolean;
 }
 
-function Kpi({ title, value, subtitle, icon: Icon, tone = "default", isLoading }: KpiProps) {
+function Kpi({ title, value, subtitle, delta, icon: Icon, tone = "default", isLoading }: KpiProps) {
   const toneClass =
     tone === "positive" ? "text-chart-2" :
     tone === "warning" ? "text-amber-500" :
@@ -76,7 +76,10 @@ function Kpi({ title, value, subtitle, icon: Icon, tone = "default", isLoading }
         {isLoading ? (
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         ) : (
-          <div className={cn("text-2xl font-bold", toneClass)}>{value}</div>
+          <div className="flex items-baseline gap-2">
+            <div className={cn("text-2xl font-bold", toneClass)}>{value}</div>
+            {delta}
+          </div>
         )}
         {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
       </CardContent>
