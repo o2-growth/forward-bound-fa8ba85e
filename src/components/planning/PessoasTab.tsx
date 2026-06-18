@@ -71,6 +71,126 @@ function Kpi({ title, value, subtitle, icon: Icon, tone = "default", isLoading }
   );
 }
 
+interface CategoryDrillDownPanelProps {
+  category: string;
+  serie: { period: string; value: number }[];
+  startDate: Date;
+  endDate: Date;
+  pessoasBu: Array<{ ID: string | number; Nome?: string; ["Título"]?: string; Cargo?: string; Time?: string }>;
+  buLabel: string;
+}
+
+function CategoryDrillDownPanel({ category, serie, startDate, endDate, pessoasBu, buLabel }: CategoryDrillDownPanelProps) {
+  const dd = useDreDrillDown({ category, startDate, endDate });
+  const maxMes = Math.max(...serie.map((s) => s.value), 1);
+  const maxItem = Math.max(...dd.items.map((i) => i.total), 1);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-3 border-t border-border/30">
+      {/* Painel A: evolução mensal da categoria */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Evolução mensal (Oxy)</p>
+        {serie.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Sem dados mensais.</p>
+        ) : (
+          <div className="space-y-1">
+            {serie.map((s) => (
+              <div key={s.period}>
+                <div className="flex justify-between text-[11px] mb-0.5">
+                  <span className="text-muted-foreground">{s.period}</span>
+                  <span className="tabular-nums text-foreground">{formatCurrencyCompact(s.value)}</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded overflow-hidden">
+                  <div className="h-full bg-primary/80" style={{ width: `${(s.value / maxMes) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pessoas Pipefy — referência cruzada (sem valor monetário) */}
+        <div className="mt-4">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
+            Pessoas no Pipefy do time {buLabel} ({pessoasBu.length})
+          </p>
+          {pessoasBu.length === 0 ? (
+            <p className="text-xs text-muted-foreground">Nenhuma pessoa mapeada.</p>
+          ) : (
+            <div className="max-h-32 overflow-y-auto">
+              <table className="w-full text-[11px]">
+                <tbody>
+                  {pessoasBu.slice(0, 30).map((p) => (
+                    <tr key={p.ID} className="border-b border-border/20 last:border-0">
+                      <td className="py-1 text-foreground truncate max-w-[140px]">{p.Nome || p["Título"]}</td>
+                      <td className="py-1 text-muted-foreground truncate">{p.Cargo || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {pessoasBu.length > 30 && (
+                <p className="text-[10px] text-muted-foreground mt-1">+ {pessoasBu.length - 30} pessoas</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Painel B: Lançamentos reais por fornecedor/cliente (Oxy drill-down) */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
+          Lançamentos reais (Oxy) {dd.items.length > 0 && `— ${dd.items.length} ${dd.items[0]?.type === "customer" ? "clientes" : "fornecedores"}`}
+        </p>
+        {dd.isLoading ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> Carregando lançamentos…
+          </div>
+        ) : dd.error ? (
+          <p className="text-xs text-destructive">
+            {dd.error.message || "Falha ao carregar lançamentos."}
+          </p>
+        ) : dd.items.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Sem lançamentos no período.</p>
+        ) : (
+          <>
+            <div className="text-[11px] text-muted-foreground mb-2">
+              Soma: <span className="tabular-nums text-foreground font-medium">{formatCurrencyCompact(dd.total)}</span>
+            </div>
+            <div className="max-h-72 overflow-y-auto space-y-1.5">
+              {dd.items.map((it) => {
+                const pct = dd.total > 0 ? (it.total / dd.total) * 100 : 0;
+                return (
+                  <div key={it.label} className="text-[11px]">
+                    <div className="flex justify-between mb-0.5">
+                      <span className="text-foreground truncate pr-2" title={it.label}>{it.label}</span>
+                      <span className="tabular-nums whitespace-nowrap">
+                        {formatCurrencyCompact(it.total)}{" "}
+                        <span className="text-muted-foreground">({pct.toFixed(1)}%)</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-muted rounded overflow-hidden">
+                      <div className="h-full bg-chart-2/80" style={{ width: `${(it.total / maxItem) * 100}%` }} />
+                    </div>
+                    {it.serie.length > 1 && (
+                      <div className="flex gap-1 mt-1 text-[10px] text-muted-foreground">
+                        {it.serie.map((s) => (
+                          <span key={s.period} className="tabular-nums">
+                            {s.period}: {formatCurrencyCompact(s.value)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 export function PessoasTab() {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
