@@ -514,7 +514,7 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
 
     return out;
   }, [
-    funnel.data,
+    
     metaQueries.map((q) => q.dataUpdatedAt).join(","),
     googleQueries.map((q) => q.dataUpdatedAt).join(","),
     modeloA.isLoading, o2taxA.isLoading, franquiaA.isLoading, oxyHackerA.isLoading,
