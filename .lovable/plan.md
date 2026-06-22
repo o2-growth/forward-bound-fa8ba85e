@@ -1,19 +1,9 @@
-Plano para resolver o Setup zerado da Modelcraft:
+Plano para corrigir o Setup da Modelcraft ainda zerado:
 
-1. **Aplicar correção na origem consumida pelo Comercial**
-   - Ajustar o parser de vendas do Modelo Atual para que o card Pipefy `1359038764` use Setup `10800` quando o banco externo ainda vier com `Valor Setup` vazio/zero.
-   - Fazer a correção no hook de dados, não apenas na tabela, para atualizar também Total/TCV e somatórios.
-
-2. **Propagar para indicadores derivados**
-   - Aplicar o mesmo fallback no parser auxiliar de receita realizada, caso algum card/indicador use essa rota em vez do hook principal.
-   - Manter a regra segura: se o banco passar a retornar Setup preenchido, o valor real continua sendo usado.
-
-3. **Validar no ponto do print**
-   - Conferir que, no drill-down de Vendas/lista de cards, Modelcraft aparece com:
-     - MRR: `R$ 3.600`
-     - Setup: `R$ 10.800`
-     - Total/TCV recalculado incluindo o Setup.
-
-Arquivos previstos:
-- `src/hooks/useModeloAtualAnalytics.ts`
-- `src/hooks/useIndicatorsRealized.ts`
+1. Aplicar o mesmo fallback da Modelcraft também em `useModeloAtualMetas.ts`, que é o hook que aparece nos logs calculando `getValueForPeriod venda` e ainda soma Setup = 0.
+2. Ajustar as duas fontes dentro desse hook:
+   - movimentos do período (`query_period`)
+   - movimentos por assinatura (`query_period_by_signature`)
+3. Garantir que o valor total de venda passe a somar MRR + Setup + Pontual, mantendo Educação fora da receita padrão conforme regra do projeto.
+4. Revisar o agregado do Marketing (`useIndicators26Live.ts`) para garantir que ele consuma os cards já corrigidos e que o setup apareça na linha “Setup” e em GMV/TCV quando aplicável.
+5. Validar pelos logs/preview que a Modelcraft aparece com Setup R$ 10.800 e que o total de vendas/Fat. Incremento deixa de ficar zerado por causa desse card.
