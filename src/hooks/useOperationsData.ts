@@ -835,6 +835,7 @@ export function useOperationsData() {
         setupByErp: setupData.setupByErp,
         satisfacaoDistribution: tratativaData.satisfacaoDistribution,
         churnDossier: projectData.churnDossier,
+        rawTratativas: tratativas as TratativaCard[],
       };
     },
     staleTime: 5 * 60 * 1000,
