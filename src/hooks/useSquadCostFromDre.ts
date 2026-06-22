@@ -338,7 +338,7 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       totalSemSquad,
       totalCaasDre: totalSquads + totalUnmatched + totalSemSquad,
     };
-  }, [assignmentsQ.data, hr.rawPessoas, drillQueries.map((q) => q.dataUpdatedAt).join(","), caasCategories]);
+  }, [assignmentsQ.data, hr.rawPessoas, aliasesQ.data, drillQueries.map((q) => q.dataUpdatedAt).join(","), caasCategories]);
 
   const getSquad = (cfoNome: string): SquadCost | null => {
     return result.porSquad.find((s) => normalize(s.cfoNome) === normalize(cfoNome)) || null;
