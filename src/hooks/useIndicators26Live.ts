@@ -335,9 +335,6 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
       buildRow("CPL - Meta Ads",
         metaSpendM.map((s, i) => safeDiv(s, metaLeadsM[i])),
         { ratio: { num: metaSpendM, den: metaLeadsM } }),
-      buildRow("Instagram O2", NULL_M),
-      buildRow("Instagram Pedro", NULL_M),
-      buildRow("Instagram Total", NULL_M),
       buildRow("Mídia total", totalSpendM),
       buildRow("Leads totais", totalLeadsApiM),
       buildRow("CPL total",
@@ -460,8 +457,6 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
         { ratio: { num: gmvM.map((g, i) => g - totalSpendM[i]), den: totalSpendM } }),
       buildRow("ROI LTV", roiLtvM, { avg: true }),
       buildRow("ROI LTV Final", NULL_M),
-      buildRow("ROI Pedro", NULL_M),
-      buildRow("ROI Pedro LTV", NULL_M),
     ];
 
     return out;

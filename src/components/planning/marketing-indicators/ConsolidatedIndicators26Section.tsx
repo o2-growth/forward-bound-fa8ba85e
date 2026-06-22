@@ -52,9 +52,6 @@ const GROUPS: Group[] = [
       { label: "Mídia Meta Ads", fmt: "brl" },
       { label: "Leads - Meta Ads", fmt: "int" },
       { label: "CPL - Meta Ads", fmt: "brl" },
-      { label: "Instagram O2", fmt: "brl" },
-      { label: "Instagram Pedro", fmt: "brl" },
-      { label: "Instagram Total", fmt: "brl" },
       { label: "Mídia total", fmt: "brl" },
       { label: "Leads totais", fmt: "int" },
       { label: "CPL total", fmt: "brl" },
@@ -149,8 +146,6 @@ const GROUPS: Group[] = [
       { label: "ROI", fmt: "x", bench: 1 },
       { label: "ROI LTV", fmt: "x", bench: 1 },
       { label: "ROI LTV Final", fmt: "x", bench: 1 },
-      { label: "ROI Pedro", fmt: "x", bench: 1 },
-      { label: "ROI Pedro LTV", fmt: "x", bench: 1 },
     ],
   },
 ];
