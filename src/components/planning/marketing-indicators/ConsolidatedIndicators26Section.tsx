@@ -230,6 +230,14 @@ export function ConsolidatedIndicators26Section() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
+  // Colunas dinâmicas: 2026 até mês atual + Qs fechados + bloco fixo 2025 + TOTAL 2026.
+  const COLS = useMemo(() => buildCols(new Date()), []);
+  const LIVE_COL_KEYS = useMemo(() => {
+    const s = new Set<string>();
+    for (const c of COLS) if (!SHEET_COL_KEYS.has(c.key)) s.add(c.key);
+    return s;
+  }, [COLS]);
+
   // Index ao vivo por label normalizado
   const liveMap = useMemo(() => {
     const m = new Map<string, Record<string, number | null>>();
@@ -237,7 +245,7 @@ export function ConsolidatedIndicators26Section() {
     return m;
   }, [liveRows]);
 
-  // Merge: 2026 vem do live; 2025 (jul25..q425) vem da planilha
+  // Merge: 2026 (LIVE_COL_KEYS) vem do live; 2025 (jul25..q425) vem da planilha
   const rowMap = useMemo(() => {
     const m = new Map<string, Indicator26Row>();
     const allLabels = new Set<string>();
@@ -252,17 +260,18 @@ export function ConsolidatedIndicators26Section() {
       const liveVals = liveMap.get(labelKey);
       const label = sheetRow?.label || liveRows.find((r) => normalize(r.label) === labelKey)?.label || "";
       const merged: Record<string, number | null> = {};
-      for (const colKey of [...LIVE_COL_KEYS, ...SHEET_COL_KEYS]) {
-        if (LIVE_COL_KEYS.has(colKey)) {
-          merged[colKey] = liveVals?.[colKey] ?? null;
+      for (const c of COLS) {
+        if (LIVE_COL_KEYS.has(c.key)) {
+          merged[c.key] = liveVals?.[c.key] ?? null;
         } else {
-          merged[colKey] = sheetRow?.values?.[colKey] ?? null;
+          merged[c.key] = sheetRow?.values?.[c.key] ?? null;
         }
       }
       m.set(labelKey, { label, values: merged });
     }
     return m;
-  }, [sheetRows, liveRows, liveMap]);
+  }, [sheetRows, liveRows, liveMap, COLS, LIVE_COL_KEYS]);
+
 
   const q = normalize(query);
 
