@@ -205,16 +205,44 @@ function fmtValue(v: number | null | undefined, fmt: Fmt): string {
 }
 
 export function ConsolidatedIndicators26Section() {
-  const { rows, lastUpdate, isFallback, isLoading } = useIndicators26Raw();
+  const { rows: sheetRows, lastUpdate, isFallback, isLoading } = useIndicators26Raw();
+  const { rows: liveRows, lastUpdate: liveUpdate, isLoading: liveLoading } = useIndicators26Live();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  // Index das linhas da planilha por label normalizado
+  // Index ao vivo por label normalizado
+  const liveMap = useMemo(() => {
+    const m = new Map<string, Record<string, number | null>>();
+    for (const r of liveRows) m.set(normalize(r.label), r.values as Record<string, number | null>);
+    return m;
+  }, [liveRows]);
+
+  // Merge: 2026 vem do live; 2025 (jul25..q425) vem da planilha
   const rowMap = useMemo(() => {
     const m = new Map<string, Indicator26Row>();
-    for (const r of rows) m.set(normalize(r.label), r);
+    const allLabels = new Set<string>();
+    for (const r of sheetRows) allLabels.add(normalize(r.label));
+    for (const r of liveRows) allLabels.add(normalize(r.label));
+
+    const sheetMap = new Map<string, Indicator26Row>();
+    for (const r of sheetRows) sheetMap.set(normalize(r.label), r);
+
+    for (const labelKey of allLabels) {
+      const sheetRow = sheetMap.get(labelKey);
+      const liveVals = liveMap.get(labelKey);
+      const label = sheetRow?.label || liveRows.find((r) => normalize(r.label) === labelKey)?.label || "";
+      const merged: Record<string, number | null> = {};
+      for (const colKey of [...LIVE_COL_KEYS, ...SHEET_COL_KEYS]) {
+        if (LIVE_COL_KEYS.has(colKey)) {
+          merged[colKey] = liveVals?.[colKey] ?? null;
+        } else {
+          merged[colKey] = sheetRow?.values?.[colKey] ?? null;
+        }
+      }
+      m.set(labelKey, { label, values: merged });
+    }
     return m;
-  }, [rows]);
+  }, [sheetRows, liveRows, liveMap]);
 
   const q = normalize(query);
 
