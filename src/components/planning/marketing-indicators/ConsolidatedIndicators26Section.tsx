@@ -193,26 +193,8 @@ const GROUPS: Group[] = [
   },
 ];
 
-// Colunas na ordem da planilha. `strong` = trimestre/total (destacado).
-const COLS: { key: string; label: string; strong?: boolean }[] = [
-  { key: "jan", label: "Jan" },
-  { key: "fev", label: "Fev" },
-  { key: "mar", label: "Mar" },
-  { key: "q1", label: "Q1", strong: true },
-  { key: "abr", label: "Abr" },
-  { key: "mai", label: "Mai" },
-  { key: "jun", label: "Jun" },
-  { key: "q2", label: "Q2", strong: true },
-  { key: "jul25", label: "Jul/25" },
-  { key: "ago25", label: "Ago/25" },
-  { key: "set25", label: "Set/25" },
-  { key: "q325", label: "Q3/25", strong: true },
-  { key: "out25", label: "Out/25" },
-  { key: "nov25", label: "Nov/25" },
-  { key: "dez25", label: "Dez/25" },
-  { key: "q425", label: "Q4/25", strong: true },
-  { key: "total2026", label: "TOTAL 2026", strong: true },
-];
+// COLS é gerado dinamicamente via buildCols() dentro do componente.
+
 
 const normalize = (s: string) =>
   s
