@@ -154,25 +154,44 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
     oxy.isLoading;
 
   const rows = useMemo<LiveRow[]>(() => {
-    // ===== Funnel realized por mês =====
-    const funnelByMonth = (indicator: string): number[] => {
+    // ===== Funil por mês — agregado dos 4 hooks de analytics (mesma fonte do drill-down Comercial) =====
+    // funnel_realized (Google Sheet) está incompleto e foi descartado como fonte aqui.
+    const BU_HOOKS: Array<{ bu: string; hook: any }> = [
+      { bu: "modelo_atual", hook: modeloA },
+      { bu: "o2_tax", hook: o2taxA },
+      { bu: "franquia", hook: franquiaA },
+      { bu: "oxy_hacker", hook: oxyHackerA },
+    ];
+
+    const aggregateFunnelByMonth = (indicator: "leads" | "mql" | "rm" | "rr" | "proposta" | "venda"): number[] => {
       const out = new Array(12).fill(0);
-      for (const r of funnel.data || []) {
-        if (r.indicator !== indicator) continue;
-        if (!r.date) continue;
-        const d = new Date(r.date);
-        if (d.getFullYear() !== year) continue;
-        out[d.getMonth()] += Number(r.value || 0);
+      const seen = new Set<string>(); // `${bu}-${id}-${month}` — dedup extra por BU+card+mês
+      for (const { bu, hook } of BU_HOOKS) {
+        let cards: any[] = [];
+        try { cards = hook?.getCardsForIndicator?.(indicator) || []; } catch { cards = []; }
+        for (const c of cards) {
+          const dt: Date | null | undefined = indicator === "venda"
+            ? (c.dataAssinatura || c.dataEntrada)
+            : c.dataEntrada;
+          if (!dt) continue;
+          if (dt.getFullYear() !== year) continue;
+          const m = dt.getMonth();
+          const k = `${bu}-${c.id}-${m}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          out[m] += 1;
+        }
       }
       return out;
     };
 
-    const leadsM = funnelByMonth("leads");
-    const mqlM = funnelByMonth("mql");
-    const rmM = funnelByMonth("rm");
-    const rrM = funnelByMonth("rr");
-    const propostaM = funnelByMonth("proposta");
-    const vendaM = funnelByMonth("venda");
+    const leadsM = aggregateFunnelByMonth("leads");
+    const mqlM = aggregateFunnelByMonth("mql");
+    const rmM = aggregateFunnelByMonth("rm");
+    const rrM = aggregateFunnelByMonth("rr");
+    const propostaM = aggregateFunnelByMonth("proposta");
+    const vendaM = aggregateFunnelByMonth("venda");
+
 
     // ===== Mídia/Leads de API por mês =====
     const metaSpendM = monthRanges.map((_, i) => metaQueries[i]?.data?.spend ?? 0);
