@@ -607,7 +607,7 @@ export function PessoasTab() {
               </div>
 
               {/* KPIs */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <Kpi
                   title="Custo de pessoal total"
                   value={formatCurrencyCompact(custoTotal)}
@@ -641,6 +641,17 @@ export function PessoasTab() {
                   isLoading={pc.isLoading || oxy.isLoading}
                   onClick={() => setShowCustoReceitaCharts((v) => !v)}
                 />
+
+                <Kpi
+                  title={`Receita total ${showCustoReceitaCharts ? "▾" : "▸"}`}
+                  value={formatCurrencyCompact(receitaPeriodo)}
+                  subtitle={`Soma das BUs · clique p/ ${showCustoReceitaCharts ? "fechar" : "ver gráficos"}`}
+                  icon={DollarSign}
+                  tone="positive"
+                  isLoading={oxy.isLoading}
+                  onClick={() => setShowCustoReceitaCharts((v) => !v)}
+                />
+
 
                 <Kpi
                   title="Custo per capita"
