@@ -42,6 +42,7 @@ export interface UnmatchedSupplier {
   label: string;
   valor: number;
   category: string;
+  cnpjDetectado: string | null;
 }
 
 interface UseParams {
