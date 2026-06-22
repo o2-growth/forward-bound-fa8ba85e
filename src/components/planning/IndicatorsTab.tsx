@@ -2060,6 +2060,7 @@ export function IndicatorsTab() {
         setDetailSheetColumns(isExpansaoBU ? [
           { key: 'product', label: 'Produto', format: columnFormatters.product },
           { key: 'company', label: 'Empresa' },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
           { key: 'pontual', label: 'Valor Pontual', format: columnFormatters.currency },
           { key: 'responsible', label: 'Closer' },
           { key: 'diasEmProposta', label: 'Dias em Proposta', format: columnFormatters.agingWithAlert },
@@ -2067,12 +2068,14 @@ export function IndicatorsTab() {
         ] : [
           { key: 'product', label: 'Produto', format: columnFormatters.product },
           { key: 'company', label: 'Empresa' },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
           { key: 'value', label: 'Valor Total', format: columnFormatters.currency },
           { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
           { key: 'responsible', label: 'Closer' },
           { key: 'diasEmProposta', label: 'Dias em Proposta', format: columnFormatters.agingWithAlert },
           { key: 'date', label: 'Data Envio', format: columnFormatters.date },
         ]);
+
         // Sort by aging descending (oldest first = action needed)
         setDetailSheetItems(itemsWithAging.sort((a, b) => (b.diasEmProposta || 0) - (a.diasEmProposta || 0)));
         setDetailSheetFilterCriteria([
