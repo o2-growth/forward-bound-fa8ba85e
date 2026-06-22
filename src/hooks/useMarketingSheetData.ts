@@ -42,7 +42,11 @@ export interface MarketingSheetData {
   roasLtv: number;
   roiLtv: number;
   ltvCac: number;
-  
+
+  // OPEX (para CAC = (mídia + time/ferramentas) ÷ vendas)
+  timeFerramentas: number;
+  despesasTotais: number;
+
   // Meta
   period: {
     startDate: string;

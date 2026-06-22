@@ -39,6 +39,9 @@ import { BestAdsSection } from "./marketing-indicators/BestAdsSection";
 import { InvestmentForecast } from "./marketing-indicators/InvestmentForecast";
 import { CHANNEL_LABELS, ChannelId, CostPerStage, AttributionCard } from "./marketing-indicators/types";
 import { CacTotalCard } from "./marketing-indicators/CacTotalCard";
+import { InvestmentCacMqlHero } from "./marketing-indicators/InvestmentCacMqlHero";
+import { ConsolidatedIndicators26Section } from "./marketing-indicators/ConsolidatedIndicators26Section";
+import { useMarketingSheetData } from "@/hooks/useMarketingSheetData";
 import { OnlineOfflineSection } from "./marketing-indicators/OnlineOfflineSection";
 import { ConversionCurveSection } from "./marketing-indicators/ConversionCurveSection";
 import { CohortTable } from "./marketing-indicators/CohortTable";
@@ -669,6 +672,26 @@ export function MarketingIndicatorsTab() {
     setDateRange({ from: start, to: end });
   };
 
+  // ===== Dados do bloco hero "Investimento • CPMQL • CAC" =====
+  // Espelho consolidado da planilha "Indicadores 26" (CAC autoritativo, LTV/CAC, Time e ferramentas).
+  const { data: sheetData } = useMarketingSheetData({
+    startDate: dateRange.from,
+    endDate: dateRange.to,
+  });
+
+  // Breakdown de spend real por canal (Meta / Google) a partir dos canais enriquecidos.
+  const investmentMeta = enrichedChannels.find(c => c.id === 'meta_ads')?.investment ?? 0;
+  const investmentGoogle = enrichedChannels.find(c => c.id === 'google_ads')?.investment ?? 0;
+
+  // CAC (definição da planilha) = (Mídia + Time e ferramentas) ÷ Vendas.
+  // FONTE A DEFINIR: `timeFerramentas` ainda não vem do backend — usamos o que a planilha já
+  // expõe (sheetData.cac) como número autoritativo e derivamos o OPEX por diferença.
+  const cacMidia = investmentTotalForRange;
+  const vendasPeriodo = salesInPeriod.length;
+  const cacReal = sheetData?.cac ?? (vendasPeriodo > 0 ? cacMidia / vendasPeriodo : 0);
+  // Preferir o OPEX real (Time e ferramentas) quando o backend já o expõe; senão derivar por diferença.
+  const cacOpex = sheetData?.timeFerramentas ?? Math.max(0, cacReal * vendasPeriodo - cacMidia);
+
   return (
     <div className="space-y-6">
       {/* Header with Filters */}
@@ -727,7 +750,26 @@ export function MarketingIndicatorsTab() {
         </div>
       )}
 
-      {/* ===== NEW: CAC Total ===== */}
+      {/* ===== Bloco hero: Investimento • CPMQL • CAC ===== */}
+      <InvestmentCacMqlHero
+        investmentReal={investmentTotalForRange}
+        investmentPlanned={finalInvestmentGoal}
+        investmentMeta={investmentMeta}
+        investmentGoogle={investmentGoogle}
+        cpmqlReal={enrichedTotals.costPerStage.cpmql}
+        cpmqlGoal={finalCostGoals.cpmql}
+        mqls={pipefyVolumes.mqls}
+        cacReal={cacReal}
+        cacMidia={cacMidia}
+        cacOpex={cacOpex}
+        vendas={vendasPeriodo}
+        ltvCac={sheetData?.ltvCac}
+      />
+
+      {/* ===== Visão Total — Indicadores 26 ===== */}
+      <ConsolidatedIndicators26Section />
+
+      {/* ===== CPV (mídia ÷ vendas) — antigo "CAC Total", renomeado ===== */}
       <CacTotalCard
         investment={investmentTotalForRange}
         sales={salesInPeriod.length}

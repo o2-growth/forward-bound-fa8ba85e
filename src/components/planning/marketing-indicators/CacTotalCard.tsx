@@ -20,7 +20,7 @@ export function CacTotalCard({ investment, sales }: Props) {
         </div>
         <div className="flex-1">
           <p className="text-sm text-muted-foreground font-medium">
-            CAC Total (período filtrado)
+            CPV — Custo por Venda (mídia, período filtrado)
           </p>
           <p className="text-4xl font-bold tracking-tight mt-1">
             {formatBRL(cac)}

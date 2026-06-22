@@ -74,6 +74,8 @@ const METRIC_MAPPINGS: Record<string, string[]> = {
   'roasLtv': ['ROAS LTV', 'ROAS Ltv', 'Roas LTV', 'ROAS x LTV'],
   'roiLtv': ['ROI LTV', 'ROI Ltv', 'Roi LTV', 'ROI x LTV'],
   'ltvCac': ['LTV/CAC', 'LTV / CAC', 'Ltv/Cac', 'LTV:CAC', 'LTV CAC'],
+  'timeFerramentas': ['Time e ferramentas', 'Time e Ferramentas', 'Time + Ferramentas', 'Time e ferramenta'],
+  'despesasTotais': ['Despesas totais', 'Despesas Totais', 'Despesa total', 'Despesas total'],
 };
 
 // Metrics that are ratios/averages (not summable)
@@ -88,7 +90,8 @@ const SUMMABLE_METRICS = new Set([
   'midiaGoogle', 'leadsGoogle', 'midiaMeta', 'leadsMeta',
   'midiaTotal', 'leadsTotais', 'mqlPorFaturamento', 'reuniaoMarcada',
   'reuniaoRealizada', 'propostaEnviada', 'vendas',
-  'mrr', 'setup', 'pontual', 'educacao', 'gmv'
+  'mrr', 'setup', 'pontual', 'educacao', 'gmv',
+  'timeFerramentas', 'despesasTotais'
 ]);
 
 function normalizeText(text: string): string {
@@ -389,10 +392,50 @@ serve(async (req) => {
   }
 
   try {
-    const { startDate, endDate } = await req.json();
-    
+    const { startDate, endDate, mode } = await req.json();
+
+    // ===== Modo RAW: grade completa da aba "Indicadores 26" (todas as linhas, colunas B..R) =====
+    if (mode === 'raw') {
+      const { rows } = await fetchSheetData(TAB_CONFIGS[2026].name);
+      // B..R -> 1..17 (coluna A = label, índice 0)
+      const COL_KEYS = [
+        'jan', 'fev', 'mar', 'q1', 'abr', 'mai', 'jun', 'q2',
+        'jul25', 'ago25', 'set25', 'q325', 'out25', 'nov25', 'dez25', 'q425', 'total2026',
+      ];
+      const isError = (v: unknown) =>
+        typeof v === 'string' && /#(DIV\/0!|REF!|N\/A|VALUE!)/.test(v);
+      const out: { label: string; values: Record<string, number | null> }[] = [];
+      let lastUpdate: string | null = null;
+      for (const row of rows) {
+        const cells = row?.c || [];
+        const label = cells[0]?.v;
+        if (typeof label !== 'string' || !label.trim()) continue;
+        const values: Record<string, number | null> = {};
+        let hasAny = false;
+        COL_KEYS.forEach((k, i) => {
+          const cell = cells[i + 1];
+          const v = cell?.v;
+          if (v === null || v === undefined || v === '' || isError(v) || typeof v !== 'number') {
+            values[k] = null;
+          } else {
+            values[k] = Math.round(v * 10000) / 10000;
+            hasAny = true;
+          }
+        });
+        if (hasAny) out.push({ label: label.trim(), values });
+        // sentinela de "Última atualização" (linha do rodapé)
+        for (const c of cells) {
+          if (typeof c?.v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(c.v)) lastUpdate = c.v.slice(0, 10);
+        }
+      }
+      return new Response(
+        JSON.stringify({ success: true, rows: out, lastUpdate }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
     console.log('Fetching marketing sheet data:', { startDate, endDate });
-    
+
     // Determine which years/months to fetch
     const yearMonthsList = startDate && endDate 
       ? getYearMonthsForPeriod(startDate, endDate)

@@ -1,0 +1,371 @@
+import { useMemo, useState } from "react";
+import { ChevronDown, Download, Search, Table2 } from "lucide-react";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
+import { useIndicators26Raw, type Indicator26Row } from "@/hooks/useIndicators26Raw";
+
+type Fmt = "brl" | "int" | "pct" | "x" | "mes";
+
+interface RowCfg {
+  label: string;
+  fmt: Fmt;
+  /** benchmark para conditional formatting (linhas de eficiência) */
+  bench?: number;
+}
+
+interface Group {
+  title: string;
+  rows: RowCfg[];
+}
+
+// Ordem e formato espelhando a aba "Indicadores 26" da planilha.
+const GROUPS: Group[] = [
+  {
+    title: "Aquisição / Mídia",
+    rows: [
+      { label: "Mídia Google Ads", fmt: "brl" },
+      { label: "Leads - Google Ads", fmt: "int" },
+      { label: "CPL - Google Ads", fmt: "brl" },
+      { label: "Mídia Meta Ads", fmt: "brl" },
+      { label: "Leads - Meta Ads", fmt: "int" },
+      { label: "CPL - Meta Ads", fmt: "brl" },
+      { label: "Instagram O2", fmt: "brl" },
+      { label: "Instagram Pedro", fmt: "brl" },
+      { label: "Instagram Total", fmt: "brl" },
+      { label: "Mídia total", fmt: "brl" },
+      { label: "Leads totais", fmt: "int" },
+      { label: "CPL total", fmt: "brl" },
+      { label: "Leads no pipe", fmt: "int" },
+      { label: "CPL no pipe", fmt: "brl" },
+    ],
+  },
+  {
+    title: "Funil MQL → Venda",
+    rows: [
+      { label: "MQL por Faturamento", fmt: "int" },
+      { label: "CPMQL por Faturamento", fmt: "brl" },
+      { label: "MQL/Leads (por Faturamento)", fmt: "pct" },
+      { label: "SQL", fmt: "int" },
+      { label: "CPSQL", fmt: "brl" },
+      { label: "SQL/MQL", fmt: "pct" },
+      { label: "SQL/Leads", fmt: "pct" },
+      { label: "Tentativas de chamada", fmt: "int" },
+      { label: "Chamadas atendidas", fmt: "int" },
+      { label: "Conversas efetuadas", fmt: "int" },
+      { label: "Taxa Tentativas/Atendidas", fmt: "pct" },
+      { label: "Taxa MQL/RM (%)", fmt: "pct" },
+      { label: "Reunião marcada", fmt: "int" },
+      { label: "Conversas/marcadas", fmt: "pct" },
+      { label: "CPRM", fmt: "brl" },
+      { label: "Taxa RM/RR (%)", fmt: "pct" },
+      { label: "No show", fmt: "int" },
+      { label: "Reunião realizada", fmt: "int" },
+      { label: "CPRR", fmt: "brl" },
+      { label: "Proposta enviada", fmt: "int" },
+      { label: "Taxa RR/Proposta (%)", fmt: "pct" },
+      { label: "Vendas/MQL", fmt: "pct" },
+      { label: "Vendas", fmt: "int" },
+      { label: "CPV", fmt: "brl" },
+      { label: "Taxa Proposta/Venda (%)", fmt: "pct" },
+      { label: "Conversão MQL/Venda (%)", fmt: "pct" },
+    ],
+  },
+  {
+    title: "CAC & Unit Economics",
+    rows: [
+      { label: "CAC", fmt: "brl" },
+      { label: "MRR", fmt: "brl" },
+      { label: "Setup", fmt: "brl" },
+      { label: "Pontual", fmt: "brl" },
+      { label: "Educação", fmt: "brl" },
+      { label: "GMV (Gross Merchandise Value)", fmt: "brl" },
+      { label: "Run Rate", fmt: "brl" },
+      { label: "ARR", fmt: "brl" },
+      { label: "ARPU", fmt: "brl" },
+      { label: "ARPU (MRR)", fmt: "brl" },
+      { label: "ARPU (Setup)", fmt: "brl" },
+      { label: "LT", fmt: "int" },
+      { label: "LTV", fmt: "brl" },
+      { label: "TCV (Total Contract Value)", fmt: "brl" },
+      { label: "LTV/TCV", fmt: "pct" },
+      { label: "Ads/GMV", fmt: "pct" },
+      { label: "Margem Bruta", fmt: "pct" },
+      { label: "LTV Final", fmt: "brl" },
+    ],
+  },
+  {
+    title: "Base & Retenção",
+    rows: [
+      { label: "Clientes ativos", fmt: "int" },
+      { label: "MRR base", fmt: "brl" },
+      { label: "Receita bruta", fmt: "brl" },
+      { label: "Risco de churn", fmt: "int" },
+      { label: "Pedido de churn", fmt: "int" },
+      { label: "Logo Churn", fmt: "int" },
+      { label: "% Logo Churn", fmt: "pct" },
+      { label: "Revenue Churn", fmt: "brl" },
+      { label: "% Revenue Churn", fmt: "pct" },
+      { label: "Net Customer Growth", fmt: "int" },
+      { label: "% Net Customer Growth", fmt: "pct" },
+      { label: "Net Revenue Retention", fmt: "brl" },
+      { label: "% Net Revenue Retention", fmt: "pct" },
+    ],
+  },
+  {
+    title: "Eficiência & Retorno",
+    rows: [
+      { label: "Time e ferramentas", fmt: "brl" },
+      { label: "Despesas totais", fmt: "brl" },
+      { label: "Headcount", fmt: "int" },
+      { label: "Revenue per Employee", fmt: "brl" },
+      { label: "ROAS", fmt: "x", bench: 1 },
+      { label: "ROAS LTV", fmt: "x", bench: 1 },
+      { label: "LTV/CAC", fmt: "x", bench: 3 },
+      { label: "CAC Payback", fmt: "mes" },
+      { label: "CAC Payback (MRR)", fmt: "mes" },
+      { label: "ROI", fmt: "x", bench: 1 },
+      { label: "ROI LTV", fmt: "x", bench: 1 },
+      { label: "ROI LTV Final", fmt: "x", bench: 1 },
+      { label: "ROI Pedro", fmt: "x", bench: 1 },
+      { label: "ROI Pedro LTV", fmt: "x", bench: 1 },
+    ],
+  },
+];
+
+// Colunas na ordem da planilha. `strong` = trimestre/total (destacado).
+const COLS: { key: string; label: string; strong?: boolean }[] = [
+  { key: "jan", label: "Jan" },
+  { key: "fev", label: "Fev" },
+  { key: "mar", label: "Mar" },
+  { key: "q1", label: "Q1", strong: true },
+  { key: "abr", label: "Abr" },
+  { key: "mai", label: "Mai" },
+  { key: "jun", label: "Jun" },
+  { key: "q2", label: "Q2", strong: true },
+  { key: "jul25", label: "Jul/25" },
+  { key: "ago25", label: "Ago/25" },
+  { key: "set25", label: "Set/25" },
+  { key: "q325", label: "Q3/25", strong: true },
+  { key: "out25", label: "Out/25" },
+  { key: "nov25", label: "Nov/25" },
+  { key: "dez25", label: "Dez/25" },
+  { key: "q425", label: "Q4/25", strong: true },
+  { key: "total2026", label: "TOTAL 2026", strong: true },
+];
+
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+function fmtValue(v: number | null | undefined, fmt: Fmt): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return "—";
+  switch (fmt) {
+    case "brl":
+      return v.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+        maximumFractionDigits: 0,
+      });
+    case "int":
+      return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    case "pct":
+      return `${(v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+    case "x":
+      return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}x`;
+    case "mes":
+      return `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} m`;
+  }
+}
+
+export function ConsolidatedIndicators26Section() {
+  const { rows, lastUpdate, isFallback, isLoading } = useIndicators26Raw();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  // Index das linhas da planilha por label normalizado
+  const rowMap = useMemo(() => {
+    const m = new Map<string, Indicator26Row>();
+    for (const r of rows) m.set(normalize(r.label), r);
+    return m;
+  }, [rows]);
+
+  const q = normalize(query);
+
+  const handleExportCsv = () => {
+    const header = ["Indicador", ...COLS.map((c) => c.label)].join(";");
+    const lines: string[] = [header];
+    for (const g of GROUPS) {
+      for (const cfg of g.rows) {
+        const row = rowMap.get(normalize(cfg.label));
+        const cells = COLS.map((c) => {
+          const v = row?.values?.[c.key];
+          return v === null || v === undefined ? "" : String(v).replace(".", ",");
+        });
+        lines.push([cfg.label, ...cells].join(";"));
+      }
+    }
+    const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "indicadores-26.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CardHeader className="pb-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CollapsibleTrigger className="flex items-center gap-2 text-left group">
+              <Table2 className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="text-lg font-semibold">Visão Total — Indicadores 26</h3>
+                <p className="text-xs text-muted-foreground">
+                  Comercial + Marketing + Growth ·{" "}
+                  {lastUpdate ? `Última atualização: ${lastUpdate}` : "—"}
+                </p>
+              </div>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform",
+                  open && "rotate-180",
+                )}
+              />
+            </CollapsibleTrigger>
+
+            <div className="flex items-center gap-2">
+              {isFallback && (
+                <Badge variant="outline" className="text-amber-600 border-amber-500/40">
+                  Snapshot da planilha · fonte ao vivo a definir
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CollapsibleContent>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="relative w-full max-w-xs">
+                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Buscar indicador..."
+                  className="pl-8"
+                />
+              </div>
+              <Button variant="outline" size="sm" className="gap-2" onClick={handleExportCsv}>
+                <Download className="h-4 w-4" />
+                Exportar CSV
+              </Button>
+            </div>
+
+            {isLoading ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Carregando…</p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="sticky left-0 z-10 bg-muted/30 px-3 py-2 text-left font-semibold min-w-[200px]">
+                        Indicador
+                      </th>
+                      {COLS.map((c) => (
+                        <th
+                          key={c.key}
+                          className={cn(
+                            "px-3 py-2 text-right font-medium whitespace-nowrap",
+                            c.strong && "bg-muted/60 font-semibold",
+                          )}
+                        >
+                          {c.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {GROUPS.map((g) => {
+                      const visibleRows = g.rows.filter(
+                        (cfg) => !q || normalize(cfg.label).includes(q),
+                      );
+                      if (visibleRows.length === 0) return null;
+                      return (
+                        <GroupBlock key={g.title} title={g.title} rows={visibleRows} rowMap={rowMap} />
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
+
+function GroupBlock({
+  title,
+  rows,
+  rowMap,
+}: {
+  title: string;
+  rows: RowCfg[];
+  rowMap: Map<string, Indicator26Row>;
+}) {
+  return (
+    <>
+      <tr>
+        <td
+          colSpan={COLS.length + 1}
+          className="sticky left-0 bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary"
+        >
+          {title}
+        </td>
+      </tr>
+      {rows.map((cfg) => {
+        const row = rowMap.get(normalize(cfg.label));
+        return (
+          <tr key={cfg.label} className="border-b last:border-0 hover:bg-muted/20">
+            <td className="sticky left-0 z-10 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap">
+              {cfg.label}
+            </td>
+            {COLS.map((c) => {
+              const v = row?.values?.[c.key] ?? null;
+              const good =
+                cfg.bench !== undefined && v !== null ? v >= cfg.bench : undefined;
+              return (
+                <td
+                  key={c.key}
+                  className={cn(
+                    "px-3 py-1.5 text-right tabular-nums whitespace-nowrap",
+                    c.strong && "bg-muted/40 font-medium",
+                    good === true && "text-emerald-600",
+                    good === false && "text-destructive",
+                  )}
+                >
+                  {fmtValue(v, cfg.fmt)}
+                </td>
+              );
+            })}
+          </tr>
+        );
+      })}
+    </>
+  );
+}
