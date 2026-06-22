@@ -365,10 +365,11 @@ export function CfoSquadAdminTab() {
         <Card className="border-red-500/40">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertTriangle className="h-4 w-4" /> Fornecedores no DRE sem vínculo
+              <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem CNPJ cadastrado em Pessoas
             </CardTitle>
             <CardDescription>
-              Lançamentos da Oxy que não bateram CNPJ nem nome com nenhuma pessoa do Pipefy.
+              Lançamentos da Oxy cujo CNPJ não bate com nenhuma pessoa do Pipefy (Database de Pessoas).
+              Cadastre o CNPJ no card da pessoa correspondente para vincular automaticamente na próxima sync.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -376,6 +377,7 @@ export function CfoSquadAdminTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fornecedor (label do DRE)</TableHead>
+                  <TableHead>CNPJ detectado</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
@@ -386,19 +388,72 @@ export function CfoSquadAdminTab() {
                   .map((u, i) => (
                     <TableRow key={`${u.label}-${i}`}>
                       <TableCell className="text-sm">{u.label}</TableCell>
+                      <TableCell className="text-xs tabular-nums">
+                        {u.cnpjDetectado ? (
+                          <Badge variant="outline" className="font-mono">{u.cnpjDetectado}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground italic">sem CNPJ na label</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{u.category}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatBRL(u.valor)}</TableCell>
                     </TableRow>
                   ))}
               </TableBody>
             </Table>
-            <p className="text-xs text-muted-foreground mt-3">
-              Para vincular: garanta que a pessoa esteja cadastrada na Pessoas DB do Pipefy com o
-              CNPJ correto (a raiz de 8 dígitos precisa bater com o início do label).
-            </p>
           </CardContent>
         </Card>
       )}
+
+      {/* Pessoas sem CNPJ na base do Pipefy */}
+      {(() => {
+        const semCnpj = (hr.rawPessoas || []).filter((p) => {
+          const sit = (p['Situação'] || '').toLowerCase();
+          if (sit !== 'ativo') return false;
+          const cargo = (p.Cargo || '').toLowerCase();
+          const ok =
+            cargo.includes('cfo') ||
+            cargo.includes('fp&a') ||
+            cargo.includes('financeiro') ||
+            cargo.includes('estagi');
+          if (!ok) return false;
+          return !(p.CNPJ && p.CNPJ.replace(/\D/g, '').length >= 8);
+        });
+        if (semCnpj.length === 0) return null;
+        return (
+          <Card className="border-amber-500/40">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-4 w-4" /> Pessoas ativas (financeiro) sem CNPJ no Pipefy
+              </CardTitle>
+              <CardDescription>
+                Essas pessoas não podem ser vinculadas a lançamentos do DRE até terem CNPJ cadastrado no
+                card da Database de Pessoas do Pipefy.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Pessoa</TableHead>
+                    <TableHead>Cargo</TableHead>
+                    <TableHead>ID Pipefy</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {semCnpj.map((p) => (
+                    <TableRow key={p.ID || p.Nome}>
+                      <TableCell className="text-sm">{p.Nome || p['Título']}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{p.Cargo}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground tabular-nums">{p.ID || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Pessoas sem squad */}
       {squad.peopleWithoutSquad.length > 0 && (
