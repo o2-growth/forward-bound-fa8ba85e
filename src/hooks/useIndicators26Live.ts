@@ -4,13 +4,13 @@ import { startOfMonth, endOfMonth } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import type { CampaignData } from "@/components/planning/marketing-indicators/types";
 import { useFunnelRealized } from "./useFunnelRealized";
-import { useModeloAtualMetas } from "./useModeloAtualMetas";
-import { useO2TaxMetas } from "./useO2TaxMetas";
-import { useExpansaoMetas } from "./useExpansaoMetas";
-import { useOxyHackerMetas } from "./useOxyHackerMetas";
+import { useModeloAtualAnalytics } from "./useModeloAtualAnalytics";
+import { useO2TaxAnalytics } from "./useO2TaxAnalytics";
+import { useExpansaoAnalytics } from "./useExpansaoAnalytics";
 import { useMrrBase } from "./useMrrBase";
 import { useOxyFinance } from "./useOxyFinance";
 import { useHrData } from "./useHrData";
+import { useOperationsData } from "./useOperationsData";
 
 export type LiveColKey =
   | "jan" | "fev" | "mar" | "q1"
@@ -50,8 +50,6 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
   const year = 2026;
 
   // ----- 1. Meta + Google Ads por mês (6 queries paralelas para Jan–Jun) -----
-  // Future months retornariam zero — não vale a pena disparar 12 calls. Mantemos 6 Jan–Jun
-  // e replicamos zero para Jul–Dez (esses meses ainda não rodaram).
   const monthRanges = useMemo(() => {
     const today = new Date();
     return MONTH_NAMES.map((_, i) => {
@@ -76,7 +74,7 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
           },
         });
         if (error) throw error;
-        const campaigns: CampaignData[] = (data?.campaigns || []).map((c: any) => {
+        const campaigns: any[] = (data?.campaigns || []).map((c: any) => {
           const ins = c.insights || {};
           const spend = parseFloat(ins.spend || "0");
           const actions: any[] = ins.actions || [];
@@ -86,11 +84,11 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
             a.action_type === "offsite_conversion.fb_pixel_lead"
           );
           const leads = leadAction ? parseInt(leadAction.value, 10) || 0 : 0;
-          return { investment: spend, leads } as any;
+          return { investment: spend, leads };
         });
         return {
-          spend: campaigns.reduce((s, c: any) => s + (c.investment || 0), 0),
-          leads: campaigns.reduce((s, c: any) => s + (c.leads || 0), 0),
+          spend: campaigns.reduce((s, c) => s + (c.investment || 0), 0),
+          leads: campaigns.reduce((s, c) => s + (c.leads || 0), 0),
         };
       },
     })),
@@ -111,9 +109,17 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
         });
         if (error) throw error;
         const campaigns = data?.campaigns || [];
+        // fetch-google-campaigns retorna `spend` já em BRL e `conversions` (ou `leads`)
         return {
-          spend: campaigns.reduce((s: number, c: any) => s + (Number(c.cost_micros || 0) / 1_000_000 || c.investment || 0), 0),
-          leads: campaigns.reduce((s: number, c: any) => s + (Number(c.conversions || c.leads || 0)), 0),
+          spend: campaigns.reduce(
+            (s: number, c: any) =>
+              s + Number(c.spend ?? c.investment ?? (Number(c.cost_micros || 0) / 1_000_000) ?? 0),
+            0
+          ),
+          leads: campaigns.reduce(
+            (s: number, c: any) => s + Number(c.conversions ?? c.leads ?? 0),
+            0
+          ),
         };
       },
     })),
@@ -124,27 +130,31 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
   const yearEnd = useMemo(() => new Date(year, 11, 31), []);
   const funnel = useFunnelRealized(yearStart, yearEnd);
 
-  // ----- 3. Receita por BU (4 hooks, range anual) -----
-  const modelo = useModeloAtualMetas(yearStart, yearEnd);
-  const o2tax = useO2TaxMetas(yearStart, yearEnd);
-  const franquia = useExpansaoMetas(yearStart, yearEnd);
-  const oxyHacker = useOxyHackerMetas(yearStart, yearEnd);
+  // ----- 3. Receita por BU via Analytics hooks (mesma fonte do drill-down comercial) -----
+  // Cada hook retorna `cards` filtrados ao período + getCardsForIndicator('venda') deduplicado.
+  const modeloA = useModeloAtualAnalytics(yearStart, yearEnd);
+  const o2taxA = useO2TaxAnalytics(yearStart, yearEnd);
+  const franquiaA = useExpansaoAnalytics(yearStart, yearEnd, "Franquia");
+  const oxyHackerA = useExpansaoAnalytics(yearStart, yearEnd, "Oxy Hacker");
 
   // ----- 4. Outras fontes -----
   const { getMrrBaseForMonth } = useMrrBase();
   const oxy = useOxyFinance(year);
   const hr = useHrData({ startDate: yearStart, endDate: yearEnd });
+  const operations = useOperationsData();
 
   const isLoading =
     metaQueries.some((q) => q.isLoading) ||
     googleQueries.some((q) => q.isLoading) ||
     funnel.isLoading ||
-    modelo.isLoading ||
-    o2tax.isLoading ||
+    modeloA.isLoading ||
+    o2taxA.isLoading ||
+    franquiaA.isLoading ||
+    oxyHackerA.isLoading ||
     oxy.isLoading;
 
   const rows = useMemo<LiveRow[]>(() => {
-    // Per-month aggregates from funnel_realized
+    // ===== Funnel realized por mês =====
     const funnelByMonth = (indicator: string): number[] => {
       const out = new Array(12).fill(0);
       for (const r of funnel.data || []) {
@@ -164,7 +174,7 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
     const propostaM = funnelByMonth("proposta");
     const vendaM = funnelByMonth("venda");
 
-    // Mídia/Leads por mês
+    // ===== Mídia/Leads de API por mês =====
     const metaSpendM = monthRanges.map((_, i) => metaQueries[i]?.data?.spend ?? 0);
     const metaLeadsM = monthRanges.map((_, i) => metaQueries[i]?.data?.leads ?? 0);
     const googleSpendM = monthRanges.map((_, i) => googleQueries[i]?.data?.spend ?? 0);
@@ -172,49 +182,99 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
     const totalSpendM = metaSpendM.map((v, i) => v + googleSpendM[i]);
     const totalLeadsApiM = metaLeadsM.map((v, i) => v + googleLeadsM[i]);
 
-    // Receita por mês (4 BUs)
-    const mrrM: number[] = [];
-    const setupM: number[] = [];
-    const pontualM: number[] = [];
-    const educacaoM: number[] = [];
+    // ===== Receita por mês via cartões de venda (regra: 'Data de assinatura do contrato') =====
+    const mrrM = new Array(12).fill(0);
+    const setupM = new Array(12).fill(0);
+    const pontualM = new Array(12).fill(0);
+    const educacaoM = new Array(12).fill(0);
 
-    for (let i = 0; i < 12; i++) {
-      const start = startOfMonth(new Date(year, i, 1));
-      const end = endOfMonth(new Date(year, i, 1));
-      let mrr = 0, setup = 0, pontual = 0, educacao = 0;
-      mrr += modelo.getMrrForPeriod(start, end);
-      setup += modelo.getSetupForPeriod(start, end);
-      pontual += modelo.getPontualForPeriod(start, end);
-      educacao += modelo.getEducacaoForPeriod(start, end);
-      mrr += o2tax.getMrrForPeriod(start, end);
-      setup += o2tax.getSetupForPeriod(start, end);
-      pontual += o2tax.getPontualForPeriod(start, end);
-      pontual += franquia.getValueForPeriod("venda", start, end);
-      pontual += oxyHacker.getValueForPeriod("venda", start, end);
-      mrrM.push(mrr);
-      setupM.push(setup);
-      pontualM.push(pontual);
-      educacaoM.push(educacao);
-    }
+    // Helper: percorre cards de venda e agrega por mês usando dataAssinatura||dataEntrada.
+    // Deduplica por (id + mês) — memória `sales-monthly-card-dedup`.
+    const aggregateSales = (vendaCards: any[]) => {
+      const seen = new Map<string, true>(); // chave: `${id}-${month}`
+      for (const c of vendaCards) {
+        const dt: Date = c.dataAssinatura || c.dataEntrada;
+        if (!dt) continue;
+        if (dt.getFullYear() !== year) continue;
+        const m = dt.getMonth();
+        const k = `${c.id}-${m}`;
+        if (seen.has(k)) continue;
+        seen.set(k, true);
+        mrrM[m] += Number(c.valorMRR || 0);
+        setupM[m] += Number(c.valorSetup || 0);
+        pontualM[m] += Number(c.valorPontual || 0);
+        educacaoM[m] += Number(c.valorEducacao || 0);
+      }
+    };
+
+    try { aggregateSales(modeloA.getCardsForIndicator?.("venda") || []); } catch {}
+    try { aggregateSales(o2taxA.getCardsForIndicator?.("venda") || []); } catch {}
+    try { aggregateSales(franquiaA.getCardsForIndicator?.("venda") || []); } catch {}
+    try { aggregateSales(oxyHackerA.getCardsForIndicator?.("venda") || []); } catch {}
 
     const gmvM = mrrM.map((v, i) => v + setupM[i] + pontualM[i] + educacaoM[i]);
 
-    // MRR Base mensal
+    // ===== MRR Base mensal =====
     const mrrBaseM = MONTH_NAMES.map((m) => getMrrBaseForMonth(m, year));
 
-    // Receita bruta (Oxy Finance cashflow)
+    // ===== Receita bruta (Oxy Finance cashflow) =====
     const receitaBrutaM = MONTH_NAMES.map((m) => oxy.cashflowByMonth?.[m as any] || 0);
 
-    // Headcount (snapshot atual — não temos histórico mensal de headcount)
+    // ===== Headcount snapshot (sem histórico mensal) =====
     const headcountAtual = hr.headcountTotal || 0;
     const headcountM = MONTH_NAMES.map(() => headcountAtual);
 
-    // Derivados
+    // ===== Operations snapshots — replicados em todos os meses =====
+    const opsKpis = operations.data?.kpis;
+    const clientesAtivosSnap = opsKpis?.totalAtivos ?? null;
+    const churnAbsSnap = opsKpis?.churn ?? null;
+    const churnRateSnap = typeof opsKpis?.churnRate === "number" ? opsKpis.churnRate / 100 : null; // 0..1
+    const mrrEmRiscoSnap = opsKpis?.mrrEmRisco ?? null;
+
+    const clientesAtivosM: (number | null)[] = MONTH_NAMES.map(() => clientesAtivosSnap);
+    const logoChurnM: (number | null)[] = MONTH_NAMES.map(() => churnAbsSnap);
+    const pctLogoChurnM: (number | null)[] = MONTH_NAMES.map(() => churnRateSnap);
+    const revenueChurnM: (number | null)[] = MONTH_NAMES.map(() => mrrEmRiscoSnap);
+    const pctRevenueChurnM: (number | null)[] = mrrBaseM.map((b) =>
+      b && mrrEmRiscoSnap != null ? mrrEmRiscoSnap / b : null
+    );
+
+    // ARPU = MRR Base / Clientes Ativos
+    const arpuM: (number | null)[] = mrrBaseM.map((b) =>
+      b && clientesAtivosSnap && clientesAtivosSnap > 0 ? b / clientesAtivosSnap : null
+    );
+    // LT (meses) = 1 / churn rate mensal
+    const ltM: (number | null)[] = MONTH_NAMES.map(() =>
+      churnRateSnap && churnRateSnap > 0 ? 1 / churnRateSnap : null
+    );
+    // LTV = ARPU * LT
+    const ltvM: (number | null)[] = arpuM.map((a, i) =>
+      a != null && ltM[i] != null ? a * (ltM[i] as number) : null
+    );
+
+    // CAC
+    const cacM: (number | null)[] = totalSpendM.map((s, i) => safeDiv(s, vendaM[i]));
+    // CAC Payback (MRR) = CAC / ARPU(MRR)
+    const cacPaybackMrrM: (number | null)[] = cacM.map((c, i) =>
+      c != null && arpuM[i] != null && (arpuM[i] as number) > 0 ? c / (arpuM[i] as number) : null
+    );
+    // LTV/CAC
+    const ltvCacM: (number | null)[] = ltvM.map((l, i) =>
+      l != null && cacM[i] != null && (cacM[i] as number) > 0 ? l / (cacM[i] as number) : null
+    );
+    // ROAS LTV = (LTV * Vendas) / Mídia
+    const roasLtvM: (number | null)[] = ltvM.map((l, i) =>
+      l != null && totalSpendM[i] > 0 ? (l * vendaM[i]) / totalSpendM[i] : null
+    );
+    // ROI LTV = ROAS LTV - 1
+    const roiLtvM: (number | null)[] = roasLtvM.map((r) => (r == null ? null : r - 1));
+
+    // Derivados de receita
     const arrM = mrrM.map((v) => v * 12);
     const runRateM = arrM;
     const tcvM = mrrM.map((v, i) => v * 12 + setupM[i] + pontualM[i]);
 
-    // Helper para build de linha mensal com agregados trimestrais e total
+    // ===== Helper para build de linha =====
     const buildRow = (label: string, monthly: (number | null)[], opts?: {
       ratio?: { num: number[]; den: number[] };
       avg?: boolean;
@@ -222,8 +282,8 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
       const values: Partial<Record<LiveColKey, number | null>> = {};
       monthly.forEach((v, i) => { values[MONTH_KEYS[i]] = v; });
 
-      // Quarters
-      const numericQ = (months: number[]) => months.map((i) => monthly[i]).filter((v): v is number => typeof v === "number");
+      const numericQ = (months: number[]) =>
+        months.map((i) => monthly[i]).filter((v): v is number => typeof v === "number");
       if (opts?.ratio) {
         const ratioQ = (months: number[]) => {
           const num = sum(months.map((i) => opts.ratio!.num[i]));
@@ -263,7 +323,7 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
 
     const NULL_M: (number | null)[] = new Array(12).fill(null);
 
-    const rows: LiveRow[] = [
+    const out: LiveRow[] = [
       // === Aquisição / Mídia ===
       buildRow("Mídia Google Ads", googleSpendM),
       buildRow("Leads - Google Ads", googleLeadsM),
@@ -340,9 +400,7 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
         { ratio: { num: vendaM, den: mqlM } }),
 
       // === CAC & Unit Economics ===
-      buildRow("CAC",
-        totalSpendM.map((s, i) => safeDiv(s, vendaM[i])),
-        { ratio: { num: totalSpendM, den: vendaM } }),
+      buildRow("CAC", cacM, { ratio: { num: totalSpendM, den: vendaM } }),
       buildRow("MRR", mrrM),
       buildRow("Setup", setupM),
       buildRow("Pontual", pontualM),
@@ -350,13 +408,15 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
       buildRow("GMV (Gross Merchandise Value)", gmvM),
       buildRow("Run Rate", runRateM, { avg: true }),
       buildRow("ARR", arrM, { avg: true }),
-      buildRow("ARPU", NULL_M),
-      buildRow("ARPU (MRR)", NULL_M),
+      buildRow("ARPU", arpuM, { avg: true }),
+      buildRow("ARPU (MRR)", arpuM, { avg: true }),
       buildRow("ARPU (Setup)", NULL_M),
-      buildRow("LT", NULL_M),
-      buildRow("LTV", NULL_M),
+      buildRow("LT", ltM, { avg: true }),
+      buildRow("LTV", ltvM, { avg: true }),
       buildRow("TCV (Total Contract Value)", tcvM),
-      buildRow("LTV/TCV", NULL_M),
+      buildRow("LTV/TCV",
+        ltvM.map((l, i) => (l != null && tcvM[i] > 0 ? l / tcvM[i] : null)),
+        { avg: true }),
       buildRow("Ads/GMV",
         totalSpendM.map((s, i) => safeDiv(s, gmvM[i])),
         { ratio: { num: totalSpendM, den: gmvM } }),
@@ -364,15 +424,15 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
       buildRow("LTV Final", NULL_M),
 
       // === Base & Retenção ===
-      buildRow("Clientes ativos", NULL_M),
+      buildRow("Clientes ativos", clientesAtivosM, { avg: true }),
       buildRow("MRR base", mrrBaseM, { avg: true }),
       buildRow("Receita bruta", receitaBrutaM),
       buildRow("Risco de churn", NULL_M),
       buildRow("Pedido de churn", NULL_M),
-      buildRow("Logo Churn", NULL_M),
-      buildRow("% Logo Churn", NULL_M),
-      buildRow("Revenue Churn", NULL_M),
-      buildRow("% Revenue Churn", NULL_M),
+      buildRow("Logo Churn", logoChurnM, { avg: true }),
+      buildRow("% Logo Churn", pctLogoChurnM, { avg: true }),
+      buildRow("Revenue Churn", revenueChurnM, { avg: true }),
+      buildRow("% Revenue Churn", pctRevenueChurnM, { avg: true }),
       buildRow("Net Customer Growth", NULL_M),
       buildRow("% Net Customer Growth", NULL_M),
       buildRow("Net Revenue Retention", NULL_M),
@@ -388,31 +448,32 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
       buildRow("ROAS",
         gmvM.map((g, i) => safeDiv(g, totalSpendM[i])),
         { ratio: { num: gmvM, den: totalSpendM } }),
-      buildRow("ROAS LTV", NULL_M),
-      buildRow("LTV/CAC", NULL_M),
-      buildRow("CAC Payback", NULL_M),
-      buildRow("CAC Payback (MRR)", NULL_M),
+      buildRow("ROAS LTV", roasLtvM, { avg: true }),
+      buildRow("LTV/CAC", ltvCacM, { avg: true }),
+      buildRow("CAC Payback", cacPaybackMrrM, { avg: true }),
+      buildRow("CAC Payback (MRR)", cacPaybackMrrM, { avg: true }),
       buildRow("ROI",
         gmvM.map((g, i) => {
           const r = safeDiv(g, totalSpendM[i]);
           return r === null ? null : r - 1;
         }),
         { ratio: { num: gmvM.map((g, i) => g - totalSpendM[i]), den: totalSpendM } }),
-      buildRow("ROI LTV", NULL_M),
+      buildRow("ROI LTV", roiLtvM, { avg: true }),
       buildRow("ROI LTV Final", NULL_M),
       buildRow("ROI Pedro", NULL_M),
       buildRow("ROI Pedro LTV", NULL_M),
     ];
 
-    return rows;
+    return out;
   }, [
     funnel.data,
     metaQueries.map((q) => q.dataUpdatedAt).join(","),
     googleQueries.map((q) => q.dataUpdatedAt).join(","),
-    modelo.isLoading, o2tax.isLoading, franquia.isLoading, oxyHacker.isLoading,
+    modeloA.isLoading, o2taxA.isLoading, franquiaA.isLoading, oxyHackerA.isLoading,
     getMrrBaseForMonth,
     oxy.cashflowByMonth,
     hr.headcountTotal,
+    operations.data,
   ]);
 
   return {
