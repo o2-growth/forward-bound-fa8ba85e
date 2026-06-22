@@ -21,6 +21,17 @@ const ROLE_OPTIONS = [
 const formatBRL = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v);
 
+function normalizeLabel(s: string | null | undefined): string {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ltda|me\b|eireli|consultoria|assessoria|financeira|servicos?/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function CfoSquadAdminTab() {
   const { toast } = useToast();
   const qc = useQueryClient();
