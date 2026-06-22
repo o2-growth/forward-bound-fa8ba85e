@@ -146,9 +146,18 @@ export default function Auth() {
     }
   };
 
-  const handleForgotPassword = async (values: ForgotPasswordFormValues) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotEmailError(null);
+
+    const parsed = forgotPasswordSchema.safeParse({ email: forgotEmail });
+    if (!parsed.success) {
+      setForgotEmailError(parsed.error.errors[0]?.message ?? 'Email inválido');
+      return;
+    }
+
     setIsSubmitting(true);
-    const { error } = await resetPassword(values.email);
+    const { error } = await resetPassword(parsed.data.email);
     setIsSubmitting(false);
 
     if (error) {
@@ -162,6 +171,7 @@ export default function Auth() {
         title: 'Email enviado!',
         description: 'Verifique sua caixa de entrada para redefinir sua senha.',
       });
+      setForgotEmail('');
       setMode('login');
     }
   };
