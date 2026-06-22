@@ -380,7 +380,7 @@ export function ConsolidatedIndicators26Section() {
                       );
                       if (visibleRows.length === 0) return null;
                       return (
-                        <GroupBlock key={g.title} title={g.title} rows={visibleRows} rowMap={rowMap} />
+                        <GroupBlock key={g.title} title={g.title} rows={visibleRows} rowMap={rowMap} cols={COLS} />
                       );
                     })}
                   </tbody>
@@ -398,16 +398,18 @@ function GroupBlock({
   title,
   rows,
   rowMap,
+  cols,
 }: {
   title: string;
   rows: RowCfg[];
   rowMap: Map<string, Indicator26Row>;
+  cols: { key: string; label: string; strong?: boolean }[];
 }) {
   return (
     <>
       <tr>
         <td
-          colSpan={COLS.length + 1}
+          colSpan={cols.length + 1}
           className="sticky left-0 bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary"
         >
           {title}
@@ -420,7 +422,7 @@ function GroupBlock({
             <td className="sticky left-0 z-10 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap">
               {cfg.label}
             </td>
-            {COLS.map((c) => {
+            {cols.map((c) => {
               const v = row?.values?.[c.key] ?? null;
               const good =
                 cfg.bench !== undefined && v !== null ? v >= cfg.bench : undefined;
@@ -444,3 +446,4 @@ function GroupBlock({
     </>
   );
 }
+
