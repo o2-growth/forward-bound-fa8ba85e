@@ -276,7 +276,8 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
     const arpuM: (number | null)[] = mrrBaseM.map((b) =>
       b && clientesAtivosSnap && clientesAtivosSnap > 0 ? b / clientesAtivosSnap : null
     );
-    // LT (meses) = 1 / churn rate mensal
+    // LT (meses) = 1 / % logo churn mensal (usa snapshot atual como média)
+    const churnRateSnap = typeof opsKpis?.churnRate === "number" ? opsKpis.churnRate / 100 : null;
     const ltM: (number | null)[] = MONTH_NAMES.map(() =>
       churnRateSnap && churnRateSnap > 0 ? 1 / churnRateSnap : null
     );
