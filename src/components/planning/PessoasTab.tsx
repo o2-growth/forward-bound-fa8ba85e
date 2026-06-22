@@ -235,6 +235,7 @@ export function PessoasTab() {
   const pc12m = usePersonnelCostByBu({ startDate: range12m.from, endDate: range12m.to });
   const [openBu, setOpenBu] = useState<string | null>(null);
   const [openCat, setOpenCat] = useState<string | null>(null);
+  const [showCustoReceitaCharts, setShowCustoReceitaCharts] = useState(false);
   const drill = usePeopleDrill();
 
   // Período anterior (mesmo tamanho) — para Δ% nos KPIs
