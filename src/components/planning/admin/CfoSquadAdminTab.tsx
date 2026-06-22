@@ -126,11 +126,51 @@ export function CfoSquadAdminTab() {
   const [newSquadInput, setNewSquadInput] = useState('');
   const [newPessoa, setNewPessoa] = useState('');
   const [newRole, setNewRole] = useState<'cfo' | 'analyst'>('analyst');
+  const [aliasPicks, setAliasPicks] = useState<Record<string, string>>({}); // labelOriginal → pessoa.nome
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['cfo-squad-assignments'] });
     qc.invalidateQueries({ queryKey: ['cfo-squad-assignments-admin'] });
+    qc.invalidateQueries({ queryKey: ['dre-supplier-aliases'] });
+    qc.invalidateQueries({ queryKey: ['dre-supplier-aliases-admin'] });
   };
+
+  const handleSaveAlias = async (labelOriginal: string) => {
+    const pessoaNome = aliasPicks[labelOriginal];
+    if (!pessoaNome) {
+      toast({ title: 'Selecione uma pessoa', variant: 'destructive' });
+      return;
+    }
+    const cand = allPessoasFinanc.find((c) => c.nome === pessoaNome);
+    const { error } = await (supabase as any).from('dre_supplier_alias').insert({
+      label_normalizado: normalizeLabel(labelOriginal),
+      label_original: labelOriginal,
+      pessoa_nome: pessoaNome,
+      pessoa_id: cand?.id || null,
+    });
+    if (error) {
+      toast({ title: 'Erro ao salvar alias', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Alias salvo', description: `${labelOriginal} → ${pessoaNome}` });
+    setAliasPicks((prev) => {
+      const next = { ...prev };
+      delete next[labelOriginal];
+      return next;
+    });
+    refresh();
+  };
+
+  const handleRemoveAlias = async (id: string) => {
+    const { error } = await (supabase as any).from('dre_supplier_alias').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Erro ao remover alias', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Alias removido' });
+    refresh();
+  };
+
 
   const handleAdd = async () => {
     const squadFinal = newSquad === '__new' ? newSquadInput.trim() : newSquad;
