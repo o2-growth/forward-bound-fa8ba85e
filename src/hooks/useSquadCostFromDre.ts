@@ -42,7 +42,8 @@ export interface UnmatchedSupplier {
   label: string;
   valor: number;
   category: string;
-  cnpjDetectado: string | null;
+  idDetectado: string | null;
+  tipoIdDetectado: "cpf" | "cnpj" | null;
 }
 
 interface UseParams {
@@ -63,11 +64,20 @@ function normalize(s: string | null | undefined): string {
     .trim();
 }
 
+function onlyDigits(value: string | null | undefined): string {
+  return (value || "").replace(/\D/g, "");
+}
+
 function cnpjRoot(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const digits = value.replace(/\D/g, "");
+  const digits = onlyDigits(value);
   if (digits.length < 8) return null;
   return digits.slice(0, 8);
+}
+
+function cpfFull(value: string | null | undefined): string | null {
+  const digits = onlyDigits(value);
+  if (digits.length < 11) return null;
+  return digits.slice(0, 11);
 }
 
 interface DrillItem {
