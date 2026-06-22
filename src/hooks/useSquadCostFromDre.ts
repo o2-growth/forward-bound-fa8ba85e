@@ -93,6 +93,22 @@ async function fetchAssignments(): Promise<SquadAssignmentRow[]> {
   return (data || []) as SquadAssignmentRow[];
 }
 
+export interface SupplierAliasRow {
+  id: string;
+  label_normalizado: string;
+  label_original: string;
+  pessoa_id: string | null;
+  pessoa_nome: string;
+}
+
+async function fetchSupplierAliases(): Promise<SupplierAliasRow[]> {
+  const { data, error } = await (supabase as any)
+    .from("dre_supplier_alias")
+    .select("id, label_normalizado, label_original, pessoa_id, pessoa_nome");
+  if (error) throw error;
+  return (data || []) as SupplierAliasRow[];
+}
+
 async function fetchDrillDown(category: string, start: string, end: string): Promise<DrillItem[]> {
   const { data, error } = await supabase.functions.invoke("fetch-oxy-finance", {
     body: { action: "dre_drill_down", category, startDate: start, endDate: end },
