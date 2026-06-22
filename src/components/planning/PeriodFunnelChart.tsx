@@ -4,7 +4,6 @@ import { useClosersMetas } from "@/hooks/useClosersMetas";
 import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
 import { useO2TaxMetas } from "@/hooks/useO2TaxMetas";
 import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
-import { useModeloAtualValues } from "@/hooks/useModeloAtualValues";
 import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
 import { BUType, IndicatorType } from "@/hooks/useFunnelRealized";
 
@@ -31,8 +30,7 @@ export function PeriodFunnelChart({ startDate, endDate, selectedBU }: PeriodFunn
   const { getQtyForPeriod: getExpansaoQty, getValueForPeriod: getExpansaoValue } = useExpansaoMetas(startDate, endDate);
   const { getQtyForPeriod: getO2TaxQty, getValueForPeriod: getO2TaxValue } = useO2TaxMetas(startDate, endDate);
   const { getQtyForPeriod: getOxyHackerQty, getValueForPeriod: getOxyHackerValue } = useOxyHackerMetas(startDate, endDate);
-  const { getValueForPeriod: getModeloAtualValue } = useModeloAtualValues(startDate, endDate);
-  const { getQtyForPeriod: getModeloAtualQty } = useModeloAtualMetas(startDate, endDate);
+  const { getQtyForPeriod: getModeloAtualQty, getValueForPeriod: getModeloAtualValue } = useModeloAtualMetas(startDate, endDate);
   
   // Check if we should use external database data
   const useExpansaoData = selectedBU === 'franquia';
