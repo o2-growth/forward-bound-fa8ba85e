@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Plus, Save, Trash2 } from 'lucide-react';
 import { useOkrMetas, useUpsertOkrMeta, useDeleteOkrMeta, type OkrMeta } from '@/hooks/useOkrMetas';
 
-type Draft = Omit<OkrMeta, 'created_at' | 'updated_at'> & { id?: string };
+type Draft = Omit<OkrMeta, 'id' | 'created_at' | 'updated_at'> & { id?: string };
 
 const EMPTY_DRAFT: Draft = {
   kr_key: '',
