@@ -183,6 +183,12 @@ function parseNumericValue(value: any): number {
   return 0;
 }
 
+function applyKnownSetupFallback(cardId: string, setupValue: number): number {
+  // Modelcraft (Pipefy 1359038764): setup correto é R$ 10.800; usar só enquanto o sync externo vier zerado.
+  if (cardId === '1359038764' && setupValue === 0) return 10800;
+  return setupValue;
+}
+
 export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['modelo-atual-metas', startDate?.toISOString(), endDate?.toISOString()],
@@ -269,7 +275,7 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
         const valorMRR = parseNumericValue(rawMRR);
         const valorPontual = parseNumericValue(rawPontual);
         const valorEducacao = parseNumericValue(rawEducacao);
-        const valorSetup = parseNumericValue(rawSetup);
+        const valorSetup = applyKnownSetupFallback(id, parseNumericValue(rawSetup));
         const titulo = row['Título'] || row['titulo'] || row['Nome'] || '';
         const dataCriacao = parseDate(row['Data Criação']);
         const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
@@ -295,7 +301,7 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
           valorPontual,
           valorEducacao,
           valorSetup,
-          valor: valorMRR + valorPontual + valorEducacao + valorSetup,
+          valor: valorMRR + valorPontual + valorSetup,
           faixaFaturamento: faixaFaturamento || undefined,
         });
       }
@@ -321,7 +327,7 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
             valorMRR: parseNumericValue(row['Valor MRR'] || 0),
             valorPontual: parseNumericValue(row['Valor Pontual'] || 0),
             valorEducacao: parseNumericValue(row['Valor Educação'] || 0),
-            valorSetup: parseNumericValue(row['Valor Setup'] || 0),
+            valorSetup: applyKnownSetupFallback(id, parseNumericValue(row['Valor Setup'] || 0)),
             valor: 0,
             faixaFaturamento: faixaFaturamento || undefined,
           });
@@ -350,7 +356,7 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
           const valorMRR = parseNumericValue(row['Valor MRR'] || 0);
           const valorPontual = parseNumericValue(row['Valor Pontual'] || 0);
           const valorEducacao = parseNumericValue(row['Valor Educação'] || row['Valor Educacao'] || 0);
-          const valorSetup = parseNumericValue(row['Valor Setup'] || 0);
+          const valorSetup = applyKnownSetupFallback(id, parseNumericValue(row['Valor Setup'] || 0));
           
           movements.push({
             id,
@@ -365,7 +371,7 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
             valorPontual,
             valorEducacao,
             valorSetup,
-            valor: valorMRR + valorPontual + valorEducacao + valorSetup,
+            valor: valorMRR + valorPontual + valorSetup,
             faixaFaturamento: (row['Faixa de faturamento mensal'] || row['Faixa'] || row['faixa'] || '') || undefined,
           });
           existingKeys.add(key);
