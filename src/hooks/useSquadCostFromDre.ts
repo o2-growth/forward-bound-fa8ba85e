@@ -1,0 +1,291 @@
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { usePersonnelCostByBu } from "./usePersonnelCostByBu";
+import { useHrData, type PessoaRow } from "./useHrData";
+
+/**
+ * Custo real por squad de CFO — vincula lançamentos do DRE Oxy (drill-down por categoria CaaS)
+ * a colaboradores via CNPJ (raiz de 8 dígitos) ou nome normalizado.
+ * Agrupa por squad usando a tabela `cfo_squad_assignment`.
+ */
+
+export interface SquadAssignmentRow {
+  id: string;
+  cfo_squad_nome: string;
+  pessoa_nome: string;
+  role: "cfo" | "analyst";
+  pessoa_id: string | null;
+}
+
+export interface SquadMemberCost {
+  pessoaNome: string;
+  pessoaId: string | null;
+  cnpj: string | null;
+  role: "cfo" | "analyst";
+  fee: number;
+  benef: number;
+  total: number;
+  suppliers: { label: string; valor: number; category: string }[];
+}
+
+export interface SquadCost {
+  cfoNome: string;
+  fee: number;
+  benef: number;
+  total: number;
+  membros: SquadMemberCost[];
+}
+
+export interface UnmatchedSupplier {
+  label: string;
+  valor: number;
+  category: string;
+}
+
+interface UseParams {
+  startDate: Date;
+  endDate: Date;
+}
+
+const BENEF_RE = /benefic|alimentac|deslocament|viage|seguro de vida|plano de saude|vale|cursos|treinament/i;
+
+function normalize(s: string | null | undefined): string {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ltda|me\b|eireli|consultoria|assessoria|financeira|servicos?/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cnpjRoot(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length < 8) return null;
+  return digits.slice(0, 8);
+}
+
+interface DrillItem {
+  label: string;
+  total: number;
+}
+
+async function fetchAssignments(): Promise<SquadAssignmentRow[]> {
+  const { data, error } = await supabase
+    .from("cfo_squad_assignment")
+    .select("id, cfo_squad_nome, pessoa_nome, role, pessoa_id");
+  if (error) throw error;
+  return (data || []) as SquadAssignmentRow[];
+}
+
+async function fetchDrillDown(category: string, start: string, end: string): Promise<DrillItem[]> {
+  const { data, error } = await supabase.functions.invoke("fetch-oxy-finance", {
+    body: { action: "dre_drill_down", category, startDate: start, endDate: end },
+  });
+  if (error) throw error;
+  const raw = (data?.data || []) as Array<{ label: string; data: { period: string; value: number }[] }>;
+  return raw.map((r) => {
+    const total = (r.data || [])
+      .filter((d) => d.period !== "Total" && d.period !== "TOTAL")
+      .reduce((s, d) => s + (Number(d.value) || 0), 0);
+    return { label: r.label, total };
+  });
+}
+
+export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
+  const start = format(startDate, "yyyy-MM-01");
+  const end = format(endDate, "yyyy-MM-dd");
+
+  const pc = usePersonnelCostByBu({ startDate, endDate });
+  const hr = useHrData({ startDate, endDate });
+
+  // Lista de categorias CaaS de pessoal (vem do hook que já classifica por BU)
+  const caasCategories = useMemo(() => {
+    const caas = pc.porBu.find((b) => b.bu === "CaaS");
+    if (!caas) return [] as string[];
+    return caas.categorias.map((c) => c.label);
+  }, [pc.porBu]);
+
+  // Drill-down em paralelo de cada categoria CaaS
+  const drillQueries = useQueries({
+    queries: caasCategories.map((cat) => ({
+      queryKey: ["squad-cost-drill", cat, start, end],
+      queryFn: () => fetchDrillDown(cat, start, end),
+      staleTime: 10 * 60 * 1000,
+      retry: 1,
+    })),
+  });
+
+  const assignmentsQ = useQuery({
+    queryKey: ["cfo-squad-assignments"],
+    queryFn: fetchAssignments,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isLoading =
+    pc.isLoading ||
+    hr.isLoading ||
+    assignmentsQ.isLoading ||
+    drillQueries.some((q) => q.isLoading);
+
+  const error =
+    pc.error ||
+    assignmentsQ.error ||
+    drillQueries.find((q) => q.error)?.error ||
+    null;
+
+  const result = useMemo(() => {
+    const assignments = assignmentsQ.data || [];
+    const pessoas = hr.rawPessoas || [];
+
+    // Index pessoas por raiz de CNPJ e por nome normalizado
+    const byCnpj = new Map<string, PessoaRow>();
+    const byName = new Map<string, PessoaRow>();
+    for (const p of pessoas) {
+      const root = cnpjRoot(p.CNPJ);
+      if (root) byCnpj.set(root, p);
+      const nomeKey = normalize(p.Nome || p["Título"]);
+      if (nomeKey) byName.set(nomeKey, p);
+    }
+
+    // Index assignment por nome normalizado de pessoa
+    const assignByPessoaNome = new Map<string, SquadAssignmentRow>();
+    for (const a of assignments) {
+      assignByPessoaNome.set(normalize(a.pessoa_nome), a);
+    }
+
+    // Acumulador por pessoa
+    const byPessoa = new Map<
+      string,
+      {
+        pessoaNome: string;
+        pessoaId: string | null;
+        cnpj: string | null;
+        fee: number;
+        benef: number;
+        suppliers: { label: string; valor: number; category: string }[];
+      }
+    >();
+
+    const unmatched: UnmatchedSupplier[] = [];
+
+    drillQueries.forEach((q, idx) => {
+      const cat = caasCategories[idx];
+      if (!cat) return;
+      const items = (q.data || []) as DrillItem[];
+      const isBenef = BENEF_RE.test(cat);
+      for (const it of items) {
+        if (!it.total) continue;
+        const labelRoot = cnpjRoot(it.label);
+        const labelNorm = normalize(it.label);
+        let pessoa: PessoaRow | null = null;
+        if (labelRoot && byCnpj.has(labelRoot)) {
+          pessoa = byCnpj.get(labelRoot) || null;
+        }
+        if (!pessoa) {
+          // Try name fallback: any pessoa whose normalized name is substring of labelNorm or vice versa
+          for (const [nomeKey, p] of byName.entries()) {
+            if (!nomeKey) continue;
+            const tokens = nomeKey.split(" ").filter((t) => t.length > 2);
+            if (tokens.length < 2) continue;
+            const hits = tokens.filter((t) => labelNorm.includes(t)).length;
+            if (hits >= 2) {
+              pessoa = p;
+              break;
+            }
+          }
+        }
+        if (!pessoa) {
+          unmatched.push({ label: it.label, valor: it.total, category: cat });
+          continue;
+        }
+        const key = normalize(pessoa.Nome || pessoa["Título"]);
+        let acc = byPessoa.get(key);
+        if (!acc) {
+          acc = {
+            pessoaNome: pessoa.Nome || pessoa["Título"] || it.label,
+            pessoaId: pessoa.ID || null,
+            cnpj: pessoa.CNPJ,
+            fee: 0,
+            benef: 0,
+            suppliers: [],
+          };
+          byPessoa.set(key, acc);
+        }
+        if (isBenef) acc.benef += it.total;
+        else acc.fee += it.total;
+        acc.suppliers.push({ label: it.label, valor: it.total, category: cat });
+      }
+    });
+
+    // Agrupa por squad
+    const squadMap = new Map<string, SquadCost>();
+    const peopleWithoutSquad: SquadMemberCost[] = [];
+    for (const [key, acc] of byPessoa.entries()) {
+      const a = assignByPessoaNome.get(key);
+      const member: SquadMemberCost = {
+        pessoaNome: acc.pessoaNome,
+        pessoaId: acc.pessoaId,
+        cnpj: acc.cnpj,
+        role: a?.role || "analyst",
+        fee: acc.fee,
+        benef: acc.benef,
+        total: acc.fee + acc.benef,
+        suppliers: acc.suppliers,
+      };
+      if (!a) {
+        peopleWithoutSquad.push(member);
+        continue;
+      }
+      let sq = squadMap.get(a.cfo_squad_nome);
+      if (!sq) {
+        sq = { cfoNome: a.cfo_squad_nome, fee: 0, benef: 0, total: 0, membros: [] };
+        squadMap.set(a.cfo_squad_nome, sq);
+      }
+      sq.fee += member.fee;
+      sq.benef += member.benef;
+      sq.total += member.total;
+      sq.membros.push(member);
+    }
+
+    const porSquad = Array.from(squadMap.values()).sort((a, b) => b.total - a.total);
+    for (const sq of porSquad) {
+      sq.membros.sort((a, b) => {
+        if (a.role !== b.role) return a.role === "cfo" ? -1 : 1;
+        return b.total - a.total;
+      });
+    }
+
+    const totalSquads = porSquad.reduce((s, sq) => s + sq.total, 0);
+    const totalUnmatched = unmatched.reduce((s, u) => s + u.valor, 0);
+    const totalSemSquad = peopleWithoutSquad.reduce((s, m) => s + m.total, 0);
+
+    return {
+      porSquad,
+      unmatched,
+      peopleWithoutSquad,
+      totalSquads,
+      totalUnmatched,
+      totalSemSquad,
+      totalCaasDre: totalSquads + totalUnmatched + totalSemSquad,
+    };
+  }, [assignmentsQ.data, hr.rawPessoas, drillQueries.map((q) => q.dataUpdatedAt).join(","), caasCategories]);
+
+  const getSquad = (cfoNome: string): SquadCost | null => {
+    return result.porSquad.find((s) => normalize(s.cfoNome) === normalize(cfoNome)) || null;
+  };
+
+  return {
+    ...result,
+    getSquad,
+    getSquadCusto: (cfoNome: string): number => getSquad(cfoNome)?.total || 0,
+    getSquadFee: (cfoNome: string): number => getSquad(cfoNome)?.fee || 0,
+    getSquadBeneficios: (cfoNome: string): number => getSquad(cfoNome)?.benef || 0,
+    isLoading,
+    error: error as Error | null,
+  };
+}
