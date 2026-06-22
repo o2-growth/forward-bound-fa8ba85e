@@ -290,6 +290,27 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
       b && b > 0 ? revenueChurnMonthly[i] / b : null
     );
 
+    // ===== Risco de churn (snapshot) e Pedido de churn (mensal via Entrada de tratativas) =====
+    const riscoChurnSnap = opsKpis?.emTratativa ?? null;
+    const riscoChurnM: (number | null)[] = MONTH_NAMES.map(() => riscoChurnSnap);
+    const pedidoChurnMonthly = new Array(12).fill(0);
+    const rawTratativas: any[] = (operations.data as any)?.rawTratativas || [];
+    for (const t of rawTratativas) {
+      const ent = t?.["Entrada"];
+      if (!ent) continue;
+      const d = new Date(ent);
+      if (isNaN(d.getTime()) || d.getFullYear() !== year) continue;
+      pedidoChurnMonthly[d.getMonth()] += 1;
+    }
+    const pedidoChurnM: (number | null)[] = pedidoChurnMonthly.map((v) => v);
+
+    // ===== Net Customer Growth = vendas - logo churn =====
+    const ncgM: (number | null)[] = vendaM.map((v, i) => v - logoChurnMonthly[i]);
+    const pctNcgM: (number | null)[] = ncgM.map((v) =>
+      v != null && clientesAtivosSnap && clientesAtivosSnap > 0 ? (v as number) / clientesAtivosSnap : null
+    );
+
+
 
     // ARPU = MRR Base / Clientes Ativos
     const arpuM: (number | null)[] = mrrBaseM.map((b) =>
