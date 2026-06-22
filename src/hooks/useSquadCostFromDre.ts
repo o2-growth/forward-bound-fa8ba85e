@@ -153,15 +153,23 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const aliasesQ = useQuery({
+    queryKey: ["dre-supplier-aliases"],
+    queryFn: fetchSupplierAliases,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const isLoading =
     pc.isLoading ||
     hr.isLoading ||
     assignmentsQ.isLoading ||
+    aliasesQ.isLoading ||
     drillQueries.some((q) => q.isLoading);
 
   const error =
     pc.error ||
     assignmentsQ.error ||
+    aliasesQ.error ||
     drillQueries.find((q) => q.error)?.error ||
     null;
 
