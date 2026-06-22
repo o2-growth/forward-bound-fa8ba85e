@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Pencil, Save, Shield, Trash2, User, Target, History, Users, UserCog } from 'lucide-react';
+import { Loader2, Pencil, Save, Shield, Trash2, User, Target, History, Users, UserCog, HeartHandshake } from 'lucide-react';
 import { CreateUserForm } from './CreateUserForm';
 import { EditUserDialog } from './EditUserDialog';
 import { DeleteUserDialog } from './DeleteUserDialog';
@@ -20,6 +20,7 @@ import { CloserAbsoluteMetasTab } from './CloserAbsoluteMetasTab';
 import { AdminLogsTab } from './AdminLogsTab';
 import { CfoMappingTab } from './CfoMappingTab';
 import { CfoSquadAdminTab } from './admin/CfoSquadAdminTab';
+import { OkrMetasTab } from './OkrMetasTab';
 
 const TAB_OPTIONS: { key: TabKey; label: string }[] = [
   { key: 'context', label: 'Macro 2025' },
@@ -157,6 +158,10 @@ export function AdminTab() {
         <TabsTrigger value="cfo-squads" className="gap-2">
           <Users className="h-4 w-4" />
           Squads CFOaaS
+        </TabsTrigger>
+        <TabsTrigger value="okr-metas" className="gap-2">
+          <HeartHandshake className="h-4 w-4" />
+          OKRs / Metas CS
         </TabsTrigger>
         <TabsTrigger value="logs" className="gap-2">
           <History className="h-4 w-4" />
@@ -349,6 +354,10 @@ export function AdminTab() {
 
       <TabsContent value="cfo-squads">
         <CfoSquadAdminTab />
+      </TabsContent>
+
+      <TabsContent value="okr-metas">
+        <OkrMetasTab />
       </TabsContent>
 
       <TabsContent value="logs">

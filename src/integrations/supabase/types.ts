@@ -1116,6 +1116,54 @@ export type Database = {
         }
         Relationships: []
       }
+      okr_metas: {
+        Row: {
+          created_at: string
+          direction: string
+          display_order: number
+          id: string
+          is_active: boolean
+          kr_key: string
+          label: string
+          period: string
+          quarter: number | null
+          target_value: number
+          unit: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          direction?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          kr_key: string
+          label: string
+          period: string
+          quarter?: number | null
+          target_value: number
+          unit?: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          kr_key?: string
+          label?: string
+          period?: string
+          quarter?: number | null
+          target_value?: number
+          unit?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       personnel_dre_groups_config: {
         Row: {
           group_ids: Json
