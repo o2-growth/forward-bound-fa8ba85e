@@ -66,6 +66,10 @@ export interface OxyFinanceResult {
   expansaoByMonth: Record<MonthType, number>;
   /** Soma das categorias SaaS: Oxy + Oxy+Gênio + Oxy+Gênio+Especialista, por mês */
   oxyProductsByMonth: Record<MonthType, number>;
+  /** Receita bruta do grupo "CaaS" por mês (separado do SaaS) */
+  caasByMonth: Record<MonthType, number>;
+  /** Receita bruta do grupo "SaaS" por mês (separado do CaaS) */
+  saasByMonth: Record<MonthType, number>;
   dreRaw: any;
   cashflowChart: CashflowChartPoint[];
   cashflowByMonth: Record<MonthType, number>;
