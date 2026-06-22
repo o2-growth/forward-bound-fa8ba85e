@@ -11,6 +11,21 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useIndicators26Raw, type Indicator26Row } from "@/hooks/useIndicators26Raw";
+import { useIndicators26Live } from "@/hooks/useIndicators26Live";
+
+// Colunas que vêm da fonte AO VIVO (2026)
+const LIVE_COL_KEYS = new Set([
+  "jan", "fev", "mar", "q1",
+  "abr", "mai", "jun", "q2",
+  "jul", "ago", "set", "q3",
+  "out", "nov", "dez", "q4",
+  "total2026",
+]);
+// Colunas que vêm da PLANILHA (histórico 2025)
+const SHEET_COL_KEYS = new Set([
+  "jul25", "ago25", "set25", "q325",
+  "out25", "nov25", "dez25", "q425",
+]);
 
 type Fmt = "brl" | "int" | "pct" | "x" | "mes";
 
@@ -190,16 +205,44 @@ function fmtValue(v: number | null | undefined, fmt: Fmt): string {
 }
 
 export function ConsolidatedIndicators26Section() {
-  const { rows, lastUpdate, isFallback, isLoading } = useIndicators26Raw();
+  const { rows: sheetRows, lastUpdate, isFallback, isLoading } = useIndicators26Raw();
+  const { rows: liveRows, lastUpdate: liveUpdate, isLoading: liveLoading } = useIndicators26Live();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  // Index das linhas da planilha por label normalizado
+  // Index ao vivo por label normalizado
+  const liveMap = useMemo(() => {
+    const m = new Map<string, Record<string, number | null>>();
+    for (const r of liveRows) m.set(normalize(r.label), r.values as Record<string, number | null>);
+    return m;
+  }, [liveRows]);
+
+  // Merge: 2026 vem do live; 2025 (jul25..q425) vem da planilha
   const rowMap = useMemo(() => {
     const m = new Map<string, Indicator26Row>();
-    for (const r of rows) m.set(normalize(r.label), r);
+    const allLabels = new Set<string>();
+    for (const r of sheetRows) allLabels.add(normalize(r.label));
+    for (const r of liveRows) allLabels.add(normalize(r.label));
+
+    const sheetMap = new Map<string, Indicator26Row>();
+    for (const r of sheetRows) sheetMap.set(normalize(r.label), r);
+
+    for (const labelKey of allLabels) {
+      const sheetRow = sheetMap.get(labelKey);
+      const liveVals = liveMap.get(labelKey);
+      const label = sheetRow?.label || liveRows.find((r) => normalize(r.label) === labelKey)?.label || "";
+      const merged: Record<string, number | null> = {};
+      for (const colKey of [...LIVE_COL_KEYS, ...SHEET_COL_KEYS]) {
+        if (LIVE_COL_KEYS.has(colKey)) {
+          merged[colKey] = liveVals?.[colKey] ?? null;
+        } else {
+          merged[colKey] = sheetRow?.values?.[colKey] ?? null;
+        }
+      }
+      m.set(labelKey, { label, values: merged });
+    }
     return m;
-  }, [rows]);
+  }, [sheetRows, liveRows, liveMap]);
 
   const q = normalize(query);
 
@@ -235,8 +278,8 @@ export function ConsolidatedIndicators26Section() {
               <div>
                 <h3 className="text-lg font-semibold">Visão Total — Indicadores 26</h3>
                 <p className="text-xs text-muted-foreground">
-                  Comercial + Marketing + Growth ·{" "}
-                  {lastUpdate ? `Última atualização: ${lastUpdate}` : "—"}
+                  2026 ao vivo (APIs + Pipefy) · 2025 da planilha
+                  {lastUpdate ? ` · planilha atualizada em ${lastUpdate}` : ""}
                 </p>
               </div>
               <ChevronDown
@@ -248,9 +291,12 @@ export function ConsolidatedIndicators26Section() {
             </CollapsibleTrigger>
 
             <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-emerald-600 border-emerald-500/40">
+                2026 · Ao vivo{liveLoading ? " (carregando…)" : ""}
+              </Badge>
               {isFallback && (
                 <Badge variant="outline" className="text-amber-600 border-amber-500/40">
-                  Snapshot da planilha · fonte ao vivo a definir
+                  2025 · Snapshot (planilha indisponível)
                 </Badge>
               )}
             </div>
