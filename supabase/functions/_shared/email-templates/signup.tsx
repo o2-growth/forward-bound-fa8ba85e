@@ -8,8 +8,8 @@ import {
   Container,
   Head,
   Heading,
+  Hr,
   Html,
-  Link,
   Preview,
   Text,
 } from 'npm:@react-email/components@0.0.22'
@@ -23,35 +23,38 @@ interface SignupEmailProps {
 
 export const SignupEmail = ({
   siteName,
-  siteUrl,
   recipient,
   confirmationUrl,
 }: SignupEmailProps) => (
-  <Html lang="en" dir="ltr">
+  <Html lang="pt-BR" dir="ltr">
     <Head />
-    <Preview>Confirm your email for {siteName}</Preview>
+    <Preview>Confirme seu e-mail para ativar seu acesso ao {siteName}</Preview>
     <Body style={main}>
       <Container style={container}>
-        <Heading style={h1}>Confirm your email</Heading>
+        <Heading style={h1}>Confirme seu e-mail</Heading>
+        <Text style={text}>Olá{recipient ? `, ${recipient}` : ''},</Text>
         <Text style={text}>
-          Thanks for signing up for{' '}
-          <Link href={siteUrl} style={link}>
-            <strong>{siteName}</strong>
-          </Link>
-          !
-        </Text>
-        <Text style={text}>
-          Please confirm your email address (
-          <Link href={`mailto:${recipient}`} style={link}>
-            {recipient}
-          </Link>
-          ) by clicking the button below:
+          Recebemos uma solicitação de cadastro no <strong>{siteName}</strong>,
+          a plataforma interna da O2 Inc. Para concluir a ativação do seu
+          acesso, confirme que este endereço de e-mail é seu clicando no botão
+          abaixo.
         </Text>
         <Button style={button} href={confirmationUrl}>
-          Verify Email
+          Confirmar meu e-mail
         </Button>
+        <Text style={textSmall}>
+          Caso o botão acima não funcione, copie e cole o link abaixo no seu
+          navegador:
+        </Text>
+        <Text style={linkFallback}>{confirmationUrl}</Text>
+        <Hr style={hr} />
         <Text style={footer}>
-          If you didn't create an account, you can safely ignore this email.
+          Se você não solicitou este cadastro, ignore este e-mail — nenhuma
+          conta será criada sem a confirmação.
+        </Text>
+        <Text style={signature}>
+          Equipe O2 Inc.<br />
+          Este é um e-mail automático enviado por notify.o2inc.com.br
         </Text>
       </Container>
     </Body>
@@ -60,27 +63,43 @@ export const SignupEmail = ({
 
 export default SignupEmail
 
-const main = { backgroundColor: '#ffffff', fontFamily: 'Arial, sans-serif' }
-const container = { padding: '20px 25px' }
+const main = { backgroundColor: '#ffffff', fontFamily: 'Inter, Arial, sans-serif' }
+const container = { padding: '32px 28px', maxWidth: '560px' }
 const h1 = {
   fontSize: '22px',
   fontWeight: 'bold' as const,
-  color: '#000000',
-  margin: '0 0 20px',
+  color: '#0a0a0a',
+  margin: '0 0 24px',
 }
 const text = {
   fontSize: '14px',
-  color: '#55575d',
-  lineHeight: '1.5',
-  margin: '0 0 25px',
+  color: '#3f3f46',
+  lineHeight: '1.6',
+  margin: '0 0 18px',
 }
-const link = { color: 'inherit', textDecoration: 'underline' }
+const textSmall = {
+  fontSize: '13px',
+  color: '#52525b',
+  lineHeight: '1.6',
+  margin: '24px 0 8px',
+}
 const button = {
-  backgroundColor: '#000000',
+  backgroundColor: '#0a0a0a',
   color: '#ffffff',
   fontSize: '14px',
+  fontWeight: '600' as const,
   borderRadius: '8px',
-  padding: '12px 20px',
+  padding: '12px 22px',
   textDecoration: 'none',
+  display: 'inline-block',
+  margin: '6px 0 8px',
 }
-const footer = { fontSize: '12px', color: '#999999', margin: '30px 0 0' }
+const linkFallback = {
+  fontSize: '12px',
+  color: '#3f3f46',
+  wordBreak: 'break-all' as const,
+  margin: '0 0 8px',
+}
+const hr = { borderColor: '#e4e4e7', margin: '28px 0' }
+const footer = { fontSize: '12px', color: '#71717a', margin: '0 0 14px', lineHeight: '1.6' }
+const signature = { fontSize: '11px', color: '#a1a1aa', margin: '20px 0 0', lineHeight: '1.5' }
