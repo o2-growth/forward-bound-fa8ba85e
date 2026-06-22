@@ -633,48 +633,15 @@ export function PessoasTab() {
                   }}
                 />
                 <Kpi
-                  title="Custo / Receita"
+                  title={`Custo / Receita ${showCustoReceitaCharts ? "▾" : "▸"}`}
                   value={custoTotal > 0 && receitaPeriodo > 0 ? formatPct(custoSobreReceita) : "—"}
-                  subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)} · clique p/ ver por BU`}
+                  subtitle={`Receita do período: ${formatCurrencyCompact(receitaPeriodo)} · clique p/ ${showCustoReceitaCharts ? "fechar" : "ver gráficos"}`}
                   icon={Percent}
                   tone={custoSobreReceita > 60 ? "negative" : custoSobreReceita > 40 ? "warning" : "positive"}
                   isLoading={pc.isLoading || oxy.isLoading}
-                  onClick={() => {
-                    const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
-                    const buToOxy: Record<string, string[]> = {
-                      CaaS: ["modelo_atual"],
-                      SaaS: ["modelo_atual"],
-                      TAX: ["o2_tax"],
-                      "Expansão": ["oxy_hacker", "franquia"],
-                    };
-                    const buRows = [...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])];
-                    const rows = buRows.map((b) => {
-                      const oxyKeys = buToOxy[b.bu] || [];
-                      let rec = 0;
-                      if (oxy.dreByBU && dateRange.from.getFullYear() === dateRange.to.getFullYear()) {
-                        for (let i = dateRange.from.getMonth(); i <= dateRange.to.getMonth(); i++) {
-                          const m = months[i];
-                          for (const k of oxyKeys) rec += (oxy.dreByBU as any)?.[k]?.[m] || 0;
-                        }
-                      }
-                      const ratio = rec > 0 ? (b.total / rec) * 100 : 0;
-                      return {
-                        label: b.bu,
-                        value: rec > 0 ? formatPct(ratio) : "—",
-                        hint: `Custo ${formatCurrencyCompact(b.total)} ÷ Receita ${formatCurrencyCompact(rec)}`,
-                        pct: Math.min(100, ratio),
-                        tone: (ratio > 60 ? "negative" : ratio > 40 ? "warning" : ratio > 0 ? "positive" : "default") as "default" | "positive" | "warning" | "negative",
-                      };
-                    });
-                    drill.open({
-                      kind: "metrics",
-                      title: "Custo / Receita por BU",
-                      subtitle: `Total: ${formatPct(custoSobreReceita)}`,
-                      rows,
-                      footer: "Receita via Oxy DRE. Corporativo não tem receita atribuída.",
-                    });
-                  }}
+                  onClick={() => setShowCustoReceitaCharts((v) => !v)}
                 />
+
                 <Kpi
                   title="Custo per capita"
                   value={custoPerCapita > 0 ? formatCurrencyCompact(custoPerCapita) : "—"}
