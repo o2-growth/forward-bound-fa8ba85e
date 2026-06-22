@@ -7,3 +7,5 @@ project_id = "dgwmwmofyaxstykwuzxh"
     verify_jwt = false
   [functions.query-external-db]
     verify_jwt = true
+  [functions.process-email-queue]
+    verify_jwt = true
