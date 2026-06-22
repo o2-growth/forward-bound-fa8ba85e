@@ -126,7 +126,8 @@ export function CustoReceitaCharts({ porBu, corporativo, receitaPorMes, oxyDreBy
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar yAxisId="right" dataKey="pct" name="% Custo/Receita" fill="hsl(var(--warning))" opacity={0.4} />
-              <Line yAxisId="left" type="monotone" dataKey="Modelo Atual" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="CaaS" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="SaaS" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
               <Line yAxisId="left" type="monotone" dataKey="O2 TAX" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
               <Line yAxisId="left" type="monotone" dataKey="Expansão" stroke="hsl(var(--chart-4))" strokeWidth={2} dot={false} />
               <Line yAxisId="left" type="monotone" dataKey="Receita" stroke="hsl(var(--foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} />
