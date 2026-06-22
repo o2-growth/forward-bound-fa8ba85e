@@ -211,6 +211,7 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
     fbclid: row['fbclid'] || undefined,
     gclid: row['gclid'] || undefined,
     investimentoDisponivel: row['Investimento disponível'] || undefined,
+    temperatura: parseTemperatura(row),
   };
 }
 
