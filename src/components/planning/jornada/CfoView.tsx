@@ -216,33 +216,56 @@ const marginBgColor = (pct: number) =>
 
 /**
  * Cache em nível de módulo populado pelo hook `useSquadCostFromDre` dentro do
- * componente `CfoView`. Permite que os helpers abaixo sejam usados como funções
- * puras em todo o arquivo (memos, sub-componentes) sem precisar prop-drillar.
- * Fallback: estrutura hardcoded de `CFO_SQUADS` quando o DRE ainda não retornou.
+ * componente `CfoView`. Mescla por pessoa: quem foi reconhecido pelo DRE Oxy
+ * (via CPF/CNPJ/alias) usa o valor real; quem ainda não foi mapeado mantém o
+ * valor hardcoded de `CFO_SQUADS` abaixo.
  */
 type SquadCostEntry = { fee: number; benef: number; total: number };
-let SQUAD_COST_CACHE: Record<string, SquadCostEntry> = {};
+let SQUAD_REAL_BY_PERSON: Record<string, SquadCostEntry> = {};
+
+function normalizePersonKey(s: string | null | undefined): string {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 function getSquad(cfoNome: string) {
   return CFO_SQUADS[cfoNome] ?? null;
 }
 
-function getSquadCusto(cfoNome: string): number {
-  const real = SQUAD_COST_CACHE[cfoNome];
-  if (real && real.total > 0) return real.total;
+/** Resolve fee+benef de uma pessoa: real do DRE se mapeada, senão hardcoded. */
+function resolvePerson(nome: string, hardcodedFee: number, hardcodedBenef: number): SquadCostEntry {
+  const real = SQUAD_REAL_BY_PERSON[normalizePersonKey(nome)];
+  if (real) return real;
+  return { fee: hardcodedFee, benef: hardcodedBenef, total: hardcodedFee + hardcodedBenef };
+}
+
+function getSquadParts(cfoNome: string): { fee: number; benef: number; total: number } {
   const sq = getSquad(cfoNome);
-  if (!sq) return 0;
-  const fees = sq.fee + sq.membros.reduce((s, m) => s + m.fee, 0);
-  const beneficios = sq.beneficios + sq.membros.reduce((s, m) => s + m.beneficios, 0);
-  return fees + beneficios;
+  if (!sq) return { fee: 0, benef: 0, total: 0 };
+  let fee = 0;
+  let benef = 0;
+  const cfoP = resolvePerson(sq.nome, sq.fee, sq.beneficios);
+  fee += cfoP.fee;
+  benef += cfoP.benef;
+  for (const m of sq.membros) {
+    const mp = resolvePerson(m.nome, m.fee, m.beneficios);
+    fee += mp.fee;
+    benef += mp.benef;
+  }
+  return { fee, benef, total: fee + benef };
+}
+
+function getSquadCusto(cfoNome: string): number {
+  return getSquadParts(cfoNome).total;
 }
 
 function getSquadBeneficios(cfoNome: string): number {
-  const real = SQUAD_COST_CACHE[cfoNome];
-  if (real && real.benef > 0) return real.benef;
-  const sq = getSquad(cfoNome);
-  if (!sq) return 0;
-  return sq.beneficios + sq.membros.reduce((s, m) => s + m.beneficios, 0);
+  return getSquadParts(cfoNome).benef;
 }
 
 function getAnalystCount(cfoNome: string): number {
