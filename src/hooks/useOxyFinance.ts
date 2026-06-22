@@ -372,6 +372,8 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
     dreByBU: parsedDreByBU,
     expansaoByMonth,
     oxyProductsByMonth,
+    caasByMonth,
+    saasByMonth,
     dreRaw: dreData,
     cashflowChart,
     cashflowByMonth,
