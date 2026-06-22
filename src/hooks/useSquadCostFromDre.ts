@@ -329,10 +329,18 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
     const totalUnmatched = unmatched.reduce((s, u) => s + u.valor, 0);
     const totalSemSquad = peopleWithoutSquad.reduce((s, m) => s + m.total, 0);
 
+    // Lookup global por nome normalizado — permite mesclar com fallback hardcoded
+    // a nível de membro (CFO + analistas) sem depender do nome do squad.
+    const matchedByPessoaNome: Record<string, { fee: number; benef: number; total: number }> = {};
+    for (const [key, acc] of byPessoa.entries()) {
+      matchedByPessoaNome[key] = { fee: acc.fee, benef: acc.benef, total: acc.fee + acc.benef };
+    }
+
     return {
       porSquad,
       unmatched,
       peopleWithoutSquad,
+      matchedByPessoaNome,
       totalSquads,
       totalUnmatched,
       totalSemSquad,
