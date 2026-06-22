@@ -3160,14 +3160,17 @@ export function IndicatorsTab() {
         ))}
       </div>
 
-      {/* Temperatura dos Leads (Modelo Atual only) */}
-      {selectedBUs.includes('modelo_atual') && (
-        <TemperaturaSection
-          analytics={modeloAtualAnalyticsRaw}
-          startDate={startDate}
-          endDate={endDate}
-        />
-      )}
+      {/* Temperatura dos Leads (respeita filtro de BU) */}
+      <TemperaturaSection
+        modeloAtualAnalytics={modeloAtualAnalyticsRaw}
+        franquiaAnalytics={franquiaAnalytics}
+        oxyHackerAnalytics={oxyHackerAnalytics}
+        outboundAnalytics={outboundAnalytics}
+        selectedBUs={selectedBUs}
+        startDate={startDate}
+        endDate={endDate}
+      />
+
 
 
 
