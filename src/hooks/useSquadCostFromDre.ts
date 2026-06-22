@@ -176,15 +176,31 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
   const result = useMemo(() => {
     const assignments = assignmentsQ.data || [];
     const pessoas = hr.rawPessoas || [];
+    const aliases = aliasesQ.data || [];
 
-    // Index pessoas por raiz de CNPJ (8 dig) e CPF completo (11 dig)
+    // Index pessoas por raiz de CNPJ (8 dig), CPF (11 dig), ID Pipefy e nome normalizado
     const byCnpj = new Map<string, PessoaRow>();
     const byCpf = new Map<string, PessoaRow>();
+    const byPessoaId = new Map<string, PessoaRow>();
+    const byPessoaNome = new Map<string, PessoaRow>();
     for (const p of pessoas) {
       const root = cnpjRoot(p.CNPJ);
       if (root) byCnpj.set(root, p);
       const cpf = cpfFull(p.CPF);
       if (cpf) byCpf.set(cpf, p);
+      if (p.ID) byPessoaId.set(p.ID, p);
+      const nomeKey = normalize(p.Nome || p["Título"]);
+      if (nomeKey) byPessoaNome.set(nomeKey, p);
+    }
+
+    // Index alias por label normalizado → pessoa
+    const aliasByLabel = new Map<string, PessoaRow>();
+    for (const a of aliases) {
+      const pessoa =
+        (a.pessoa_id && byPessoaId.get(a.pessoa_id)) ||
+        byPessoaNome.get(normalize(a.pessoa_nome)) ||
+        null;
+      if (pessoa) aliasByLabel.set(a.label_normalizado, pessoa);
     }
 
     // Index assignment por nome normalizado de pessoa
@@ -216,10 +232,11 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       for (const it of items) {
         if (!it.total) continue;
         const labelDigits = onlyDigits(it.label);
+        const labelNorm = normalize(it.label);
         let pessoa: PessoaRow | null = null;
         let idDetectado: string | null = null;
         let tipoIdDetectado: "cpf" | "cnpj" | null = null;
-        // Try CPF first (11 digits) — covers estagiários/CLT
+        // 1. CPF (11 digits) — covers estagiários/CLT
         if (labelDigits.length >= 11) {
           const cpf = labelDigits.slice(0, 11);
           const hit = byCpf.get(cpf);
@@ -229,7 +246,7 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
             tipoIdDetectado = "cpf";
           }
         }
-        // Then CNPJ root (8 digits)
+        // 2. CNPJ root (8 digits)
         if (!pessoa && labelDigits.length >= 8) {
           const root = labelDigits.slice(0, 8);
           const hit = byCnpj.get(root);
@@ -241,6 +258,11 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
             idDetectado = root;
             tipoIdDetectado = "cnpj";
           }
+        }
+        // 3. Alias manual por label normalizado
+        if (!pessoa && labelNorm) {
+          const hit = aliasByLabel.get(labelNorm);
+          if (hit) pessoa = hit;
         }
         if (!pessoa) {
           unmatched.push({ label: it.label, valor: it.total, category: cat, idDetectado, tipoIdDetectado });
