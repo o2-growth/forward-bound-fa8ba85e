@@ -30,7 +30,7 @@ export function CfoSquadAdminTab() {
     return { from: startOfMonth(ref), to: endOfMonth(ref) };
   }, []);
 
-  const hr = useHrData(dateRange);
+  const hr = useHrData({ startDate: dateRange.from, endDate: dateRange.to });
   const squad = useSquadCostFromDre({ startDate: dateRange.from, endDate: dateRange.to });
 
   const assignmentsQ = useQuery({
