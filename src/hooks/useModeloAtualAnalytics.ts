@@ -145,6 +145,23 @@ function parseNumericValue(value: any): number {
 }
 
 // Helper to parse a row from the database into a ModeloAtualCard
+// Cards forçados como "Quente" independente do Pipefy Labels/Prioridade Lead.
+// Manter títulos normalizados (lowercase, sem acento, trim).
+const FORCED_QUENTE_TITLES = new Set<string>([
+  'baffs',
+  'fromtherm',
+  'viga',
+  'espolio carpena',
+]);
+
+function normalizeTitleForQuente(s: string): string {
+  return (s || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
 function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): ModeloAtualCard | null {
   const id = String(row['ID'] || row['id'] || '');
   const fase = row['Fase'] || row['fase'] || '';
@@ -224,7 +241,9 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
     motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
     faseAtual: row['Fase Atual'] || row['fase_atual'] || undefined,
     produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
-    temperatura: parseTemperatura(row),
+    temperatura: FORCED_QUENTE_TITLES.has(normalizeTitleForQuente(tituloRaw))
+      ? 'Quente'
+      : parseTemperatura(row),
   };
 }
 
