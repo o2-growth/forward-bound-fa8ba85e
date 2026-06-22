@@ -38,6 +38,7 @@ export interface ExpansaoCard {
   fbclid?: string;
   gclid?: string;
   investimentoDisponivel?: string;
+  temperatura?: 'Quente' | 'Morno' | 'Frio'; // Tag de prioridade do lead (Labels / Prioridade Lead)
 }
 
 // MQL Expansão (Franquia e Oxy Hacker): investimento disponível >= R$ 15k
