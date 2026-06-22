@@ -13,19 +13,62 @@ import { cn } from "@/lib/utils";
 import { useIndicators26Raw, type Indicator26Row } from "@/hooks/useIndicators26Raw";
 import { useIndicators26Live } from "@/hooks/useIndicators26Live";
 
-// Colunas que vêm da fonte AO VIVO (2026)
-const LIVE_COL_KEYS = new Set([
-  "jan", "fev", "mar", "q1",
-  "abr", "mai", "jun", "q2",
-  "jul", "ago", "set", "q3",
-  "out", "nov", "dez", "q4",
-  "total2026",
-]);
-// Colunas que vêm da PLANILHA (histórico 2025)
+// Colunas que vêm da PLANILHA (histórico 2025 — fonte da verdade para 2025)
 const SHEET_COL_KEYS = new Set([
   "jul25", "ago25", "set25", "q325",
   "out25", "nov25", "dez25", "q425",
 ]);
+
+const MONTHS_2026: Array<{ key: string; label: string; idx: number }> = [
+  { key: "jan", label: "Jan", idx: 0 },
+  { key: "fev", label: "Fev", idx: 1 },
+  { key: "mar", label: "Mar", idx: 2 },
+  { key: "abr", label: "Abr", idx: 3 },
+  { key: "mai", label: "Mai", idx: 4 },
+  { key: "jun", label: "Jun", idx: 5 },
+  { key: "jul", label: "Jul", idx: 6 },
+  { key: "ago", label: "Ago", idx: 7 },
+  { key: "set", label: "Set", idx: 8 },
+  { key: "out", label: "Out", idx: 9 },
+  { key: "nov", label: "Nov", idx: 10 },
+  { key: "dez", label: "Dez", idx: 11 },
+];
+
+/**
+ * Constrói as colunas dinamicamente: meses de 2026 até o mês atual (com Qs
+ * inseridos quando o trimestre fecha), depois o bloco fixo de 2025 e TOTAL 2026.
+ */
+function buildCols(today: Date = new Date()): { key: string; label: string; strong?: boolean }[] {
+  const isCurrentYear = today.getFullYear() === 2026;
+  const lastMonth = today.getFullYear() > 2026 ? 11 : (isCurrentYear ? today.getMonth() : -1);
+  const cols: { key: string; label: string; strong?: boolean }[] = [];
+  const quarters: Array<{ afterIdx: number; key: string; label: string }> = [
+    { afterIdx: 2, key: "q1", label: "Q1" },
+    { afterIdx: 5, key: "q2", label: "Q2" },
+    { afterIdx: 8, key: "q3", label: "Q3" },
+    { afterIdx: 11, key: "q4", label: "Q4" },
+  ];
+  for (const m of MONTHS_2026) {
+    if (m.idx > lastMonth) break;
+    cols.push({ key: m.key, label: m.label });
+    const q = quarters.find((q) => q.afterIdx === m.idx);
+    if (q && m.idx <= lastMonth) cols.push({ key: q.key, label: q.label, strong: true });
+  }
+  // Bloco fixo de 2025 (planilha)
+  cols.push(
+    { key: "jul25", label: "Jul/25" },
+    { key: "ago25", label: "Ago/25" },
+    { key: "set25", label: "Set/25" },
+    { key: "q325", label: "Q3/25", strong: true },
+    { key: "out25", label: "Out/25" },
+    { key: "nov25", label: "Nov/25" },
+    { key: "dez25", label: "Dez/25" },
+    { key: "q425", label: "Q4/25", strong: true },
+    { key: "total2026", label: "TOTAL 2026", strong: true },
+  );
+  return cols;
+}
+
 
 type Fmt = "brl" | "int" | "pct" | "x" | "mes";
 

@@ -1,42 +1,50 @@
-## Problema
+## O que muda
 
-Na aba Marketing → tabela "Indicadores 26 Consolidado", as linhas **Reunião marcada / No show / Reunião realizada / Proposta enviada / Vendas** (e tudo que depende delas — CPRM, CPRR, CPV, Taxa MQL/RM, Conversão MQL/Venda etc.) estão completamente erradas por mês. Janeiro mostra 0 em quase tudo, junho mostra 28 RM, etc.
+Na tabela **"Visão Total — Indicadores 26"** (aba Marketing):
 
-## Causa raiz
+- **2026** → todas as células vêm dos hooks ao vivo (`useIndicators26Live`). A planilha não é mais consultada para 2026.
+- **2025** → continua vindo da planilha (`useIndicators26Raw`) como fonte da verdade.
+- A grade de 2026 mostra apenas **do início do ano até o mês corrente** (não exibe meses futuros).
 
-`useIndicators26Live.ts` consome a tabela `funnel_realized` (via `useFunnelRealized`) como fonte do funil mensal. Conferi o conteúdo direto no banco:
+### Colunas
 
+Geradas dinamicamente:
+
+1. Meses de 2026 `Jan…<mês atual>`, com os Qs inseridos quando completos (`Q1` após Mar, `Q2` após Jun, `Q3` após Set, `Q4` após Dez).
+2. Em seguida o histórico fixo de 2025 da planilha: `Jul/25 | Ago/25 | Set/25 | Q3/25 | Out/25 | Nov/25 | Dez/25 | Q4/25`.
+3. Fecha com `TOTAL 2026`.
+
+Hoje (Jun/26) ficaria:
 ```
-2026: rm    jan=0  fev=2  mar=3  abr=12 mai=27 jun=27
-      rr    jan=0  fev=0  mar=0  abr=2  mai=8  jun=5
-      mql   jan=0 ... mai=9  jun=14
-      venda jan=14 fev=14 mar=6  abr=11 mai=6  jun=0
+Jan | Fev | Mar | Q1 | Abr | Mai | Jun | Q2 | Jul/25 | Ago/25 | Set/25 | Q3/25 | Out/25 | Nov/25 | Dez/25 | Q4/25 | TOTAL 2026
 ```
+Em Jul/26 a coluna `Jul` aparece automaticamente, e assim por diante; `Q3` só aparece quando Set/26 fechar.
 
-A tabela `funnel_realized` é alimentada por sincronização do Google Sheet (`sync-from-sheets`), que está incompleta/desalinhada — é a fonte errada. O dashboard Comercial não usa essa tabela; usa direto `useModeloAtualAnalytics`, `useO2TaxAnalytics`, `useExpansaoAnalytics` (Franquia + Oxy Hacker), que leem cards do Pipefy via banco externo e já têm a regra correta (deduplicação por mês, `isMqlQualified`, `dataAssinatura` para venda, etc.).
+### Merge das linhas
 
-A aba Marketing também já importa esses 4 hooks (`modeloA`, `o2taxA`, `franquiaA`, `oxyHackerA`) e os usa para agregar **Vendas/MRR/Setup**. Basta usar a mesma fonte para os demais indicadores do funil.
+- Para cada label, percorrer as colunas de 2026 (geradas dinamicamente) e ler de `liveMap` — nunca cair na planilha para 2026.
+- Para as colunas `jul25..q425`, ler de `sheetMap` (planilha).
+- `total2026` continua vindo do `liveMap`.
+- Labels que existem só na planilha (sem correspondente no live) ainda renderizam, mas suas colunas de 2026 ficam `—` (não há fonte ao vivo).
 
-## Mudança
+### Header
 
-**Arquivo único:** `src/hooks/useIndicators26Live.ts`
+- Subtítulo: "2026 ao vivo (Pipefy + Meta/Google Ads + Oxy Finance) · 2025 da planilha".
+- Mantém o badge "2025 · Snapshot (planilha indisponível)" quando `isFallback` for verdadeiro (planilha realmente caiu).
+- Mantém o badge "2026 · Ao vivo".
 
-1. Trocar a função `funnelByMonth(indicator)` (hoje lendo `funnel.data`) por uma nova `aggregateFunnelByMonth(indicator)` que:
-   - Para cada uma das 4 BUs (Modelo Atual, O2 TAX, Franquia, Oxy Hacker) chama `hook.getCardsForIndicator(indicator)`.
-   - Para cada card, usa `dataEntrada` como referência (ou `dataAssinatura || dataEntrada` quando `indicator === 'venda'`, alinhado à regra de Sales Date Prioritization já em uso na agregação de vendas).
-   - Filtra `year === 2026` e soma 1 por card no mês correspondente.
-   - Faz dedup adicional por `${bu}-${id}-${month}` para garantir contagem única por (BU + card + mês) mesmo que o hook já deduplique internamente.
-2. Recalcular os arrays `leadsM`, `mqlM`, `rmM`, `rrM`, `propostaM`, `vendaM` a partir dessa nova função (vendaM mantém compatibilidade com `aggregateSales` que já existe — vou consolidar para uma única passada).
-3. Remover a dependência do `funnel.data` no `useMemo` (sai do array de deps; `useFunnelRealized` pode até ser removido do hook ou mantido apenas se outras telas dependerem — vou apenas parar de usá-lo nos cálculos do Live).
-4. Manter `Tentativas/Atendidas/Conversas/SQL` como `NULL_M` (não temos esses dados em Pipefy hoje).
+## Arquivo
 
-Como consequência automática (mesmas células recalculam): **CPRM, CPRR, CPV, Taxa MQL/RM, Taxa RM/RR, Taxa RR/Proposta, Taxa Proposta/Venda, Conversão MQL/Venda, CAC, ROAS, ROI, LTV/CAC, Vendas/MQL, No show = RM − RR** voltam a bater com o dashboard Comercial.
+**Único arquivo:** `src/components/planning/marketing-indicators/ConsolidatedIndicators26Section.tsx`
 
-## Validação
-
-Depois de implementado, conferir na preview a linha "Reunião marcada" e "Vendas" mês a mês — devem bater com os totais do drill-down Comercial (que já usa a mesma fonte).
+1. Substituir o `COLS` estático por `buildCols()` que monta dinamicamente:
+   - meses 2026 até o atual + Qs fechados + bloco fixo de 2025 + `TOTAL 2026`.
+2. Reescrever `LIVE_COL_KEYS` como o conjunto derivado de `buildCols()` (todas as chaves geradas para 2026 + `total2026`). `SHEET_COL_KEYS` permanece como hoje: `jul25..q425`.
+3. O merge atual já decide por coluna (live vs sheet); só precisa apontar para a nova `LIVE_COL_KEYS` dinâmica.
+4. Atualizar o subtítulo do header conforme acima.
+5. Exportação CSV segue a nova `COLS` (sem mudanças extras).
 
 ## Fora de escopo
 
-- Não vou consertar a sincronização `funnel_realized` ← Google Sheet (continua existindo para quem usa, mas a aba Marketing deixa de depender dela).
-- Não mudo nada nas linhas históricas 2025 (continuam vindo da planilha snapshot).
+- Não toco em `useIndicators26Live` nem em `useIndicators26Raw`.
+- Não removo o consumo da planilha em outras telas.
