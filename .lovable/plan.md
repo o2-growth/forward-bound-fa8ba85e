@@ -1,46 +1,24 @@
-## Problema
-Na tela "Recuperar senha" o campo de e-mail não permite digitação e o DevTools mostra `label for doesn't match any element id`.
+## Objetivo
+Criar usuário `paulo.cerqueira@o2inc.com.br` com acesso restrito a **Indicadores Comercial** e **Marketing** apenas.
 
-## Causa
-Em `src/pages/Auth.tsx` (linhas 215–224), o `<Input>` da tela `forgot` está com as props do `field` desestruturadas manualmente:
+## Passos
 
-```tsx
-<Input
-  type="email"
-  ...
-  name={field.name}
-  ref={field.ref}
-  onBlur={field.onBlur}
-  onChange={field.onChange}
-  value={field.value ?? ''}
-/>
-```
+1. **Criar usuário no Auth**
+   - Email: `paulo.cerqueira@o2inc.com.br`
+   - Senha temporária gerada (você compartilha com ele e ele troca no primeiro login via "Recuperar senha")
+   - Email já confirmado (sem etapa de verificação)
+   - Trigger `handle_new_user` cria automaticamente `profiles` + role `user`
 
-Isso quebra a integração do shadcn `FormControl`, que injeta o `id` no input via Context. Resultado:
-1. O `<FormLabel>` aponta para um `id` que não existe → warning de a11y.
-2. A validação do zod dispara em loop com `mode` padrão, junto com a renderização desconectada do RHF, fazendo o campo parecer "travado" para digitação.
+2. **Atribuir permissões de aba** (`user_tab_permissions`)
+   - `indicators` → aba Indicadores (sub-aba Comercial é a default)
+   - `marketing_indicators` → libera a sub-aba Marketing dentro de Indicadores
+   - Sem `admin`, sem `goals`, sem `monthly`, sem `cs`, sem `financial`, sem `structure`, sem `context`
 
-Telas de login e cadastro **não têm esse problema** porque usam `{...field}`.
+   Conforme `useUserPermissions.ts`, ter `marketing_indicators` já garante acesso à aba `indicators` automaticamente — então ele entra direto e enxerga Comercial + Marketing nas sub-abas, sem NPS, sem Growth, sem Operação.
 
-## Correção (1 arquivo, 1 trecho)
-Substituir o `<Input>` do formulário `forgot` para usar o mesmo padrão das outras telas:
+## Detalhes técnicos
+- Inserção via SQL na `auth.users` (com `crypt()` para senha) + `user_tab_permissions`.
+- Role default `user` é criada pelo trigger `handle_new_user`.
 
-```tsx
-<Input
-  type="email"
-  placeholder="seu@email.com"
-  autoComplete="email"
-  {...field}
-  value={field.value ?? ''}
-/>
-```
-
-## Escopo
-- **Arquivo:** `src/pages/Auth.tsx` (apenas o bloco do `case 'forgot'`).
-- **Não mexer em:** lógica de envio (`handleForgotPassword`), `useAuth`, demais formulários, edge functions ou backend.
-- **Sem mudanças em:** estilos, layout escuro, design system.
-
-## Verificação
-- Abrir `/auth` → "Esqueci minha senha".
-- Digitar um e-mail → o campo aceita digitação e o aviso de label some.
-- Clicar em "Enviar link de recuperação" → toast de sucesso (fluxo já testado anteriormente).
+## Pergunta antes de executar
+Qual senha temporária você quer definir? (sugestão: eu gero uma aleatória e te entrego, ele troca no primeiro acesso)
