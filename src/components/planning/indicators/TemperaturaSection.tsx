@@ -3,8 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DetailSheet, DetailItem, columnFormatters } from "./DetailSheet";
 import type { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
+import type { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
+import type { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
+import type { BUType } from "@/hooks/useFunnelRealized";
 
-type Analytics = ReturnType<typeof useModeloAtualAnalytics>;
+type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
+type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
+type OutboundAnalyticsT = ReturnType<typeof useOutboundAnalytics>;
 
 type Temperatura = "Quente" | "Morno" | "Frio";
 
@@ -27,15 +32,27 @@ const CONFIG: Record<Temperatura, { icon: string; chipClass: string }> = {
 };
 
 interface Props {
-  analytics: Analytics;
+  modeloAtualAnalytics: ModeloAnalytics;
+  franquiaAnalytics: ExpansaoAnalyticsT;
+  oxyHackerAnalytics: ExpansaoAnalyticsT;
+  outboundAnalytics: OutboundAnalyticsT;
+  selectedBUs: BUType[];
   startDate: Date;
   endDate: Date;
 }
 
-export function TemperaturaSection({ analytics, startDate, endDate }: Props) {
+export function TemperaturaSection({
+  modeloAtualAnalytics,
+  franquiaAnalytics,
+  oxyHackerAnalytics,
+  outboundAnalytics,
+  selectedBUs,
+  startDate,
+  endDate,
+}: Props) {
   const [openTemp, setOpenTemp] = useState<Temperatura | null>(null);
 
-  const { buckets, totalTagged, totalSemTag } = useMemo(() => {
+  const { buckets, totalTagged, totalSemTag, activeLabels } = useMemo(() => {
     const startTime = startDate.getTime();
     const endTime = new Date(
       endDate.getFullYear(),
@@ -47,15 +64,41 @@ export function TemperaturaSection({ analytics, startDate, endDate }: Props) {
       999,
     ).getTime();
 
-    // allCards = movimentos do período (unfiltered por fase). Dedup por id mantendo
-    // a entrada mais recente, para refletir o estado atual do card.
-    const byId = new Map<string, (typeof analytics.allCards)[number]>();
-    for (const c of analytics.allCards) {
-      const t = c.dataEntrada.getTime();
-      if (t < startTime || t > endTime) continue;
-      const ex = byId.get(c.id);
-      if (!ex || c.dataEntrada > ex.dataEntrada) byId.set(c.id, c);
-    }
+    type Source = {
+      buLabel: string;
+      enabled: boolean;
+      cards: Array<{ id: string; dataEntrada: Date; temperatura?: Temperatura }>;
+      toDetail: (card: any) => DetailItem;
+    };
+
+    const includesModelo = selectedBUs.includes("modelo_atual");
+    const sources: Source[] = [
+      {
+        buLabel: "Modelo Atual",
+        enabled: includesModelo,
+        cards: modeloAtualAnalytics.allCards as any,
+        toDetail: modeloAtualAnalytics.toDetailItem,
+      },
+      {
+        buLabel: "Outbound",
+        // Outbound alimenta o funil de Modelo Atual → segue o mesmo filtro
+        enabled: includesModelo,
+        cards: (outboundAnalytics.allCards || []) as any,
+        toDetail: outboundAnalytics.toDetailItem,
+      },
+      {
+        buLabel: "Franquia",
+        enabled: selectedBUs.includes("franquia"),
+        cards: franquiaAnalytics.cards as any,
+        toDetail: franquiaAnalytics.toDetailItem,
+      },
+      {
+        buLabel: "Oxy Hacker",
+        enabled: selectedBUs.includes("oxy_hacker"),
+        cards: oxyHackerAnalytics.cards as any,
+        toDetail: oxyHackerAnalytics.toDetailItem,
+      },
+    ];
 
     const buckets: Record<Temperatura, DetailItem[]> = {
       Quente: [],
@@ -63,31 +106,63 @@ export function TemperaturaSection({ analytics, startDate, endDate }: Props) {
       Frio: [],
     };
     let semTag = 0;
-    for (const card of byId.values()) {
-      if (card.temperatura) {
-        buckets[card.temperatura].push(analytics.toDetailItem(card));
-      } else {
-        semTag++;
+    const activeLabels: string[] = [];
+
+    for (const src of sources) {
+      if (!src.enabled) continue;
+      activeLabels.push(src.buLabel);
+
+      // dedup por id mantendo o card mais recente dentro do período
+      const byId = new Map<string, any>();
+      for (const c of src.cards) {
+        if (!c?.dataEntrada) continue;
+        const t = c.dataEntrada.getTime();
+        if (t < startTime || t > endTime) continue;
+        const ex = byId.get(c.id);
+        if (!ex || c.dataEntrada > ex.dataEntrada) byId.set(c.id, c);
+      }
+
+      for (const card of byId.values()) {
+        if (card.temperatura) {
+          const item = src.toDetail(card);
+          buckets[card.temperatura as Temperatura].push({
+            ...item,
+            bu: src.buLabel,
+          });
+        } else {
+          semTag++;
+        }
       }
     }
+
     const tagged =
       buckets.Quente.length + buckets.Morno.length + buckets.Frio.length;
-    return { buckets, totalTagged: tagged, totalSemTag: semTag };
-  }, [analytics, startDate, endDate]);
+    return { buckets, totalTagged: tagged, totalSemTag: semTag, activeLabels };
+  }, [
+    modeloAtualAnalytics,
+    franquiaAnalytics,
+    oxyHackerAnalytics,
+    outboundAnalytics,
+    selectedBUs,
+    startDate,
+    endDate,
+  ]);
 
   if (totalTagged === 0) return null;
 
   const order: Temperatura[] = ["Quente", "Morno", "Frio"];
+  const scopeLabel = activeLabels.join(" + ");
 
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          🌡 Temperatura dos Leads · Modelo Atual
+          🌡 Temperatura dos Leads
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Cards do Modelo Atual com tag de prioridade (Labels do Pipefy) no período
-          selecionado. Clique em cada chip para abrir a lista.
+          Cards com tag de prioridade (Labels do Pipefy) no período selecionado.
+          Escopo atual: <span className="font-medium">{scopeLabel}</span>. Clique
+          em cada chip para abrir a lista.
         </p>
       </CardHeader>
       <CardContent>
@@ -123,18 +198,17 @@ export function TemperaturaSection({ analytics, startDate, endDate }: Props) {
         open={openTemp !== null}
         onOpenChange={(o) => !o && setOpenTemp(null)}
         title={
-          openTemp
-            ? `${CONFIG[openTemp].icon} Leads ${openTemp} · Modelo Atual`
-            : ""
+          openTemp ? `${CONFIG[openTemp].icon} Leads ${openTemp}` : ""
         }
         description={
           openTemp
-            ? `Cards do Modelo Atual marcados como ${openTemp} no Pipefy (campo Labels / Prioridade Lead) com movimentação no período selecionado.`
+            ? `Cards marcados como ${openTemp} no Pipefy (campo Labels / Prioridade Lead) com movimentação no período selecionado. Escopo: ${scopeLabel}.`
             : undefined
         }
         items={openTemp ? buckets[openTemp] : []}
         columns={[
           { key: "name", label: "Empresa" },
+          { key: "bu", label: "BU" },
           { key: "phase", label: "Fase Atual", format: columnFormatters.phase },
           { key: "closer", label: "Closer" },
           { key: "sdr", label: "SDR" },

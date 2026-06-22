@@ -5,6 +5,7 @@ import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
 import { isTestCard } from "./useModeloAtualMetas";
+import { parseTemperatura } from "./useModeloAtualAnalytics";
 
 export interface ExpansaoCard {
   id: string;
@@ -37,6 +38,7 @@ export interface ExpansaoCard {
   fbclid?: string;
   gclid?: string;
   investimentoDisponivel?: string;
+  temperatura?: 'Quente' | 'Morno' | 'Frio'; // Tag de prioridade do lead (Labels / Prioridade Lead)
 }
 
 // MQL Expansão (Franquia e Oxy Hacker): investimento disponível >= R$ 15k
@@ -209,6 +211,7 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
     fbclid: row['fbclid'] || undefined,
     gclid: row['gclid'] || undefined,
     investimentoDisponivel: row['Investimento disponível'] || undefined,
+    temperatura: parseTemperatura(row),
   };
 }
 

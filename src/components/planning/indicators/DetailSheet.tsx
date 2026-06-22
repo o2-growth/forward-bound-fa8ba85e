@@ -55,6 +55,7 @@ export interface DetailItem {
   origemLead?: string;
   fonte?: string;
   campanha?: string;
+  bu?: string; // Modelo Atual | O2 TAX | Franquia | Oxy Hacker | Outbound
 }
 
 interface DetailSheetProps {
