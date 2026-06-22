@@ -1038,8 +1038,25 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
   return (
     <TooltipProvider>
     <div className="space-y-6">
+      {/* Banner: origem do custo do squad */}
+      <div className={`rounded border p-3 text-xs flex items-start gap-2 ${
+        squadCost.totalUnmatched > 0
+          ? "border-red-500/40 bg-red-500/5 text-red-700 dark:text-red-400"
+          : "border-blue-500/40 bg-blue-500/5 text-blue-700 dark:text-blue-400"
+      }`}>
+        <Info className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="flex-1">
+          <strong>Custo do squad:</strong> vindo do DRE Oxy via CNPJ da Pessoas DB. Total CaaS no período: {formatBRL(squadCost.totalCaasDre)}.
+          {squadCost.totalUnmatched > 0 && (
+            <> Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo — resolva em Admin → Squads CFOaaS.</>
+          )}
+          {squadCost.isLoading && <> (carregando...)</>}
+        </div>
+      </div>
+
       {/* Feature 4: Comparativo entre CFOs (P&L lado a lado) */}
       <div className="space-y-3">
+
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           Comparativo P&L por CFO
           <Tooltip>
