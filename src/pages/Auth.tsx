@@ -208,7 +208,9 @@ export default function Auth() {
               <FormField
                 control={forgotPasswordForm.control}
                 name="email"
-                render={({ field }) => (
+                render={({ field }) => {
+                  console.log('[FORGOT-FIELD render] value=', JSON.stringify(field.value));
+                  return (
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
@@ -218,11 +220,13 @@ export default function Auth() {
                         autoComplete="email"
                         {...field}
                         value={field.value ?? ''}
+                        onChange={(e) => { console.log('[FORGOT onChange]', e.target.value); field.onChange(e); }}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
-                )}
+                  );
+                }}
               />
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? (
