@@ -278,8 +278,8 @@ export function ConsolidatedIndicators26Section() {
               <div>
                 <h3 className="text-lg font-semibold">Visão Total — Indicadores 26</h3>
                 <p className="text-xs text-muted-foreground">
-                  Comercial + Marketing + Growth ·{" "}
-                  {lastUpdate ? `Última atualização: ${lastUpdate}` : "—"}
+                  2026 ao vivo (APIs + Pipefy) · 2025 da planilha
+                  {lastUpdate ? ` · planilha atualizada em ${lastUpdate}` : ""}
                 </p>
               </div>
               <ChevronDown
@@ -291,9 +291,12 @@ export function ConsolidatedIndicators26Section() {
             </CollapsibleTrigger>
 
             <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-emerald-600 border-emerald-500/40">
+                2026 · Ao vivo{liveLoading ? " (carregando…)" : ""}
+              </Badge>
               {isFallback && (
                 <Badge variant="outline" className="text-amber-600 border-amber-500/40">
-                  Snapshot da planilha · fonte ao vivo a definir
+                  2025 · Snapshot (planilha indisponível)
                 </Badge>
               )}
             </div>
