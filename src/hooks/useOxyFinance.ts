@@ -203,27 +203,36 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
     return result as Record<MonthType, number>;
   }, [saasCategoriesData]);
 
-  // Parse DRE into dreByBU + expansaoByMonth
-  const { parsedDreByBU, expansaoByMonth } = useMemo(() => {
+  // Parse DRE into dreByBU + expansaoByMonth + caasByMonth + saasByMonth
+  const { parsedDreByBU, expansaoByMonth, caasByMonth, saasByMonth } = useMemo(() => {
     const result = initDreByBU();
     const expansao: Record<string, number> = {};
-    for (const m of MONTHS) expansao[m] = 0;
+    const caas: Record<string, number> = {};
+    const saas: Record<string, number> = {};
+    for (const m of MONTHS) { expansao[m] = 0; caas[m] = 0; saas[m] = 0; }
 
-    if (!dreData) return { parsedDreByBU: result, expansaoByMonth: expansao as Record<MonthType, number> };
+    const emptyReturn = {
+      parsedDreByBU: result,
+      expansaoByMonth: expansao as Record<MonthType, number>,
+      caasByMonth: caas as Record<MonthType, number>,
+      saasByMonth: saas as Record<MonthType, number>,
+    };
+
+    if (!dreData) return emptyReturn;
+
+    const normalize = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
     try {
       // Primary: parse groups format { groups: [{ label, code, data: [{ period, value }] }] }
       if (dreData?.groups && Array.isArray(dreData.groups)) {
         for (const group of dreData.groups) {
-          // Para a parte de receita/expansão por BU, considerar somente Receita Bruta.
-          // Outros grupos (despesas, pessoal etc) ficam disponíveis em `dreRaw` para hooks específicos.
           if (group.code !== 'RB') continue;
 
           const label = group.label || '';
+          const labelNorm = normalize(label);
           const entries = Array.isArray(group.data) ? group.data : [];
 
           if (isExpansaoGroup(label)) {
-            // Expansão: store separately (contains oxy_hacker + franquia combined)
             for (const entry of entries) {
               const monthName = parseMonthFromDate(entry.period || entry.date || '');
               if (monthName) {
@@ -235,13 +244,20 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
             if (!bu) continue;
             for (const entry of entries) {
               const monthName = parseMonthFromDate(entry.period || entry.date || '');
-              if (monthName) {
-                result[bu][monthName] += Number(entry.value || 0);
-              }
+              if (!monthName) continue;
+              const value = Number(entry.value || 0);
+              result[bu][monthName] += value;
+              if (labelNorm === 'caas') caas[monthName] += value;
+              else if (labelNorm === 'saas') saas[monthName] += value;
             }
           }
         }
-        return { parsedDreByBU: result, expansaoByMonth: expansao as Record<MonthType, number> };
+        return {
+          parsedDreByBU: result,
+          expansaoByMonth: expansao as Record<MonthType, number>,
+          caasByMonth: caas as Record<MonthType, number>,
+          saasByMonth: saas as Record<MonthType, number>,
+        };
       }
 
       // Fallback: flat rows format
@@ -250,6 +266,7 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
         for (const row of rows) {
           if (row.code && row.code !== 'RB') continue;
           const groupLabel = row.grupo || row.group || row.name || row.categoria || '';
+          const labelNorm = normalize(groupLabel);
 
           if (isExpansaoGroup(groupLabel)) {
             if (row.value && row.date) {
@@ -263,7 +280,11 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
           if (!bu) continue;
           if (row.value && row.date) {
             const monthName = parseMonthFromDate(row.date);
-            if (monthName) result[bu][monthName] += Number(row.value || 0);
+            if (!monthName) continue;
+            const value = Number(row.value || 0);
+            result[bu][monthName] += value;
+            if (labelNorm === 'caas') caas[monthName] += value;
+            else if (labelNorm === 'saas') saas[monthName] += value;
           }
         }
       }
@@ -271,8 +292,15 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
       console.error('[useOxyFinance] Error parsing DRE data:', e);
     }
 
-    return { parsedDreByBU: result, expansaoByMonth: expansao as Record<MonthType, number> };
+    return {
+      parsedDreByBU: result,
+      expansaoByMonth: expansao as Record<MonthType, number>,
+      caasByMonth: caas as Record<MonthType, number>,
+      saasByMonth: saas as Record<MonthType, number>,
+    };
   }, [dreData]);
+
+
 
   // Parse cashflow chart data (for CashflowChart component)
   const cashflowChart = useMemo<CashflowChartPoint[]>(() => {
