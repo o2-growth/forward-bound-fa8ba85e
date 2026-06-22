@@ -171,7 +171,9 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
   const valorMRR = parseNumericValue(row['Valor MRR'] || row['valor_mrr'] || 0);
   const valorPontual = parseNumericValue(row['Valor Pontual'] || row['valor_pontual'] || 0);
   const valorEducacao = parseNumericValue(row['Valor Educação'] || row['Valor Educacao'] || row['valor_educacao'] || 0);
-  const valorSetup = parseNumericValue(row['Valor Setup'] || row['valor_setup'] || 0);
+  let valorSetup = parseNumericValue(row['Valor Setup'] || row['valor_setup'] || 0);
+  // Override manual: Modelcraft (Pipefy card 1359038764) – Setup R$ 10.800 enquanto sync externo não atualiza
+  if (id === '1359038764' && valorSetup === 0) valorSetup = 10800;
   const valor = valorMRR + valorPontual + valorEducacao + valorSetup;
   
   // Parse exit date and calculate duration dynamically
