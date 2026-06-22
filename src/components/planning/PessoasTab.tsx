@@ -24,6 +24,7 @@ import { tenureDistribution, previousRange, personToBu, headcountByBu, turnoverB
 import { AgeDistribution } from "./pessoas/AgeDistribution";
 import { FaseDoisRoadmap } from "./pessoas/FaseDoisRoadmap";
 import { SaneamentoCard } from "./pessoas/SaneamentoCard";
+import { CustoReceitaCharts } from "./pessoas/CustoReceitaCharts";
 
 // Compat: alguns componentes ainda recebem só o nome do Time.
 // Roteia via personToBu sem cargo (heurística por substring de Time).
