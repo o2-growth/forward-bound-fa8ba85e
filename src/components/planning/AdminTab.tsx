@@ -19,6 +19,7 @@ import { SdrMetasTab } from './SdrMetasTab';
 import { CloserAbsoluteMetasTab } from './CloserAbsoluteMetasTab';
 import { AdminLogsTab } from './AdminLogsTab';
 import { CfoMappingTab } from './CfoMappingTab';
+import { CfoSquadAdminTab } from './admin/CfoSquadAdminTab';
 
 const TAB_OPTIONS: { key: TabKey; label: string }[] = [
   { key: 'context', label: 'Macro 2025' },
@@ -152,6 +153,10 @@ export function AdminTab() {
         <TabsTrigger value="cfo-mapping" className="gap-2">
           <UserCog className="h-4 w-4" />
           Acessos CFO
+        </TabsTrigger>
+        <TabsTrigger value="cfo-squads" className="gap-2">
+          <Users className="h-4 w-4" />
+          Squads CFOaaS
         </TabsTrigger>
         <TabsTrigger value="logs" className="gap-2">
           <History className="h-4 w-4" />
@@ -340,6 +345,10 @@ export function AdminTab() {
 
       <TabsContent value="cfo-mapping">
         <CfoMappingTab />
+      </TabsContent>
+
+      <TabsContent value="cfo-squads">
+        <CfoSquadAdminTab />
       </TabsContent>
 
       <TabsContent value="logs">

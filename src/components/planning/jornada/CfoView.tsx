@@ -15,6 +15,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from "recharts";
 import type { JornadaCfo, JornadaCliente } from "./types";
 import { ChurnKpiDrawer, type KpiDrawerData } from "@/components/planning/cs/ChurnKpiDrawer";
+import { useSquadCostFromDre } from "@/hooks/useSquadCostFromDre";
+import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
 /* ── Simulator types ── */
 interface SimulatedClient {
@@ -212,11 +214,22 @@ const marginBgColor = (pct: number) =>
     ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
     : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
 
+/**
+ * Cache em nível de módulo populado pelo hook `useSquadCostFromDre` dentro do
+ * componente `CfoView`. Permite que os helpers abaixo sejam usados como funções
+ * puras em todo o arquivo (memos, sub-componentes) sem precisar prop-drillar.
+ * Fallback: estrutura hardcoded de `CFO_SQUADS` quando o DRE ainda não retornou.
+ */
+type SquadCostEntry = { fee: number; benef: number; total: number };
+let SQUAD_COST_CACHE: Record<string, SquadCostEntry> = {};
+
 function getSquad(cfoNome: string) {
   return CFO_SQUADS[cfoNome] ?? null;
 }
 
 function getSquadCusto(cfoNome: string): number {
+  const real = SQUAD_COST_CACHE[cfoNome];
+  if (real && real.total > 0) return real.total;
   const sq = getSquad(cfoNome);
   if (!sq) return 0;
   const fees = sq.fee + sq.membros.reduce((s, m) => s + m.fee, 0);
@@ -225,6 +238,8 @@ function getSquadCusto(cfoNome: string): number {
 }
 
 function getSquadBeneficios(cfoNome: string): number {
+  const real = SQUAD_COST_CACHE[cfoNome];
+  if (real && real.benef > 0) return real.benef;
   const sq = getSquad(cfoNome);
   if (!sq) return 0;
   return sq.beneficios + sq.membros.reduce((s, m) => s + m.beneficios, 0);
@@ -693,6 +708,24 @@ const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arq
 const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
 
 export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: CfoViewProps) {
+  // ── Custo real por squad via DRE Oxy (CNPJ matching) ──
+  // Usa o range do dashboard quando informado; senão último mês fechado.
+  const squadCostRange = useMemo(() => {
+    if (dateRange) return dateRange;
+    const ref = subMonths(new Date(), 1);
+    return { from: startOfMonth(ref), to: endOfMonth(ref) };
+  }, [dateRange]);
+  const squadCost = useSquadCostFromDre({ startDate: squadCostRange.from, endDate: squadCostRange.to });
+  // Atualiza o cache de módulo para que os helpers `getSquadCusto/...` retornem
+  // valores reais em todos os memos/sub-componentes deste arquivo.
+  useMemo(() => {
+    const next: Record<string, SquadCostEntry> = {};
+    for (const sq of squadCost.porSquad) {
+      next[sq.cfoNome] = { fee: sq.fee, benef: sq.benef, total: sq.total };
+    }
+    SQUAD_COST_CACHE = next;
+  }, [squadCost.porSquad]);
+
   // Snapshot dos clientes considerando o período selecionado:
   // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
   // - Churns ocorridos NO período: faseAtual em CHURN_PHASES AND dataEntrada (entrada na fase de churn) dentro do range
@@ -1005,8 +1038,25 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
   return (
     <TooltipProvider>
     <div className="space-y-6">
+      {/* Banner: origem do custo do squad */}
+      <div className={`rounded border p-3 text-xs flex items-start gap-2 ${
+        squadCost.totalUnmatched > 0
+          ? "border-red-500/40 bg-red-500/5 text-red-700 dark:text-red-400"
+          : "border-blue-500/40 bg-blue-500/5 text-blue-700 dark:text-blue-400"
+      }`}>
+        <Info className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="flex-1">
+          <strong>Custo do squad:</strong> vindo do DRE Oxy via CNPJ da Pessoas DB. Total CaaS no período: {formatBRL(squadCost.totalCaasDre)}.
+          {squadCost.totalUnmatched > 0 && (
+            <> Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo — resolva em Admin → Squads CFOaaS.</>
+          )}
+          {squadCost.isLoading && <> (carregando...)</>}
+        </div>
+      </div>
+
       {/* Feature 4: Comparativo entre CFOs (P&L lado a lado) */}
       <div className="space-y-3">
+
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           Comparativo P&L por CFO
           <Tooltip>

@@ -331,6 +331,36 @@ export type Database = {
         }
         Relationships: []
       }
+      cfo_squad_assignment: {
+        Row: {
+          cfo_squad_nome: string
+          created_at: string
+          id: string
+          pessoa_id: string | null
+          pessoa_nome: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          cfo_squad_nome: string
+          created_at?: string
+          id?: string
+          pessoa_id?: string | null
+          pessoa_nome: string
+          role: string
+          updated_at?: string
+        }
+        Update: {
+          cfo_squad_nome?: string
+          created_at?: string
+          id?: string
+          pessoa_id?: string | null
+          pessoa_nome?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cfo_user_mapping: {
         Row: {
           cfo_name: string
