@@ -707,7 +707,7 @@ export function PessoasTab() {
                   porBu={pc12m.porBu}
                   corporativo={pc12m.corporativo}
                   receitaPorMes={receitaPorMes}
-                  oxyDreByBU={oxy.dreByBU}
+                  oxyDreByBU={{ dreByBU: oxy.dreByBU, caasByMonth: oxy.caasByMonth, saasByMonth: oxy.saasByMonth }}
                 />
               )}
 
