@@ -220,24 +220,57 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
     // ===== Receita bruta (Oxy Finance cashflow) =====
     const receitaBrutaM = MONTH_NAMES.map((m) => oxy.cashflowByMonth?.[m as any] || 0);
 
-    // ===== Headcount snapshot (sem histórico mensal) =====
-    const headcountAtual = hr.headcountTotal || 0;
-    const headcountM = MONTH_NAMES.map(() => headcountAtual);
+    // ===== Headcount mensal — ativos no fim de cada mês =====
+    // Considera "ativo no fim do mês M" todo card cuja Data de contratação <= fim do mês
+    // E que ainda não estava inativo até essa data (Situação=Ativo agora OU updated_at > fim do mês).
+    const headcountM = MONTH_NAMES.map((_, i) => {
+      const monthEnd = endOfMonth(new Date(year, i, 1));
+      let count = 0;
+      for (const p of hr.rawPessoas || []) {
+        const hireStr = p["Data de contratação"];
+        if (!hireStr) continue;
+        const hireDate = new Date(hireStr);
+        if (isNaN(hireDate.getTime()) || hireDate > monthEnd) continue;
+        const sit = (p["Situação"] || "").trim().toLowerCase();
+        const isInativoNow = sit === "inativo" || sit === "desligado";
+        if (isInativoNow) {
+          const offStr = p.updated_at;
+          if (!offStr) continue;
+          const offDate = new Date(offStr);
+          if (!isNaN(offDate.getTime()) && offDate <= monthEnd) continue;
+        }
+        count += 1;
+      }
+      return count;
+    });
 
-    // ===== Operations snapshots — replicados em todos os meses =====
+    // ===== Churn mensal — a partir do churnDossier (data de encerramento) =====
+    const churnDossier = (operations.data?.kpis as any)?.churnDossier || [];
+    const logoChurnMonthly = new Array(12).fill(0);
+    const revenueChurnMonthly = new Array(12).fill(0);
+    for (const c of churnDossier) {
+      const d = c?.dataEncerramento ? new Date(c.dataEncerramento) : null;
+      if (!d || isNaN(d.getTime())) continue;
+      if (d.getFullYear() !== year) continue;
+      const m = d.getMonth();
+      logoChurnMonthly[m] += 1;
+      revenueChurnMonthly[m] += Number(c.mrr || 0);
+    }
+
+    // Clientes ativos: snapshot atual replicado (sem histórico mensal disponível)
     const opsKpis = operations.data?.kpis;
     const clientesAtivosSnap = opsKpis?.totalAtivos ?? null;
-    const churnAbsSnap = opsKpis?.churn ?? null;
-    const churnRateSnap = typeof opsKpis?.churnRate === "number" ? opsKpis.churnRate / 100 : null; // 0..1
-    const mrrEmRiscoSnap = opsKpis?.mrrEmRisco ?? null;
-
     const clientesAtivosM: (number | null)[] = MONTH_NAMES.map(() => clientesAtivosSnap);
-    const logoChurnM: (number | null)[] = MONTH_NAMES.map(() => churnAbsSnap);
-    const pctLogoChurnM: (number | null)[] = MONTH_NAMES.map(() => churnRateSnap);
-    const revenueChurnM: (number | null)[] = MONTH_NAMES.map(() => mrrEmRiscoSnap);
-    const pctRevenueChurnM: (number | null)[] = mrrBaseM.map((b) =>
-      b && mrrEmRiscoSnap != null ? mrrEmRiscoSnap / b : null
+
+    const logoChurnM: (number | null)[] = logoChurnMonthly.map((v) => v);
+    const pctLogoChurnM: (number | null)[] = logoChurnMonthly.map((v) =>
+      clientesAtivosSnap && clientesAtivosSnap > 0 ? v / clientesAtivosSnap : null
     );
+    const revenueChurnM: (number | null)[] = revenueChurnMonthly.map((v) => v);
+    const pctRevenueChurnM: (number | null)[] = mrrBaseM.map((b, i) =>
+      b && b > 0 ? revenueChurnMonthly[i] / b : null
+    );
+
 
     // ARPU = MRR Base / Clientes Ativos
     const arpuM: (number | null)[] = mrrBaseM.map((b) =>
