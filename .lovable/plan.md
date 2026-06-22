@@ -1,27 +1,32 @@
 ## Objetivo
-Limpar a tabela "Visão Total — Indicadores 26" (2026) removendo a linha que não faz sentido e preenchendo as linhas que hoje estão vazias mas cujos dados já existem nos hooks do projeto.
+Marcar 4 cards específicos como **Quente** na aba de temperatura do dashboard comercial (`TemperaturaSection`), independente do que o Pipefy retorna no campo `Labels`/`Prioridade Lead`.
 
-## Mudanças
+Cards: **BAFFS, FROMTHERM, VIGA, ESPOLIO CARPENA**.
 
-### 1. Remover linha
-- **Conversas/marcadas** — retirar do array `out` em `src/hooks/useIndicators26Live.ts` (não temos fonte confiável e o usuário pediu para retirar).
+## Como vai funcionar
+A aba "Temperatura dos Leads" lê `card.temperatura` direto do `ModeloAtualCard`. Vou forçar `temperatura = 'Quente'` para esses títulos no hook, então eles aparecem automaticamente no bucket Quente da aba sem mudar nenhum componente de UI.
 
-### 2. Preencher linhas hoje vazias (`NULL_M`) com dados já disponíveis
+## Mudança
 
-Em `src/hooks/useIndicators26Live.ts`:
+**Arquivo:** `src/hooks/useModeloAtualAnalytics.ts`
 
-- **Risco de churn** → snapshot `operations.data.kpis.emTratativa` replicado para cada mês (mesmo padrão de `Clientes ativos`), `avg` para Qs/Total. Justificativa: só temos snapshot atual, mas é o melhor dado disponível.
-- **Pedido de churn** → contagem mensal de novas tratativas abertas em 2026 (`TratativaCard.Entrada` por mês). Como `useOperationsData` hoje não devolve `rawTratativas`, vou adicioná-lo ao retorno do hook (sem alterar nenhum outro consumidor) e consumir em `useIndicators26Live`. Soma para Qs/Total.
-- **Net Customer Growth** → `vendaM[i] - logoChurnMonthly[i]` por mês. Soma para Qs/Total.
-- **% Net Customer Growth** → `NCG / clientesAtivosSnap` por mês (avg para Qs/Total).
+1. Adicionar constante com os 4 títulos (normalizados — lowercase + sem acento):
+   ```ts
+   const FORCED_QUENTE_TITLES = new Set([
+     'baffs', 'fromtherm', 'viga', 'espolio carpena',
+   ]);
+   ```
+2. Adicionar helper `normalizeTitle()` (NFD, trim, lowercase, remove diacríticos) — segue o padrão de `CARD_OVERRIDES_BY_TITLE` em `useExpansaoAnalytics.ts`.
+3. Em `parseCardRow`, após calcular `parseTemperatura(row)`:
+   - Se `normalizeTitle(titulo) ∈ FORCED_QUENTE_TITLES` → `temperatura = 'Quente'`.
+   - Caso contrário, mantém o valor original.
 
-### 3. Mantidas como `NULL_M` (sem fonte confiável hoje)
-SQL, CPSQL, SQL/MQL, SQL/Leads, Tentativas de chamada, Chamadas atendidas, Conversas efetuadas, Taxa Tentativas/Atendidas, ARPU (Setup), Margem Bruta, LTV Final, Net Revenue Retention, % Net Revenue Retention, Time e ferramentas, Despesas totais, ROI LTV Final. (Posso ligar essas depois quando definirmos a fonte.)
+Efeito imediato:
+- `TemperaturaSection` (aba de tags do indicador comercial) passa a contar os 4 cards no chip 🔥 Quente e a listá-los no drawer.
+- Como bônus zero-custo, eles também caem em `hotOpportunityItems` do `CommercialPaceDashboard`.
 
-## Arquivos afetados
-- `src/hooks/useIndicators26Live.ts` — remoção da linha, novas linhas calculadas, dependências do `useMemo` ajustadas.
-- `src/hooks/useOperationsData.ts` — expor `rawTratativas` no retorno do `useQuery` (não-breaking, só adiciona campo).
+## Suposição
+Os 4 cards estão no pipe **Modelo Atual (CaaS)**, que é a única BU cuja `TemperaturaSection` exibe. Se algum estiver em O2 TAX ou Expansão, vou estender o override para esses hooks também numa segunda rodada — me avise se isso acontecer.
 
 ## Fora de escopo
-- `useIndicators26Raw` e colunas 2025 da planilha.
-- Outros componentes que consomem `useOperationsData` (não muda contrato existente).
+Nenhuma mudança em UI, tabelas de drill-down, banco de dados ou outras BUs nesta passagem.
