@@ -1,28 +1,59 @@
-## Matching também por CPF (não só CNPJ)
+## Diagnóstico
 
-### Causa raiz
-Hoje o `useSquadCostFromDre` extrai só os **8 primeiros dígitos** do label do DRE e tenta casar contra `pipefy_db_pessoas.CNPJ`. Quem aparece na lista "sem CNPJ cadastrado" é, na maioria, **estagiário ou CLT** — pessoas que existem no Pessoas DB mas com **só CPF preenchido** (CNPJ vazio). E os lançamentos da folha/pró-labore vêm rotulados com **CPF** na label do DRE (ex.: `077.629.589 FRANK MAYKEL...`), não CNPJ.
+Olhando a resposta real da API DRE Oxy (categoria `Equipe CaaS`, mai/26), o label do fornecedor **não vem com CNPJ** na maioria dos casos — vem com a **razão social da PJ** do colaborador. Exemplos:
 
-Ou seja, a info já está toda no `pipefy_db_pessoas` — falta a gente olhar a coluna `CPF` também.
+| Label DRE | Pessoa real (no Pessoas DB) |
+|---|---|
+| `TAINARA SOFIA KONZEN ANALISE E PLANEJAMENTO LTDA` | Tainara Sofia Konzen |
+| `DOUGLAS PINHEIRO SCHOSSLER LTDA` | Douglas Pinheiro Schossler |
+| `COCHLAR SERVICOS DE APOIO ADMINISTRATIVO LTDA` | Gustavo Ferreira Cochlar |
+| `MENDES INTELIGENCIA FINANCEIRA` | Anderson Felizardo Mendes |
+| `JOSY SARTORI GESTAO FINANCEIRA E ADMINISTRATIVA` | Joseane Lima da Silva Sartori |
+| `EB CONSULTORIA FINANCEIRA` | ??? (precisa decisão humana) |
 
-### O que muda
+A API só retorna `label` e `type:"supplier"`. Não tem campo de CNPJ no payload. O Pessoas DB do Pipefy também não tem coluna "Razão social" — só Nome, CPF, CNPJ. Então não dá pra automatizar 100% sem inferência.
 
-**`src/hooks/useSquadCostFromDre.ts`**
-- Indexar `pipefy_db_pessoas` por **dois identificadores**: raiz de CNPJ (8 dígitos) **e** CPF completo (11 dígitos).
-- Na hora de casar o fornecedor do DRE:
-  1. Extrair os dígitos iniciais da label.
-  2. Se tiver ≥11 dígitos contíguos, tentar **CPF (11 dígitos)** primeiro.
-  3. Se não bater, tentar **CNPJ root (8 dígitos)**.
-  4. Se nem CPF nem CNPJ baterem → `unmatched` (com qual identificador foi detectado).
-- `UnmatchedSupplier` ganha `tipoIdDetectado: 'cpf' | 'cnpj' | null` (além do número já existente em `cnpjDetectado`, renomear para `idDetectado`).
+Você já vetou matching fuzzy por nome (e está correto — `BORAFAZERCONSULTORIALTDA` e `MLS SOLUCOES` etc. seriam chutes ruins).
 
-**`src/components/planning/admin/CfoSquadAdminTab.tsx`**
-- Tabela de "Fornecedores DRE sem vínculo" mostra coluna **"Identificador"** com badge `CPF` ou `CNPJ` + número.
-- Renomear card para "Fornecedores DRE sem CPF/CNPJ cadastrado em Pessoas".
-- A seção "Pessoas ativas (financeiro) sem CNPJ" passa a ser **"Pessoas ativas sem CPF e sem CNPJ"** (só lista quem realmente não tem nenhum dos dois — não dá pra vincular). Estagiário com CPF sai dessa lista.
+## Solução: alias manual (1x por fornecedor, persistido)
 
-### Resultado esperado
-- Estagiários (Pedro Oppermann, Raissa, Felipe, Maria Eduarda, etc.) passam a ser vinculados por CPF.
-- Lista de "sem CNPJ cadastrado" reduz drasticamente para o resíduo real: fornecedores PJ externos que não são pessoas (ex.: assinaturas SaaS, fornecedores de benefícios) ou pessoas que de fato faltam cadastro.
+Nova tabela `dre_supplier_alias` com `label_normalizado UNIQUE → pessoa_id + pessoa_nome`. Admin vincula cada fornecedor uma única vez, e a partir daí o matching é determinístico para sempre.
 
-Sem migração de banco. Só hook + UI do admin tab.
+### 1. Migração
+```sql
+CREATE TABLE public.dre_supplier_alias (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  label_normalizado text UNIQUE NOT NULL,
+  label_original text NOT NULL,
+  pessoa_id text,                -- ID Pipefy da pessoa
+  pessoa_nome text NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+-- GRANTs + RLS (read authenticated, write admin)
+```
+
+### 2. `useSquadCostFromDre.ts`
+Ordem de matching:
+1. CPF (11 dígitos no início do label)
+2. CNPJ root (8 dígitos no início do label)
+3. **Alias manual** (`normalize(label)` ↔ `dre_supplier_alias.label_normalizado`)
+4. Senão → `unmatched`
+
+### 3. `CfoSquadAdminTab.tsx` — painel unmatched
+Cada linha ganha um **dropdown "Vincular a pessoa…"** (lista de pessoas ativas do Pessoas DB com cargo financeiro). Ao escolher e clicar "Salvar":
+- Insere em `dre_supplier_alias` (`label_normalizado` = normalize(label), `pessoa_nome` = pessoa escolhida).
+- Linha some no próximo render; o custo passa a entrar no squad da pessoa.
+
+Bloco extra: tabela **"Aliases configurados"** listando todos os vínculos manuais com botão de remover (caso erro).
+
+### 4. Resultado
+- Estagiários/CLT → já resolvidos por CPF (mudança anterior).
+- PJs com CNPJ no label → resolvidos por CNPJ.
+- PJs só com razão social no label → admin vincula 1x, persiste pra sempre.
+- 100% determinístico, sem fuzzy.
+
+### Arquivos
+- migração nova
+- `src/hooks/useSquadCostFromDre.ts` (load alias + ordem de matching)
+- `src/components/planning/admin/CfoSquadAdminTab.tsx` (dropdown + tabela aliases)
