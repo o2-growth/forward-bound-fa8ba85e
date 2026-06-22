@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import type { ModeloAtualCard } from "./useModeloAtualAnalytics";
+import { parseTemperatura } from "./useModeloAtualAnalytics";
 
 // SDR fixo do pipe outbound (definido pelo user — todos os cards desse pipe
 // são prospecção ativa do Matheus, independente do que vendedor_respons_vel diga).
