@@ -42,7 +42,8 @@ export interface UnmatchedSupplier {
   label: string;
   valor: number;
   category: string;
-  cnpjDetectado: string | null;
+  idDetectado: string | null;
+  tipoIdDetectado: "cpf" | "cnpj" | null;
 }
 
 interface UseParams {
@@ -63,11 +64,20 @@ function normalize(s: string | null | undefined): string {
     .trim();
 }
 
+function onlyDigits(value: string | null | undefined): string {
+  return (value || "").replace(/\D/g, "");
+}
+
 function cnpjRoot(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const digits = value.replace(/\D/g, "");
+  const digits = onlyDigits(value);
   if (digits.length < 8) return null;
   return digits.slice(0, 8);
+}
+
+function cpfFull(value: string | null | undefined): string | null {
+  const digits = onlyDigits(value);
+  if (digits.length < 11) return null;
+  return digits.slice(0, 11);
 }
 
 interface DrillItem {
@@ -143,11 +153,14 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
     const assignments = assignmentsQ.data || [];
     const pessoas = hr.rawPessoas || [];
 
-    // Index pessoas por raiz de CNPJ (única fonte de verdade)
+    // Index pessoas por raiz de CNPJ (8 dig) e CPF completo (11 dig)
     const byCnpj = new Map<string, PessoaRow>();
+    const byCpf = new Map<string, PessoaRow>();
     for (const p of pessoas) {
       const root = cnpjRoot(p.CNPJ);
       if (root) byCnpj.set(root, p);
+      const cpf = cpfFull(p.CPF);
+      if (cpf) byCpf.set(cpf, p);
     }
 
     // Index assignment por nome normalizado de pessoa
@@ -178,10 +191,35 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       const isBenef = BENEF_RE.test(cat);
       for (const it of items) {
         if (!it.total) continue;
-        const labelRoot = cnpjRoot(it.label);
-        const pessoa = labelRoot ? byCnpj.get(labelRoot) || null : null;
+        const labelDigits = onlyDigits(it.label);
+        let pessoa: PessoaRow | null = null;
+        let idDetectado: string | null = null;
+        let tipoIdDetectado: "cpf" | "cnpj" | null = null;
+        // Try CPF first (11 digits) — covers estagiários/CLT
+        if (labelDigits.length >= 11) {
+          const cpf = labelDigits.slice(0, 11);
+          const hit = byCpf.get(cpf);
+          if (hit) {
+            pessoa = hit;
+            idDetectado = cpf;
+            tipoIdDetectado = "cpf";
+          }
+        }
+        // Then CNPJ root (8 digits)
+        if (!pessoa && labelDigits.length >= 8) {
+          const root = labelDigits.slice(0, 8);
+          const hit = byCnpj.get(root);
+          if (hit) {
+            pessoa = hit;
+            idDetectado = root;
+            tipoIdDetectado = "cnpj";
+          } else if (!idDetectado) {
+            idDetectado = root;
+            tipoIdDetectado = "cnpj";
+          }
+        }
         if (!pessoa) {
-          unmatched.push({ label: it.label, valor: it.total, category: cat, cnpjDetectado: labelRoot });
+          unmatched.push({ label: it.label, valor: it.total, category: cat, idDetectado, tipoIdDetectado });
           continue;
         }
         const key = normalize(pessoa.Nome || pessoa["Título"]);

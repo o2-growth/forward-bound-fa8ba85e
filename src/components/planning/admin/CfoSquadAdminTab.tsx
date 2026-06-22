@@ -365,11 +365,12 @@ export function CfoSquadAdminTab() {
         <Card className="border-red-500/40">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem CNPJ cadastrado em Pessoas
+              <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem CPF/CNPJ cadastrado em Pessoas
             </CardTitle>
             <CardDescription>
-              Lançamentos da Oxy cujo CNPJ não bate com nenhuma pessoa do Pipefy (Database de Pessoas).
-              Cadastre o CNPJ no card da pessoa correspondente para vincular automaticamente na próxima sync.
+              Lançamentos da Oxy cujo CPF ou CNPJ não bate com nenhuma pessoa do Pipefy (Database de
+              Pessoas). Cadastre o identificador correto no card da pessoa para vincular automaticamente
+              na próxima sync.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -377,7 +378,7 @@ export function CfoSquadAdminTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fornecedor (label do DRE)</TableHead>
-                  <TableHead>CNPJ detectado</TableHead>
+                  <TableHead>Identificador</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
@@ -389,10 +390,22 @@ export function CfoSquadAdminTab() {
                     <TableRow key={`${u.label}-${i}`}>
                       <TableCell className="text-sm">{u.label}</TableCell>
                       <TableCell className="text-xs tabular-nums">
-                        {u.cnpjDetectado ? (
-                          <Badge variant="outline" className="font-mono">{u.cnpjDetectado}</Badge>
+                        {u.idDetectado ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Badge
+                              variant="outline"
+                              className={
+                                u.tipoIdDetectado === 'cpf'
+                                  ? 'border-blue-500/40 text-blue-600 dark:text-blue-400'
+                                  : 'border-purple-500/40 text-purple-600 dark:text-purple-400'
+                              }
+                            >
+                              {u.tipoIdDetectado?.toUpperCase()}
+                            </Badge>
+                            <span className="font-mono">{u.idDetectado}</span>
+                          </span>
                         ) : (
-                          <span className="text-muted-foreground italic">sem CNPJ na label</span>
+                          <span className="text-muted-foreground italic">sem ID na label</span>
                         )}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{u.category}</TableCell>
@@ -405,9 +418,9 @@ export function CfoSquadAdminTab() {
         </Card>
       )}
 
-      {/* Pessoas sem CNPJ na base do Pipefy */}
+      {/* Pessoas sem CPF e sem CNPJ na base do Pipefy */}
       {(() => {
-        const semCnpj = (hr.rawPessoas || []).filter((p) => {
+        const semId = (hr.rawPessoas || []).filter((p) => {
           const sit = (p['Situação'] || '').toLowerCase();
           if (sit !== 'ativo') return false;
           const cargo = (p.Cargo || '').toLowerCase();
@@ -417,18 +430,20 @@ export function CfoSquadAdminTab() {
             cargo.includes('financeiro') ||
             cargo.includes('estagi');
           if (!ok) return false;
-          return !(p.CNPJ && p.CNPJ.replace(/\D/g, '').length >= 8);
+          const cnpjOk = p.CNPJ && p.CNPJ.replace(/\D/g, '').length >= 8;
+          const cpfOk = p.CPF && p.CPF.replace(/\D/g, '').length >= 11;
+          return !cnpjOk && !cpfOk;
         });
-        if (semCnpj.length === 0) return null;
+        if (semId.length === 0) return null;
         return (
           <Card className="border-amber-500/40">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2 text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="h-4 w-4" /> Pessoas ativas (financeiro) sem CNPJ no Pipefy
+                <AlertTriangle className="h-4 w-4" /> Pessoas ativas (financeiro) sem CPF e sem CNPJ
               </CardTitle>
               <CardDescription>
-                Essas pessoas não podem ser vinculadas a lançamentos do DRE até terem CNPJ cadastrado no
-                card da Database de Pessoas do Pipefy.
+                Essas pessoas não podem ser vinculadas a lançamentos do DRE até terem CPF ou CNPJ
+                cadastrado no card da Database de Pessoas do Pipefy.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -441,7 +456,7 @@ export function CfoSquadAdminTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {semCnpj.map((p) => (
+                  {semId.map((p) => (
                     <TableRow key={p.ID || p.Nome}>
                       <TableCell className="text-sm">{p.Nome || p['Título']}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{p.Cargo}</TableCell>
