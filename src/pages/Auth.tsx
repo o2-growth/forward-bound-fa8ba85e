@@ -212,50 +212,49 @@ export default function Auth() {
     switch (mode) {
       case 'forgot':
         return (
-          <Form {...forgotPasswordForm}>
-            <form onSubmit={forgotPasswordForm.handleSubmit(handleForgotPassword)} className="space-y-4">
-              <FormField
-                control={forgotPasswordForm.control}
-                name="email"
-                render={({ field }) => {
-                  console.log('[FORGOT-FIELD render] value=', JSON.stringify(field.value));
-                  return (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="seu@email.com"
-                        autoComplete="email"
-                        {...field}
-                        value={field.value ?? ''}
-                        onChange={(e) => { console.log('[FORGOT onChange]', e.target.value); field.onChange(e); }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                  );
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="forgot-email"
+                className="text-sm font-medium leading-none"
+              >
+                Email
+              </label>
+              <Input
+                id="forgot-email"
+                type="email"
+                placeholder="seu@email.com"
+                autoComplete="email"
+                value={forgotEmail}
+                onChange={(e) => {
+                  setForgotEmail(e.target.value);
+                  if (forgotEmailError) setForgotEmailError(null);
                 }}
               />
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <KeyRound className="h-4 w-4 mr-2" />
-                )}
-                Enviar link de recuperação
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={() => setMode('login')}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar ao login
-              </Button>
-            </form>
-          </Form>
+              {forgotEmailError && (
+                <p className="text-sm font-medium text-destructive">
+                  {forgotEmailError}
+                </p>
+              )}
+            </div>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <KeyRound className="h-4 w-4 mr-2" />
+              )}
+              Enviar link de recuperação
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setMode('login')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar ao login
+            </Button>
+          </form>
         );
 
       case 'reset':
