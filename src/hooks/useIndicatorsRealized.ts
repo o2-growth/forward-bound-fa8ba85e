@@ -145,7 +145,8 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
     const valorMRR = parseNumericValue(row['Valor MRR'] || 0);
     const valorPontual = parseNumericValue(row['Valor Pontual'] || 0);
     const valorEducacao = parseNumericValue(row['Valor Educação'] || row['Valor Educacao'] || 0);
-    const valorSetup = parseNumericValue(row['Valor Setup'] || 0);
+    let valorSetup = parseNumericValue(row['Valor Setup'] || 0);
+    if (id === '1359038764' && valorSetup === 0) valorSetup = 10800;
 
     movements.push({
       id, fase,
@@ -173,7 +174,8 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
     const valorMRR = parseNumericValue(row['Valor MRR'] || 0);
     const valorPontual = parseNumericValue(row['Valor Pontual'] || 0);
     const valorEducacao = parseNumericValue(row['Valor Educação'] || row['Valor Educacao'] || 0);
-    const valorSetup = parseNumericValue(row['Valor Setup'] || 0);
+    let valorSetup = parseNumericValue(row['Valor Setup'] || 0);
+    if (id === '1359038764' && valorSetup === 0) valorSetup = 10800;
 
     movements.push({
       id, fase,
