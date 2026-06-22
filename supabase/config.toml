@@ -1,7 +1,9 @@
 project_id = "dgwmwmofyaxstykwuzxh"
 
-[functions.query-external-db]
-verify_jwt = true
-
-[functions.debug-card-history]
-verify_jwt = false
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.debug-card-history]
+    verify_jwt = false
+  [functions.query-external-db]
+    verify_jwt = true
