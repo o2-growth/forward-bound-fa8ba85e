@@ -702,6 +702,17 @@ export function PessoasTab() {
                 )}
               </div>
 
+              {showCustoReceitaCharts && (
+                <CustoReceitaCharts
+                  porBu={pc12m.porBu}
+                  corporativo={pc12m.corporativo}
+                  receitaPorMes={receitaPorMes}
+                  oxyDreByBU={oxy.dreByBU}
+                />
+              )}
+
+
+
 
               {/* Card 1: Custo de pessoal por BU (com drill-down) */}
               <Card className="mt-4">
