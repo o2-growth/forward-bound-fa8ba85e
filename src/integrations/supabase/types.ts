@@ -601,6 +601,36 @@ export type Database = {
         }
         Relationships: []
       }
+      dre_supplier_alias: {
+        Row: {
+          created_at: string
+          id: string
+          label_normalizado: string
+          label_original: string
+          pessoa_id: string | null
+          pessoa_nome: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          label_normalizado: string
+          label_original: string
+          pessoa_id?: string | null
+          pessoa_nome: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          label_normalizado?: string
+          label_original?: string
+          pessoa_id?: string | null
+          pessoa_nome?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       funnel_metas: {
         Row: {
           bu: string

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useHrData } from '@/hooks/useHrData';
-import { useSquadCostFromDre, type SquadAssignmentRow } from '@/hooks/useSquadCostFromDre';
+import { useSquadCostFromDre, type SquadAssignmentRow, type SupplierAliasRow } from '@/hooks/useSquadCostFromDre';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 const ROLE_OPTIONS = [
@@ -20,6 +20,17 @@ const ROLE_OPTIONS = [
 
 const formatBRL = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v);
+
+function normalizeLabel(s: string | null | undefined): string {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ltda|me\b|eireli|consultoria|assessoria|financeira|servicos?/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 export function CfoSquadAdminTab() {
   const { toast } = useToast();
@@ -44,6 +55,42 @@ export function CfoSquadAdminTab() {
       return (data || []) as SquadAssignmentRow[];
     },
   });
+
+  const aliasesQ = useQuery({
+    queryKey: ['dre-supplier-aliases-admin'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('dre_supplier_alias')
+        .select('id, label_normalizado, label_original, pessoa_id, pessoa_nome')
+        .order('label_original');
+      if (error) throw error;
+      return (data || []) as SupplierAliasRow[];
+    },
+  });
+
+  // Todas as pessoas ativas elegíveis (sem filtro de já-vinculadas) para o dropdown de alias
+  const allPessoasFinanc = useMemo(() => {
+    return (hr.rawPessoas || [])
+      .filter((p) => {
+        const cargo = (p.Cargo || '').toLowerCase();
+        const sit = (p['Situação'] || '').toLowerCase();
+        if (sit !== 'ativo') return false;
+        return (
+          cargo.includes('cfo') ||
+          cargo.includes('fp&a') ||
+          cargo.includes('financeiro') ||
+          cargo.includes('estagi') ||
+          cargo.includes('coordenador')
+        );
+      })
+      .map((p) => ({
+        nome: p.Nome || p['Título'] || '',
+        cargo: p.Cargo || '',
+        id: p.ID,
+      }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [hr.rawPessoas]);
+
 
   const assignments = assignmentsQ.data || [];
   const squads = useMemo(
@@ -79,11 +126,51 @@ export function CfoSquadAdminTab() {
   const [newSquadInput, setNewSquadInput] = useState('');
   const [newPessoa, setNewPessoa] = useState('');
   const [newRole, setNewRole] = useState<'cfo' | 'analyst'>('analyst');
+  const [aliasPicks, setAliasPicks] = useState<Record<string, string>>({}); // labelOriginal → pessoa.nome
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['cfo-squad-assignments'] });
     qc.invalidateQueries({ queryKey: ['cfo-squad-assignments-admin'] });
+    qc.invalidateQueries({ queryKey: ['dre-supplier-aliases'] });
+    qc.invalidateQueries({ queryKey: ['dre-supplier-aliases-admin'] });
   };
+
+  const handleSaveAlias = async (labelOriginal: string) => {
+    const pessoaNome = aliasPicks[labelOriginal];
+    if (!pessoaNome) {
+      toast({ title: 'Selecione uma pessoa', variant: 'destructive' });
+      return;
+    }
+    const cand = allPessoasFinanc.find((c) => c.nome === pessoaNome);
+    const { error } = await (supabase as any).from('dre_supplier_alias').insert({
+      label_normalizado: normalizeLabel(labelOriginal),
+      label_original: labelOriginal,
+      pessoa_nome: pessoaNome,
+      pessoa_id: cand?.id || null,
+    });
+    if (error) {
+      toast({ title: 'Erro ao salvar alias', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Alias salvo', description: `${labelOriginal} → ${pessoaNome}` });
+    setAliasPicks((prev) => {
+      const next = { ...prev };
+      delete next[labelOriginal];
+      return next;
+    });
+    refresh();
+  };
+
+  const handleRemoveAlias = async (id: string) => {
+    const { error } = await (supabase as any).from('dre_supplier_alias').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Erro ao remover alias', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Alias removido' });
+    refresh();
+  };
+
 
   const handleAdd = async () => {
     const squadFinal = newSquad === '__new' ? newSquadInput.trim() : newSquad;
@@ -365,12 +452,11 @@ export function CfoSquadAdminTab() {
         <Card className="border-red-500/40">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem CPF/CNPJ cadastrado em Pessoas
+              <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem vínculo
             </CardTitle>
             <CardDescription>
-              Lançamentos da Oxy cujo CPF ou CNPJ não bate com nenhuma pessoa do Pipefy (Database de
-              Pessoas). Cadastre o identificador correto no card da pessoa para vincular automaticamente
-              na próxima sync.
+              Lançamentos da Oxy que não casaram por CPF nem CNPJ. Vincule manualmente cada fornecedor
+              a uma pessoa do Pessoas DB (1 vez por fornecedor — persiste para sempre).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -381,6 +467,7 @@ export function CfoSquadAdminTab() {
                   <TableHead>Identificador</TableHead>
                   <TableHead>Categoria</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
+                  <TableHead className="w-[280px]">Vincular a pessoa</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -410,8 +497,79 @@ export function CfoSquadAdminTab() {
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{u.category}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatBRL(u.valor)}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1.5">
+                          <Select
+                            value={aliasPicks[u.label] || ''}
+                            onValueChange={(v) => setAliasPicks((p) => ({ ...p, [u.label]: v }))}
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue placeholder="Selecionar pessoa..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {allPessoasFinanc.map((c) => (
+                                <SelectItem key={c.id} value={c.nome}>
+                                  {c.nome}{' '}
+                                  <span className="text-muted-foreground ml-1">· {c.cargo}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled={!aliasPicks[u.label]}
+                            onClick={() => handleSaveAlias(u.label)}
+                            className="h-8"
+                          >
+                            Salvar
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Aliases manuais configurados */}
+      {(aliasesQ.data?.length || 0) > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Aliases manuais (fornecedor → pessoa)</CardTitle>
+            <CardDescription>
+              Vínculos persistidos. Remover só se foi cadastrado errado — o fornecedor volta pra
+              lista "sem vínculo" no próximo render.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fornecedor (DRE)</TableHead>
+                  <TableHead>Pessoa</TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(aliasesQ.data || []).map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="text-sm">{a.label_original}</TableCell>
+                    <TableCell className="text-sm font-medium">{a.pessoa_nome}</TableCell>
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleRemoveAlias(a.id)}
+                        className="h-7 w-7"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
