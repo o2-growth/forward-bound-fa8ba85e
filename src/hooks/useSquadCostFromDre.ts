@@ -143,14 +143,11 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
     const assignments = assignmentsQ.data || [];
     const pessoas = hr.rawPessoas || [];
 
-    // Index pessoas por raiz de CNPJ e por nome normalizado
+    // Index pessoas por raiz de CNPJ (única fonte de verdade)
     const byCnpj = new Map<string, PessoaRow>();
-    const byName = new Map<string, PessoaRow>();
     for (const p of pessoas) {
       const root = cnpjRoot(p.CNPJ);
       if (root) byCnpj.set(root, p);
-      const nomeKey = normalize(p.Nome || p["Título"]);
-      if (nomeKey) byName.set(nomeKey, p);
     }
 
     // Index assignment por nome normalizado de pessoa
@@ -182,26 +179,9 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       for (const it of items) {
         if (!it.total) continue;
         const labelRoot = cnpjRoot(it.label);
-        const labelNorm = normalize(it.label);
-        let pessoa: PessoaRow | null = null;
-        if (labelRoot && byCnpj.has(labelRoot)) {
-          pessoa = byCnpj.get(labelRoot) || null;
-        }
+        const pessoa = labelRoot ? byCnpj.get(labelRoot) || null : null;
         if (!pessoa) {
-          // Try name fallback: any pessoa whose normalized name is substring of labelNorm or vice versa
-          for (const [nomeKey, p] of byName.entries()) {
-            if (!nomeKey) continue;
-            const tokens = nomeKey.split(" ").filter((t) => t.length > 2);
-            if (tokens.length < 2) continue;
-            const hits = tokens.filter((t) => labelNorm.includes(t)).length;
-            if (hits >= 2) {
-              pessoa = p;
-              break;
-            }
-          }
-        }
-        if (!pessoa) {
-          unmatched.push({ label: it.label, valor: it.total, category: cat });
+          unmatched.push({ label: it.label, valor: it.total, category: cat, cnpjDetectado: labelRoot });
           continue;
         }
         const key = normalize(pessoa.Nome || pessoa["Título"]);
