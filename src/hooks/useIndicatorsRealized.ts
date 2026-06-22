@@ -154,7 +154,7 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
       motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
       dataEntrada, dataCriacao: parseDate(row['Data Criação']), dataAssinatura,
       faixaFaturamento: (row['Faixa de faturamento mensal'] || row['Faixa'] || '') || undefined,
-      valor: valorMRR + valorPontual + valorEducacao + valorSetup,
+      valor: valorMRR + valorPontual + valorSetup,
     });
   }
 
@@ -183,7 +183,7 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
       motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
       dataEntrada, dataCriacao: parseDate(row['Data Criação']), dataAssinatura,
       faixaFaturamento: (row['Faixa de faturamento mensal'] || row['Faixa'] || '') || undefined,
-      valor: valorMRR + valorPontual + valorEducacao + valorSetup,
+      valor: valorMRR + valorPontual + valorSetup,
     });
     existingKeys.add(key);
   }

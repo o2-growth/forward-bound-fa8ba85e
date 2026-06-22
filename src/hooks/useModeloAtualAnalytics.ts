@@ -174,7 +174,7 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
   let valorSetup = parseNumericValue(row['Valor Setup'] || row['valor_setup'] || 0);
   // Override manual: Modelcraft (Pipefy card 1359038764) – Setup R$ 10.800 enquanto sync externo não atualiza
   if (id === '1359038764' && valorSetup === 0) valorSetup = 10800;
-  const valor = valorMRR + valorPontual + valorEducacao + valorSetup;
+  const valor = valorMRR + valorPontual + valorSetup;
   
   // Parse exit date and calculate duration dynamically
   const dataSaida = parseDate(row['Saída']);
