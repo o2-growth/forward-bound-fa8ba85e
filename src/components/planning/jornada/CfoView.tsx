@@ -708,6 +708,24 @@ const INACTIVE_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência', 'Arq
 const CHURN_PHASES = ['Churn', 'Atividades finalizadas', 'Desistência'];
 
 export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: CfoViewProps) {
+  // ── Custo real por squad via DRE Oxy (CNPJ matching) ──
+  // Usa o range do dashboard quando informado; senão último mês fechado.
+  const squadCostRange = useMemo(() => {
+    if (dateRange) return dateRange;
+    const ref = subMonths(new Date(), 1);
+    return { from: startOfMonth(ref), to: endOfMonth(ref) };
+  }, [dateRange]);
+  const squadCost = useSquadCostFromDre({ startDate: squadCostRange.from, endDate: squadCostRange.to });
+  // Atualiza o cache de módulo para que os helpers `getSquadCusto/...` retornem
+  // valores reais em todos os memos/sub-componentes deste arquivo.
+  useMemo(() => {
+    const next: Record<string, SquadCostEntry> = {};
+    for (const sq of squadCost.porSquad) {
+      next[sq.cfoNome] = { fee: sq.fee, benef: sq.benef, total: sq.total };
+    }
+    SQUAD_COST_CACHE = next;
+  }, [squadCost.porSquad]);
+
   // Snapshot dos clientes considerando o período selecionado:
   // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
   // - Churns ocorridos NO período: faseAtual em CHURN_PHASES AND dataEntrada (entrada na fase de churn) dentro do range
