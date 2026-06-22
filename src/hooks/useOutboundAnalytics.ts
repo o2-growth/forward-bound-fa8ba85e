@@ -103,6 +103,7 @@ function parseOutboundRow(row: Record<string, any>): ModeloAtualCard {
     produto: row["quais_servi_os_o_cliente_est_adquirindo"]
       ? String(row["quais_servi_os_o_cliente_est_adquirindo"]).trim()
       : undefined,
+    temperatura: parseTemperatura(row),
   };
 }
 
