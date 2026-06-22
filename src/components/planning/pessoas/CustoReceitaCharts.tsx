@@ -49,9 +49,10 @@ export function CustoReceitaCharts({ porBu, corporativo, receitaPorMes, oxyDreBy
       // Receita por BU (Oxy DRE usa nome de mês, sem ano)
       const monthIdx = parseInt(p.slice(5, 7), 10) - 1;
       const mLabel = MONTHS_PT[monthIdx];
-      const modeloAtual = (oxyDreByBU?.modelo_atual?.[mLabel] || 0) as number;
-      const o2Tax = (oxyDreByBU?.o2_tax?.[mLabel] || 0) as number;
-      const expansao = ((oxyDreByBU?.oxy_hacker?.[mLabel] || 0) + (oxyDreByBU?.franquia?.[mLabel] || 0)) as number;
+      const caas = (oxyDreByBU?.caasByMonth?.[mLabel] || 0) as number;
+      const saas = (oxyDreByBU?.saasByMonth?.[mLabel] || 0) as number;
+      const o2Tax = (oxyDreByBU?.dreByBU?.o2_tax?.[mLabel] || 0) as number;
+      const expansao = ((oxyDreByBU?.dreByBU?.oxy_hacker?.[mLabel] || 0) + (oxyDreByBU?.dreByBU?.franquia?.[mLabel] || 0)) as number;
 
       const pct = receitaTotal > 0 ? (folha / receitaTotal) * 100 : 0;
 
@@ -60,7 +61,8 @@ export function CustoReceitaCharts({ porBu, corporativo, receitaPorMes, oxyDreBy
         label: `${mLabel}/${p.slice(2, 4)}`,
         Folha: folha,
         Receita: receitaTotal,
-        "Modelo Atual": modeloAtual,
+        CaaS: caas,
+        SaaS: saas,
         "O2 TAX": o2Tax,
         "Expansão": expansao,
         pct,
@@ -124,7 +126,8 @@ export function CustoReceitaCharts({ porBu, corporativo, receitaPorMes, oxyDreBy
               />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar yAxisId="right" dataKey="pct" name="% Custo/Receita" fill="hsl(var(--warning))" opacity={0.4} />
-              <Line yAxisId="left" type="monotone" dataKey="Modelo Atual" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="CaaS" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+              <Line yAxisId="left" type="monotone" dataKey="SaaS" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} />
               <Line yAxisId="left" type="monotone" dataKey="O2 TAX" stroke="hsl(var(--chart-3))" strokeWidth={2} dot={false} />
               <Line yAxisId="left" type="monotone" dataKey="Expansão" stroke="hsl(var(--chart-4))" strokeWidth={2} dot={false} />
               <Line yAxisId="left" type="monotone" dataKey="Receita" stroke="hsl(var(--foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} />
