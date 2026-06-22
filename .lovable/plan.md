@@ -1,59 +1,41 @@
-## Diagnóstico
+## Objetivo
 
-Olhando a resposta real da API DRE Oxy (categoria `Equipe CaaS`, mai/26), o label do fornecedor **não vem com CNPJ** na maioria dos casos — vem com a **razão social da PJ** do colaborador. Exemplos:
+Mesclar valores **por pessoa** (não por squad inteiro): quem já está mapeado pela nova lógica (CPF / CNPJ / alias do DRE Oxy) usa o valor real do DRE; quem ainda não está mapeado mantém o valor hardcoded de `CFO_SQUADS` em `CfoView.tsx`.
 
-| Label DRE | Pessoa real (no Pessoas DB) |
-|---|---|
-| `TAINARA SOFIA KONZEN ANALISE E PLANEJAMENTO LTDA` | Tainara Sofia Konzen |
-| `DOUGLAS PINHEIRO SCHOSSLER LTDA` | Douglas Pinheiro Schossler |
-| `COCHLAR SERVICOS DE APOIO ADMINISTRATIVO LTDA` | Gustavo Ferreira Cochlar |
-| `MENDES INTELIGENCIA FINANCEIRA` | Anderson Felizardo Mendes |
-| `JOSY SARTORI GESTAO FINANCEIRA E ADMINISTRATIVA` | Joseane Lima da Silva Sartori |
-| `EB CONSULTORIA FINANCEIRA` | ??? (precisa decisão humana) |
+Hoje o cache em `CfoView.tsx` faz fallback só quando o **total do squad inteiro = 0**. Então basta um membro ser reconhecido para o squad usar o DRE puro e os outros membros sumirem do custo. É isso que está causando os números errados.
 
-A API só retorna `label` e `type:"supplier"`. Não tem campo de CNPJ no payload. O Pessoas DB do Pipefy também não tem coluna "Razão social" — só Nome, CPF, CNPJ. Então não dá pra automatizar 100% sem inferência.
+## Mudanças
 
-Você já vetou matching fuzzy por nome (e está correto — `BORAFAZERCONSULTORIALTDA` e `MLS SOLUCOES` etc. seriam chutes ruins).
+### 1. `useSquadCostFromDre.ts`
+Expor, junto de cada `SquadCost`, o **set de pessoas reconhecidas** (chave normalizada do nome) — o que já existe internamente, só precisa sair no retorno. Também expor um lookup global `matchedByPessoaNome: Map<nomeNormalizado, { fee, benef }>` para o CfoView poder consultar membro a membro sem depender do nome do squad.
 
-## Solução: alias manual (1x por fornecedor, persistido)
+Sem mudar a lógica de matching (continua CPF → CNPJ → alias → unmatched).
 
-Nova tabela `dre_supplier_alias` com `label_normalizado UNIQUE → pessoa_id + pessoa_nome`. Admin vincula cada fornecedor uma única vez, e a partir daí o matching é determinístico para sempre.
+### 2. `CfoView.tsx` — merge granular
 
-### 1. Migração
-```sql
-CREATE TABLE public.dre_supplier_alias (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  label_normalizado text UNIQUE NOT NULL,
-  label_original text NOT NULL,
-  pessoa_id text,                -- ID Pipefy da pessoa
-  pessoa_nome text NOT NULL,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
--- GRANTs + RLS (read authenticated, write admin)
+Substituir o cache atual `SQUAD_COST_CACHE: Record<cfoNome, {fee,benef,total}>` por dois caches:
+
+- `SQUAD_REAL_BY_PERSON: Record<nomeNormalizado, {fee, benef}>` — populado pelo hook.
+- `CFO_SQUADS` (hardcoded) continua igual.
+
+Reescrever `getSquadCusto / getSquadFee / getSquadBeneficios` assim:
+
+```
+para cada squad em CFO_SQUADS[cfoNome]:
+  para o CFO e cada membro:
+    se SQUAD_REAL_BY_PERSON[normalize(nome)] existe → usa fee/benef do DRE
+    senão → usa fee/benef do CFO_SQUADS (hardcoded)
+  soma tudo
 ```
 
-### 2. `useSquadCostFromDre.ts`
-Ordem de matching:
-1. CPF (11 dígitos no início do label)
-2. CNPJ root (8 dígitos no início do label)
-3. **Alias manual** (`normalize(label)` ↔ `dre_supplier_alias.label_normalizado`)
-4. Senão → `unmatched`
+Isso garante que, conforme você vincular aliases no admin, o custo daquela pessoa migra do hardcoded para o DRE real, e os colegas dela continuam com o hardcoded sem zerar.
 
-### 3. `CfoSquadAdminTab.tsx` — painel unmatched
-Cada linha ganha um **dropdown "Vincular a pessoa…"** (lista de pessoas ativas do Pessoas DB com cargo financeiro). Ao escolher e clicar "Salvar":
-- Insere em `dre_supplier_alias` (`label_normalizado` = normalize(label), `pessoa_nome` = pessoa escolhida).
-- Linha some no próximo render; o custo passa a entrar no squad da pessoa.
+### 3. `CfoSquadAdminTab.tsx`
+Sem mudanças funcionais. Continua mostrando unmatched + dropdown de alias. Opcional: badge "usando hardcoded" ao lado de cada membro de `CFO_SQUADS` que ainda não tem match real (útil pra saber quem falta vincular).
 
-Bloco extra: tabela **"Aliases configurados"** listando todos os vínculos manuais com botão de remover (caso erro).
+## Arquivos
+- `src/hooks/useSquadCostFromDre.ts` — adicionar `matchedByPessoaNome` no retorno.
+- `src/components/planning/jornada/CfoView.tsx` — trocar cache e reescrever os 3 helpers `getSquad*`.
+- (opcional) `src/components/planning/admin/CfoSquadAdminTab.tsx` — badge informativa.
 
-### 4. Resultado
-- Estagiários/CLT → já resolvidos por CPF (mudança anterior).
-- PJs com CNPJ no label → resolvidos por CNPJ.
-- PJs só com razão social no label → admin vincula 1x, persiste pra sempre.
-- 100% determinístico, sem fuzzy.
-
-### Arquivos
-- migração nova
-- `src/hooks/useSquadCostFromDre.ts` (load alias + ordem de matching)
-- `src/components/planning/admin/CfoSquadAdminTab.tsx` (dropdown + tabela aliases)
+Nada de migração nova, nada de mexer no DRE.
