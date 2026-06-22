@@ -98,10 +98,9 @@ export default function Auth() {
     defaultValues: { email: '', password: '' },
   });
 
-  const forgotPasswordForm = useForm<ForgotPasswordFormValues>({
-    resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: { email: '' },
-  });
+  // Estado simples para "Esqueci minha senha" (apenas 1 campo)
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotEmailError, setForgotEmailError] = useState<string | null>(null);
 
   const resetPasswordForm = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -147,9 +146,18 @@ export default function Auth() {
     }
   };
 
-  const handleForgotPassword = async (values: ForgotPasswordFormValues) => {
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotEmailError(null);
+
+    const parsed = forgotPasswordSchema.safeParse({ email: forgotEmail });
+    if (!parsed.success) {
+      setForgotEmailError(parsed.error.errors[0]?.message ?? 'Email inválido');
+      return;
+    }
+
     setIsSubmitting(true);
-    const { error } = await resetPassword(values.email);
+    const { error } = await resetPassword(parsed.data.email);
     setIsSubmitting(false);
 
     if (error) {
@@ -163,6 +171,7 @@ export default function Auth() {
         title: 'Email enviado!',
         description: 'Verifique sua caixa de entrada para redefinir sua senha.',
       });
+      setForgotEmail('');
       setMode('login');
     }
   };
@@ -203,46 +212,49 @@ export default function Auth() {
     switch (mode) {
       case 'forgot':
         return (
-          <Form {...forgotPasswordForm}>
-            <form onSubmit={forgotPasswordForm.handleSubmit(handleForgotPassword)} className="space-y-4">
-              <FormField
-                control={forgotPasswordForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="seu@email.com"
-                        autoComplete="email"
-                        {...field}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <KeyRound className="h-4 w-4 mr-2" />
-                )}
-                Enviar link de recuperação
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={() => setMode('login')}
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="forgot-email"
+                className="text-sm font-medium leading-none"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar ao login
-              </Button>
-            </form>
-          </Form>
+                Email
+              </label>
+              <Input
+                id="forgot-email"
+                type="email"
+                placeholder="seu@email.com"
+                autoComplete="email"
+                value={forgotEmail}
+                onChange={(e) => {
+                  setForgotEmail(e.target.value);
+                  if (forgotEmailError) setForgotEmailError(null);
+                }}
+              />
+              {forgotEmailError && (
+                <p className="text-sm font-medium text-destructive">
+                  {forgotEmailError}
+                </p>
+              )}
+            </div>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <KeyRound className="h-4 w-4 mr-2" />
+              )}
+              Enviar link de recuperação
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={() => setMode('login')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar ao login
+            </Button>
+          </form>
         );
 
       case 'reset':
