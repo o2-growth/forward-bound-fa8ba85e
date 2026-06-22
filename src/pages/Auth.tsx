@@ -98,10 +98,9 @@ export default function Auth() {
     defaultValues: { email: '', password: '' },
   });
 
-  const forgotPasswordForm = useForm<ForgotPasswordFormValues>({
-    resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: { email: '' },
-  });
+  // Estado simples para "Esqueci minha senha" (apenas 1 campo)
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotEmailError, setForgotEmailError] = useState<string | null>(null);
 
   const resetPasswordForm = useForm<ResetPasswordFormValues>({
     resolver: zodResolver(resetPasswordSchema),
