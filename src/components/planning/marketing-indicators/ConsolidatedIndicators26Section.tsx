@@ -307,7 +307,7 @@ export function ConsolidatedIndicators26Section() {
               <div>
                 <h3 className="text-lg font-semibold">Visão Total — Indicadores 26</h3>
                 <p className="text-xs text-muted-foreground">
-                  2026 ao vivo (APIs + Pipefy) · 2025 da planilha
+                  2026 ao vivo (Pipefy + Meta/Google Ads + Oxy Finance) · 2025 da planilha
                   {lastUpdate ? ` · planilha atualizada em ${lastUpdate}` : ""}
                 </p>
               </div>
