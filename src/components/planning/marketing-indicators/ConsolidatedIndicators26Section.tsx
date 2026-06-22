@@ -11,6 +11,21 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useIndicators26Raw, type Indicator26Row } from "@/hooks/useIndicators26Raw";
+import { useIndicators26Live } from "@/hooks/useIndicators26Live";
+
+// Colunas que vêm da fonte AO VIVO (2026)
+const LIVE_COL_KEYS = new Set([
+  "jan", "fev", "mar", "q1",
+  "abr", "mai", "jun", "q2",
+  "jul", "ago", "set", "q3",
+  "out", "nov", "dez", "q4",
+  "total2026",
+]);
+// Colunas que vêm da PLANILHA (histórico 2025)
+const SHEET_COL_KEYS = new Set([
+  "jul25", "ago25", "set25", "q325",
+  "out25", "nov25", "dez25", "q425",
+]);
 
 type Fmt = "brl" | "int" | "pct" | "x" | "mes";
 
