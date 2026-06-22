@@ -56,6 +56,42 @@ export function CfoSquadAdminTab() {
     },
   });
 
+  const aliasesQ = useQuery({
+    queryKey: ['dre-supplier-aliases-admin'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('dre_supplier_alias')
+        .select('id, label_normalizado, label_original, pessoa_id, pessoa_nome')
+        .order('label_original');
+      if (error) throw error;
+      return (data || []) as SupplierAliasRow[];
+    },
+  });
+
+  // Todas as pessoas ativas elegíveis (sem filtro de já-vinculadas) para o dropdown de alias
+  const allPessoasFinanc = useMemo(() => {
+    return (hr.rawPessoas || [])
+      .filter((p) => {
+        const cargo = (p.Cargo || '').toLowerCase();
+        const sit = (p['Situação'] || '').toLowerCase();
+        if (sit !== 'ativo') return false;
+        return (
+          cargo.includes('cfo') ||
+          cargo.includes('fp&a') ||
+          cargo.includes('financeiro') ||
+          cargo.includes('estagi') ||
+          cargo.includes('coordenador')
+        );
+      })
+      .map((p) => ({
+        nome: p.Nome || p['Título'] || '',
+        cargo: p.Cargo || '',
+        id: p.ID,
+      }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [hr.rawPessoas]);
+
+
   const assignments = assignmentsQ.data || [];
   const squads = useMemo(
     () => Array.from(new Set(assignments.map((a) => a.cfo_squad_nome))).sort(),
