@@ -214,11 +214,22 @@ const marginBgColor = (pct: number) =>
     ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
     : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
 
+/**
+ * Cache em nível de módulo populado pelo hook `useSquadCostFromDre` dentro do
+ * componente `CfoView`. Permite que os helpers abaixo sejam usados como funções
+ * puras em todo o arquivo (memos, sub-componentes) sem precisar prop-drillar.
+ * Fallback: estrutura hardcoded de `CFO_SQUADS` quando o DRE ainda não retornou.
+ */
+type SquadCostEntry = { fee: number; benef: number; total: number };
+let SQUAD_COST_CACHE: Record<string, SquadCostEntry> = {};
+
 function getSquad(cfoNome: string) {
   return CFO_SQUADS[cfoNome] ?? null;
 }
 
 function getSquadCusto(cfoNome: string): number {
+  const real = SQUAD_COST_CACHE[cfoNome];
+  if (real && real.total > 0) return real.total;
   const sq = getSquad(cfoNome);
   if (!sq) return 0;
   const fees = sq.fee + sq.membros.reduce((s, m) => s + m.fee, 0);
@@ -227,6 +238,8 @@ function getSquadCusto(cfoNome: string): number {
 }
 
 function getSquadBeneficios(cfoNome: string): number {
+  const real = SQUAD_COST_CACHE[cfoNome];
+  if (real && real.benef > 0) return real.benef;
   const sq = getSquad(cfoNome);
   if (!sq) return 0;
   return sq.beneficios + sq.membros.reduce((s, m) => s + m.beneficios, 0);
