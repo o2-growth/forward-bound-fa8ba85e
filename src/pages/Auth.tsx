@@ -216,10 +216,7 @@ export default function Auth() {
                         type="email"
                         placeholder="seu@email.com"
                         autoComplete="email"
-                        name={field.name}
-                        ref={field.ref}
-                        onBlur={field.onBlur}
-                        onChange={field.onChange}
+                        {...field}
                         value={field.value ?? ''}
                       />
                     </FormControl>
