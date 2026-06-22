@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertTriangle, Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useHrData } from '@/hooks/useHrData';
-import { useSquadCostFromDre, type SquadAssignmentRow } from '@/hooks/useSquadCostFromDre';
+import { useSquadCostFromDre, type SquadAssignmentRow, type SupplierAliasRow } from '@/hooks/useSquadCostFromDre';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 const ROLE_OPTIONS = [
