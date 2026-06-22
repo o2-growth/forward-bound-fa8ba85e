@@ -113,7 +113,7 @@ export function useIndicators26Live(): UseIndicators26LiveResult {
         return {
           spend: campaigns.reduce(
             (s: number, c: any) =>
-              s + Number(c.spend ?? c.investment ?? (Number(c.cost_micros || 0) / 1_000_000) ?? 0),
+              s + Number(c.spend ?? c.investment ?? (Number(c.cost_micros || 0) / 1_000_000)),
             0
           ),
           leads: campaigns.reduce(
