@@ -927,19 +927,20 @@ export function PessoasTab() {
         <EfficiencyByBu
           rows={[...pc.porBu, ...(pc.corporativo.total > 0 ? [pc.corporativo] : [])].map((b) => {
             const months = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"] as const;
-            const buToOxy: Record<string, string[]> = {
-              CaaS: ["modelo_atual"],
-              SaaS: ["modelo_atual"],
-              TAX: ["o2_tax"],
-              "Expansão": ["oxy_hacker", "franquia"],
-            };
-            const oxyKeys = buToOxy[b.bu] || [];
-            let receita = 0;
-            if (oxy.dreByBU && dateRange.from.getFullYear() === dateRange.to.getFullYear()) {
+            const sumMonths = (src: Record<string, number> | undefined): number => {
+              if (!src || dateRange.from.getFullYear() !== dateRange.to.getFullYear()) return 0;
+              let total = 0;
               for (let i = dateRange.from.getMonth(); i <= dateRange.to.getMonth(); i++) {
-                const m = months[i];
-                for (const k of oxyKeys) receita += (oxy.dreByBU as any)?.[k]?.[m] || 0;
+                total += src[months[i]] || 0;
               }
+              return total;
+            };
+            let receita = 0;
+            if (b.bu === "CaaS") receita = sumMonths(oxy.caasByMonth);
+            else if (b.bu === "SaaS") receita = sumMonths(oxy.saasByMonth);
+            else if (b.bu === "TAX") receita = sumMonths(oxy.dreByBU?.o2_tax);
+            else if (b.bu === "Expansão") {
+              receita = sumMonths(oxy.dreByBU?.oxy_hacker) + sumMonths(oxy.dreByBU?.franquia);
             }
             const hc = hr.headcountByTime
               .filter((h) => {
