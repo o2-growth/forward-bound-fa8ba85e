@@ -1,80 +1,62 @@
-## Objetivo
 
-Adicionar um bloco **Funil de Monetização** na aba Indicadores → Comercial, lendo do pipe `pipefy_moviment_contrato` já sincronizado no banco externo. Só realizado, sem metas.
+## Contexto — 3 problemas a corrigir na aba **Operação**
 
-## Pipe identificado
+### 1. Salários (Custo Squad) na aba **CFO**
+O custo real por squad já é calculado pelo hook `useSquadCostFromDre` (drill-down do DRE Oxy por CNPJ/CPF/alias). Hoje:
+- Em `CustomerSuccessTab` o `CfoView` **recebe** `dateRange={ from: csStartDate, to: csEndDate }` ✅
+- Em `CfoView` o hook usa esse range corretamente. ✅
+- **Bug real:** o valor real é mesclado por uma variável **módulo-level** (`SQUAD_REAL_BY_PERSON`) atualizada dentro de um `useMemo`. Como `useMemo` não é garantido para side-effects e o cache é global ao módulo, em montagens/desmontagens (ou quando outro componente lê primeiro) o `matchedByPessoaNome` chega vazio e os helpers caem no fallback hardcoded — o que dá a sensação de “não está puxando da Oxy / não muda quando troco o mês”.
+- Além disso, `matchedByPessoaNome` só vincula a pessoa quando o **label do fornecedor** no DRE Oxy tem CPF/CNPJ no texto OU existe alias em `dre_supplier_alias`. Quando o label vem só com o nome da empresa, não há match → cai para hardcoded silenciosamente.
 
-Tabela: `pipefy_moviment_contrato` (no EXTERNAL_PG).
+### 2. **Entregas → Onboarding atrasado** sempre vazio
+- `useJornadaData` já produz `onboardingAtrasado` corretamente (Kick-off / Primeiras Entregas - Diagnóstico cruzado com Central de Projetos).
+- `CustomerSuccessTab` repassa para `ReunioesView` ✅, mas filtra por `filters.cfos` no `filteredOnboardingAtrasado`.
+- **Bug provável:** `c.cfo` em `onboardingAtrasado` é gerado a partir de `row['CFO Responsavel']` do pipe **Gestão de Rotinas CFO**, que muitas vezes está vazio ou com nome diferente do filtro do CustomerSuccessTab. Quando o filtro está em "Todos" também aparece vazio → o `activeOnboardingTitles` (clientes em fase "Onboarding" em Central de Projetos) pode estar zerado se nenhum cliente está com `Fase Atual === 'Onboarding'` no momento (a regra hoje exige `row['Fase'] === row['Fase Atual']`, o que descarta linhas históricas — pode estar dropando 100% das linhas).
 
-**Tipos de movimentação** (campo `tipo_de_movimenta_o`):
-- Novo produto · Troca de produto · Upsell · Downsell
+### 3. **Visão Geral CS vs aba CFO** mostram números diferentes para o mesmo CFO
+- `VisaoGeralCS` faz `clientesByCfo` em cima de `activeClientes` (filtra só `INACTIVE_PHASES` no estado atual e usa `c.mrr` atual).
+- `CfoView` re-agrega usando `clientesPeriodo` (snapshot do **fim do período selecionado** considerando data de assinatura e data oficial de churn).
+- Resultado: bases diferentes → contagens e MRR diferentes por CFO.
 
-**Fases** (campo `Fase`, ordem do funil):
-1. Start form
-2. Oportunidade Levantada
-3. Proposta em Elaboração
-4. Proposta enviada / Follow Up
-5. Aprovado pelo Cliente
-6. Jurídico
-7. Faturamento
-8. Concluído (= ganho)
+---
 
-Campos de valor (somar para "valor total do card"):
-`valor_cfoaas`, `valor_setup`, `valor_oxy`, `valor_diagn_stico`, `valor_turnaround`, `valor_valuation`, `valor_assessoria_mrr`, `valor_bpo`, `valor_coordenador_financeiro`, `valor_educa_o`.
+## Plano
 
-Outros campos relevantes: `Título`, `cliente`, `produto`, `Fase Atual`, `Entrada`, `motivo_da_perda`, `status_da_proposta`, `respons_vel`.
+### Etapa A — Salários reais por mês (aba CFO)
+1. **Remover** o cache módulo-level `SQUAD_REAL_BY_PERSON` e a `useMemo` com side-effect em `CfoView.tsx`.
+2. Passar `squadCost.matchedByPessoaNome` por **contexto/closure**: criar um `Map` local com `useMemo([matchedByPessoaNome])` e refatorar `resolvePerson / getSquadParts / getSquadCusto / getSquadBeneficios / getAnalystCount` para receberem esse map como parâmetro (ou virarem closures dentro do componente). Isso garante reatividade real ao trocar `csStartDate/csEndDate`.
+3. Adicionar um pequeno indicador visual no header da tabela CFO ("Custo real Oxy DRE • Mar/2026 • N pessoas mapeadas / total") usando contagem do `matchedByPessoaNome` para deixar claro quando o valor é real vs. fallback hardcoded.
+4. Verificar que `useSquadCostFromDre` está sendo invalidado ao mudar `start/end` — já está (`queryKey` inclui datas). Sem alterações no hook.
 
-A tabela é de **movimentos** (mesmo card aparece N vezes). Dedup por `ID` mantendo a linha mais recente por `Entrada` (e usar `Fase Atual` como fase corrente).
+### Etapa B — Onboarding atrasado em Entregas
+1. Em `useJornadaData` (bloco onboardingAtrasado, linhas ~1018–1071):
+   - **Relaxar** o gate `row['Fase'] === row['Fase Atual']`. Esse campo `Fase` vem do movement log; a fase atual já está em `Fase Atual`. Trocar por: usar **a linha mais recente por `ID` em `rotinas`** (mesmo padrão de dedup já usado nos hooks de analytics) e descartar o filtro redundante.
+   - **Fallback do cruzamento com Central de Projetos:** se `activeOnboardingTitles` estiver vazio (zero clientes em "Onboarding" na Central), não bloquear todos — manter o card desde que a fase no pipe Rotinas seja Kick-off / Primeiras Entregas - Diagnóstico (a regra original já é específica o suficiente). Logar `console.warn` se essa branch disparar.
+2. Em `CustomerSuccessTab`, no `filteredOnboardingAtrasado`: quando o card não tem `cfo` populado, **não excluir** se o filtro estiver em `all`; quando há filtro de CFO específico, manter exclusão.
+3. Garantir tooltip do bloco já explica a regra.
 
-## O que mudar
+### Etapa C — Alinhar Visão Geral CS com aba CFO
+Definir a **fonte única**: usar `clientesPeriodo` (snapshot do fim do período selecionado) tanto na aba CFO quanto em VisaoGeralCS.
 
-### 1. Backend — liberar acesso à tabela
-`supabase/functions/query-external-db/index.ts` — adicionar `"pipefy_moviment_contrato"` à constante `validTables`. Sem nova edge function: já reutilizamos `action: 'raw_sql'` (ou `preview`) existente.
+1. Em `CustomerSuccessTab`, já existe `filteredClientesPeriodo` (linha ~257). Passar essa lista (em vez do `clientes` cru) para `VisaoGeralCS` no prop `clientes`.
+2. Em `VisaoGeralCS`, `clientesByCfo` continuará funcionando, mas agora sobre o **mesmo snapshot** usado por `CfoView`. Adicionar tooltip explicando "Snapshot do fim do período: dd/mm/aaaa".
+3. Como sanity check, no card "Clientes Ativos" da Visão Geral também usar `activeClientes` derivado do snapshot (já que `INACTIVE_PHASES` é aplicado dentro do componente).
 
-### 2. Novo hook — `src/hooks/useMonetizacaoAnalytics.ts`
-- Query única via `supabase.functions.invoke('query-external-db', { table: 'pipefy_moviment_contrato', action: 'raw_sql', sql: '...' })` puxando todos os campos relevantes no período (`Entrada BETWEEN`).
-- Cache via `@tanstack/react-query` (mesmo padrão dos outros analytics).
-- Dedup por `ID` (linha mais recente por `Entrada`).
-- Helpers calculados:
-  - `valorTotal` = soma de todos os `valor_*`.
-  - `tipo` = `tipo_de_movimenta_o`.
-  - `faseAtual` = `Fase Atual` (fallback `Fase`).
-  - `ganho` = `faseAtual === 'Concluído'` ou `status_da_proposta` ganho.
-  - `perdido` = presença de `motivo_da_perda`.
-- Exports:
-  - `cards` (lista deduplicada)
-  - `byFase` (contagem + valor por fase, na ordem canônica do funil)
-  - `byTipo` (contagem + valor por Upsell / Cross-sell≈Novo produto / Troca de produto / Downsell)
-  - `totals` (cards, valor total em pipeline, valor ganho/concluído)
-  - `toDetailItem(card)` para abrir DetailSheet
-  - `isLoading`
+---
 
-### 3. Novo componente — `src/components/planning/indicators/MonetizacaoSection.tsx`
-Card colapsável com:
-- **Header**: 💎 Funil de Monetização + descrição (escopo da seção = pipe `Monetização`, não respeita o filtro de BU do dashboard porque é um pipe transversal; respeita só o período).
-- **KPIs topo** (linha de 4 chips): Total de cards · Valor em pipeline · Valor concluído · Ticket médio.
-- **Mini-funil por fase**: chips clicáveis por fase (Start form → Concluído) mostrando contagem + valor. Clique abre DetailSheet com os cards daquela fase.
-- **Quebra por tipo de movimentação**: 4 chips coloridos (Novo produto, Upsell, Cross-sell, Troca de produto, Downsell — usar mapping de `tipo_de_movimenta_o`). Clicáveis também.
-- **DetailSheet** comum (`DetailItem`): colunas Empresa (`Título`), Tipo, Produto, Fase Atual, Valor total, Responsável, Entrada. Link Pipefy.
+## Arquivos a alterar
 
-Se a query retornar `0` cards no período, renderiza msg vazia em vez de esconder (pra deixar claro que existe a seção e o filtro pode estar errado).
+```text
+src/components/planning/jornada/CfoView.tsx          (Etapa A — refatorar helpers e remover cache global)
+src/hooks/useJornadaData.ts                          (Etapa B — relaxar dedup e gate de Central de Projetos)
+src/components/planning/CustomerSuccessTab.tsx       (Etapa B + C — filtro CFO permissivo + clientes snapshot)
+src/components/planning/cs/VisaoGeralCS.tsx          (Etapa C — tooltip e leitura do snapshot)
+```
 
-### 4. Wiring no IndicatorsTab
-- Importar `MonetizacaoSection` em `src/components/planning/IndicatorsTab.tsx`.
-- Renderizar logo abaixo do `CenarioCaixaSection`, passando apenas `startDate` e `endDate` (independe de `selectedBUs`).
+Sem mudanças em edge functions, migrations ou hooks de dados (`useSquadCostFromDre` já está correto).
 
-### 5. Sem mudanças em metas/banco
-Conforme pedido, apenas realizado. Sem migration. Sem alteração em `monetary_metas`, `funnel_metas`, etc.
-
-## Detalhes técnicos
-
-- Período: filtro por `Entrada` (data do card no pipe). Como a tabela é de movimentos, fazemos `SELECT * WHERE Entrada >= start AND Entrada <= end` e dedup client-side.
-- Mapeamento Upsell ≈ Upsell, Cross-sell ≈ `Novo produto` (validar com você na primeira renderização — fácil de trocar se preferir mapear diferente).
-- Valor monetário: somatório de todos os `valor_*` por card. Para cards com valores em MRR (cfoaas/assessoria), tratamos como valor mensal (1×) — coerente com o resto do dash.
-
-## Arquivos afetados
-
-- `supabase/functions/query-external-db/index.ts` — incluir tabela na whitelist
-- `src/hooks/useMonetizacaoAnalytics.ts` — **novo**
-- `src/components/planning/indicators/MonetizacaoSection.tsx` — **novo**
-- `src/components/planning/IndicatorsTab.tsx` — mount do bloco
+## Validação manual após implementar
+- Trocar período em Operação (ex.: Fev → Mar/2026) e ver o "Custo Squad" mudando na tabela CFO.
+- Verificar pelo menos 1 CFO em que o valor difere do hardcoded (indicador "X/Y pessoas mapeadas" > 0).
+- Abrir aba "Entrega" e ver os cards atrasados de Kick-off e Primeiras Entregas - Diagnóstico aparecendo.
+- Comparar a contagem de clientes e MRR por CFO entre "Visão Geral" e a aba "CFO" — devem bater linha a linha.
