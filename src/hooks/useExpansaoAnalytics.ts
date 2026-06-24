@@ -7,6 +7,18 @@ import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate,
 import { isTestCard } from "./useModeloAtualMetas";
 import { parseTemperatura } from "./useModeloAtualAnalytics";
 
+// Cards forçados como "Quente" por BU/produto (Quentes junho 2026).
+// Match por título normalizado: lowercase + NFD (sem acento) + trim.
+function normalizeTitleForQuente(s: string): string {
+  return (s || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+const FORCED_QUENTE_FRANQUIA = new Set<string>(['eberson', 'ranieri']);
+const FORCED_QUENTE_OXY_HACKER = new Set<string>(['thiago', 'marcia', 'patrick']);
+
 export interface ExpansaoCard {
   id: string;
   titulo: string;
