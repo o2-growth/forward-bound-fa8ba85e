@@ -439,18 +439,23 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       const pontual = taxaFranquia > 0 ? taxaFranquia : (pontualReal > 0 ? pontualReal : (indicator === 'venda' ? TICKET_PADRAO : 0));
       const total = taxaFranquia > 0 ? taxaFranquia : (pontualReal + setup + mrr);
 
+      const itemValue = total > 0 ? total : pontual;
       byCard.set(movement.id, {
         id: movement.id,
         name: movement.titulo,
+        company: movement.titulo,
         phase: movement.fase,
         date: movement.dataEntrada.toISOString(),
-        value: indicator === 'venda' ? (total || pontual) : undefined,
+        value: itemValue,
         product: 'Franquia',
         bu: 'Franquia',
         mrr,
         setup,
         pontual,
         total,
+        responsible: '',
+        closer: '',
+        sdr: '',
         dataAssinatura: movement.dataEntrada.toISOString(),
       });
     }
