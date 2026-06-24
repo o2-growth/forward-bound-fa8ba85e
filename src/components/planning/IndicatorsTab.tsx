@@ -44,6 +44,7 @@ import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
+import { CenarioCaixaSection } from "./indicators/CenarioCaixaSection";
 import { CommercialPaceDashboard } from "./indicators/CommercialPaceDashboard";
 
 import { CardInvestigator } from "./indicators/CardInvestigator";
