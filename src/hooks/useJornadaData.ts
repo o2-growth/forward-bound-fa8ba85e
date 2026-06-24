@@ -1070,9 +1070,15 @@ export function useJornadaData() {
       const fase = row['Fase Atual'] || '';
       if (!ONBOARDING_PHASES.includes(fase)) continue;
       const tituloRaw = (row['Título'] || '').trim();
-      // Cruza com Central de Projetos APENAS se ela tiver dados — caso contrário
-      // (sincronização atrasada) não dropa todos os cards.
-      if (useStrictCentralFilter && !activeOnboardingTitles.has(normTitle(tituloRaw))) continue;
+      const tNorm = normTitle(tituloRaw);
+      // Cruzamento com Central de Projetos:
+      // - Fases de onboarding propriamente ditas: exige cliente em "Onboarding" na Central.
+      // - "Oxy Integrada": cliente costuma já estar em "Em Operação Recorrente" — aceita ambas.
+      if (STRICT_ONBOARDING_PHASES.has(fase)) {
+        if (useStrictCentralFilter && !activeOnboardingTitles.has(tNorm)) continue;
+      } else {
+        if (activeAnyTitles.size > 0 && !activeAnyTitles.has(tNorm)) continue;
+      }
       const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
       const pipefyOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
       const dateOverdue = dataPrevista ? dataPrevista.getTime() < startOfTodayTs : false;
