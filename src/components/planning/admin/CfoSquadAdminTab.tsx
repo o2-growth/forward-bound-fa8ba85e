@@ -566,7 +566,16 @@ export function CfoSquadAdminTab() {
                   .sort((a, b) => b.valor - a.valor)
                   .map((u, i) => (
                     <TableRow key={`${u.label}-${i}`}>
-                      <TableCell className="text-sm">{u.label}</TableCell>
+                      <TableCell className="text-sm">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{u.label}</span>
+                          {autoSuggested.has(u.label) && (
+                            <Badge variant="outline" className="w-fit border-amber-500/40 text-amber-600 dark:text-amber-400 text-[10px]">
+                              Sugestão automática
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs tabular-nums">
                         {u.idDetectado ? (
                           <span className="inline-flex items-center gap-1.5">
