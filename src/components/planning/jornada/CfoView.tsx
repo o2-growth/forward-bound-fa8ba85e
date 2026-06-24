@@ -220,7 +220,7 @@ const marginBgColor = (pct: number) =>
  * (via CPF/CNPJ/alias) usa o valor real; quem ainda não foi mapeado mantém o
  * valor hardcoded de `CFO_SQUADS` abaixo.
  */
-type SquadCostEntry = { fee: number; benef: number; total: number };
+type SquadCostEntry = { fee: number; benef: number; total: number; fallback?: boolean };
 let SQUAD_REAL_BY_PERSON: Record<string, SquadCostEntry> = {};
 
 function normalizePersonKey(s: string | null | undefined): string {
