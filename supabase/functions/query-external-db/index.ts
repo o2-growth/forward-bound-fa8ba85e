@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
       "pipefy_moviment_rotinas",
       "pipefy_card_connections",
       "pipefy_moviment_outbound",
+      "pipefy_moviment_contrato",
     ];
 
     const validateTable = async (tbl: string) => {
