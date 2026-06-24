@@ -247,6 +247,19 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
 
     const unmatched: UnmatchedSupplier[] = [];
 
+    // Pré-computa tokens de nomes — restrito a pessoas que estão em cfo_squad_assignment
+    // (evita falso-positivo com colaboradores de outras áreas que aparecem no DRE).
+    const assignedNomeKeys = new Set(assignments.map((a) => normalize(a.pessoa_nome)));
+    const pessoasInSquad: Array<{ pessoa: PessoaRow; tokens: Set<string>; nomeNorm: string }> = [];
+    for (const p of pessoas) {
+      const nomeNorm = normalize(p.Nome || p["Título"]);
+      if (!nomeNorm) continue;
+      if (!assignedNomeKeys.has(nomeNorm)) continue;
+      pessoasInSquad.push({ pessoa: p, tokens: tokensFromName(p.Nome || p["Título"] || ""), nomeNorm });
+    }
+
+    const diag = { cpf: 0, cnpj: 0, alias: 0, "name-exact": 0, "name-fuzzy": 0, unmatched: 0 };
+
     drillQueries.forEach((q, idx) => {
       const cat = caasCategories[idx];
       if (!cat) return;
