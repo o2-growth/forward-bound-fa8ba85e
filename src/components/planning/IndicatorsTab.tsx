@@ -543,6 +543,7 @@ export function IndicatorsTab() {
   const o2TaxAnalytics = useO2TaxAnalytics(startDate, endDate);
   const franquiaAnalytics = useExpansaoAnalytics(startDate, endDate, 'Franquia');
   const oxyHackerAnalytics = useExpansaoAnalytics(startDate, endDate, 'Oxy Hacker');
+  const monetizacaoAnalytics = useMonetizacaoAnalytics(startDate, endDate);
 
   // Combina Modelo Atual + Outbound: cards do pipe `pipefy_moviment_outbound`
   // são tratados como extensão do Modelo Atual (mesma BU, origem = Outbound).
