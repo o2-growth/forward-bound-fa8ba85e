@@ -55,8 +55,10 @@ export function TemperaturaSection(props: AggregateInput) {
         </CardTitle>
         <p className="text-xs text-muted-foreground">
           Cards com tag de prioridade (Labels do Pipefy) no período selecionado.
-          Escopo atual: <span className="font-medium">{scopeLabel}</span>. Clique
-          em cada chip para abrir a lista.
+          Inclui Upsell, Cross-sell e Troca de produto do funil de Monetização
+          (sempre considerados 🔥 Quente). Escopo atual:{" "}
+          <span className="font-medium">{scopeLabel}</span>. Clique em cada chip
+          para abrir a lista.
         </p>
       </CardHeader>
       <CardContent>

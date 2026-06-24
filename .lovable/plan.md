@@ -1,18 +1,29 @@
-Plano para corrigir o modal vazio dos acelerômetros no Dash Comercial:
+# Classificar cards do Funil de Monetização como "Quente"
 
-1. Ajustar os itens gerados pelos hooks de metas
-   - Em `useExpansaoMetas` e `useOxyHackerMetas`, preencher `company`, `responsible`, `closer` e `sdr` com fallback seguro.
-   - Alinhar `value`, `pontual` e `total` para que vendas de Franquia/Oxy tenham o mesmo valor usado nos acelerômetros.
-   - Remover o log de debug temporário que foi adicionado em `IndicatorsTab`.
+## Objetivo
+Cards do pipe **Monetização** cujo tipo seja **Upsell**, **Cross-sell** (Novo produto) ou **Troca de produto** devem entrar automaticamente no bucket **🔥 Quente** do "Termômetro dos Leads", independente de terem ou não Label/Prioridade no Pipefy. Downsell continua de fora.
 
-2. Corrigir a origem dos dados no clique dos cards monetários
-   - Em `handleMonetaryCardClick`, montar a lista de vendas a partir dos mesmos detalhes usados pelos gauges quando Franquia ou Oxy Hacker estiverem selecionados sem filtros.
-   - Para `Fat Incremento` e `Pontual`, usar o valor realizado do acelerômetro como total de referência, evitando que o modal calcule zero por depender de campos antigos.
+## Arquivos
 
-3. Corrigir o clique do acelerômetro de `Vendas`
-   - Garantir que `getItemsForIndicator('venda')` devolva registros completos vindos de `getExpansaoDetailItems('venda', startDate, endDate)` para Franquia e de `getOxyHackerDetailItems(...)` para Oxy Hacker.
-   - Manter a base analytics apenas quando filtros de pessoa/origem estiverem ativos, porque ela contém os campos de filtro.
+### 1. `src/components/planning/indicators/temperaturaAggregator.ts`
+- Adicionar `monetizacaoAnalytics: ReturnType<typeof useMonetizacaoAnalytics>` (opcional) em `AggregateInput`.
+- Após percorrer as fontes por BU, percorrer `monetizacaoAnalytics.cards` filtrando `tipo ∈ {"Upsell","Cross-sell","Troca de produto"}` e com `entrada` dentro de `[startDate, endDate]`.
+- Para cada um, gerar `DetailItem` via `monetizacaoAnalytics.toDetailItem(card)`, anotar `bu: "Monetização"` e empurrar em `buckets.Quente`.
+- Dedup por `id` dentro do bucket Quente (caso o mesmo card já tenha vindo de uma BU com tag Quente, manter um só).
+- Incluir `"Monetização"` em `activeLabels` quando houver pelo menos 1 card elegível.
 
-4. Validar o caso reportado
-   - Dash Comercial com BU Franquia e período completo.
-   - Clicar em `Vendas`, `Fat Incremento` e `Pontual` deve abrir o modal com registros, empresas e valores coerentes com os acelerômetros.
+### 2. `src/components/planning/IndicatorsTab.tsx`
+- Já existe `useMonetizacaoAnalytics(startDate, endDate)` em uso para `MonetizacaoSection`. Reaproveitar a mesma instância e passar como prop `monetizacaoAnalytics` para `<TemperaturaSection ... />` e `<CenarioCaixaSection ... />`.
+
+### 3. `src/components/planning/indicators/TemperaturaSection.tsx`
+- Atualizar o texto do header para deixar claro: "Inclui Upsell, Cross-sell e Troca de produto do funil de Monetização (considerados Quentes)".
+- Nenhuma mudança de UI além disso — o bucket já é clicável e o `DetailSheet` já mostra a coluna `bu`.
+
+### 4. `src/components/planning/indicators/CenarioCaixaSection.tsx`
+- Sem mudança de comportamento além de receber a mesma prop e repassar para `aggregateByTemperatura`, para que o cenário de caixa também considere esses cards no bucket Quente (mantém coerência entre as duas seções).
+
+## Validação
+- Período corrente: abrir aba Indicadores → conferir que o chip 🔥 Quente cresce conforme cards de Upsell/Cross/Troca existentes no funil de Monetização.
+- Clicar no chip Quente → ver linhas com coluna BU = "Monetização" e fase = "Fase Atual" do pipe.
+- Downsell **não** deve aparecer.
+- Cards sem tag de BU continuam contando em `totalSemTag` normalmente; cards de Monetização **não** afetam `totalSemTag` (são sempre classificados).

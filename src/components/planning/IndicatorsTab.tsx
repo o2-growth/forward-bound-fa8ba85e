@@ -46,6 +46,7 @@ import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
 import { CenarioCaixaSection } from "./indicators/CenarioCaixaSection";
 import { MonetizacaoSection } from "./indicators/MonetizacaoSection";
+import { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
 import { CommercialPaceDashboard } from "./indicators/CommercialPaceDashboard";
 
 import { CardInvestigator } from "./indicators/CardInvestigator";
@@ -542,6 +543,7 @@ export function IndicatorsTab() {
   const o2TaxAnalytics = useO2TaxAnalytics(startDate, endDate);
   const franquiaAnalytics = useExpansaoAnalytics(startDate, endDate, 'Franquia');
   const oxyHackerAnalytics = useExpansaoAnalytics(startDate, endDate, 'Oxy Hacker');
+  const monetizacaoAnalytics = useMonetizacaoAnalytics(startDate, endDate);
 
   // Combina Modelo Atual + Outbound: cards do pipe `pipefy_moviment_outbound`
   // são tratados como extensão do Modelo Atual (mesma BU, origem = Outbound).
@@ -3186,6 +3188,7 @@ export function IndicatorsTab() {
         franquiaAnalytics={franquiaAnalytics}
         oxyHackerAnalytics={oxyHackerAnalytics}
         outboundAnalytics={outboundAnalytics}
+        monetizacaoAnalytics={monetizacaoAnalytics}
         selectedBUs={selectedBUs}
         startDate={startDate}
         endDate={endDate}
@@ -3197,6 +3200,7 @@ export function IndicatorsTab() {
         franquiaAnalytics={franquiaAnalytics}
         oxyHackerAnalytics={oxyHackerAnalytics}
         outboundAnalytics={outboundAnalytics}
+        monetizacaoAnalytics={monetizacaoAnalytics}
         selectedBUs={selectedBUs}
         startDate={startDate}
         endDate={endDate}

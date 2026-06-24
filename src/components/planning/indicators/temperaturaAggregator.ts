@@ -2,20 +2,34 @@ import type { DetailItem } from "./DetailSheet";
 import type { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
 import type { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import type { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
+import type { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
 import type { BUType } from "@/hooks/useFunnelRealized";
 
 export type Temperatura = "Quente" | "Morno" | "Frio";
-export type BuLabel = "Modelo Atual" | "Outbound" | "Franquia" | "Oxy Hacker";
+export type BuLabel =
+  | "Modelo Atual"
+  | "Outbound"
+  | "Franquia"
+  | "Oxy Hacker"
+  | "Monetização";
+
+const MONETIZACAO_QUENTE_TIPOS = new Set([
+  "Upsell",
+  "Cross-sell",
+  "Troca de produto",
+]);
 
 type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
 type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
 type OutboundAnalyticsT = ReturnType<typeof useOutboundAnalytics>;
+type MonetizacaoAnalyticsT = ReturnType<typeof useMonetizacaoAnalytics>;
 
 export interface AggregateInput {
   modeloAtualAnalytics: ModeloAnalytics;
   franquiaAnalytics: ExpansaoAnalyticsT;
   oxyHackerAnalytics: ExpansaoAnalyticsT;
   outboundAnalytics: OutboundAnalyticsT;
+  monetizacaoAnalytics?: MonetizacaoAnalyticsT;
   selectedBUs: BUType[];
   startDate: Date;
   endDate: Date;
@@ -33,6 +47,7 @@ export function aggregateByTemperatura({
   franquiaAnalytics,
   oxyHackerAnalytics,
   outboundAnalytics,
+  monetizacaoAnalytics,
   selectedBUs,
   startDate,
   endDate,
@@ -117,6 +132,29 @@ export function aggregateByTemperatura({
     }
   }
 
+  // Monetização: Upsell, Cross-sell, Troca de produto entram como Quente
+  if (monetizacaoAnalytics && monetizacaoAnalytics.cards.length > 0) {
+    const existingQuenteIds = new Set(
+      buckets.Quente.map((it) => String(it.id)),
+    );
+    let added = 0;
+    for (const card of monetizacaoAnalytics.cards) {
+      if (!MONETIZACAO_QUENTE_TIPOS.has(card.tipo)) continue;
+      const entradaTime = card.entrada
+        ? new Date(card.entrada).getTime()
+        : NaN;
+      if (!Number.isFinite(entradaTime)) continue;
+      if (entradaTime < startTime || entradaTime > endTime) continue;
+      const id = String(card.id);
+      if (existingQuenteIds.has(id)) continue;
+      existingQuenteIds.add(id);
+      const item = monetizacaoAnalytics.toDetailItem(card);
+      buckets.Quente.push({ ...item, bu: "Monetização" });
+      added++;
+    }
+    if (added > 0) activeLabels.push("Monetização");
+  }
+
   const tagged =
     buckets.Quente.length + buckets.Morno.length + buckets.Frio.length;
   return { buckets, totalTagged: tagged, totalSemTag: semTag, activeLabels };
@@ -128,6 +166,7 @@ export const CASH_RULES: Record<BuLabel, { mrr: number; setup: number; pontual: 
   Outbound: { mrr: 0, setup: 0.75, pontual: 0.5 },
   Franquia: { mrr: 0, setup: 0, pontual: 0.7 },
   "Oxy Hacker": { mrr: 0, setup: 0, pontual: 0.7 },
+  "Monetização": { mrr: 0, setup: 0, pontual: 0 },
 };
 
 export interface CashBreakdown {
