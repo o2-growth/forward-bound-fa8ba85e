@@ -254,6 +254,18 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
     motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
     faseAtual: row['Fase Atual'] || row['fase_atual'] || undefined,
     produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
+    valoresExtras: {
+      valorMRR,
+      valorSetup,
+      valorEducacao,
+      valorCFOaaS: parseNumericValue(row['Valor CFOaaS'] || 0),
+      valorOXY: parseNumericValue(row['Valor OXY'] || row['Valor Oxy'] || 0),
+      valorTurnaround: parseNumericValue(row['Valor Turnaround'] || 0),
+      valorValuation: parseNumericValue(row['Valor Valuation'] || 0),
+      valorDiagnostico: parseNumericValue(
+        row['Valor Diagnóstico Estratégico'] || row['Valor Diagnostico'] || 0
+      ),
+    },
     temperatura: FORCED_QUENTE_TITLES.has(normalizeTitleForQuente(tituloRaw))
       ? 'Quente'
       : parseTemperatura(row),
