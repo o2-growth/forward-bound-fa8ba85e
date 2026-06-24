@@ -3175,6 +3175,18 @@ export function IndicatorsTab() {
         endDate={endDate}
       />
 
+      {/* Cenário de Caixa (Otimista / Realista) */}
+      <CenarioCaixaSection
+        modeloAtualAnalytics={modeloAtualAnalyticsRaw}
+        franquiaAnalytics={franquiaAnalytics}
+        oxyHackerAnalytics={oxyHackerAnalytics}
+        outboundAnalytics={outboundAnalytics}
+        selectedBUs={selectedBUs}
+        startDate={startDate}
+        endDate={endDate}
+      />
+
+
 
 
 
