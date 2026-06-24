@@ -1077,6 +1077,9 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
           {' '}Período: <strong>{squadCostRange.from.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</strong>
           {' '}— {matchedCount} pessoa(s) mapeada(s) ao DRE (demais usam fallback fixo).
           {' '}Total CaaS no período: {formatBRL(squadCost.totalCaasDre)}.
+          {squadCost.prevMonthLabel && (
+            <> Pessoas sem lançamento no mês usam o valor de <strong>{squadCost.prevMonthLabel}</strong> (mês anterior).</>
+          )}
           {squadCost.totalUnmatched > 0 && (
             <> Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo — resolva em Admin → Squads CFOaaS.</>
           )}
