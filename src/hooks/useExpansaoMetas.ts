@@ -399,6 +399,65 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
     return { qty: qtyArray, meta: metaArray };
   };
 
+  // Build DetailItem-shaped objects for drill-down sheet (Franquia).
+  // Uses the same dedup/qualification rules as getQtyForPeriod.
+  const getDetailItemsForIndicator = (indicator: ExpansaoIndicator, start?: Date, end?: Date) => {
+    if (!data?.movements || data.movements.length === 0) return [] as any[];
+
+    const startTime = start ? new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime() : 0;
+    const endTime = end ? new Date(end.getFullYear(), end.getMonth(), end.getDate(), 23, 59, 59, 999).getTime() : Date.now();
+
+    const TICKET_PADRAO = 140000;
+    const byCard = new Map<string, any>();
+
+    for (const movement of data.movements) {
+      const entryTime = movement.dataEntrada.getTime();
+      if (entryTime < startTime || entryTime > endTime) continue;
+
+      const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
+      let matches = false;
+
+      if (indicator === 'venda') {
+        matches = movement.fase === 'Contrato assinado' || shouldForceAssinaturaDate(movement.titulo, 'expansao');
+      } else if (indicator === 'proposta') {
+        matches = movementIndicator === 'proposta';
+      } else if (indicator === 'mql') {
+        if (movement.fase === 'Lead' || movement.fase === 'MQL') {
+          const inv = cardInvestimento.get(movement.id) || null;
+          matches = isFranquiaMqlQualified(inv);
+        }
+      } else {
+        matches = movementIndicator === indicator;
+      }
+
+      if (!matches || byCard.has(movement.id)) continue;
+
+      const taxaFranquia = movement.taxaFranquia || 0;
+      const pontualReal = movement.valorPontual || 0;
+      const setup = movement.valorSetup || 0;
+      const mrr = movement.valorMRR || 0;
+      const pontual = taxaFranquia > 0 ? taxaFranquia : (pontualReal > 0 ? pontualReal : (indicator === 'venda' ? TICKET_PADRAO : 0));
+      const total = taxaFranquia > 0 ? taxaFranquia : (pontualReal + setup + mrr);
+
+      byCard.set(movement.id, {
+        id: movement.id,
+        name: movement.titulo,
+        phase: movement.fase,
+        date: movement.dataEntrada.toISOString(),
+        value: indicator === 'venda' ? (total || pontual) : undefined,
+        product: 'Franquia',
+        bu: 'Franquia',
+        mrr,
+        setup,
+        pontual,
+        total,
+        dataAssinatura: movement.dataEntrada.toISOString(),
+      });
+    }
+
+    return Array.from(byCard.values());
+  };
+
   return {
     movements: data?.movements ?? [],
     isLoading,
@@ -408,5 +467,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
     getValueForPeriod,
     getMetaForPeriod,
     getGroupedData,
+    getDetailItemsForIndicator,
   };
 }
+

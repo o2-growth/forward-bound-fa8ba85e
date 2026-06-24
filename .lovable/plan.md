@@ -1,38 +1,28 @@
-## Diagnóstico (confirmado via logs + banco)
+## Diagnóstico
 
-No banco existem **10 cards de Franquia com fase `Contrato assinado` em 2026**, somando exatamente `R$ 1,353M` (Pontual gauge mostra "R$ 1.4M" arredondado ✓).
-
-Logs do console confirmam que `useExpansaoMetas.getValueForPeriod('venda') = 1.353.000` — esta é a fonte do gauge de Pontual.
-
-Já o gauge **"Vendas" (qty)** lê de uma fonte diferente: `franquiaAnalytics.getDetailItemsForIndicator('venda').length` (IndicatorsTab.tsx linha 1168), que usa `useExpansaoAnalytics`. Esse hook depende de `query_period` + `query_period_by_signature` + `query_card_history` no edge function — e está retornando 0 cards de venda no período, mesmo com os 10 registros existentes (não há nenhum log `[Franquia Analytics]` no console, indicando que o memo nem fechou com dados de venda).
-
-Resultado: **fontes inconsistentes** — monetário lê tudo, contagem lê do hook com bug.
+Os gauges (qtd/valor) já leem de `useExpansaoMetas` / `useOxyHackerMetas` (correto). Mas a planilha lateral de drill-down ainda chama `franquiaAnalytics.getDetailItemsForIndicator(...)` / `oxyHackerAnalytics.getDetailItemsForIndicator(...)` em `getItemsForIndicator` (IndicatorsTab.tsx linhas ~1540 e ~1563). Esses hooks (`useExpansaoAnalytics`) estão retornando 0 cards no período → a sheet abre vazia.
 
 ## Mudanças
 
 ### `src/components/planning/IndicatorsTab.tsx`
 
-No bloco `if (includesFranquia)` (linhas ~1145–1171), no caminho "sem filtros de closer/SDR/origem" (linha 1168):
+1. Adicionar helper `buildExpansaoMetasDetailItems(movements, indicator, startDate, endDate, produto)` que percorre `movements` aplicando a mesma regra de `getQtyForPeriod` (dedup por `id`, fase = 'Contrato assinado' OR `shouldForceAssinaturaDate` para venda; PHASE_TO_INDICATOR para os demais; MQL com filtro `isFranquiaMqlQualified`/`isOxyHackerMqlQualified`). Para cada card único emite um `DetailItem` com:
+   - `id`, `name = titulo`, `phase`, `date = dataEntrada.toISOString()`
+   - `product = 'Franquia' | 'Oxy Hacker'`
+   - `mrr = valorMRR`, `setup = valorSetup`
+   - `pontual = taxaFranquia > 0 ? taxaFranquia : (valorPontual > 0 ? valorPontual : ticketPadrao)` (ticket padrão: 140k Franquia, 54k Oxy Hacker)
+   - `value = pontual` (compatível com o cálculo de drill-down)
+   - `bu = 'Franquia'` ou `'Oxy Hacker'`
+   - Deixar `closer/sdr/responsible` indefinidos (movements não trazem)
 
-- Trocar `franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length` por `getExpansaoQty(indicator.key as ExpansaoIndicator, startDate, endDate)`.
+2. Expor `movements` de `useExpansaoMetas` e `useOxyHackerMetas` no destructure (já estão sendo retornados, falta importar).
 
-`getExpansaoQty` já está importado/desestruturado na linha 535 e usa exatamente a mesma fonte (`useExpansaoMetas`) que alimenta o gauge monetário. Resultado: Vendas = 10, Pontual = R$1.35M coerentes.
+3. Em `getItemsForIndicator`, nos blocos Franquia (linha ~1540) e Oxy Hacker (linha ~1563), quando NÃO há filtro de closer/SDR/origem ativo, usar os DetailItems vindos do helper acima. Quando há filtro ativo, manter o fallback atual (`franquiaAnalytics.getDetailItemsForIndicator` / `oxyHackerAnalytics.getDetailItemsForIndicator`) — não é regressão pois é o comportamento existente.
 
-No caminho "com filtros de pessoa" (linha 1159), continuar usando `franquiaAnalytics.getDetailItemsForIndicator(...)` filtrado por closer/SDR — o filtro precisa da granularidade por card.
+4. Atualizar deps do `itemsByIndicator` useMemo para incluir as referências de `franquiaMetasMovements` e `oxyHackerMetasMovements`.
 
-Aplicar a mesma troca para o bloco análogo de **Oxy Hacker** (linhas ~1117–1143, sem filtro → trocar `oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key).length` pelo `getOxyHackerQty('venda'/'proposta'/etc, startDate, endDate)`), pois o mesmo padrão arquitetural está em uso lá e o bug é o mesmo (hoje passa despercebido porque Oxy Hacker tem volume menor).
+5. Não alterar `getItemsWithFullHistory` (modo cohort) por enquanto — mesmo problema existe lá mas é menos crítico; podemos atacar se aparecer.
 
-### Não mexer
+### Validação
 
-- A série do gráfico (`buildChartData` linhas 1250–1268) continua usando `franquiaAnalytics.getCardsForIndicator(...)` quando há filtros de pessoa, e `expansaoData.qty` (que vem de `useExpansaoMetas`) caso contrário — já está alinhado.
-- Não mexer em `useExpansaoAnalytics` ou no edge function — o bug raiz dele exige investigação maior e fica fora desse fix.
-
-## Validação
-
-Após o ajuste, ao filtrar **Franquia + todo período**:
-- "Vendas" deve mostrar **10** (meta 18 → ~56%).
-- "Pontual" continua R$ 1.4M (93%).
-- "Fat Incremento" continua R$ 1.4M.
-- Os números batem com a query SQL feita no banco.
-
-Conferir também console: o log `[useExpansaoMetas] getQtyForPeriod venda: 10 unique cards` deve aparecer.
+Abrir Comercial → Franquia + período total → clicar nos cards de "Vendas" e "Pontual": a sheet deve listar 10 contratos (Mônica, Ricardo, Silvio, Erenildo, Nathan, Eduardo, Rafael, Everton, Renan, Silvio Filho) com valores Pontual somando ~R$ 1,35M. Sem regressão em Modelo Atual / O2 TAX.
