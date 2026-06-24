@@ -1073,7 +1073,10 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
       }`}>
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <div className="flex-1">
-          <strong>Custo do squad:</strong> vindo do DRE Oxy via CNPJ da Pessoas DB. Total CaaS no período: {formatBRL(squadCost.totalCaasDre)}.
+          <strong>Custo do squad:</strong> vindo do DRE Oxy via CNPJ da Pessoas DB.
+          {' '}Período: <strong>{squadCostRange.from.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</strong>
+          {' '}— {matchedCount} pessoa(s) mapeada(s) ao DRE (demais usam fallback fixo).
+          {' '}Total CaaS no período: {formatBRL(squadCost.totalCaasDre)}.
           {squadCost.totalUnmatched > 0 && (
             <> Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo — resolva em Admin → Squads CFOaaS.</>
           )}
