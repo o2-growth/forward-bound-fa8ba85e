@@ -1,80 +1,61 @@
 ## Diagnóstico
 
-### Bug 1 — Modal "Composição do Squad" ignora o DRE
+O Gustavo continua mostrando R$ 20.000 mesmo depois de trocar o mês porque há **duas causas combinadas** introduzidas pela última mudança:
 
-No `CfoView.tsx` há duas fontes para os números do squad:
+### Causa 1 — Loop de render no `useSquadCostFromDre` invalida o cache antes de pintar
 
-- `getSquadCusto / getSquadFee / getSquadBeneficios` (linhas 263–268) → chamam `resolvePerson()` → leem do DRE real. **Funcionam.**
-- `getSquad()` (linha 236) → retorna o objeto `CFO_SQUADS[cfoNome]` **hardcoded**. Nunca passa pelo DRE.
-
-A linha 1468 do modal usa `getSquad(selectedCfo)` e renderiza `squad.fee` / `squad.beneficios` / `m.fee` / `m.beneficios` (linhas 1498–1510). Resultado:
-
-- Gustavo CFO → mostra sempre **Fee R$ 20.000 + Benef R$ 740** (constantes), não muda com o filtro de mês.
-- A coluna **Total** (R$ 28.085,07) e o P&L **estão corretos** porque usam `getSquadCusto/getSquadBeneficios`, que leem do DRE.
-
-Por isso a soma não bate (20k+740+7k+987,60 = 28.727 ≠ 28.085).
-
-### Bug 2 — "Mês atual só mapeia 4"
-
-Hoje é 24/jun/2026. Para "mês atual", o DRE Oxy ainda tem só lançamentos parciais. Quem ainda não foi pago no mês some do mapeamento, e na UI aparece valor hardcoded ou pessoa fora do squad.
-
-**Solução combinada (decisão do usuário):** quando uma pessoa do squad **não tem lançamento no mês selecionado**, puxar automaticamente o valor do **mês anterior**.
-
-## Correções
-
-### 1. Fallback "mês anterior" no hook (`useSquadCostFromDre.ts`)
-
-Disparar uma 2ª rodada de drill-down em paralelo para o **mês anterior** ao `startDate`. Construir um segundo mapa `matchedByPessoaNomePrev` com o mesmo algoritmo (CPF → CNPJ → alias → nome).
-
-No retorno, expor um helper:
+Adicionei `startDate` (objeto `Date`) ao array de dependências do `useMemo` que produz `matchedByPessoaNome`:
 
 ```ts
-const matchedByPessoaNomeWithFallback: Record<string, { fee, benef, total, fallback?: boolean }> = {};
-for (const key of new Set([...Object.keys(matchedByPessoaNome), ...Object.keys(matchedByPessoaNomePrev)])) {
-  const cur = matchedByPessoaNome[key];
-  if (cur && (cur.fee > 0 || cur.benef > 0)) {
-    matchedByPessoaNomeWithFallback[key] = cur;
-  } else {
-    const prev = matchedByPessoaNomePrev[key];
-    if (prev) matchedByPessoaNomeWithFallback[key] = { ...prev, fallback: true };
-  }
-}
+}, [..., isSingleMonth, startDate]);
 ```
 
-Atribuir esse mapa em `SQUAD_REAL_BY_PERSON` para o `resolvePerson` enxergar.
+`startDate` é recriado pelo parent a cada render (`new Date()` indireto via `dateRange`). Resultado:
 
-Range do "mês anterior": `start = subMonths(startOfMonth(startDate), 1)`, `end = subDays(startOfMonth(startDate), 1)`. Só executar se `startDate` for o mês corrente ou se o range cobrir só 1 mês (não disparar fallback em ranges longos tipo YTD para evitar dobrar custo).
+1. Memo recomputa em todo render → `matchedByPessoaNome` ganha referência nova.
+2. `useEffect` no `CfoView` (`[squadCost.matchedByPessoaNome]`) dispara, faz `setSquadRealVersion(v+1)`.
+3. Render novo → loop. O console já mostra `Maximum update depth exceeded` em telas correlatas.
+4. Enquanto o loop está ativo, o módulo `SQUAD_REAL_BY_PERSON` chega a ser preenchido, mas o modal lê o valor *antes* do `setState` aplicar — efeito visível: hardcoded R$ 20.000.
 
-Cache: `staleTime: 10 min`, mesmas categorias CaaS.
+### Causa 2 — `prevMonthLabel` recalculado dentro do memo
 
-### 2. Modal usa valores reais por pessoa (`CfoView.tsx`, linhas 1481–1524)
+Mesmo problema, mas como agora `prevMonthLabel` é string idêntica, basta tirar `startDate` do deps e movê-lo para fora do memo (usar `prevStart` já memoizado, que é string estável).
 
-Trocar a renderização para `resolvePerson()` em cada linha (CFO + cada membro). O total da modal passa a bater com o card lá fora. Quando o valor veio do fallback, mostrar badge sutil "mês anterior" do lado do número (cor muted).
+### Causa 3 (a confirmar) — chave de normalização
 
-```ts
-const cfoP = resolvePerson(squad.nome, squad.fee, squad.beneficios);
-const membrosResolvidos = squad.membros.map((m) => ({
-  ...m,
-  resolved: resolvePerson(m.nome, m.fee, m.beneficios),
-}));
-```
+`normalize("Gustavo Ferreira Cochlar")` no hook não passa por nenhum stop word, mas a função strip tem `assessoria/consultoria/financeira/servicos` — Cochlar sobrevive. Vou logar no console (`console.debug`) o keyset de `matchedByPessoaNome` e o resultado de `normalizePersonKey("Gustavo Ferreira Cochlar")` no CfoView pra garantir paridade. Se diferir, ajustar para usar a mesma função `normalize` do hook.
 
-`resolvePerson` retorna `{ fee, benef, total, fallback? }` para a UI saber quando marcar.
+## Plano
 
-### 3. Banner discreto no header da view
+### 1. `src/hooks/useSquadCostFromDre.ts`
 
-Se o range incluir o mês corrente, abaixo do filtro de período:
+- Remover `startDate` do deps do `useMemo` principal. Manter apenas `prevStart`/`isSingleMonth` (strings estáveis).
+- Mover cálculo do `prevMonthLabel` para fora do memo (computar a partir de `prevStart` que já é `useMemo`'d e string).
+- Garantir que `caasCategories` seja estável: já vem de outro memo, mas confirmar que sua identidade só muda quando `pc.porBu` muda.
 
-> "Junho/2026 ainda em curso. Pessoas sem lançamento até hoje usam o valor de Maio/2026."
+### 2. `src/components/planning/jornada/CfoView.tsx`
 
-## Resultado esperado
+- Trocar `useEffect(..., [squadCost.matchedByPessoaNome])` por um efeito que só atualize quando o **conteúdo** mudar de fato. Opções:
+  - Comparar `JSON.stringify` da chave ordenada → barato e suficiente.
+  - Ou guardar versão derivada de `dataUpdatedAt` das queries do hook (expor um `version` numérico no retorno do hook, e usar isso como dep).
 
-- Trocar mês → linhas individuais (Gustavo, Humberto, etc.) mostram fees/benefícios reais do mês.
-- No mês corrente parcial, quem ainda não foi pago aparece com valor de maio + indicação "mês anterior".
-- Total da modal bate com a soma das linhas e com o card.
-- Contagem de "pessoas mapeadas" no mês corrente sobe (preenchida pelo fallback).
+  Preferência: expor `matchedVersion: number` no hook (incrementa só quando uma das queries de drill atualiza). Mais robusto que stringify.
+
+- Adicionar `console.debug` temporário para listar:
+  - `Object.keys(SQUAD_REAL_BY_PERSON)` após cada update
+  - `normalizePersonKey("Gustavo Ferreira Cochlar")` vs chave esperada
+  - Valor resolvido para Gustavo no render do modal
+
+  Se a chave estiver divergente, alinhar `normalizePersonKey` para reproduzir exatamente o `normalize` do hook (mesma remoção de stop-words/sufixos).
+
+### 3. Validação
+
+Depois do build:
+- Abrir Jornada → CFO → trocar para Maio/2026 → abrir modal do Gustavo → confirmar fee ≈ R$ 21.043,67 (valor real do mês).
+- Trocar para Junho/2026 → confirmar que Gustavo aparece com R$ 20.800 (real do mês corrente, se já tiver lançamento) ou com badge "(05/2026)" e R$ 21.043,67 (fallback).
+- Confirmar no console que o warning `Maximum update depth exceeded` sumiu.
 
 ## Arquivos
 
-- `src/hooks/useSquadCostFromDre.ts` — 2ª query do mês anterior + merge com flag `fallback`.
-- `src/components/planning/jornada/CfoView.tsx` — modal usa `resolvePerson`, banner de mês parcial, badge "mês anterior" quando `fallback=true`.
+- `src/hooks/useSquadCostFromDre.ts` — corrigir deps do memo, expor `matchedVersion`.
+- `src/components/planning/jornada/CfoView.tsx` — depender de `matchedVersion` no `useEffect`; debug temporário pra validar a chave do Gustavo.
