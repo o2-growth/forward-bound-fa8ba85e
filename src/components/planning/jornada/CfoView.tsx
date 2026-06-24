@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -740,10 +740,15 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
   }, [dateRange]);
   const squadCost = useSquadCostFromDre({ startDate: squadCostRange.from, endDate: squadCostRange.to });
   // Atualiza o cache de módulo para que os helpers `getSquadCusto/...` retornem
-  // valores reais em todos os memos/sub-componentes deste arquivo.
-  useMemo(() => {
+  // valores reais em todos os memos/sub-componentes deste arquivo. Usamos
+  // useEffect (não useMemo) pra garantir a ordem correta, e bump de versão
+  // pra forçar memos dependentes a recalcular quando os dados reais chegarem.
+  const [squadRealVersion, setSquadRealVersion] = useState(0);
+  useEffect(() => {
     SQUAD_REAL_BY_PERSON = { ...(squadCost.matchedByPessoaNome || {}) };
+    setSquadRealVersion(v => v + 1);
   }, [squadCost.matchedByPessoaNome]);
+  const matchedCount = Object.keys(squadCost.matchedByPessoaNome || {}).length;
 
   // Snapshot dos clientes considerando o período selecionado:
   // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
@@ -762,7 +767,10 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
         return t >= fromTs && t <= toTs;
       }
       // Cliente ainda ativo (não-churn): precisa ter assinado até o fim do período
-      if (!c.dataAssinatura) return false;
+      // Sem dataAssinatura: considerar ativo (fallback conservador — mesma regra
+      // de filteredClientesPeriodo em CustomerSuccessTab pra que Visão Geral CS
+      // e aba CFO mostrem exatamente os mesmos números por CFO).
+      if (!c.dataAssinatura) return true;
       return c.dataAssinatura.getTime() <= toTs;
     });
   }, [clientes, dateRange]);
@@ -974,7 +982,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
       if (typeof av === "string" && typeof bv === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
       return sortAsc ? ((av as number) ?? 0) - ((bv as number) ?? 0) : ((bv as number) ?? 0) - ((av as number) ?? 0);
     });
-  }, [cfos, sortCol, sortAsc, churnsPerCfo]);
+  }, [cfos, sortCol, sortAsc, churnsPerCfo, squadRealVersion]);
 
   // Sort state for dialog client table
   type ClientSortCol = 'cliente' | 'status' | 'produto' | 'fase' | 'feeMensal' | 'pontual' | 'health' | 'nps' | 'tratativa';
@@ -1065,7 +1073,10 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
       }`}>
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <div className="flex-1">
-          <strong>Custo do squad:</strong> vindo do DRE Oxy via CNPJ da Pessoas DB. Total CaaS no período: {formatBRL(squadCost.totalCaasDre)}.
+          <strong>Custo do squad:</strong> vindo do DRE Oxy via CNPJ da Pessoas DB.
+          {' '}Período: <strong>{squadCostRange.from.toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}</strong>
+          {' '}— {matchedCount} pessoa(s) mapeada(s) ao DRE (demais usam fallback fixo).
+          {' '}Total CaaS no período: {formatBRL(squadCost.totalCaasDre)}.
           {squadCost.totalUnmatched > 0 && (
             <> Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo — resolva em Admin → Squads CFOaaS.</>
           )}

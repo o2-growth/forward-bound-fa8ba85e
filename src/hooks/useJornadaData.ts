@@ -1042,13 +1042,31 @@ export function useJornadaData() {
       diasAtraso: number;
     }> = [];
     const seenOnboardingIds = new Set<string>();
+    // Dedup: mantém a linha mais recente por ID (rotinas é movement log)
+    const latestRotinaById = new Map<string, any>();
     for (const row of data.rotinas) {
-      if (row['Fase'] !== row['Fase Atual']) continue;
+      const id = String(row.ID || '');
+      if (!id) continue;
+      const existing = latestRotinaById.get(id);
+      const ts = (() => {
+        const d = parseRotinaDateOnly(row['Entrada']) || parseRotinaDateOnly(row['Data Prevista Entrega']);
+        return d ? d.getTime() : 0;
+      })();
+      if (!existing || ts > (existing.__ts || 0)) {
+        latestRotinaById.set(id, { ...row, __ts: ts });
+      }
+    }
+    const useStrictCentralFilter = activeOnboardingTitles.size > 0;
+    if (!useStrictCentralFilter) {
+      console.warn('[onboardingAtrasado] Central de Projetos sem clientes em "Onboarding" — usando fallback sem cruzamento.');
+    }
+    for (const row of latestRotinaById.values()) {
       const fase = row['Fase Atual'] || '';
       if (!ONBOARDING_PHASES.includes(fase)) continue;
       const tituloRaw = (row['Título'] || '').trim();
-      // Ignora cards fantasmas — cliente já saiu da fase Onboarding no Central de Projetos
-      if (!activeOnboardingTitles.has(normTitle(tituloRaw))) continue;
+      // Cruza com Central de Projetos APENAS se ela tiver dados — caso contrário
+      // (sincronização atrasada) não dropa todos os cards.
+      if (useStrictCentralFilter && !activeOnboardingTitles.has(normTitle(tituloRaw))) continue;
       const dataPrevista = parseRotinaDateOnly(row['Data Prevista Entrega']);
       const pipefyOverdue = row['Overdue'] === true || row['Overdue'] === 'true';
       const dateOverdue = dataPrevista ? dataPrevista.getTime() < startOfTodayTs : false;
