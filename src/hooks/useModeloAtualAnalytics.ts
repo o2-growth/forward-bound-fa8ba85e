@@ -152,6 +152,18 @@ const FORCED_QUENTE_TITLES = new Set<string>([
   'fromtherm',
   'viga',
   'espolio carpena',
+  // Quentes junho 2026
+  'viver',
+  'rede sander',
+  'instituto da boca',
+  'sb travel',
+  'ths diagnostico',
+  'gsc',
+  'art rio',
+  'grupo orthos',
+  'fauhome',
+  'rodotec',
+  'easy plan',
 ]);
 
 function normalizeTitleForQuente(s: string): string {

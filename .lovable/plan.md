@@ -1,56 +1,39 @@
 ## Objetivo
 
-Adicionar uma seção **Cenário de Caixa** logo abaixo da "Temperatura dos Leads" na aba Indicadores → Comercial, com dois cenários (Otimista / Realista) calculados a partir dos cards taggeados.
+Forçar como **Quente** 16 cards listados na planilha `Quentes junho.xlsx`, independente da tag atual no Pipefy, em cada um dos hooks de analytics relevantes.
 
-## Localização
+## Distribuição dos cards por BU
 
-- Arquivo novo: `src/components/planning/indicators/CenarioCaixaSection.tsx`
-- Montagem: em `src/components/planning/IndicatorsTab.tsx`, renderizar imediatamente após o `<TemperaturaSection />`, recebendo as mesmas 4 analytics + `selectedBUs` + `startDate`/`endDate`.
+**Modelo Atual** (`useModeloAtualAnalytics.ts`) — produtos CAAS / Turnaround / Diagnóstico / Oxy / Oxy + BPO:
+- Viver, Rede sander, Instituto da Boca, SB Travel, THS Diagnóstico, GSC, Art Rio, Grupo Orthos, FAUHOME, Rodotec, Easy Plan
 
-## Regras de cálculo
+**Expansão — Franquia** (`useExpansaoAnalytics.ts`, produto = 'Franquia'):
+- Eberson, Ranieri
 
-Reaproveita o mesmo agregado de buckets (Quente / Morno / Frio) já feito em `TemperaturaSection` — mesma dedup por `id`, mesmo filtro de período, mesma resolução por BU via `selectedBUs`.
+**Expansão — Oxy Hacker** (`useExpansaoAnalytics.ts`, produto = 'Oxy Hacker'):
+- Thiago, Márcia, Patrick
 
-Para cada card considerado, aplicar **% por BU** sobre os campos monetários (`mrr`, `setup`, `pontual`), tratando MRR como valor mensal (1×):
+## O que mudar
 
-| BU | MRR | Setup | Pontual |
-|---|---|---|---|
-| Modelo Atual | 0% | 75% | 50% |
-| Outbound | 0% | 75% | 50% |
-| Franquia (Expansão) | — | — | 70% |
-| Oxy Hacker (Expansão) | — | — | 70% |
+### 1. `src/hooks/useModeloAtualAnalytics.ts`
+Adicionar ao `FORCED_QUENTE_TITLES` (set já existente, normalizado: lowercase + sem acento + trim) os 11 títulos de Modelo Atual.
 
-(Expansão hoje só tem Pontual — MRR/Setup ignorados mesmo se vierem ≠ 0.)
+### 2. `src/hooks/useExpansaoAnalytics.ts`
+- Criar helper local `normalizeTitleForQuente` (mesma fórmula do Modelo Atual).
+- Criar dois sets:
+  - `FORCED_QUENTE_FRANQUIA = new Set(['eberson','ranieri'])`
+  - `FORCED_QUENTE_OXY_HACKER = new Set(['thiago','marcia','patrick'])`
+- No `parseCardRow` (linha ~214), substituir `temperatura: parseTemperatura(row)` por uma checagem que, com base no `produto` já calculado, escolhe o set correspondente e força `'Quente'` se o título normalizado bater. Fallback continua `parseTemperatura(row)`.
 
-**Cenários:**
-- **Realista** = soma dos cards `Quente` aplicando a tabela acima.
-- **Otimista** = soma dos cards `Quente + Morno` aplicando a tabela acima.
-
-Frios nunca entram.
-
-## UI
-
-Card com header `💰 Cenário de Caixa` e subtítulo explicando as premissas (mesmo escopo da seção de temperatura). Conteúdo: duas colunas (Realista | Otimista), cada uma mostrando:
-
-- Total geral (formatCurrency)
-- Quebra por BU ativa (Modelo Atual + Outbound somados, Franquia, Oxy Hacker) com mini-bar de proporção
-- Sublinhas com nº de cards considerados
-- Botão "Ver detalhes" que abre um `DetailSheet` com a lista dos cards do cenário, exibindo BU, Empresa, Temperatura, Setup considerado, Pontual considerado, MRR considerado, **Total Caixa** (soma dos 3 com %), e Entrada.
-
-Tooltip pequeno (ícone `Info`) explicando as % usadas.
-
-Se nenhum card Quente/Morno existir no escopo, não renderiza nada (igual à seção de temperatura).
+### 3. Outbound
+Não há cards de outbound na planilha — sem mudança em `useOutboundAnalytics.ts`.
 
 ## Detalhes técnicos
 
-- Não duplicar lógica de agregação: extrair a função `aggregateByTemperatura(sources, selectedBUs, startDate, endDate)` em um helper compartilhado (`src/components/planning/indicators/temperaturaAggregator.ts`) usado por `TemperaturaSection` e `CenarioCaixaSection`. Mantém a `bu` tag (string label) em cada item para identificar a regra de % no cálculo de caixa.
-- Helper `computeCashFromCard(item)` retorna `{ mrr, setup, pontual, total }` já com as % aplicadas, baseado em `item.bu`.
-- `DetailItem` já tem `bu`, `mrr`, `setup`, `pontual`; adicionar colunas calculadas no `DetailSheet` via prop `format` ou montar items específicos do cenário.
-- Nenhuma alteração em hooks de analytics, banco ou edge functions.
+- Match por **título normalizado exato** (lowercase + NFD + sem combining marks + trim), conforme padrão já existente.
+- Override é incondicional (sem filtro por mês) — segue o mesmo comportamento dos títulos já forçados (`baffs`, `fromtherm`, etc.). O filtro de período do dashboard naturalmente só exibe os cards cuja `dataEntrada` cai dentro da janela selecionada, então quem visualizar junho/2026 verá esses cards como Quentes e quem mudar para outro período não os verá (a menos que o card também tenha `dataEntrada` lá).
 
 ## Arquivos afetados
 
-- **Novo**: `src/components/planning/indicators/CenarioCaixaSection.tsx`
-- **Novo**: `src/components/planning/indicators/temperaturaAggregator.ts`
-- **Editado**: `src/components/planning/indicators/TemperaturaSection.tsx` (passa a consumir o helper)
-- **Editado**: `src/components/planning/IndicatorsTab.tsx` (renderiza a nova seção)
+- `src/hooks/useModeloAtualAnalytics.ts` — expandir `FORCED_QUENTE_TITLES`
+- `src/hooks/useExpansaoAnalytics.ts` — adicionar normalizer + 2 sets + lógica de override no `parseCardRow`
