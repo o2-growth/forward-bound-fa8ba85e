@@ -1,20 +1,18 @@
-## Plano
+Plano para corrigir o modal vazio dos acelerômetros no Dash Comercial:
 
-1. Ajustar os detalhes gerados pelos hooks de metas de Franquia e Oxy Hacker para preencher os campos esperados pelo modal:
-   - `company`, além de `name`
-   - `value` como total real do contrato
-   - `pontual` como o mesmo valor pontual real usado no gauge
-   - `responsible/closer/sdr` com fallback vazio, para não quebrar rankings/colunas
+1. Ajustar os itens gerados pelos hooks de metas
+   - Em `useExpansaoMetas` e `useOxyHackerMetas`, preencher `company`, `responsible`, `closer` e `sdr` com fallback seguro.
+   - Alinhar `value`, `pontual` e `total` para que vendas de Franquia/Oxy tenham o mesmo valor usado nos acelerômetros.
+   - Remover o log de debug temporário que foi adicionado em `IndicatorsTab`.
 
-2. Corrigir a lógica dos acelerômetros monetários em `IndicatorsTab.tsx`:
-   - para `Faturamento` e `Pontual`, usar a mesma soma exibida no card quando a BU selecionada for Franquia/Oxy
-   - evitar depender de `item.value` zerado quando o dado vem da base de metas
+2. Corrigir a origem dos dados no clique dos cards monetários
+   - Em `handleMonetaryCardClick`, montar a lista de vendas a partir dos mesmos detalhes usados pelos gauges quando Franquia ou Oxy Hacker estiverem selecionados sem filtros.
+   - Para `Fat Incremento` e `Pontual`, usar o valor realizado do acelerômetro como total de referência, evitando que o modal calcule zero por depender de campos antigos.
 
-3. Corrigir o clique no acelerômetro de `Vendas`:
-   - garantir que o modal receba os itens vindos de `getExpansaoDetailItems('venda', startDate, endDate)` / `getOxyHackerDetailItems(...)`
-   - manter filtros de closer/SDR/origem usando a base antiga apenas quando eles estiverem ativos
+3. Corrigir o clique do acelerômetro de `Vendas`
+   - Garantir que `getItemsForIndicator('venda')` devolva registros completos vindos de `getExpansaoDetailItems('venda', startDate, endDate)` para Franquia e de `getOxyHackerDetailItems(...)` para Oxy Hacker.
+   - Manter a base analytics apenas quando filtros de pessoa/origem estiverem ativos, porque ela contém os campos de filtro.
 
-4. Validar no preview o caso reportado:
-   - Dash Comercial → BU Franquia → período 01/01/2026 a 24/06/2026
-   - card mostra 14 vendas e R$ 1,4M
-   - clique em `Vendas`, `Fat Incremento` e `Pontual` deve abrir modal com registros e totais coerentes.
+4. Validar o caso reportado
+   - Dash Comercial com BU Franquia e período completo.
+   - Clicar em `Vendas`, `Fat Incremento` e `Pontual` deve abrir o modal com registros, empresas e valores coerentes com os acelerômetros.

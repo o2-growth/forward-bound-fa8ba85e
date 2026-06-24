@@ -1562,7 +1562,6 @@ export function IndicatorsTab() {
         } else {
           // No filters → use metas hook (same source as gauges)
           const franquiaItems = getExpansaoDetailItems(indicatorKey as ExpansaoIndicator, startDate, endDate);
-          console.log(`[IndicatorsTab] Franquia drill-down ${indicatorKey}: ${franquiaItems.length} items`, franquiaItems);
           items = [...items, ...franquiaItems];
         }
       }
