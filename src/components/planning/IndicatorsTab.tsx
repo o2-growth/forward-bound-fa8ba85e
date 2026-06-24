@@ -3185,7 +3185,11 @@ export function IndicatorsTab() {
         selectedBUs={selectedBUs}
         startDate={startDate}
         endDate={endDate}
-      />
+
+
+      {/* Funil de Monetização (pipe pipefy_moviment_contrato) */}
+      <MonetizacaoSection startDate={startDate} endDate={endDate} />
+
 
 
 
