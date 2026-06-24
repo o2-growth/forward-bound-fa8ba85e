@@ -43,6 +43,7 @@ export interface ModeloAtualCard {
   motivoPerda?: string;
   faseAtual?: string;
   produto?: string; // Sub-produto vendido (campo "Produtos" do Pipefy)
+  valoresExtras?: ProductValueFields; // Campos Valor_* brutos para inferência de produto
   temperatura?: 'Quente' | 'Morno' | 'Frio'; // Tag de prioridade do lead (Labels / Prioridade Lead)
 }
 
