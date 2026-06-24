@@ -3188,6 +3188,7 @@ export function IndicatorsTab() {
         franquiaAnalytics={franquiaAnalytics}
         oxyHackerAnalytics={oxyHackerAnalytics}
         outboundAnalytics={outboundAnalytics}
+        monetizacaoAnalytics={monetizacaoAnalytics}
         selectedBUs={selectedBUs}
         startDate={startDate}
         endDate={endDate}
@@ -3199,6 +3200,7 @@ export function IndicatorsTab() {
         franquiaAnalytics={franquiaAnalytics}
         oxyHackerAnalytics={oxyHackerAnalytics}
         outboundAnalytics={outboundAnalytics}
+        monetizacaoAnalytics={monetizacaoAnalytics}
         selectedBUs={selectedBUs}
         startDate={startDate}
         endDate={endDate}
