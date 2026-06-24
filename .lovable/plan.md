@@ -1,58 +1,51 @@
+## Comparação: planilha "PJs Ativos" × estado atual do sistema
 
-## Problema
+A planilha enviada tem 49 PJs ativos com 4 campos-chave: **Nome (Pipefy)**, **CNPJ (Contrato)**, **Razão Social (Contrato)** e **Gestor**. Hoje o sistema tem:
 
-A aba **Operação → CFO** mostra apenas 4 pessoas mapeadas ao DRE Oxy, e ~R$ 47k de lançamentos sem vínculo, porque o algoritmo de match em `useSquadCostFromDre` só tenta 3 estratégias:
+- `cfo_squad_assignment` — 21 pessoas vinculadas a um squad de CFO (incompleto)
+- `dre_supplier_alias` — vazio (nenhum alias manual cadastrado)
+- Hook `useSquadCostFromDre` casa lançamentos DRE por CPF → CNPJ-raiz → alias → nome-exato → fuzzy-tokens
 
-1. CPF (11 dígitos no `label`)
-2. Raiz de CNPJ (8 dígitos no `label`)
-3. Alias manual em `dre_supplier_alias`
+A planilha é a **fonte da verdade** que falta para resolver os ~R$ 47k "sem vínculo" e os squads com fallback.
 
-Quando o `label` do fornecedor no DRE Oxy é simplesmente o **nome da pessoa** (sem CPF/CNPJ embutido), nada bate — e a tabela `dre_supplier_alias` está atualmente vazia (0 linhas). As 21 pessoas em `cfo_squad_assignment` (8 squads de CFOaaS) ficam invisíveis.
+### O que a planilha resolve
 
-## Solução em duas frentes
+1. **Razão Social ↔ Pessoa** (o gap principal). Ex.: `"AURUM CONSULTORIA E SERVICOS LTDA"` no DRE = Gabriela Ramos Muniz. Hoje não casa por CPF/CNPJ-no-nome nem por tokens (nome da empresa ≠ nome da pessoa).
+2. **CNPJ correto do contrato** quando difere do Pipefy (Lucas Ilha, Daniel Trindade, Eric Silveira, Sergio Piva, Tiago Pisoni — 5 divergências marcadas).
+3. **Gestor → Squad CFO** para reorganizar `cfo_squad_assignment` (hoje provavelmente desatualizado vs. a coluna "Gestor (Pipefy match)" da planilha).
 
-### Frente A — Match automático por nome no hook (cobre 80%+ sem trabalho manual)
+### Plano de implementação
 
-Adicionar **estratégias 4 e 5** em `src/hooks/useSquadCostFromDre.ts`:
+**Etapa 1 — Importar como `dre_supplier_alias`** (resolve o grosso do unmatched)
+- Script seed que insere 1 linha por PJ ativo:
+  - `label_original` = Razão Social do contrato
+  - `label_normalizado` = normalize(Razão Social)
+  - `pessoa_nome` = Nome (Pipefy)
+  - `pessoa_id` = ID Pipefy quando disponível (linhas 1–12)
+- `upsert` por `label_normalizado` (não sobrescreve aliases já criados pelo admin).
+- Pular 4 pessoas físicas sem CNPJ (estagiárias/CEO) — não aparecem no DRE com razão social distinta.
 
-4. **Nome exato normalizado**: comparar `normalize(it.label)` com `normalize(pessoa.Nome)` e `normalize(pessoa.Título)`. Match imediato se igual.
-5. **Nome fuzzy por tokens** (apenas contra pessoas que estão em `cfo_squad_assignment`, para evitar falso-positivo com outros funcionários):
-   - Tokenizar nome em palavras ≥3 letras (ignorar "de", "da", "do", "dos", "das", "e").
-   - Se ≥2 tokens do label baterem com tokens da pessoa **E** for o único candidato com score ≥2, faz match.
-   - Empate → não bate (deixa para alias manual).
+**Etapa 2 — Sincronizar `cfo_squad_assignment` com a coluna Gestor**
+- Para cada PJ, garantir registro com `pessoa_nome` + `cfo_squad_nome = Gestor (Pipefy match)` + `role`:
+  - role = `cfo` se Cargo = "CFO as a Service"
+  - role = `analyst` para os demais
+- Resolver o ramo "Pedro Ghiorzzi (CEO)": Gestor = "Desconhecido" → deixar sem squad (não aparece em squad de CFO).
+- Não apagar registros existentes que não estão na planilha (preservar histórico); só atualizar o que muda.
 
-Para os matches por nome, marcar `confidence: 'name-exact' | 'name-fuzzy' | 'cpf' | 'cnpj' | 'alias'` no `SquadMemberCost.suppliers` para auditoria.
+**Etapa 3 — Diagnóstico de divergências CNPJ**
+- Criar um aviso na aba `Admin → Squads CFOaaS` listando os 5 casos onde `pipefy_db_pessoas.CNPJ ≠ CNPJ do contrato` (Lucas, Daniel T., Eric, Sergio, Tiago P.), com botão "marcar como ciente" — não altera a tabela Pipefy automaticamente.
 
-### Frente B — Admin UI: Auto-sugestão com bulk save
+**Etapa 4 — Validar no CFO View**
+- Após import, conferir: indicador "X pessoas mapeadas" deve subir de 4 para ~21, e "Fornecedor s/ vínculo" cair drasticamente. Squads de Tiago Pisoni (10 pessoas) e Eduardo Milani (4) devem mostrar custo real, não fallback.
 
-Em `src/components/planning/admin/CfoSquadAdminTab.tsx`, na seção "Fornecedores DRE sem vínculo":
+### Arquivos
 
-1. Botão **"Auto-sugerir vínculos"** que roda o matching fuzzy (mesmo algoritmo da Frente A) sobre a lista de `squad.unmatched` × `allPessoasFinanc`, e pré-preenche `aliasPicks` com a melhor sugestão por label.
-2. Cada sugestão pré-preenchida ganha um badge "🟡 Sugestão automática" para o admin revisar antes de salvar.
-3. Botão **"Salvar todas as sugestões"** que faz `insert` em batch em `dre_supplier_alias` para todas as sugestões com confiança ≥ 2 tokens.
-4. Após salvar, invalida queries — a aba CFO recarrega com os novos vínculos sem reload manual.
+- **Novo:** `supabase/migrations/<timestamp>_seed_dre_supplier_alias_from_pjs.sql` — INSERTs idempotentes a partir da planilha (49 linhas hardcoded extraídas do .xlsx).
+- **Novo:** `supabase/migrations/<timestamp>_sync_cfo_squad_assignment.sql` — UPSERTs de assignment usando Gestor da planilha.
+- **Edit:** `src/components/planning/admin/CfoSquadAdminTab.tsx` — bloco de "Divergências CNPJ Pipefy × Contrato" (read-only, informativo).
+- Sem mudanças no hook `useSquadCostFromDre` (a lógica de match já é suficiente; só faltava data).
 
-### Frente C — Diagnóstico (opcional, recomendado)
+### Pontos para confirmar antes de executar
 
-Adicionar console.warn no hook listando, no primeiro render com dados, quantos labels foram resolvidos por cada estratégia (cpf/cnpj/alias/name-exact/name-fuzzy) e quais ficaram sem vínculo — facilita debugar quando algum nome muda.
-
-## Arquivos a alterar
-
-```text
-src/hooks/useSquadCostFromDre.ts                       (Frente A — estratégias 4+5 + diagnóstico)
-src/components/planning/admin/CfoSquadAdminTab.tsx     (Frente B — auto-sugerir + bulk save)
-```
-
-Sem alterações em schema, edge functions ou migrations. A tabela `dre_supplier_alias` continua sendo a fonte de verdade para overrides manuais.
-
-## Validação após implementar
-
-1. Abrir Operação → CFO. O indicador deve subir de "4 pessoa(s) mapeada(s)" para perto de 21.
-2. "Total CaaS" deve continuar igual, mas "Fornecedor s/ vínculo" cair drasticamente.
-3. Cada CFO Squad deve mostrar custo real refletindo CFO + analistas, não fallback hardcoded.
-4. Em Admin → Squads CFOaaS, clicar "Auto-sugerir vínculos" deve preencher a maioria dos picks; admin revisa e salva em lote os corretos.
-
-## Observações
-
-- O fuzzy match é **restrito a pessoas em `cfo_squad_assignment`** para não puxar funcionários de outras áreas (RH, comercial) que aparecem no DRE com nome similar.
-- A Frente A já entrega o resultado imediato. A Frente B é a ferramenta para tratar os ~20% de casos onde o nome no DRE é uma razão social (ex.: "ABC SERVIÇOS LTDA — Pedro Silva") que o fuzzy não pega sozinho.
+1. Quero seguir com **todas as 3 etapas** (alias + squad + aviso de divergências) ou só a Etapa 1 (alias) primeiro pra você validar o impacto no CFO View?
+2. Na Etapa 2, se um registro atual em `cfo_squad_assignment` tiver squad **diferente** do Gestor da planilha — sobrescrever ou criar uma linha extra? Planilha é a fonte da verdade ou histórico vale?
