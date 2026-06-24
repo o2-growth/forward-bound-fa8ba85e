@@ -223,7 +223,13 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
     fbclid: row['fbclid'] || undefined,
     gclid: row['gclid'] || undefined,
     investimentoDisponivel: row['Investimento disponível'] || undefined,
-    temperatura: parseTemperatura(row),
+    temperatura: (() => {
+      const normTitle = normalizeTitleForQuente(titulo);
+      const prod = String(produto || '').toLowerCase();
+      if (prod.includes('franquia') && FORCED_QUENTE_FRANQUIA.has(normTitle)) return 'Quente';
+      if (prod.includes('oxy hacker') && FORCED_QUENTE_OXY_HACKER.has(normTitle)) return 'Quente';
+      return parseTemperatura(row);
+    })(),
   };
 }
 
