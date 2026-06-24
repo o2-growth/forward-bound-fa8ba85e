@@ -45,6 +45,7 @@ import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } f
 import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
 import { CenarioCaixaSection } from "./indicators/CenarioCaixaSection";
+import { MonetizacaoSection } from "./indicators/MonetizacaoSection";
 import { CommercialPaceDashboard } from "./indicators/CommercialPaceDashboard";
 
 import { CardInvestigator } from "./indicators/CardInvestigator";
