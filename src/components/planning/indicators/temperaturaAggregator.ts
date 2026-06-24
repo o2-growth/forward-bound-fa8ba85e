@@ -2,10 +2,22 @@ import type { DetailItem } from "./DetailSheet";
 import type { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
 import type { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import type { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
+import type { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
 import type { BUType } from "@/hooks/useFunnelRealized";
 
 export type Temperatura = "Quente" | "Morno" | "Frio";
-export type BuLabel = "Modelo Atual" | "Outbound" | "Franquia" | "Oxy Hacker";
+export type BuLabel =
+  | "Modelo Atual"
+  | "Outbound"
+  | "Franquia"
+  | "Oxy Hacker"
+  | "Monetização";
+
+const MONETIZACAO_QUENTE_TIPOS = new Set([
+  "Upsell",
+  "Cross-sell",
+  "Troca de produto",
+]);
 
 type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
 type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
