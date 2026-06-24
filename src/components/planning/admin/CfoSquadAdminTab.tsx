@@ -127,6 +127,78 @@ export function CfoSquadAdminTab() {
   const [newPessoa, setNewPessoa] = useState('');
   const [newRole, setNewRole] = useState<'cfo' | 'analyst'>('analyst');
   const [aliasPicks, setAliasPicks] = useState<Record<string, string>>({}); // labelOriginal → pessoa.nome
+  const [autoSuggested, setAutoSuggested] = useState<Set<string>>(new Set()); // labels com sugestão auto
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const STOP = new Set(['de','da','do','dos','das','e','jr','junior','neto','filho','sa','ltda','me','eireli']);
+  const tokensOf = (s: string) =>
+    new Set(normalizeLabel(s).split(' ').filter((t) => t.length >= 3 && !STOP.has(t)));
+
+  const handleAutoSuggest = () => {
+    const picks: Record<string, string> = { ...aliasPicks };
+    const flagged = new Set(autoSuggested);
+    let count = 0;
+    for (const u of squad.unmatched) {
+      if (picks[u.label]) continue;
+      const labelTokens = tokensOf(u.label);
+      if (labelTokens.size === 0) continue;
+      let best: { nome: string; score: number } | null = null;
+      let bestCount = 0;
+      for (const c of allPessoasFinanc) {
+        const score = [...tokensOf(c.nome)].filter((t) => labelTokens.has(t)).length;
+        if (!best || score > best.score) {
+          best = { nome: c.nome, score };
+          bestCount = 1;
+        } else if (score === best.score && score > 0) {
+          bestCount++;
+        }
+      }
+      if (best && best.score >= 2 && bestCount === 1) {
+        picks[u.label] = best.nome;
+        flagged.add(u.label);
+        count++;
+      }
+    }
+    setAliasPicks(picks);
+    setAutoSuggested(flagged);
+    toast({
+      title: 'Sugestões geradas',
+      description: `${count} fornecedor(es) com vínculo sugerido automaticamente. Revise e clique em "Salvar todas".`,
+    });
+  };
+
+  const handleBulkSaveSuggestions = async () => {
+    const rows = Array.from(autoSuggested)
+      .filter((label) => aliasPicks[label])
+      .map((label) => {
+        const pessoaNome = aliasPicks[label];
+        const cand = allPessoasFinanc.find((c) => c.nome === pessoaNome);
+        return {
+          label_normalizado: normalizeLabel(label),
+          label_original: label,
+          pessoa_nome: pessoaNome,
+          pessoa_id: cand?.id || null,
+        };
+      });
+    if (rows.length === 0) {
+      toast({ title: 'Nenhuma sugestão para salvar', variant: 'destructive' });
+      return;
+    }
+    setBulkSaving(true);
+    const { error } = await (supabase as any)
+      .from('dre_supplier_alias')
+      .upsert(rows, { onConflict: 'label_normalizado' });
+    setBulkSaving(false);
+    if (error) {
+      toast({ title: 'Erro no salvamento em lote', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Sugestões salvas', description: `${rows.length} vínculo(s) criados.` });
+    setAliasPicks({});
+    setAutoSuggested(new Set());
+    refresh();
+  };
+
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['cfo-squad-assignments'] });
