@@ -290,7 +290,9 @@ function CustomerSuccessTabInner() {
   const filteredOnboardingAtrasado = useMemo(() => {
     const list = onboardingAtrasado || [];
     if (filters.cfos.length === 0) return list;
-    return list.filter((r: any) => filters.cfos.includes(r.cfo));
+    // Cards sem CFO no Pipe Rotinas: não excluir do filtro (fallback) pra evitar
+    // que a lista fique vazia quando o filtro de CFO está ativo.
+    return list.filter((r: any) => !r.cfo || filters.cfos.includes(r.cfo));
   }, [onboardingAtrasado, filters.cfos]);
 
   // MRR Base agora vem da Oxy Finance (tabela mrr_base_monthly, sincronizada via sync-mrr-base).
