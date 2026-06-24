@@ -44,6 +44,29 @@ export interface UnmatchedSupplier {
   category: string;
   idDetectado: string | null;
   tipoIdDetectado: "cpf" | "cnpj" | null;
+  /** Sugestão automática (fuzzy/name) para o admin revisar */
+  sugestaoPessoaNome?: string | null;
+  sugestaoScore?: number;
+}
+
+export type MatchConfidence = "cpf" | "cnpj" | "alias" | "name-exact" | "name-fuzzy";
+
+const STOP_TOKENS = new Set([
+  "de", "da", "do", "dos", "das", "e", "jr", "junior", "neto", "filho", "sa", "ltda", "me", "eireli",
+]);
+
+function tokensFromName(s: string): Set<string> {
+  return new Set(
+    normalize(s)
+      .split(" ")
+      .filter((t) => t.length >= 3 && !STOP_TOKENS.has(t))
+  );
+}
+
+function scoreOverlap(a: Set<string>, b: Set<string>): number {
+  let n = 0;
+  for (const t of a) if (b.has(t)) n++;
+  return n;
 }
 
 interface UseParams {
