@@ -47,6 +47,7 @@ export function aggregateByTemperatura({
   franquiaAnalytics,
   oxyHackerAnalytics,
   outboundAnalytics,
+  monetizacaoAnalytics,
   selectedBUs,
   startDate,
   endDate,
