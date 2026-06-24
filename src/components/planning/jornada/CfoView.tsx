@@ -1479,35 +1479,53 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
               <div className="space-y-4">
                 {/* Squad overview */}
                 {squad && (() => {
-                  const totalFees = squad.fee + squad.membros.reduce((s, m) => s + (m.fee || 0), 0);
-                  const totalBeneficios = squad.beneficios + squad.membros.reduce((s, m) => s + (m.beneficios || 0), 0);
+                  const cfoResolved = resolvePerson(squad.nome, squad.fee, squad.beneficios);
+                  const membrosResolved = squad.membros.map((m) => ({
+                    ...m,
+                    resolved: resolvePerson(m.nome, m.fee, m.beneficios),
+                  }));
+                  const totalFees = cfoResolved.fee + membrosResolved.reduce((s, m) => s + m.resolved.fee, 0);
+                  const totalBeneficios = cfoResolved.benef + membrosResolved.reduce((s, m) => s + m.resolved.benef, 0);
+                  const totalGeral = totalFees + totalBeneficios;
+                  const prevLabel = squadCost.prevMonthLabel;
+                  const FallbackBadge = () => prevLabel ? (
+                    <span className="ml-1 text-[9px] uppercase tracking-wide text-amber-600 dark:text-amber-400" title={`Valor do mês anterior (${prevLabel}) — sem lançamento no mês selecionado`}>
+                      ({prevLabel})
+                    </span>
+                  ) : null;
                   return (
                     <Card className="border-dashed">
                       <CardContent className="pt-4 pb-3 space-y-2">
                         <div className="flex items-center gap-2 text-sm font-semibold">
                           <Users className="h-4 w-4" />
                           Composição do Squad
-                          <span className="text-xs font-normal text-muted-foreground ml-auto">Fees + Benefícios (deslocamento + alimentação + Raiô)</span>
+                          <span className="text-xs font-normal text-muted-foreground ml-auto">Fees + Benefícios (DRE Oxy do período)</span>
                         </div>
                         <div className="space-y-1.5 text-xs">
                           <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center border rounded-md px-3 py-2">
                             <div>
-                              <p className="font-medium">{squad.nome}</p>
+                              <p className="font-medium">
+                                {squad.nome}
+                                {cfoResolved.fallback && <FallbackBadge />}
+                              </p>
                               <p className="text-muted-foreground">CFO</p>
                             </div>
-                            <span className="text-right tabular-nums">Fee: <span className="font-medium">{formatBRL(squad.fee)}</span></span>
-                            <span className="text-right tabular-nums text-muted-foreground">Benef.: <span className="font-medium">{squad.beneficios > 0 ? formatBRL(squad.beneficios) : '—'}</span></span>
-                            <span className="text-right tabular-nums font-semibold w-24">{formatBRL(squad.fee + squad.beneficios)}</span>
+                            <span className="text-right tabular-nums">Fee: <span className="font-medium">{cfoResolved.fee > 0 ? formatBRL(cfoResolved.fee) : '—'}</span></span>
+                            <span className="text-right tabular-nums text-muted-foreground">Benef.: <span className="font-medium">{cfoResolved.benef > 0 ? formatBRL(cfoResolved.benef) : '—'}</span></span>
+                            <span className="text-right tabular-nums font-semibold w-24">{formatBRL(cfoResolved.total)}</span>
                           </div>
-                          {squad.membros.map((m) => (
+                          {membrosResolved.map((m) => (
                             <div key={m.nome} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center border rounded-md px-3 py-2">
                               <div>
-                                <p className="font-medium">{m.nome}</p>
+                                <p className="font-medium">
+                                  {m.nome}
+                                  {m.resolved.fallback && <FallbackBadge />}
+                                </p>
                                 <p className="text-muted-foreground">{m.cargo}</p>
                               </div>
-                              <span className="text-right tabular-nums">Fee: <span className="font-medium">{m.fee > 0 ? formatBRL(m.fee) : '—'}</span></span>
-                              <span className="text-right tabular-nums text-muted-foreground">Benef.: <span className="font-medium">{m.beneficios > 0 ? formatBRL(m.beneficios) : '—'}</span></span>
-                              <span className="text-right tabular-nums font-semibold w-24">{formatBRL((m.fee || 0) + (m.beneficios || 0))}</span>
+                              <span className="text-right tabular-nums">Fee: <span className="font-medium">{m.resolved.fee > 0 ? formatBRL(m.resolved.fee) : '—'}</span></span>
+                              <span className="text-right tabular-nums text-muted-foreground">Benef.: <span className="font-medium">{m.resolved.benef > 0 ? formatBRL(m.resolved.benef) : '—'}</span></span>
+                              <span className="text-right tabular-nums font-semibold w-24">{formatBRL(m.resolved.total)}</span>
                             </div>
                           ))}
                         </div>
@@ -1516,7 +1534,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                           <span>Totais</span>
                           <span className="text-right tabular-nums">{formatBRL(totalFees)}</span>
                           <span className="text-right tabular-nums">{formatBRL(totalBeneficios)}</span>
-                          <span className="text-right tabular-nums w-24">{formatBRL(custoSquad)}</span>
+                          <span className="text-right tabular-nums w-24">{formatBRL(totalGeral)}</span>
                         </div>
                       </CardContent>
                     </Card>
