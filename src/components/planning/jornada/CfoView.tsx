@@ -747,7 +747,14 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
   useEffect(() => {
     SQUAD_REAL_BY_PERSON = { ...(squadCost.matchedByPessoaNome || {}) };
     setSquadRealVersion(v => v + 1);
-  }, [squadCost.matchedByPessoaNome]);
+    // eslint-disable-next-line no-console
+    console.debug("[CfoView] SQUAD_REAL_BY_PERSON refreshed", {
+      keys: Object.keys(SQUAD_REAL_BY_PERSON),
+      gustavoKey: normalizePersonKey("Gustavo Ferreira Cochlar"),
+      gustavoValue: SQUAD_REAL_BY_PERSON[normalizePersonKey("Gustavo Ferreira Cochlar")],
+      matchedVersion: squadCost.matchedVersion,
+    });
+  }, [squadCost.matchedVersion]);
   const matchedCount = Object.keys(squadCost.matchedByPessoaNome || {}).length;
 
   // Snapshot dos clientes considerando o período selecionado:
