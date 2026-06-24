@@ -316,12 +316,29 @@ export const columnFormatters = {
     };
     
     const colorClass = colorMap[value] || 'bg-gray-100 text-gray-800';
-    
-    return (
+
+    const badge = (
       <Badge className={`font-normal ${colorClass}`}>
         {value}
       </Badge>
     );
+
+    if (value === 'A definir') {
+      return (
+        <TooltipProvider delayDuration={150}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">{badge}</span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs text-xs">
+              Campo "Produtos" não preenchido no card do Pipefy. Preencha no Pipefy para categorizar este card automaticamente nos indicadores.
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    return badge;
   },
   // Strategic drill-down formatters with visual alerts
   agingWithAlert: (days: number) => {
