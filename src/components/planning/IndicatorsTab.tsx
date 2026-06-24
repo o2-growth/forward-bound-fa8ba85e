@@ -1136,8 +1136,8 @@ export function IndicatorsTab() {
           });
           total += filteredCards.length;
         } else {
-          // No filters - use analytics hook with first-entry logic for consistency
-          total += oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          // No filters - use metas hook (full dataset) for consistency with monetary gauges
+          total += getOxyHackerQty(indicator.key as OxyHackerIndicator, startDate, endDate);
         }
       }
     }
@@ -1164,11 +1164,12 @@ export function IndicatorsTab() {
           });
           total += filteredCards.length;
         } else {
-          // No filters - use analytics hook with first-entry logic for consistency
-          total += franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          // No filters - use metas hook (full dataset) for consistency with monetary gauges
+          total += getExpansaoQty(indicator.key as ExpansaoIndicator, startDate, endDate);
         }
       }
     }
+
 
     return total;
   };
