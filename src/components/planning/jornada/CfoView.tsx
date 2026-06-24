@@ -16,6 +16,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, 
 import type { JornadaCfo, JornadaCliente } from "./types";
 import { ChurnKpiDrawer, type KpiDrawerData } from "@/components/planning/cs/ChurnKpiDrawer";
 import { useSquadCostFromDre } from "@/hooks/useSquadCostFromDre";
+import { UnmatchedSuppliersPanel } from "@/components/planning/admin/UnmatchedSuppliersPanel";
 import { startOfMonth, endOfMonth, subMonths } from "date-fns";
 
 /* ── Simulator types ── */
@@ -756,6 +757,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
     });
   }, [squadCost.matchedVersion]);
   const matchedCount = Object.keys(squadCost.matchedByPessoaNome || {}).length;
+  const [unmatchedOpen, setUnmatchedOpen] = useState(false);
 
   // Snapshot dos clientes considerando o período selecionado:
   // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
@@ -1088,11 +1090,34 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
             <> Pessoas sem lançamento no mês usam o valor de <strong>{squadCost.prevMonthLabel}</strong> (mês anterior).</>
           )}
           {squadCost.totalUnmatched > 0 && (
-            <> Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo — resolva em Admin → Squads CFOaaS.</>
+            <>
+              {' '}Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo —{' '}
+              <button
+                type="button"
+                onClick={() => setUnmatchedOpen(true)}
+                className="underline font-semibold hover:no-underline"
+              >
+                vincular {squadCost.unmatched.length} fornecedor(es) agora
+              </button>
+              .
+            </>
           )}
           {squadCost.isLoading && <> (carregando...)</>}
         </div>
       </div>
+
+      {/* Dialog: vincular fornecedores DRE sem match */}
+      <Dialog open={unmatchedOpen} onOpenChange={setUnmatchedOpen}>
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Vincular fornecedores DRE a pessoas</DialogTitle>
+          </DialogHeader>
+          <UnmatchedSuppliersPanel
+            unmatched={squadCost.unmatched}
+            variant="inline"
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Feature 4: Comparativo entre CFOs (P&L lado a lado) */}
       <div className="space-y-3">

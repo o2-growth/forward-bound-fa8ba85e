@@ -11,6 +11,7 @@ import { Loader2, AlertTriangle, Trash2, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useHrData } from '@/hooks/useHrData';
 import { useSquadCostFromDre, type SquadAssignmentRow, type SupplierAliasRow } from '@/hooks/useSquadCostFromDre';
+import { UnmatchedSuppliersPanel } from './UnmatchedSuppliersPanel';
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns';
 
 const ROLE_OPTIONS = [
@@ -521,117 +522,7 @@ export function CfoSquadAdminTab() {
 
       {/* Não vinculados no DRE */}
       {squad.unmatched.length > 0 && (
-        <Card className="border-red-500/40">
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
-                  <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem vínculo
-                </CardTitle>
-                <CardDescription>
-                  Lançamentos da Oxy que não casaram por CPF, CNPJ nem nome. Use "Auto-sugerir" para
-                  pré-preencher por similaridade de nome; revise e salve em lote.
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={handleAutoSuggest}>
-                  Auto-sugerir vínculos
-                </Button>
-                <Button
-                  size="sm"
-                  variant="default"
-                  disabled={autoSuggested.size === 0 || bulkSaving}
-                  onClick={handleBulkSaveSuggestions}
-                >
-                  {bulkSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                  Salvar todas ({autoSuggested.size})
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fornecedor (label do DRE)</TableHead>
-                  <TableHead>Identificador</TableHead>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="w-[280px]">Vincular a pessoa</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {squad.unmatched
-                  .sort((a, b) => b.valor - a.valor)
-                  .map((u, i) => (
-                    <TableRow key={`${u.label}-${i}`}>
-                      <TableCell className="text-sm">
-                        <div className="flex flex-col gap-0.5">
-                          <span>{u.label}</span>
-                          {autoSuggested.has(u.label) && (
-                            <Badge variant="outline" className="w-fit border-amber-500/40 text-amber-600 dark:text-amber-400 text-[10px]">
-                              Sugestão automática
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs tabular-nums">
-                        {u.idDetectado ? (
-                          <span className="inline-flex items-center gap-1.5">
-                            <Badge
-                              variant="outline"
-                              className={
-                                u.tipoIdDetectado === 'cpf'
-                                  ? 'border-blue-500/40 text-blue-600 dark:text-blue-400'
-                                  : 'border-purple-500/40 text-purple-600 dark:text-purple-400'
-                              }
-                            >
-                              {u.tipoIdDetectado?.toUpperCase()}
-                            </Badge>
-                            <span className="font-mono">{u.idDetectado}</span>
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground italic">sem ID na label</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{u.category}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatBRL(u.valor)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-1.5">
-                          <Select
-                            value={aliasPicks[u.label] || ''}
-                            onValueChange={(v) => setAliasPicks((p) => ({ ...p, [u.label]: v }))}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Selecionar pessoa..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {allPessoasFinanc.map((c) => (
-                                <SelectItem key={c.id} value={c.nome}>
-                                  {c.nome}{' '}
-                                  <span className="text-muted-foreground ml-1">· {c.cargo}</span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            size="sm"
-                            variant="default"
-                            disabled={!aliasPicks[u.label]}
-                            onClick={() => handleSaveAlias(u.label)}
-                            className="h-8"
-                          >
-                            Salvar
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        <UnmatchedSuppliersPanel unmatched={squad.unmatched} onSaved={refresh} />
       )}
 
       {/* Aliases manuais configurados */}
