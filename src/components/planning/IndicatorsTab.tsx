@@ -532,9 +532,9 @@ export function IndicatorsTab() {
     return new Date(maxDate);
   }, [funnelRawData]);
   const { getQtyForPeriod: getModeloAtualQty, getValueForPeriod: getModeloAtualValue, getMrrForPeriod, getSetupForPeriod, getPontualForPeriod, getGroupedData: getModeloAtualGroupedData, isLoading: isLoadingModeloAtual } = useModeloAtualMetas(startDate, endDate);
-  const { getQtyForPeriod: getExpansaoQty, getValueForPeriod: getExpansaoValue, getGroupedData: getExpansaoGroupedData, isLoading: isLoadingExpansao, refetch: refetchExpansao } = useExpansaoMetas(startDate, endDate);
+  const { getQtyForPeriod: getExpansaoQty, getValueForPeriod: getExpansaoValue, getGroupedData: getExpansaoGroupedData, getDetailItemsForIndicator: getExpansaoDetailItems, isLoading: isLoadingExpansao, refetch: refetchExpansao } = useExpansaoMetas(startDate, endDate);
   const { getQtyForPeriod: getO2TaxQty, getValueForPeriod: getO2TaxValue, getMrrForPeriod: getO2TaxMrr, getSetupForPeriod: getO2TaxSetup, getPontualForPeriod: getO2TaxPontual, getGroupedData: getO2TaxGroupedData, isLoading: isLoadingO2Tax } = useO2TaxMetas(startDate, endDate);
-  const { getQtyForPeriod: getOxyHackerQty, getValueForPeriod: getOxyHackerValue, getGroupedData: getOxyHackerGroupedData, isLoading: isLoadingOxyHacker } = useOxyHackerMetas(startDate, endDate);
+  const { getQtyForPeriod: getOxyHackerQty, getValueForPeriod: getOxyHackerValue, getGroupedData: getOxyHackerGroupedData, getDetailItemsForIndicator: getOxyHackerDetailItems, isLoading: isLoadingOxyHacker } = useOxyHackerMetas(startDate, endDate);
   
   // Analytics hooks for drill-down
   const modeloAtualAnalyticsRaw = useModeloAtualAnalytics(startDate, endDate);
