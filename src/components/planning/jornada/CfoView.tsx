@@ -740,10 +740,15 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
   }, [dateRange]);
   const squadCost = useSquadCostFromDre({ startDate: squadCostRange.from, endDate: squadCostRange.to });
   // Atualiza o cache de módulo para que os helpers `getSquadCusto/...` retornem
-  // valores reais em todos os memos/sub-componentes deste arquivo.
-  useMemo(() => {
+  // valores reais em todos os memos/sub-componentes deste arquivo. Usamos
+  // useEffect (não useMemo) pra garantir a ordem correta, e bump de versão
+  // pra forçar memos dependentes a recalcular quando os dados reais chegarem.
+  const [squadRealVersion, setSquadRealVersion] = useState(0);
+  useEffect(() => {
     SQUAD_REAL_BY_PERSON = { ...(squadCost.matchedByPessoaNome || {}) };
+    setSquadRealVersion(v => v + 1);
   }, [squadCost.matchedByPessoaNome]);
+  const matchedCount = Object.keys(squadCost.matchedByPessoaNome || {}).length;
 
   // Snapshot dos clientes considerando o período selecionado:
   // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
