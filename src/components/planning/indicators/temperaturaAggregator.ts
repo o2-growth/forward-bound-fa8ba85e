@@ -132,6 +132,29 @@ export function aggregateByTemperatura({
     }
   }
 
+  // Monetização: Upsell, Cross-sell, Troca de produto entram como Quente
+  if (monetizacaoAnalytics && monetizacaoAnalytics.cards.length > 0) {
+    const existingQuenteIds = new Set(
+      buckets.Quente.map((it) => String(it.id)),
+    );
+    let added = 0;
+    for (const card of monetizacaoAnalytics.cards) {
+      if (!MONETIZACAO_QUENTE_TIPOS.has(card.tipo)) continue;
+      const entradaTime = card.entrada
+        ? new Date(card.entrada).getTime()
+        : NaN;
+      if (!Number.isFinite(entradaTime)) continue;
+      if (entradaTime < startTime || entradaTime > endTime) continue;
+      const id = String(card.id);
+      if (existingQuenteIds.has(id)) continue;
+      existingQuenteIds.add(id);
+      const item = monetizacaoAnalytics.toDetailItem(card);
+      buckets.Quente.push({ ...item, bu: "Monetização" });
+      added++;
+    }
+    if (added > 0) activeLabels.push("Monetização");
+  }
+
   const tagged =
     buckets.Quente.length + buckets.Morno.length + buckets.Frio.length;
   return { buckets, totalTagged: tagged, totalSemTag: semTag, activeLabels };
@@ -143,6 +166,7 @@ export const CASH_RULES: Record<BuLabel, { mrr: number; setup: number; pontual: 
   Outbound: { mrr: 0, setup: 0.75, pontual: 0.5 },
   Franquia: { mrr: 0, setup: 0, pontual: 0.7 },
   "Oxy Hacker": { mrr: 0, setup: 0, pontual: 0.7 },
+  "Monetização": { mrr: 0, setup: 0, pontual: 0 },
 };
 
 export interface CashBreakdown {
