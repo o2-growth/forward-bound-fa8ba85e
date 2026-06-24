@@ -1,29 +1,38 @@
-# Classificar cards do Funil de Monetização como "Quente"
+# Produto "A definir" nos acelerômetros — manter comportamento atual
 
-## Objetivo
-Cards do pipe **Monetização** cujo tipo seja **Upsell**, **Cross-sell** (Novo produto) ou **Troca de produto** devem entrar automaticamente no bucket **🔥 Quente** do "Termômetro dos Leads", independente de terem ou não Label/Prioridade no Pipefy. Downsell continua de fora.
+## Diagnóstico
 
-## Arquivos
+Verifiquei no banco externo (`pipefy_moviment_cfos`) o preenchimento do campo "Produtos" e dos campos auxiliares de produto, filtrando por `Entrada >= 2026-01-01`:
 
-### 1. `src/components/planning/indicators/temperaturaAggregator.ts`
-- Adicionar `monetizacaoAnalytics: ReturnType<typeof useMonetizacaoAnalytics>` (opcional) em `AggregateInput`.
-- Após percorrer as fontes por BU, percorrer `monetizacaoAnalytics.cards` filtrando `tipo ∈ {"Upsell","Cross-sell","Troca de produto"}` e com `entrada` dentro de `[startDate, endDate]`.
-- Para cada um, gerar `DetailItem` via `monetizacaoAnalytics.toDetailItem(card)`, anotar `bu: "Monetização"` e empurrar em `buckets.Quente`.
-- Dedup por `id` dentro do bucket Quente (caso o mesmo card já tenha vindo de uma BU com tag Quente, manter um só).
-- Incluir `"Monetização"` em `activeLabels` quando houver pelo menos 1 card elegível.
+| Fase Atual | Total | Produtos | Plano CFOaaS | Plano Oxy | Valor Setup |
+|---|---:|---:|---:|---:|---:|
+| Reunião agendada / Qualificado | 92 | 0 | 0 | 0 | 0 |
+| Reunião 2 agendada | 20 | 0 | 0 | 0 | 0 |
+| Reunião Realizada | 154 | 0 | 0 | 0 | 1 |
+| Tentativas de contato | 73 | 0 | 0 | 0 | 0 |
+| Proposta enviada / Follow Up | 311 | 0 | 0 | 0 | 237 |
+| Contrato em elaboração | 57 | 0 | 0 | 0 | 42 |
+| Contrato assinado | 10 | 0 | 0 | 0 | 10 |
+| Ganho | 678 | 0 | 27 | 0 | 545 |
 
-### 2. `src/components/planning/IndicatorsTab.tsx`
-- Já existe `useMonetizacaoAnalytics(startDate, endDate)` em uso para `MonetizacaoSection`. Reaproveitar a mesma instância e passar como prop `monetizacaoAnalytics` para `<TemperaturaSection ... />` e `<CenarioCaixaSection ... />`.
+**Conclusão:** o campo "Produtos" está **100% vazio** em todas as fases (até mesmo em Ganho). O produto só é inferível indiretamente via "Valor Setup"/"Valor CFOaaS"/"Plano CFOaaS" — e mesmo esses campos só começam a ser preenchidos a partir de Proposta enviada.
 
-### 3. `src/components/planning/indicators/TemperaturaSection.tsx`
-- Atualizar o texto do header para deixar claro: "Inclui Upsell, Cross-sell e Troca de produto do funil de Monetização (considerados Quentes)".
-- Nenhuma mudança de UI além disso — o bucket já é clicável e o `DetailSheet` já mostra a coluna `bu`.
+Para cards em Reunião agendada, RR, Tentativas, RR2, o produto **realmente não está no Pipefy** — o lookup em `pipefy_db_clientes` (que tem ~293 clientes ativos) só acerta quando o título do card prospect coincide com algum cliente já fechado, o que é raro.
 
-### 4. `src/components/planning/indicators/CenarioCaixaSection.tsx`
-- Sem mudança de comportamento além de receber a mesma prop e repassar para `aggregateByTemperatura`, para que o cenário de caixa também considere esses cards no bucket Quente (mantém coerência entre as duas seções).
+## Decisão (confirmada com o usuário)
+
+Manter "A definir" como está — é o estado real do Pipefy. A correção é operacional, não de código: o time precisa preencher o campo Produtos / Plano CFOaaS / Plano Oxy Finance no card do Pipefy para o produto aparecer categorizado nos acelerômetros.
+
+## Mudanças
+
+Nenhuma mudança de lógica ou de banco. Apenas dois ajustes leves de UX para deixar claro que "A definir" reflete o Pipefy:
+
+1. **`src/components/planning/indicators/DetailSheet.tsx`** — na coluna/badge "Produto", quando o valor for "A definir" adicionar um tooltip: *"Campo 'Produtos' não preenchido no Pipefy. Preencha no card para categorizar."* Sem mudança de cor ou estrutura.
+
+2. **`src/lib/productClassifier.ts`** — adicionar comentário no topo explicitando que "A definir" significa literalmente "Pipefy vazio" e listando os campos consultados em ordem (Produtos → fallback via `pipefy_db_clientes`), para futuras dúvidas.
 
 ## Validação
-- Período corrente: abrir aba Indicadores → conferir que o chip 🔥 Quente cresce conforme cards de Upsell/Cross/Troca existentes no funil de Monetização.
-- Clicar no chip Quente → ver linhas com coluna BU = "Monetização" e fase = "Fase Atual" do pipe.
-- Downsell **não** deve aparecer.
-- Cards sem tag de BU continuam contando em `totalSemTag` normalmente; cards de Monetização **não** afetam `totalSemTag` (são sempre classificados).
+
+- Acelerômetro → clicar em RM/RR/Proposta de Modelo Atual: cards continuam aparecendo como "A definir" (correto), agora com tooltip explicativo.
+- Cards em Ganho que têm correspondência em `pipefy_db_clientes` continuam categorizados normalmente (CaaS, OXY, etc.).
+- Nenhuma quebra em totais monetários ou em outras BUs.
