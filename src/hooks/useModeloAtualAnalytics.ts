@@ -607,7 +607,12 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       const found = produtosMap.get(k);
       if (found) { produtoRaw = found; break; }
     }
-    const productCategory = classifyProduto(produtoRaw);
+    let productCategory = classifyProduto(produtoRaw);
+    // Fallback: se ainda "A definir", tenta inferir pelos campos Valor_* preenchidos
+    if (productCategory === 'A definir' && card.valoresExtras) {
+      const inferred = inferProductFromValues(card.valoresExtras);
+      if (inferred) productCategory = inferred;
+    }
 
     return {
       id: card.id,
