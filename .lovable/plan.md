@@ -1,51 +1,80 @@
-## Comparação: planilha "PJs Ativos" × estado atual do sistema
+## Diagnóstico
 
-A planilha enviada tem 49 PJs ativos com 4 campos-chave: **Nome (Pipefy)**, **CNPJ (Contrato)**, **Razão Social (Contrato)** e **Gestor**. Hoje o sistema tem:
+### Bug 1 — Modal "Composição do Squad" ignora o DRE
 
-- `cfo_squad_assignment` — 21 pessoas vinculadas a um squad de CFO (incompleto)
-- `dre_supplier_alias` — vazio (nenhum alias manual cadastrado)
-- Hook `useSquadCostFromDre` casa lançamentos DRE por CPF → CNPJ-raiz → alias → nome-exato → fuzzy-tokens
+No `CfoView.tsx` há duas fontes para os números do squad:
 
-A planilha é a **fonte da verdade** que falta para resolver os ~R$ 47k "sem vínculo" e os squads com fallback.
+- `getSquadCusto / getSquadFee / getSquadBeneficios` (linhas 263–268) → chamam `resolvePerson()` → leem do DRE real. **Funcionam.**
+- `getSquad()` (linha 236) → retorna o objeto `CFO_SQUADS[cfoNome]` **hardcoded**. Nunca passa pelo DRE.
 
-### O que a planilha resolve
+A linha 1468 do modal usa `getSquad(selectedCfo)` e renderiza `squad.fee` / `squad.beneficios` / `m.fee` / `m.beneficios` (linhas 1498–1510). Resultado:
 
-1. **Razão Social ↔ Pessoa** (o gap principal). Ex.: `"AURUM CONSULTORIA E SERVICOS LTDA"` no DRE = Gabriela Ramos Muniz. Hoje não casa por CPF/CNPJ-no-nome nem por tokens (nome da empresa ≠ nome da pessoa).
-2. **CNPJ correto do contrato** quando difere do Pipefy (Lucas Ilha, Daniel Trindade, Eric Silveira, Sergio Piva, Tiago Pisoni — 5 divergências marcadas).
-3. **Gestor → Squad CFO** para reorganizar `cfo_squad_assignment` (hoje provavelmente desatualizado vs. a coluna "Gestor (Pipefy match)" da planilha).
+- Gustavo CFO → mostra sempre **Fee R$ 20.000 + Benef R$ 740** (constantes), não muda com o filtro de mês.
+- A coluna **Total** (R$ 28.085,07) e o P&L **estão corretos** porque usam `getSquadCusto/getSquadBeneficios`, que leem do DRE.
 
-### Plano de implementação
+Por isso a soma não bate (20k+740+7k+987,60 = 28.727 ≠ 28.085).
 
-**Etapa 1 — Importar como `dre_supplier_alias`** (resolve o grosso do unmatched)
-- Script seed que insere 1 linha por PJ ativo:
-  - `label_original` = Razão Social do contrato
-  - `label_normalizado` = normalize(Razão Social)
-  - `pessoa_nome` = Nome (Pipefy)
-  - `pessoa_id` = ID Pipefy quando disponível (linhas 1–12)
-- `upsert` por `label_normalizado` (não sobrescreve aliases já criados pelo admin).
-- Pular 4 pessoas físicas sem CNPJ (estagiárias/CEO) — não aparecem no DRE com razão social distinta.
+### Bug 2 — "Mês atual só mapeia 4"
 
-**Etapa 2 — Sincronizar `cfo_squad_assignment` com a coluna Gestor**
-- Para cada PJ, garantir registro com `pessoa_nome` + `cfo_squad_nome = Gestor (Pipefy match)` + `role`:
-  - role = `cfo` se Cargo = "CFO as a Service"
-  - role = `analyst` para os demais
-- Resolver o ramo "Pedro Ghiorzzi (CEO)": Gestor = "Desconhecido" → deixar sem squad (não aparece em squad de CFO).
-- Não apagar registros existentes que não estão na planilha (preservar histórico); só atualizar o que muda.
+Hoje é 24/jun/2026. Para "mês atual", o DRE Oxy ainda tem só lançamentos parciais. Quem ainda não foi pago no mês some do mapeamento, e na UI aparece valor hardcoded ou pessoa fora do squad.
 
-**Etapa 3 — Diagnóstico de divergências CNPJ**
-- Criar um aviso na aba `Admin → Squads CFOaaS` listando os 5 casos onde `pipefy_db_pessoas.CNPJ ≠ CNPJ do contrato` (Lucas, Daniel T., Eric, Sergio, Tiago P.), com botão "marcar como ciente" — não altera a tabela Pipefy automaticamente.
+**Solução combinada (decisão do usuário):** quando uma pessoa do squad **não tem lançamento no mês selecionado**, puxar automaticamente o valor do **mês anterior**.
 
-**Etapa 4 — Validar no CFO View**
-- Após import, conferir: indicador "X pessoas mapeadas" deve subir de 4 para ~21, e "Fornecedor s/ vínculo" cair drasticamente. Squads de Tiago Pisoni (10 pessoas) e Eduardo Milani (4) devem mostrar custo real, não fallback.
+## Correções
 
-### Arquivos
+### 1. Fallback "mês anterior" no hook (`useSquadCostFromDre.ts`)
 
-- **Novo:** `supabase/migrations/<timestamp>_seed_dre_supplier_alias_from_pjs.sql` — INSERTs idempotentes a partir da planilha (49 linhas hardcoded extraídas do .xlsx).
-- **Novo:** `supabase/migrations/<timestamp>_sync_cfo_squad_assignment.sql` — UPSERTs de assignment usando Gestor da planilha.
-- **Edit:** `src/components/planning/admin/CfoSquadAdminTab.tsx` — bloco de "Divergências CNPJ Pipefy × Contrato" (read-only, informativo).
-- Sem mudanças no hook `useSquadCostFromDre` (a lógica de match já é suficiente; só faltava data).
+Disparar uma 2ª rodada de drill-down em paralelo para o **mês anterior** ao `startDate`. Construir um segundo mapa `matchedByPessoaNomePrev` com o mesmo algoritmo (CPF → CNPJ → alias → nome).
 
-### Pontos para confirmar antes de executar
+No retorno, expor um helper:
 
-1. Quero seguir com **todas as 3 etapas** (alias + squad + aviso de divergências) ou só a Etapa 1 (alias) primeiro pra você validar o impacto no CFO View?
-2. Na Etapa 2, se um registro atual em `cfo_squad_assignment` tiver squad **diferente** do Gestor da planilha — sobrescrever ou criar uma linha extra? Planilha é a fonte da verdade ou histórico vale?
+```ts
+const matchedByPessoaNomeWithFallback: Record<string, { fee, benef, total, fallback?: boolean }> = {};
+for (const key of new Set([...Object.keys(matchedByPessoaNome), ...Object.keys(matchedByPessoaNomePrev)])) {
+  const cur = matchedByPessoaNome[key];
+  if (cur && (cur.fee > 0 || cur.benef > 0)) {
+    matchedByPessoaNomeWithFallback[key] = cur;
+  } else {
+    const prev = matchedByPessoaNomePrev[key];
+    if (prev) matchedByPessoaNomeWithFallback[key] = { ...prev, fallback: true };
+  }
+}
+```
+
+Atribuir esse mapa em `SQUAD_REAL_BY_PERSON` para o `resolvePerson` enxergar.
+
+Range do "mês anterior": `start = subMonths(startOfMonth(startDate), 1)`, `end = subDays(startOfMonth(startDate), 1)`. Só executar se `startDate` for o mês corrente ou se o range cobrir só 1 mês (não disparar fallback em ranges longos tipo YTD para evitar dobrar custo).
+
+Cache: `staleTime: 10 min`, mesmas categorias CaaS.
+
+### 2. Modal usa valores reais por pessoa (`CfoView.tsx`, linhas 1481–1524)
+
+Trocar a renderização para `resolvePerson()` em cada linha (CFO + cada membro). O total da modal passa a bater com o card lá fora. Quando o valor veio do fallback, mostrar badge sutil "mês anterior" do lado do número (cor muted).
+
+```ts
+const cfoP = resolvePerson(squad.nome, squad.fee, squad.beneficios);
+const membrosResolvidos = squad.membros.map((m) => ({
+  ...m,
+  resolved: resolvePerson(m.nome, m.fee, m.beneficios),
+}));
+```
+
+`resolvePerson` retorna `{ fee, benef, total, fallback? }` para a UI saber quando marcar.
+
+### 3. Banner discreto no header da view
+
+Se o range incluir o mês corrente, abaixo do filtro de período:
+
+> "Junho/2026 ainda em curso. Pessoas sem lançamento até hoje usam o valor de Maio/2026."
+
+## Resultado esperado
+
+- Trocar mês → linhas individuais (Gustavo, Humberto, etc.) mostram fees/benefícios reais do mês.
+- No mês corrente parcial, quem ainda não foi pago aparece com valor de maio + indicação "mês anterior".
+- Total da modal bate com a soma das linhas e com o card.
+- Contagem de "pessoas mapeadas" no mês corrente sobe (preenchida pelo fallback).
+
+## Arquivos
+
+- `src/hooks/useSquadCostFromDre.ts` — 2ª query do mês anterior + merge com flag `fallback`.
+- `src/components/planning/jornada/CfoView.tsx` — modal usa `resolvePerson`, banner de mês parcial, badge "mês anterior" quando `fallback=true`.
