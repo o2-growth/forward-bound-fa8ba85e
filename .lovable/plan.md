@@ -1,37 +1,38 @@
-## Objetivo
-Incluir a fase **"Oxy Integrada"** na lista de "Onboarding atrasado" da aba Jornada/CS, ao lado de "Kick-off do Projeto" e "Primeiras Entregas - Diagnóstico", trazendo os 24 cards que hoje estão invisíveis.
+## Diagnóstico (confirmado via logs + banco)
 
-## Diagnóstico (já confirmado no banco)
-Pipe `pipefy_moviment_rotinas` (Gestão de Rotinas CFO), fases ativas:
-- Kick-off do Projeto: 5
-- Primeiras Entregas - Diagnóstico: 23
-- **Oxy Integrada: 24** ← não aparece hoje
-- Execução de Rotinas: 119 (fora do escopo)
-- Atrasado / Pendente: 5 (fora do escopo)
+No banco existem **10 cards de Franquia com fase `Contrato assinado` em 2026**, somando exatamente `R$ 1,353M` (Pontual gauge mostra "R$ 1.4M" arredondado ✓).
 
-Hoje a lista só considera as duas primeiras fases e ainda cruza com a Central de Projetos exigindo que o cliente esteja na fase "Onboarding". Clientes com Oxy Integrada já estão majoritariamente em "Em Operação Recorrente", então seriam dropados mesmo se a fase fosse incluída.
+Logs do console confirmam que `useExpansaoMetas.getValueForPeriod('venda') = 1.353.000` — esta é a fonte do gauge de Pontual.
+
+Já o gauge **"Vendas" (qty)** lê de uma fonte diferente: `franquiaAnalytics.getDetailItemsForIndicator('venda').length` (IndicatorsTab.tsx linha 1168), que usa `useExpansaoAnalytics`. Esse hook depende de `query_period` + `query_period_by_signature` + `query_card_history` no edge function — e está retornando 0 cards de venda no período, mesmo com os 10 registros existentes (não há nenhum log `[Franquia Analytics]` no console, indicando que o memo nem fechou com dados de venda).
+
+Resultado: **fontes inconsistentes** — monetário lê tudo, contagem lê do hook com bug.
 
 ## Mudanças
 
-### 1. `src/hooks/useJornadaData.ts` (bloco "Onboarding atrasado", linhas ~1018–1089)
-- Adicionar `'Oxy Integrada'` em `ONBOARDING_PHASES`.
-- Ajustar o cruzamento com Central de Projetos: aplicar o filtro estrito apenas às fases de onboarding propriamente ditas (Kick-off / Primeiras Entregas). Para "Oxy Integrada" não filtrar por fase do cliente na Central (o cliente já está em operação) — só exigir que o `Título` exista em Central de Projetos como cliente ativo (Onboarding OU Em Operação Recorrente) para evitar lixo.
-- Manter a regra de atraso atual: `Data Prevista Entrega` vencida (< hoje) ou flag `Overdue=true` do Pipefy. É exatamente o campo "Data Vencimento do card vencida" que o usuário pediu.
-- Atualizar o tipo retornado: cada item já tem `fase`, então nenhum schema novo é necessário.
+### `src/components/planning/IndicatorsTab.tsx`
 
-### 2. `src/components/planning/jornada/ReunioesView.tsx` (bloco "Onboarding atrasado", linhas ~356–432)
-- Adicionar `'Oxy Integrada'` no array `ONBOARDING_PHASES` da view (usado para renderizar os sub-blocos por fase).
-- Renomear o título visual de "Onboarding atrasado" para "Onboarding & Oxy Integrada atrasados" para refletir o novo escopo.
-- Atualizar o tooltip "De onde vem" para citar também a fase "Oxy Integrada".
+No bloco `if (includesFranquia)` (linhas ~1145–1171), no caminho "sem filtros de closer/SDR/origem" (linha 1168):
 
-### 3. Tipos (`src/components/planning/jornada/types.ts`)
-- Nenhuma mudança estrutural; o tipo `OnboardingAtrasadoCard` já carrega `fase` como string livre.
+- Trocar `franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length` por `getExpansaoQty(indicator.key as ExpansaoIndicator, startDate, endDate)`.
 
-## Validação após implementar
-- Conferir no console que a contagem total de "atrasados" passa a incluir os cards de Oxy Integrada com Data Prevista vencida.
-- Validar visualmente no preview que aparece um terceiro bloco "Oxy Integrada" com a tabela de cards.
-- Spot-check de 2–3 títulos contra Pipefy.
+`getExpansaoQty` já está importado/desestruturado na linha 535 e usa exatamente a mesma fonte (`useExpansaoMetas`) que alimenta o gauge monetário. Resultado: Vendas = 10, Pontual = R$1.35M coerentes.
 
-## Fora do escopo
-- Pipe `pipefy_moviment_setup` (jornada OXY interna com R1..R4) — não é o que o usuário quer, conforme confirmado.
-- Mexer em "Setup atrasados" (KPI separado, lógica de >90 dias).
+No caminho "com filtros de pessoa" (linha 1159), continuar usando `franquiaAnalytics.getDetailItemsForIndicator(...)` filtrado por closer/SDR — o filtro precisa da granularidade por card.
+
+Aplicar a mesma troca para o bloco análogo de **Oxy Hacker** (linhas ~1117–1143, sem filtro → trocar `oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key).length` pelo `getOxyHackerQty('venda'/'proposta'/etc, startDate, endDate)`), pois o mesmo padrão arquitetural está em uso lá e o bug é o mesmo (hoje passa despercebido porque Oxy Hacker tem volume menor).
+
+### Não mexer
+
+- A série do gráfico (`buildChartData` linhas 1250–1268) continua usando `franquiaAnalytics.getCardsForIndicator(...)` quando há filtros de pessoa, e `expansaoData.qty` (que vem de `useExpansaoMetas`) caso contrário — já está alinhado.
+- Não mexer em `useExpansaoAnalytics` ou no edge function — o bug raiz dele exige investigação maior e fica fora desse fix.
+
+## Validação
+
+Após o ajuste, ao filtrar **Franquia + todo período**:
+- "Vendas" deve mostrar **10** (meta 18 → ~56%).
+- "Pontual" continua R$ 1.4M (93%).
+- "Fat Incremento" continua R$ 1.4M.
+- Os números batem com a query SQL feita no banco.
+
+Conferir também console: o log `[useExpansaoMetas] getQtyForPeriod venda: 10 unique cards` deve aparecer.
