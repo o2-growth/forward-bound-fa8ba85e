@@ -2,13 +2,21 @@
  * Classifica o campo "Produtos" do Pipefy (vindo de pipefy_db_clientes) em
  * UMA categoria única para exibição nos indicadores comerciais.
  *
+ * Ordem de resolução do produto de um card (ver useModeloAtualAnalytics):
+ *   1. row["Produtos"] em pipefy_moviment_cfos (campo do próprio card)
+ *   2. fallback: lookup em pipefy_db_clientes por Título / Empresa / Razão Social
+ *   3. se ambos vazios → "A definir" (= Pipefy literalmente sem produto)
+ *
+ * IMPORTANTE: hoje o campo "Produtos" em pipefy_moviment_cfos está ~100%
+ * vazio em fases pré-proposta (Reunião agendada, RR, Tentativas, RR2).
+ * Cards nessas fases caem em "A definir" porque o time ainda não preencheu
+ * o campo no Pipefy — não é bug de leitura. Para categorizar, preencha
+ * "Produtos" no card do Pipefy.
+ *
  * Regras (decisão do usuário em 06/06/2026):
  * - Setup + CFOaaS  → CaaS (Setup combinado é entrada para o recorrente)
  * - Setup sozinho   → Setup (projeto one-shot)
  * - Sem match no DB → CaaS (fallback)
- *
- * Cada card recebe UMA categoria primária — sem rateio — para preservar
- * os valores monetários totais (MRR/Setup/Pontual) sem dupla contagem.
  */
 
 export type ProductCategory =
