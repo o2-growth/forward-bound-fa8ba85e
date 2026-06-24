@@ -81,3 +81,38 @@ export function normalizeClientKey(s: string | null | undefined): string {
   if (!s) return '';
   return norm(String(s));
 }
+
+/**
+ * Inferência de produto a partir dos campos numéricos Valor_* do card,
+ * usada quando o campo textual "Produtos" não foi preenchido no Pipefy.
+ * Retorna null se nenhum campo monetário relevante estiver preenchido —
+ * nesse caso o consumidor deve manter "A definir".
+ *
+ * Ordem (primeiro match vence):
+ *   OXY → Turnaround → Valuation → Diagnóstico → Educação →
+ *   CaaS (MRR>0 ou CFOaaS>0) → Setup (Setup>0 sozinho) → null.
+ */
+export interface ProductValueFields {
+  valorMRR?: number;
+  valorSetup?: number;
+  valorCFOaaS?: number;
+  valorOXY?: number;
+  valorTurnaround?: number;
+  valorValuation?: number;
+  valorDiagnostico?: number;
+  valorEducacao?: number;
+}
+
+export function inferProductFromValues(v: ProductValueFields): ProductCategory | null {
+  const pos = (n: number | undefined) => typeof n === 'number' && n > 0;
+
+  if (pos(v.valorOXY)) return 'OXY';
+  if (pos(v.valorTurnaround)) return 'Turnaround';
+  if (pos(v.valorValuation)) return 'Valuation';
+  if (pos(v.valorDiagnostico)) return 'Diagnóstico Estratégico';
+  if (pos(v.valorEducacao)) return 'Educação';
+  if (pos(v.valorMRR) || pos(v.valorCFOaaS)) return 'CaaS';
+  if (pos(v.valorSetup)) return 'Setup';
+
+  return null;
+}
