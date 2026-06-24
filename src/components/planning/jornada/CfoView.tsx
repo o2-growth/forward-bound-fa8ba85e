@@ -1090,11 +1090,34 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
             <> Pessoas sem lançamento no mês usam o valor de <strong>{squadCost.prevMonthLabel}</strong> (mês anterior).</>
           )}
           {squadCost.totalUnmatched > 0 && (
-            <> Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo — resolva em Admin → Squads CFOaaS.</>
+            <>
+              {' '}Atenção: {formatBRL(squadCost.totalUnmatched)} em lançamentos sem vínculo —{' '}
+              <button
+                type="button"
+                onClick={() => setUnmatchedOpen(true)}
+                className="underline font-semibold hover:no-underline"
+              >
+                vincular {squadCost.unmatched.length} fornecedor(es) agora
+              </button>
+              .
+            </>
           )}
           {squadCost.isLoading && <> (carregando...)</>}
         </div>
       </div>
+
+      {/* Dialog: vincular fornecedores DRE sem match */}
+      <Dialog open={unmatchedOpen} onOpenChange={setUnmatchedOpen}>
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Vincular fornecedores DRE a pessoas</DialogTitle>
+          </DialogHeader>
+          <UnmatchedSuppliersPanel
+            unmatched={squadCost.unmatched}
+            variant="inline"
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Feature 4: Comparativo entre CFOs (P&L lado a lado) */}
       <div className="space-y-3">
