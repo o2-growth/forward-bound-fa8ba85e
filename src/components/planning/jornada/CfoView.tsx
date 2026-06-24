@@ -981,7 +981,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
       if (typeof av === "string" && typeof bv === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
       return sortAsc ? ((av as number) ?? 0) - ((bv as number) ?? 0) : ((bv as number) ?? 0) - ((av as number) ?? 0);
     });
-  }, [cfos, sortCol, sortAsc, churnsPerCfo]);
+  }, [cfos, sortCol, sortAsc, churnsPerCfo, squadRealVersion]);
 
   // Sort state for dialog client table
   type ClientSortCol = 'cliente' | 'status' | 'produto' | 'fase' | 'feeMensal' | 'pontual' | 'health' | 'nps' | 'tratativa';
