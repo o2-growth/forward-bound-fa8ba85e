@@ -6,7 +6,7 @@ import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isTestCard } from "@/hooks/useModeloAtualMetas";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { useClientesProdutos } from "./useClientesProdutos";
-import { classifyProduto, normalizeClientKey } from "@/lib/productClassifier";
+import { classifyProduto, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
 
 export interface ModeloAtualCard {
   id: string;
@@ -43,6 +43,7 @@ export interface ModeloAtualCard {
   motivoPerda?: string;
   faseAtual?: string;
   produto?: string; // Sub-produto vendido (campo "Produtos" do Pipefy)
+  valoresExtras?: ProductValueFields; // Campos Valor_* brutos para inferência de produto
   temperatura?: 'Quente' | 'Morno' | 'Frio'; // Tag de prioridade do lead (Labels / Prioridade Lead)
 }
 
@@ -253,6 +254,18 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
     motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
     faseAtual: row['Fase Atual'] || row['fase_atual'] || undefined,
     produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
+    valoresExtras: {
+      valorMRR,
+      valorSetup,
+      valorEducacao,
+      valorCFOaaS: parseNumericValue(row['Valor CFOaaS'] || 0),
+      valorOXY: parseNumericValue(row['Valor OXY'] || row['Valor Oxy'] || 0),
+      valorTurnaround: parseNumericValue(row['Valor Turnaround'] || 0),
+      valorValuation: parseNumericValue(row['Valor Valuation'] || 0),
+      valorDiagnostico: parseNumericValue(
+        row['Valor Diagnóstico Estratégico'] || row['Valor Diagnostico'] || 0
+      ),
+    },
     temperatura: FORCED_QUENTE_TITLES.has(normalizeTitleForQuente(tituloRaw))
       ? 'Quente'
       : parseTemperatura(row),
@@ -594,7 +607,12 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       const found = produtosMap.get(k);
       if (found) { produtoRaw = found; break; }
     }
-    const productCategory = classifyProduto(produtoRaw);
+    let productCategory = classifyProduto(produtoRaw);
+    // Fallback: se ainda "A definir", tenta inferir pelos campos Valor_* preenchidos
+    if (productCategory === 'A definir' && card.valoresExtras) {
+      const inferred = inferProductFromValues(card.valoresExtras);
+      if (inferred) productCategory = inferred;
+    }
 
     return {
       id: card.id,

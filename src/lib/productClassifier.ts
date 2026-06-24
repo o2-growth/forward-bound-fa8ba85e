@@ -5,13 +5,14 @@
  * Ordem de resolução do produto de um card (ver useModeloAtualAnalytics):
  *   1. row["Produtos"] em pipefy_moviment_cfos (campo do próprio card)
  *   2. fallback: lookup em pipefy_db_clientes por Título / Empresa / Razão Social
- *   3. se ambos vazios → "A definir" (= Pipefy literalmente sem produto)
+ *   3. fallback: inferência pelos campos Valor_* preenchidos no card
+ *      (ver inferProductFromValues abaixo)
+ *   4. se nada bater → "A definir" (= Pipefy literalmente sem produto)
  *
- * IMPORTANTE: hoje o campo "Produtos" em pipefy_moviment_cfos está ~100%
- * vazio em fases pré-proposta (Reunião agendada, RR, Tentativas, RR2).
- * Cards nessas fases caem em "A definir" porque o time ainda não preencheu
- * o campo no Pipefy — não é bug de leitura. Para categorizar, preencha
- * "Produtos" no card do Pipefy.
+ * IMPORTANTE: o campo textual "Produtos" em pipefy_moviment_cfos está ~100%
+ * vazio em todas as fases. A partir de Proposta enviada, porém, o time
+ * preenche Valor MRR / Valor Setup / Valor OXY etc., permitindo inferir
+ * a categoria sem inventar dados.
  *
  * Regras (decisão do usuário em 06/06/2026):
  * - Setup + CFOaaS  → CaaS (Setup combinado é entrada para o recorrente)
@@ -79,4 +80,39 @@ export function classifyProduto(produtosRaw: string | null | undefined): Product
 export function normalizeClientKey(s: string | null | undefined): string {
   if (!s) return '';
   return norm(String(s));
+}
+
+/**
+ * Inferência de produto a partir dos campos numéricos Valor_* do card,
+ * usada quando o campo textual "Produtos" não foi preenchido no Pipefy.
+ * Retorna null se nenhum campo monetário relevante estiver preenchido —
+ * nesse caso o consumidor deve manter "A definir".
+ *
+ * Ordem (primeiro match vence):
+ *   OXY → Turnaround → Valuation → Diagnóstico → Educação →
+ *   CaaS (MRR>0 ou CFOaaS>0) → Setup (Setup>0 sozinho) → null.
+ */
+export interface ProductValueFields {
+  valorMRR?: number;
+  valorSetup?: number;
+  valorCFOaaS?: number;
+  valorOXY?: number;
+  valorTurnaround?: number;
+  valorValuation?: number;
+  valorDiagnostico?: number;
+  valorEducacao?: number;
+}
+
+export function inferProductFromValues(v: ProductValueFields): ProductCategory | null {
+  const pos = (n: number | undefined) => typeof n === 'number' && n > 0;
+
+  if (pos(v.valorOXY)) return 'OXY';
+  if (pos(v.valorTurnaround)) return 'Turnaround';
+  if (pos(v.valorValuation)) return 'Valuation';
+  if (pos(v.valorDiagnostico)) return 'Diagnóstico Estratégico';
+  if (pos(v.valorEducacao)) return 'Educação';
+  if (pos(v.valorMRR) || pos(v.valorCFOaaS)) return 'CaaS';
+  if (pos(v.valorSetup)) return 'Setup';
+
+  return null;
 }
