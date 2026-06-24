@@ -6,7 +6,7 @@ import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isTestCard } from "@/hooks/useModeloAtualMetas";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { useClientesProdutos } from "./useClientesProdutos";
-import { classifyProduto, normalizeClientKey } from "@/lib/productClassifier";
+import { classifyProduto, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
 
 export interface ModeloAtualCard {
   id: string;
