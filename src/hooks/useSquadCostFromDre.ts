@@ -485,19 +485,25 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       };
     }
 
+    const prevMonthLabel = isSingleMonth ? `${prevStart.slice(5, 7)}/${prevStart.slice(0, 4)}` : null;
+
+    // versão numérica baseada nos dataUpdatedAt das queries — referencialmente estável
+    const matchedVersion =
+      drillQueries.reduce((s, q) => s + (q.dataUpdatedAt || 0), 0) +
+      drillQueriesPrev.reduce((s, q) => s + (q.dataUpdatedAt || 0), 0);
+
     return {
       porSquad,
       unmatched,
       peopleWithoutSquad,
       matchedByPessoaNome,
+      matchedVersion,
       totalSquads,
       totalUnmatched,
       totalSemSquad,
       totalCaasDre: totalSquads + totalUnmatched + totalSemSquad,
       isSingleMonth,
-      prevMonthLabel: isSingleMonth
-        ? format(subMonths(startDate, 1), "MM/yyyy")
-        : null,
+      prevMonthLabel,
     };
   }, [
     assignmentsQ.data,
@@ -507,7 +513,7 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
     drillQueriesPrev.map((q) => q.dataUpdatedAt).join(","),
     caasCategories,
     isSingleMonth,
-    startDate,
+    prevStart,
   ]);
 
   const getSquad = (cfoNome: string): SquadCost | null => {
