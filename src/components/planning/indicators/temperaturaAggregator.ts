@@ -22,12 +22,14 @@ const MONETIZACAO_QUENTE_TIPOS = new Set([
 type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
 type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
 type OutboundAnalyticsT = ReturnType<typeof useOutboundAnalytics>;
+type MonetizacaoAnalyticsT = ReturnType<typeof useMonetizacaoAnalytics>;
 
 export interface AggregateInput {
   modeloAtualAnalytics: ModeloAnalytics;
   franquiaAnalytics: ExpansaoAnalyticsT;
   oxyHackerAnalytics: ExpansaoAnalyticsT;
   outboundAnalytics: OutboundAnalyticsT;
+  monetizacaoAnalytics?: MonetizacaoAnalyticsT;
   selectedBUs: BUType[];
   startDate: Date;
   endDate: Date;
