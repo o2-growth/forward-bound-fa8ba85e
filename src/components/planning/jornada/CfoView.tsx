@@ -809,8 +809,6 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
       } as JornadaCfo;
     });
   }, [propCfos, clientesPeriodo, dateRange]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  void squadRealVersion;
   const [selectedCfo, setSelectedCfo] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<SortCol>("mrrTotal");
   const [sortAsc, setSortAsc] = useState(false);
