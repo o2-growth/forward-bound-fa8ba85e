@@ -375,6 +375,12 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       }
     });
 
+    if (typeof console !== "undefined" && (diag.cpf + diag.cnpj + diag.alias + diag["name-exact"] + diag["name-fuzzy"] + diag.unmatched) > 0) {
+      // eslint-disable-next-line no-console
+      console.debug("[useSquadCostFromDre] match diag", diag);
+    }
+
+
     // Agrupa por squad
     const squadMap = new Map<string, SquadCost>();
     const peopleWithoutSquad: SquadMemberCost[] = [];
