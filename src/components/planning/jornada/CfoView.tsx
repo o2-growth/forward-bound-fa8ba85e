@@ -767,7 +767,10 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
         return t >= fromTs && t <= toTs;
       }
       // Cliente ainda ativo (não-churn): precisa ter assinado até o fim do período
-      if (!c.dataAssinatura) return false;
+      // Sem dataAssinatura: considerar ativo (fallback conservador — mesma regra
+      // de filteredClientesPeriodo em CustomerSuccessTab pra que Visão Geral CS
+      // e aba CFO mostrem exatamente os mesmos números por CFO).
+      if (!c.dataAssinatura) return true;
       return c.dataAssinatura.getTime() <= toTs;
     });
   }, [clientes, dateRange]);
