@@ -1020,15 +1020,21 @@ export function useJornadaData() {
     // FIX: cruza com Central de Projetos — só conta se o cliente AINDA está em "Onboarding" lá.
     // Sem isso, cards de rotina ficam órfãos (cliente avançou pra "Em Operação", "Em Tratativa", etc.)
     // e seguem gerando alerta falso enquanto o pipe Rotinas não for atualizado no Pipefy.
-    const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico'];
+    const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico', 'Oxy Integrada'];
+    // Fases que exigem cruzamento estrito com Central de Projetos (cliente ainda em "Onboarding")
+    const STRICT_ONBOARDING_PHASES = new Set(['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico']);
     const normTitle = (s: string) =>
       (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const activeOnboardingTitles = new Set<string>();
+    // Para Oxy Integrada o cliente já está em "Em Operação Recorrente" — aceitar ambas as fases.
+    const activeAnyTitles = new Set<string>();
     for (const row of data.projetos) {
       if (row['Fase'] !== row['Fase Atual']) continue;
-      if ((row['Fase Atual'] || '').trim() !== 'Onboarding') continue;
+      const fa = (row['Fase Atual'] || '').trim();
       const t = normTitle(row['Título'] || '');
-      if (t) activeOnboardingTitles.add(t);
+      if (!t) continue;
+      if (fa === 'Onboarding') activeOnboardingTitles.add(t);
+      if (fa === 'Onboarding' || fa === 'Em Operação Recorrente') activeAnyTitles.add(t);
     }
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
