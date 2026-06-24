@@ -272,6 +272,7 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
         let pessoa: PessoaRow | null = null;
         let idDetectado: string | null = null;
         let tipoIdDetectado: "cpf" | "cnpj" | null = null;
+        let conf: MatchConfidence | null = null;
         // 1. CPF (11 digits) — covers estagiários/CLT
         if (labelDigits.length >= 11) {
           const cpf = labelDigits.slice(0, 11);
@@ -280,6 +281,7 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
             pessoa = hit;
             idDetectado = cpf;
             tipoIdDetectado = "cpf";
+            conf = "cpf";
           }
         }
         // 2. CNPJ root (8 digits)
@@ -290,6 +292,7 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
             pessoa = hit;
             idDetectado = root;
             tipoIdDetectado = "cnpj";
+            conf = "cnpj";
           } else if (!idDetectado) {
             idDetectado = root;
             tipoIdDetectado = "cnpj";
@@ -298,12 +301,61 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
         // 3. Alias manual por label normalizado
         if (!pessoa && labelNorm) {
           const hit = aliasByLabel.get(labelNorm);
-          if (hit) pessoa = hit;
+          if (hit) {
+            pessoa = hit;
+            conf = "alias";
+          }
+        }
+        // 4. Nome exato normalizado (somente pessoas em squads)
+        if (!pessoa && labelNorm) {
+          for (const entry of pessoasInSquad) {
+            if (entry.nomeNorm === labelNorm) {
+              pessoa = entry.pessoa;
+              conf = "name-exact";
+              break;
+            }
+          }
+        }
+        // 5. Nome fuzzy por tokens (>=2 tokens em comum, vencedor único)
+        let bestSuggestion: { pessoa: PessoaRow; score: number } | null = null;
+        if (!pessoa && labelNorm) {
+          const labelTokens = tokensFromName(it.label);
+          if (labelTokens.size > 0) {
+            let bestScore = 0;
+            let bestCount = 0;
+            let best: PessoaRow | null = null;
+            for (const entry of pessoasInSquad) {
+              const s = scoreOverlap(labelTokens, entry.tokens);
+              if (s > bestScore) {
+                bestScore = s;
+                best = entry.pessoa;
+                bestCount = 1;
+              } else if (s === bestScore && s > 0) {
+                bestCount++;
+              }
+            }
+            if (best && bestScore >= 2 && bestCount === 1) {
+              pessoa = best;
+              conf = "name-fuzzy";
+            } else if (best && bestScore >= 1) {
+              bestSuggestion = { pessoa: best, score: bestScore };
+            }
+          }
         }
         if (!pessoa) {
-          unmatched.push({ label: it.label, valor: it.total, category: cat, idDetectado, tipoIdDetectado });
+          diag.unmatched++;
+          unmatched.push({
+            label: it.label,
+            valor: it.total,
+            category: cat,
+            idDetectado,
+            tipoIdDetectado,
+            sugestaoPessoaNome: bestSuggestion?.pessoa.Nome || bestSuggestion?.pessoa["Título"] || null,
+            sugestaoScore: bestSuggestion?.score || 0,
+          });
           continue;
         }
+        if (conf) diag[conf]++;
         const key = normalize(pessoa.Nome || pessoa["Título"]);
         let acc = byPessoa.get(key);
         if (!acc) {
