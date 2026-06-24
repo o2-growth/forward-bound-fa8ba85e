@@ -46,6 +46,7 @@ import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
 import { CenarioCaixaSection } from "./indicators/CenarioCaixaSection";
 import { MonetizacaoSection } from "./indicators/MonetizacaoSection";
+import { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
 import { CommercialPaceDashboard } from "./indicators/CommercialPaceDashboard";
 
 import { CardInvestigator } from "./indicators/CardInvestigator";
