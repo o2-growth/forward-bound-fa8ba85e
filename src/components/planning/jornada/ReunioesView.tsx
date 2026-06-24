@@ -353,9 +353,9 @@ export function ReunioesView({ reunioes, allCfos, clientes, onboardingAtrasado =
         </div>
       </div>
 
-      {/* Onboarding atrasado (Kick-off / Primeiras Entregas - Diagnóstico) */}
+      {/* Onboarding atrasado (Kick-off / Primeiras Entregas - Diagnóstico / Oxy Integrada) */}
       {(() => {
-        const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico'];
+        const ONBOARDING_PHASES = ['Kick-off do Projeto', 'Primeiras Entregas - Diagnóstico', 'Oxy Integrada'];
         const totalOnb = onboardingAtrasado.length;
         const formatDate = (d: Date | null) => {
           if (!d) return '—';
@@ -368,7 +368,7 @@ export function ReunioesView({ reunioes, allCfos, clientes, onboardingAtrasado =
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-orange-500" />
-                Onboarding atrasado
+                Onboarding & Oxy Integrada atrasados
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
@@ -377,12 +377,13 @@ export function ReunioesView({ reunioes, allCfos, clientes, onboardingAtrasado =
                     <p className="font-semibold mb-1">De onde vem:</p>
                     <p>Pipefy → pipe <strong>Gestão de Rotinas CFO</strong> → tabela <code>pipefy_moviment_rotinas</code>.</p>
                     <p className="mt-2 font-semibold">Como conta:</p>
-                    <p>Cards cuja <code>Fase Atual</code> é <strong>Kick-off do Projeto</strong> ou <strong>Primeiras Entregas - Diagnóstico</strong> e cuja <code>Data Prevista</code> já está vencida (ou com o flag <code>Overdue</code> do Pipefy marcado como <code>true</code>).</p>
+                    <p>Cards cuja <code>Fase Atual</code> é <strong>Kick-off do Projeto</strong>, <strong>Primeiras Entregas - Diagnóstico</strong> ou <strong>Oxy Integrada</strong> e cuja <code>Data Prevista</code> já está vencida (ou com o flag <code>Overdue</code> do Pipefy marcado como <code>true</code>).</p>
                   </TooltipContent>
                 </Tooltip>
               </h4>
               <Badge variant={totalOnb > 0 ? 'destructive' : 'secondary'}>{totalOnb} atrasados</Badge>
             </div>
+
 
             {ONBOARDING_PHASES.map(fase => {
               const cardsDaFase = onboardingAtrasado.filter(c => c.fase === fase);
