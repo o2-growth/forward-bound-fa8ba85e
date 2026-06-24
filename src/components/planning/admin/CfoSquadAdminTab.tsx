@@ -523,14 +523,33 @@ export function CfoSquadAdminTab() {
       {squad.unmatched.length > 0 && (
         <Card className="border-red-500/40">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem vínculo
-            </CardTitle>
-            <CardDescription>
-              Lançamentos da Oxy que não casaram por CPF nem CNPJ. Vincule manualmente cada fornecedor
-              a uma pessoa do Pessoas DB (1 vez por fornecedor — persiste para sempre).
-            </CardDescription>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem vínculo
+                </CardTitle>
+                <CardDescription>
+                  Lançamentos da Oxy que não casaram por CPF, CNPJ nem nome. Use "Auto-sugerir" para
+                  pré-preencher por similaridade de nome; revise e salve em lote.
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={handleAutoSuggest}>
+                  Auto-sugerir vínculos
+                </Button>
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={autoSuggested.size === 0 || bulkSaving}
+                  onClick={handleBulkSaveSuggestions}
+                >
+                  {bulkSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Salvar todas ({autoSuggested.size})
+                </Button>
+              </div>
+            </div>
           </CardHeader>
+
           <CardContent>
             <Table>
               <TableHeader>
