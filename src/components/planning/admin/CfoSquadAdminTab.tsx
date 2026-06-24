@@ -127,6 +127,78 @@ export function CfoSquadAdminTab() {
   const [newPessoa, setNewPessoa] = useState('');
   const [newRole, setNewRole] = useState<'cfo' | 'analyst'>('analyst');
   const [aliasPicks, setAliasPicks] = useState<Record<string, string>>({}); // labelOriginal → pessoa.nome
+  const [autoSuggested, setAutoSuggested] = useState<Set<string>>(new Set()); // labels com sugestão auto
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const STOP = new Set(['de','da','do','dos','das','e','jr','junior','neto','filho','sa','ltda','me','eireli']);
+  const tokensOf = (s: string) =>
+    new Set(normalizeLabel(s).split(' ').filter((t) => t.length >= 3 && !STOP.has(t)));
+
+  const handleAutoSuggest = () => {
+    const picks: Record<string, string> = { ...aliasPicks };
+    const flagged = new Set(autoSuggested);
+    let count = 0;
+    for (const u of squad.unmatched) {
+      if (picks[u.label]) continue;
+      const labelTokens = tokensOf(u.label);
+      if (labelTokens.size === 0) continue;
+      let best: { nome: string; score: number } | null = null;
+      let bestCount = 0;
+      for (const c of allPessoasFinanc) {
+        const score = [...tokensOf(c.nome)].filter((t) => labelTokens.has(t)).length;
+        if (!best || score > best.score) {
+          best = { nome: c.nome, score };
+          bestCount = 1;
+        } else if (score === best.score && score > 0) {
+          bestCount++;
+        }
+      }
+      if (best && best.score >= 2 && bestCount === 1) {
+        picks[u.label] = best.nome;
+        flagged.add(u.label);
+        count++;
+      }
+    }
+    setAliasPicks(picks);
+    setAutoSuggested(flagged);
+    toast({
+      title: 'Sugestões geradas',
+      description: `${count} fornecedor(es) com vínculo sugerido automaticamente. Revise e clique em "Salvar todas".`,
+    });
+  };
+
+  const handleBulkSaveSuggestions = async () => {
+    const rows = Array.from(autoSuggested)
+      .filter((label) => aliasPicks[label])
+      .map((label) => {
+        const pessoaNome = aliasPicks[label];
+        const cand = allPessoasFinanc.find((c) => c.nome === pessoaNome);
+        return {
+          label_normalizado: normalizeLabel(label),
+          label_original: label,
+          pessoa_nome: pessoaNome,
+          pessoa_id: cand?.id || null,
+        };
+      });
+    if (rows.length === 0) {
+      toast({ title: 'Nenhuma sugestão para salvar', variant: 'destructive' });
+      return;
+    }
+    setBulkSaving(true);
+    const { error } = await (supabase as any)
+      .from('dre_supplier_alias')
+      .upsert(rows, { onConflict: 'label_normalizado' });
+    setBulkSaving(false);
+    if (error) {
+      toast({ title: 'Erro no salvamento em lote', description: error.message, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Sugestões salvas', description: `${rows.length} vínculo(s) criados.` });
+    setAliasPicks({});
+    setAutoSuggested(new Set());
+    refresh();
+  };
+
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['cfo-squad-assignments'] });
@@ -451,14 +523,33 @@ export function CfoSquadAdminTab() {
       {squad.unmatched.length > 0 && (
         <Card className="border-red-500/40">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
-              <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem vínculo
-            </CardTitle>
-            <CardDescription>
-              Lançamentos da Oxy que não casaram por CPF nem CNPJ. Vincule manualmente cada fornecedor
-              a uma pessoa do Pessoas DB (1 vez por fornecedor — persiste para sempre).
-            </CardDescription>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <AlertTriangle className="h-4 w-4" /> Fornecedores DRE sem vínculo
+                </CardTitle>
+                <CardDescription>
+                  Lançamentos da Oxy que não casaram por CPF, CNPJ nem nome. Use "Auto-sugerir" para
+                  pré-preencher por similaridade de nome; revise e salve em lote.
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={handleAutoSuggest}>
+                  Auto-sugerir vínculos
+                </Button>
+                <Button
+                  size="sm"
+                  variant="default"
+                  disabled={autoSuggested.size === 0 || bulkSaving}
+                  onClick={handleBulkSaveSuggestions}
+                >
+                  {bulkSaving ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Salvar todas ({autoSuggested.size})
+                </Button>
+              </div>
+            </div>
           </CardHeader>
+
           <CardContent>
             <Table>
               <TableHeader>
@@ -475,7 +566,16 @@ export function CfoSquadAdminTab() {
                   .sort((a, b) => b.valor - a.valor)
                   .map((u, i) => (
                     <TableRow key={`${u.label}-${i}`}>
-                      <TableCell className="text-sm">{u.label}</TableCell>
+                      <TableCell className="text-sm">
+                        <div className="flex flex-col gap-0.5">
+                          <span>{u.label}</span>
+                          {autoSuggested.has(u.label) && (
+                            <Badge variant="outline" className="w-fit border-amber-500/40 text-amber-600 dark:text-amber-400 text-[10px]">
+                              Sugestão automática
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs tabular-nums">
                         {u.idDetectado ? (
                           <span className="inline-flex items-center gap-1.5">
