@@ -1549,13 +1549,20 @@ export function IndicatorsTab() {
       const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
-        const buItems = franquiaAnalytics.getDetailItemsForIndicator(indicatorKey);
-        const filteredItems = buItems.filter(item => {
-          const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
-          const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr && matchesOrigemFilter(item);
-        });
-        items = [...items, ...filteredItems];
+        const hasPeopleOrOrigemFilter = effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0;
+        if (hasPeopleOrOrigemFilter) {
+          // Filters active → fall back to analytics hook (carries closer/sdr/origem fields)
+          const buItems = franquiaAnalytics.getDetailItemsForIndicator(indicatorKey);
+          const filteredItems = buItems.filter(item => {
+            const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
+            const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
+            return matchCloser && matchSdr && matchesOrigemFilter(item);
+          });
+          items = [...items, ...filteredItems];
+        } else {
+          // No filters → use metas hook (same source as gauges)
+          items = [...items, ...getExpansaoDetailItems(indicatorKey as ExpansaoIndicator, startDate, endDate)];
+        }
       }
     }
 
@@ -1572,15 +1579,21 @@ export function IndicatorsTab() {
       const includeBySdr = sdrsForBU.length > 0 || effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length === 0;
       
       if (includeByCloser && includeBySdr) {
-        const buItems = oxyHackerAnalytics.getDetailItemsForIndicator(indicatorKey);
-        const filteredItems = buItems.filter(item => {
-          const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
-          const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
-          return matchCloser && matchSdr && matchesOrigemFilter(item);
-        });
-        items = [...items, ...filteredItems];
+        const hasPeopleOrOrigemFilter = effectiveSelectedClosers.length > 0 || effectiveSelectedSDRs.length > 0 || selectedOrigens.length > 0;
+        if (hasPeopleOrOrigemFilter) {
+          const buItems = oxyHackerAnalytics.getDetailItemsForIndicator(indicatorKey);
+          const filteredItems = buItems.filter(item => {
+            const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(item.closer || item.responsible);
+            const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(item.sdr || item.responsible);
+            return matchCloser && matchSdr && matchesOrigemFilter(item);
+          });
+          items = [...items, ...filteredItems];
+        } else {
+          items = [...items, ...getOxyHackerDetailItems(indicatorKey as OxyHackerIndicator, startDate, endDate)];
+        }
       }
     }
+
 
     return items;
   };
