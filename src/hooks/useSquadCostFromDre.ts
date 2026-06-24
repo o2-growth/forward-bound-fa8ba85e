@@ -1,6 +1,6 @@
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, differenceInCalendarMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { usePersonnelCostByBu } from "./usePersonnelCostByBu";
 import { useHrData, type PessoaRow } from "./useHrData";
@@ -9,6 +9,11 @@ import { useHrData, type PessoaRow } from "./useHrData";
  * Custo real por squad de CFO — vincula lançamentos do DRE Oxy (drill-down por categoria CaaS)
  * a colaboradores via CNPJ (raiz de 8 dígitos) ou nome normalizado.
  * Agrupa por squad usando a tabela `cfo_squad_assignment`.
+ *
+ * Fallback "mês anterior": quando o range cobre um único mês (ex. filtro mensal),
+ * dispara uma 2ª rodada de drill-down do mês imediatamente anterior. Pessoas que
+ * NÃO têm lançamento no mês atual herdam o valor do mês anterior (com flag
+ * `fallback: true`). Não duplica custo em ranges multi-mês (YTD etc.).
  */
 
 export interface SquadAssignmentRow {
@@ -27,6 +32,7 @@ export interface SquadMemberCost {
   fee: number;
   benef: number;
   total: number;
+  fallback?: boolean;
   suppliers: { label: string; valor: number; category: string }[];
 }
 
@@ -150,6 +156,15 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
   const start = format(startDate, "yyyy-MM-01");
   const end = format(endDate, "yyyy-MM-dd");
 
+  // Só usamos fallback "mês anterior" se o range cobrir um único mês (filtro mensal).
+  // Em ranges multi-mês (YTD, trimestre) isso duplicaria custo.
+  const isSingleMonth = useMemo(() => {
+    return differenceInCalendarMonths(endDate, startDate) === 0;
+  }, [startDate, endDate]);
+
+  const prevStart = useMemo(() => format(startOfMonth(subMonths(startDate, 1)), "yyyy-MM-dd"), [startDate]);
+  const prevEnd = useMemo(() => format(endOfMonth(subMonths(startDate, 1)), "yyyy-MM-dd"), [startDate]);
+
   const pc = usePersonnelCostByBu({ startDate, endDate });
   const hr = useHrData({ startDate, endDate });
 
@@ -160,13 +175,24 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
     return caas.categorias.map((c) => c.label);
   }, [pc.porBu]);
 
-  // Drill-down em paralelo de cada categoria CaaS
+  // Drill-down em paralelo de cada categoria CaaS (período atual)
   const drillQueries = useQueries({
     queries: caasCategories.map((cat) => ({
       queryKey: ["squad-cost-drill", cat, start, end],
       queryFn: () => fetchDrillDown(cat, start, end),
       staleTime: 10 * 60 * 1000,
       retry: 1,
+    })),
+  });
+
+  // Drill-down do mês anterior (apenas se for filtro mensal — evita duplicação em YTD)
+  const drillQueriesPrev = useQueries({
+    queries: caasCategories.map((cat) => ({
+      queryKey: ["squad-cost-drill", cat, prevStart, prevEnd],
+      queryFn: () => fetchDrillDown(cat, prevStart, prevEnd),
+      staleTime: 10 * 60 * 1000,
+      retry: 1,
+      enabled: isSingleMonth && caasCategories.length > 0,
     })),
   });
 
@@ -187,7 +213,8 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
     hr.isLoading ||
     assignmentsQ.isLoading ||
     aliasesQ.isLoading ||
-    drillQueries.some((q) => q.isLoading);
+    drillQueries.some((q) => q.isLoading) ||
+    (isSingleMonth && drillQueriesPrev.some((q) => q.isLoading));
 
   const error =
     pc.error ||
@@ -232,23 +259,7 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       assignByPessoaNome.set(normalize(a.pessoa_nome), a);
     }
 
-    // Acumulador por pessoa
-    const byPessoa = new Map<
-      string,
-      {
-        pessoaNome: string;
-        pessoaId: string | null;
-        cnpj: string | null;
-        fee: number;
-        benef: number;
-        suppliers: { label: string; valor: number; category: string }[];
-      }
-    >();
-
-    const unmatched: UnmatchedSupplier[] = [];
-
     // Pré-computa tokens de nomes — restrito a pessoas que estão em cfo_squad_assignment
-    // (evita falso-positivo com colaboradores de outras áreas que aparecem no DRE).
     const assignedNomeKeys = new Set(assignments.map((a) => normalize(a.pessoa_nome)));
     const pessoasInSquad: Array<{ pessoa: PessoaRow; tokens: Set<string>; nomeNorm: string }> = [];
     for (const p of pessoas) {
@@ -258,133 +269,172 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       pessoasInSquad.push({ pessoa: p, tokens: tokensFromName(p.Nome || p["Título"] || ""), nomeNorm });
     }
 
-    const diag = { cpf: 0, cnpj: 0, alias: 0, "name-exact": 0, "name-fuzzy": 0, unmatched: 0 };
+    type PessoaAcc = {
+      pessoaNome: string;
+      pessoaId: string | null;
+      cnpj: string | null;
+      fee: number;
+      benef: number;
+      suppliers: { label: string; valor: number; category: string }[];
+    };
 
-    drillQueries.forEach((q, idx) => {
-      const cat = caasCategories[idx];
-      if (!cat) return;
-      const items = (q.data || []) as DrillItem[];
-      const isBenef = BENEF_RE.test(cat);
-      for (const it of items) {
-        if (!it.total) continue;
-        const labelDigits = onlyDigits(it.label);
-        const labelNorm = normalize(it.label);
-        let pessoa: PessoaRow | null = null;
-        let idDetectado: string | null = null;
-        let tipoIdDetectado: "cpf" | "cnpj" | null = null;
-        let conf: MatchConfidence | null = null;
-        // 1. CPF (11 digits) — covers estagiários/CLT
-        if (labelDigits.length >= 11) {
-          const cpf = labelDigits.slice(0, 11);
-          const hit = byCpf.get(cpf);
-          if (hit) {
-            pessoa = hit;
-            idDetectado = cpf;
-            tipoIdDetectado = "cpf";
-            conf = "cpf";
-          }
-        }
-        // 2. CNPJ root (8 digits)
-        if (!pessoa && labelDigits.length >= 8) {
-          const root = labelDigits.slice(0, 8);
-          const hit = byCnpj.get(root);
-          if (hit) {
-            pessoa = hit;
-            idDetectado = root;
-            tipoIdDetectado = "cnpj";
-            conf = "cnpj";
-          } else if (!idDetectado) {
-            idDetectado = root;
-            tipoIdDetectado = "cnpj";
-          }
-        }
-        // 3. Alias manual por label normalizado
-        if (!pessoa && labelNorm) {
-          const hit = aliasByLabel.get(labelNorm);
-          if (hit) {
-            pessoa = hit;
-            conf = "alias";
-          }
-        }
-        // 4. Nome exato normalizado (somente pessoas em squads)
-        if (!pessoa && labelNorm) {
-          for (const entry of pessoasInSquad) {
-            if (entry.nomeNorm === labelNorm) {
-              pessoa = entry.pessoa;
-              conf = "name-exact";
-              break;
+    // Função reutilizável que processa um conjunto de drill results e retorna o mapa por pessoa
+    function processDrills(
+      drillData: Array<{ cat: string; items: DrillItem[] }>,
+      unmatchedSink: UnmatchedSupplier[] | null,
+    ): Map<string, PessoaAcc> {
+      const byPessoa = new Map<string, PessoaAcc>();
+      const diag = { cpf: 0, cnpj: 0, alias: 0, "name-exact": 0, "name-fuzzy": 0, unmatched: 0 };
+
+      for (const { cat, items } of drillData) {
+        const isBenef = BENEF_RE.test(cat);
+        for (const it of items) {
+          if (!it.total) continue;
+          const labelDigits = onlyDigits(it.label);
+          const labelNorm = normalize(it.label);
+          let pessoa: PessoaRow | null = null;
+          let idDetectado: string | null = null;
+          let tipoIdDetectado: "cpf" | "cnpj" | null = null;
+          let conf: MatchConfidence | null = null;
+          if (labelDigits.length >= 11) {
+            const cpf = labelDigits.slice(0, 11);
+            const hit = byCpf.get(cpf);
+            if (hit) {
+              pessoa = hit;
+              idDetectado = cpf;
+              tipoIdDetectado = "cpf";
+              conf = "cpf";
             }
           }
-        }
-        // 5. Nome fuzzy por tokens (>=2 tokens em comum, vencedor único)
-        let bestSuggestion: { pessoa: PessoaRow; score: number } | null = null;
-        if (!pessoa && labelNorm) {
-          const labelTokens = tokensFromName(it.label);
-          if (labelTokens.size > 0) {
-            let bestScore = 0;
-            let bestCount = 0;
-            let best: PessoaRow | null = null;
+          if (!pessoa && labelDigits.length >= 8) {
+            const root = labelDigits.slice(0, 8);
+            const hit = byCnpj.get(root);
+            if (hit) {
+              pessoa = hit;
+              idDetectado = root;
+              tipoIdDetectado = "cnpj";
+              conf = "cnpj";
+            } else if (!idDetectado) {
+              idDetectado = root;
+              tipoIdDetectado = "cnpj";
+            }
+          }
+          if (!pessoa && labelNorm) {
+            const hit = aliasByLabel.get(labelNorm);
+            if (hit) {
+              pessoa = hit;
+              conf = "alias";
+            }
+          }
+          if (!pessoa && labelNorm) {
             for (const entry of pessoasInSquad) {
-              const s = scoreOverlap(labelTokens, entry.tokens);
-              if (s > bestScore) {
-                bestScore = s;
-                best = entry.pessoa;
-                bestCount = 1;
-              } else if (s === bestScore && s > 0) {
-                bestCount++;
+              if (entry.nomeNorm === labelNorm) {
+                pessoa = entry.pessoa;
+                conf = "name-exact";
+                break;
               }
             }
-            if (best && bestScore >= 2 && bestCount === 1) {
-              pessoa = best;
-              conf = "name-fuzzy";
-            } else if (best && bestScore >= 1) {
-              bestSuggestion = { pessoa: best, score: bestScore };
+          }
+          let bestSuggestion: { pessoa: PessoaRow; score: number } | null = null;
+          if (!pessoa && labelNorm) {
+            const labelTokens = tokensFromName(it.label);
+            if (labelTokens.size > 0) {
+              let bestScore = 0;
+              let bestCount = 0;
+              let best: PessoaRow | null = null;
+              for (const entry of pessoasInSquad) {
+                const s = scoreOverlap(labelTokens, entry.tokens);
+                if (s > bestScore) {
+                  bestScore = s;
+                  best = entry.pessoa;
+                  bestCount = 1;
+                } else if (s === bestScore && s > 0) {
+                  bestCount++;
+                }
+              }
+              if (best && bestScore >= 2 && bestCount === 1) {
+                pessoa = best;
+                conf = "name-fuzzy";
+              } else if (best && bestScore >= 1) {
+                bestSuggestion = { pessoa: best, score: bestScore };
+              }
             }
           }
+          if (!pessoa) {
+            diag.unmatched++;
+            if (unmatchedSink) {
+              unmatchedSink.push({
+                label: it.label,
+                valor: it.total,
+                category: cat,
+                idDetectado,
+                tipoIdDetectado,
+                sugestaoPessoaNome: bestSuggestion?.pessoa.Nome || bestSuggestion?.pessoa["Título"] || null,
+                sugestaoScore: bestSuggestion?.score || 0,
+              });
+            }
+            continue;
+          }
+          if (conf) diag[conf]++;
+          const key = normalize(pessoa.Nome || pessoa["Título"]);
+          let acc = byPessoa.get(key);
+          if (!acc) {
+            acc = {
+              pessoaNome: pessoa.Nome || pessoa["Título"] || it.label,
+              pessoaId: pessoa.ID || null,
+              cnpj: pessoa.CNPJ,
+              fee: 0,
+              benef: 0,
+              suppliers: [],
+            };
+            byPessoa.set(key, acc);
+          }
+          if (isBenef) acc.benef += it.total;
+          else acc.fee += it.total;
+          acc.suppliers.push({ label: it.label, valor: it.total, category: cat });
         }
-        if (!pessoa) {
-          diag.unmatched++;
-          unmatched.push({
-            label: it.label,
-            valor: it.total,
-            category: cat,
-            idDetectado,
-            tipoIdDetectado,
-            sugestaoPessoaNome: bestSuggestion?.pessoa.Nome || bestSuggestion?.pessoa["Título"] || null,
-            sugestaoScore: bestSuggestion?.score || 0,
-          });
-          continue;
-        }
-        if (conf) diag[conf]++;
-        const key = normalize(pessoa.Nome || pessoa["Título"]);
-        let acc = byPessoa.get(key);
-        if (!acc) {
-          acc = {
-            pessoaNome: pessoa.Nome || pessoa["Título"] || it.label,
-            pessoaId: pessoa.ID || null,
-            cnpj: pessoa.CNPJ,
-            fee: 0,
-            benef: 0,
-            suppliers: [],
-          };
-          byPessoa.set(key, acc);
-        }
-        if (isBenef) acc.benef += it.total;
-        else acc.fee += it.total;
-        acc.suppliers.push({ label: it.label, valor: it.total, category: cat });
       }
-    });
 
-    if (typeof console !== "undefined" && (diag.cpf + diag.cnpj + diag.alias + diag["name-exact"] + diag["name-fuzzy"] + diag.unmatched) > 0) {
-      // eslint-disable-next-line no-console
-      console.debug("[useSquadCostFromDre] match diag", diag);
+      if (typeof console !== "undefined" && (diag.cpf + diag.cnpj + diag.alias + diag["name-exact"] + diag["name-fuzzy"] + diag.unmatched) > 0) {
+        // eslint-disable-next-line no-console
+        console.debug("[useSquadCostFromDre] match diag", diag);
+      }
+      return byPessoa;
     }
 
+    const unmatched: UnmatchedSupplier[] = [];
+    const drillCurrent = drillQueries.map((q, idx) => ({
+      cat: caasCategories[idx] || "",
+      items: (q.data || []) as DrillItem[],
+    }));
+    const byPessoa = processDrills(drillCurrent, unmatched);
 
-    // Agrupa por squad
+    // Mês anterior (somente em filtro mensal): roda matching para usar como fallback
+    let byPessoaPrev: Map<string, PessoaAcc> | null = null;
+    if (isSingleMonth) {
+      const drillPrev = drillQueriesPrev.map((q, idx) => ({
+        cat: caasCategories[idx] || "",
+        items: (q.data || []) as DrillItem[],
+      }));
+      byPessoaPrev = processDrills(drillPrev, null);
+    }
+
+    // Agrupa por squad — usa atual; pessoas sem lançamento atual herdam do prev (fallback)
+    type MergedAcc = PessoaAcc & { fallback?: boolean };
+    const merged = new Map<string, MergedAcc>();
+    for (const [k, v] of byPessoa.entries()) merged.set(k, { ...v });
+    if (byPessoaPrev) {
+      for (const [k, prev] of byPessoaPrev.entries()) {
+        const cur = merged.get(k);
+        if (!cur || (cur.fee === 0 && cur.benef === 0)) {
+          merged.set(k, { ...prev, fallback: true });
+        }
+      }
+    }
+
     const squadMap = new Map<string, SquadCost>();
     const peopleWithoutSquad: SquadMemberCost[] = [];
-    for (const [key, acc] of byPessoa.entries()) {
+    for (const [key, acc] of merged.entries()) {
       const a = assignByPessoaNome.get(key);
       const member: SquadMemberCost = {
         pessoaNome: acc.pessoaNome,
@@ -394,6 +444,7 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
         fee: acc.fee,
         benef: acc.benef,
         total: acc.fee + acc.benef,
+        fallback: acc.fallback,
         suppliers: acc.suppliers,
       };
       if (!a) {
@@ -423,11 +474,15 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
     const totalUnmatched = unmatched.reduce((s, u) => s + u.valor, 0);
     const totalSemSquad = peopleWithoutSquad.reduce((s, m) => s + m.total, 0);
 
-    // Lookup global por nome normalizado — permite mesclar com fallback hardcoded
-    // a nível de membro (CFO + analistas) sem depender do nome do squad.
-    const matchedByPessoaNome: Record<string, { fee: number; benef: number; total: number }> = {};
-    for (const [key, acc] of byPessoa.entries()) {
-      matchedByPessoaNome[key] = { fee: acc.fee, benef: acc.benef, total: acc.fee + acc.benef };
+    // Lookup global por nome normalizado — agora inclui flag `fallback` quando vier do mês anterior
+    const matchedByPessoaNome: Record<string, { fee: number; benef: number; total: number; fallback?: boolean }> = {};
+    for (const [key, acc] of merged.entries()) {
+      matchedByPessoaNome[key] = {
+        fee: acc.fee,
+        benef: acc.benef,
+        total: acc.fee + acc.benef,
+        fallback: acc.fallback,
+      };
     }
 
     return {
@@ -439,8 +494,21 @@ export function useSquadCostFromDre({ startDate, endDate }: UseParams) {
       totalUnmatched,
       totalSemSquad,
       totalCaasDre: totalSquads + totalUnmatched + totalSemSquad,
+      isSingleMonth,
+      prevMonthLabel: isSingleMonth
+        ? format(subMonths(startDate, 1), "MM/yyyy")
+        : null,
     };
-  }, [assignmentsQ.data, hr.rawPessoas, aliasesQ.data, drillQueries.map((q) => q.dataUpdatedAt).join(","), caasCategories]);
+  }, [
+    assignmentsQ.data,
+    hr.rawPessoas,
+    aliasesQ.data,
+    drillQueries.map((q) => q.dataUpdatedAt).join(","),
+    drillQueriesPrev.map((q) => q.dataUpdatedAt).join(","),
+    caasCategories,
+    isSingleMonth,
+    startDate,
+  ]);
 
   const getSquad = (cfoNome: string): SquadCost | null => {
     return result.porSquad.find((s) => normalize(s.cfoNome) === normalize(cfoNome)) || null;
