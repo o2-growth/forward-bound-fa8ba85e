@@ -45,6 +45,7 @@ import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } f
 import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
 import { CenarioCaixaSection } from "./indicators/CenarioCaixaSection";
+import { MonetizacaoSection } from "./indicators/MonetizacaoSection";
 import { CommercialPaceDashboard } from "./indicators/CommercialPaceDashboard";
 
 import { CardInvestigator } from "./indicators/CardInvestigator";
@@ -3185,6 +3186,13 @@ export function IndicatorsTab() {
         startDate={startDate}
         endDate={endDate}
       />
+
+
+
+
+      {/* Funil de Monetização (pipe pipefy_moviment_contrato) */}
+      <MonetizacaoSection startDate={startDate} endDate={endDate} />
+
 
 
 
