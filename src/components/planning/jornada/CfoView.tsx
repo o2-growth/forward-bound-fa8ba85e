@@ -757,6 +757,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
     });
   }, [squadCost.matchedVersion]);
   const matchedCount = Object.keys(squadCost.matchedByPessoaNome || {}).length;
+  const [unmatchedOpen, setUnmatchedOpen] = useState(false);
 
   // Snapshot dos clientes considerando o período selecionado:
   // - Ativos no fim do período: dataAssinatura <= dateRange.to AND (não está em churn OU entrou no churn depois de dateRange.to)
