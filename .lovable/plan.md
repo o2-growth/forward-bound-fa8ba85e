@@ -1,30 +1,27 @@
-## Liberar aba "CFOs" para usuários com role `cfo` (escopo bloqueado ao próprio squad)
+## Alinhar contador de clientes do card de CFO com a regra de carteira (Pedrolo & Mariana)
 
 ### Problema
-O Pedrolo (role `cfo`, mapeado em `cfo_user_mapping` como "Eduardo Milani Pedrolo") só vê a aba **Operação**, mas dentro dela a sub-aba **CFOs** está escondida. Hoje:
+- Card resumo do CFO mostra 35 (carteira ativa total).
+- Modal/lista do squad mostra 5 (regra especial: só assinados no mês calendário anterior).
 
-```ts
-const canViewCfoTab = isAdmin && !isCfo;
-```
-
-→ qualquer um com role `cfo` é bloqueado da sub-aba, mesmo já existindo um `useEffect` que força o filtro `filters.cfos = [lockedCfoName]` quando `isCfo` é true.
+A regra do "mês passado" só está sendo aplicada em `activeClientes` (modal), mas não na agregação que alimenta `cfos[].clientes` (card).
 
 ### Mudança
-Em `src/components/planning/CustomerSuccessTab.tsx`:
+Arquivo: `src/components/planning/jornada/CfoView.tsx`
 
-1. Trocar a regra para:
-   ```ts
-   const canViewCfoTab = isAdmin || isCfo;
-   ```
-   Assim admins continuam vendo tudo, e CFOs passam a ver a sub-aba já travada no próprio nome (a trava do filtro `cfos = [lockedCfoName]` que já existe garante que ele só enxergue o squad/clientes dele).
+1. Extrair a regra de elegibilidade da carteira (a função interna que já usa `isMari`, `isPedrolo`, `inMesPassado`, `temAssessoriaFinanceira`, e exclui `INACTIVE_PHASES`) para um helper `isClienteNaCarteira(c)` no escopo do componente, baseado em `clientesPeriodo` quando houver `dateRange`, ou em `clientes`.
 
-2. Manter o `useEffect` de redirect (linhas 50–54) inalterado — ele já não dispara para CFOs depois da mudança.
+2. Reusar esse helper em dois pontos:
+   - `activeClientes` (modal) — já é o comportamento atual, mantém igual.
+   - Agregação `cfos` (linhas 788–823) e também o caminho `propCfos` (quando não há `dateRange`):
+     - Quando há `dateRange`: ao invés de `ativos = lista.filter(c => !INACTIVE_PHASES.includes(c.faseAtual))`, usar `ativos = lista.filter(isClienteNaCarteira)`.
+     - Quando NÃO há `dateRange`: recalcular `cfos` a partir de `clientes` aplicando o mesmo `isClienteNaCarteira`, em vez de usar `propCfos` cru — assim Pedrolo/Mariana respeitam a regra também no fluxo sem filtro. Para os demais CFOs nada muda (o helper retorna `true` por padrão).
 
-3. Sem alterações em RLS, hooks de dados ou no `CfoView` — o componente já respeita `filters.cfos`, então listará apenas Eduardo Milani Pedrolo.
+3. Garantir que `selectedCfoData.clientes`, `mrrTotal`, `clientesTratativa`, etc. usados no modal venham dessa mesma agregação re-filtrada, para que **header do card, modal, "Composição do Squad" e Simulador de Carteira mostrem o MESMO número** (5 e não 35 no caso do Pedrolo).
 
-### Resultado esperado
-- Pedrolo abre `Operação → CFOs` e vê só o card/visão dele e do squad dele.
-- Admins seguem com a visão completa.
-- Demais usuários (sem role `cfo` e sem admin) continuam sem a sub-aba.
+4. Sem mudanças em `INACTIVE_PHASES`, `CHURN_PHASES`, churns, custo de squad, ou em nenhum outro CFO.
 
-Nenhuma migração, nenhum dado tocado.
+### Resultado
+- Pedrolo: card e modal mostram o mesmo número (ex.: 5 clientes assinados no mês passado).
+- Mariana: idem, respeitando exceção da Assessoria Financeira recorrente.
+- Demais CFOs: comportamento idêntico ao atual.
