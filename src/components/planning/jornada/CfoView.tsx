@@ -1251,7 +1251,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
                   </span>
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {cfo.clientes} clientes | {formatCompact(cfo.mrrTotal)} MRR
+                  {cfo.clientes} clientes | {formatCompact(cfo.mrrTotal)} {(cfo.nome.includes('Pedrolo') || cfo.nome.includes('Mariana')) ? 'Pontual' : 'MRR'}
                 </p>
                 {(cfo.nome.includes('Pedrolo') || cfo.nome.includes('Mariana')) && (
                   <div className="mt-2 flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
