@@ -404,7 +404,7 @@ export function ConsolidatedIndicators26Section() {
                       );
                       if (visibleRows.length === 0) return null;
                       return (
-                        <GroupBlock key={g.title} title={g.title} rows={visibleRows} rowMap={rowMap} cols={COLS} />
+                        <GroupBlock key={g.title} title={g.title} rows={visibleRows} rowMap={rowMap} cols={COLS} onRowClick={(cfg) => setTrendRow({ label: cfg.label, fmt: cfg.fmt, bench: cfg.bench })} />
                       );
                     })}
                   </tbody>
