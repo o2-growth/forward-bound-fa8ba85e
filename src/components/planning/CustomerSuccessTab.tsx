@@ -45,7 +45,7 @@ function CustomerSuccessTabInner() {
   const { user } = useAuth();
   const { isAdmin, isCfo, loading: permissionsLoading } = useUserPermissions(user?.id);
   const { data: lockedCfoName, isLoading: cfoNameLoading } = useMyCfoName(!!isCfo);
-  const canViewCfoTab = isAdmin && !isCfo;
+  const canViewCfoTab = isAdmin || isCfo;
 
   useEffect(() => {
     if (!permissionsLoading && !canViewCfoTab && activeTab === 'cfos') {
