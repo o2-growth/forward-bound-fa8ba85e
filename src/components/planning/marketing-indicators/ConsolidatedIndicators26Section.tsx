@@ -252,6 +252,7 @@ export function ConsolidatedIndicators26Section() {
   const { rows: liveRows, lastUpdate: liveUpdate, isLoading: liveLoading } = useIndicators26Live();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [trendRow, setTrendRow] = useState<{ label: string; fmt: Fmt; bench?: number } | null>(null);
 
   // Colunas dinâmicas: 2026 até mês atual + Qs fechados + bloco fixo 2025 + TOTAL 2026.
   const COLS = useMemo(() => buildCols(new Date()), []);
