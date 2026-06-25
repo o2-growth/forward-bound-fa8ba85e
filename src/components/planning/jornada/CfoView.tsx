@@ -824,9 +824,15 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
     }
     return Array.from(groups.entries()).map(([nome, lista]) => {
       const ativos = lista.filter(isClienteNaCarteira);
-      const mrrTotal = ativos.reduce((s, c) => s + c.mrr, 0);
+      // Pedrolo e Mariana: receita é PONTUAL (não recorrente). Usa pontual como "fee".
+      const usaPontualComoFee = nome.includes('Pedrolo') || nome.includes('Mariana');
+      const mrrTotal = usaPontualComoFee
+        ? ativos.reduce((s, c) => s + (c.pontual || 0), 0)
+        : ativos.reduce((s, c) => s + c.mrr, 0);
       const emRisco = ativos.filter(c => c.tratativaAtiva);
-      const mrrEmRisco = emRisco.reduce((s, c) => s + c.mrr, 0);
+      const mrrEmRisco = usaPontualComoFee
+        ? emRisco.reduce((s, c) => s + (c.pontual || 0), 0)
+        : emRisco.reduce((s, c) => s + c.mrr, 0);
       const clientesChurn = lista.filter(c => CHURN_PHASES.includes(c.faseAtual)).length;
       const tarefasAtrasadas = ativos.reduce((s, c) => s + c.tarefasAtrasadas, 0);
       const totalTarefas = ativos.reduce((s, c) => s + c.tarefasAtivas, 0);
