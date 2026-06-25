@@ -784,17 +784,46 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
     });
   }, [clientes, dateRange]);
 
-  // Re-aggregate métricas por CFO quando há filtro de período (caso contrário, usa as do prop)
+  // Helper de elegibilidade da carteira do CFO.
+  // Inclui clientes ativos (não-terminais). Regra especial para Mariana e Pedrolo:
+  // carteira filtrada por assinatura no MÊS CALENDÁRIO ANTERIOR ao atual.
+  // Mariana: Assessoria Financeira é recorrente e sempre entra.
+  const isClienteNaCarteira = useMemo(() => {
+    const now = new Date();
+    const mesAnteriorStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const mesAnteriorEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+    const isMari = (cfo: string) => cfo.includes('Mariana');
+    const isPedrolo = (cfo: string) => cfo.includes('Pedrolo');
+    const inMesPassado = (dt: Date | null | undefined) =>
+      !!dt && dt >= mesAnteriorStart && dt < mesAnteriorEnd;
+    return (c: JornadaCliente) => {
+      if (INACTIVE_PHASES.includes(c.faseAtual)) return false;
+      if (isPedrolo(c.cfo || '')) return inMesPassado(c.dataAssinatura);
+      if (isMari(c.cfo || '')) {
+        if (c.temAssessoriaFinanceira) return true;
+        return inMesPassado(c.dataAssinatura);
+      }
+      return true;
+    };
+  }, []);
+
+  // Re-aggregate métricas por CFO aplicando sempre a regra de carteira.
+  // Faz isso tanto com dateRange (sobre clientesPeriodo) quanto sem (sobre clientes crus),
+  // garantindo que o contador do card bata com o modal/lista do squad.
   const cfos = useMemo<JornadaCfo[]>(() => {
-    if (!dateRange) return propCfos;
+    const source = dateRange ? clientesPeriodo : clientes;
     const groups = new Map<string, JornadaCliente[]>();
-    for (const c of clientesPeriodo) {
+    for (const c of source) {
       if (!c.cfo) continue;
       if (!groups.has(c.cfo)) groups.set(c.cfo, []);
       groups.get(c.cfo)!.push(c);
     }
+    // Garante que CFOs sem cards no source ainda apareçam (ex.: vindo de propCfos).
+    for (const p of propCfos) {
+      if (!groups.has(p.nome)) groups.set(p.nome, []);
+    }
     return Array.from(groups.entries()).map(([nome, lista]) => {
-      const ativos = lista.filter(c => !INACTIVE_PHASES.includes(c.faseAtual));
+      const ativos = lista.filter(isClienteNaCarteira);
       const mrrTotal = ativos.reduce((s, c) => s + c.mrr, 0);
       const emRisco = ativos.filter(c => c.tratativaAtiva);
       const mrrEmRisco = emRisco.reduce((s, c) => s + c.mrr, 0);
@@ -820,7 +849,7 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
         healthScoreMedio,
       } as JornadaCfo;
     });
-  }, [propCfos, clientesPeriodo, dateRange]);
+  }, [propCfos, clientes, clientesPeriodo, dateRange, isClienteNaCarteira]);
   const [selectedCfo, setSelectedCfo] = useState<string | null>(null);
   const [sortCol, setSortCol] = useState<SortCol>("mrrTotal");
   const [sortAsc, setSortAsc] = useState(false);
@@ -840,35 +869,13 @@ export function CfoView({ cfos: propCfos, clientes, dateRange, churnDossier }: C
     });
   };
 
-  // Carteira do CFO = todos os clientes ainda ativos (não-terminais).
-  // Inclui clientes em tratativa (Triagem, Em Tratativa com CS, Plano de Ação, etc.),
-  // pois o CFO continua atendendo esses clientes. Exclui apenas Churn / Arquivado / Desistência.
-  //
-  // Regra Mariana e Pedrolo: carteira filtrada por assinatura no MÊS PASSADO
-  // (mês calendário anterior ao atual). Cliente "expira" da carteira virando o mês.
+  // Lista de clientes ativos (para o modal/lista), usando a MESMA regra do card.
   const activeClientes = useMemo(() => {
-    const now = new Date();
-    const mesAnteriorStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const mesAnteriorEnd = new Date(now.getFullYear(), now.getMonth(), 1);
-    const isMari = (cfo: string) => cfo.includes('Mariana');
-    const isPedrolo = (cfo: string) => cfo.includes('Pedrolo');
-    const inMesPassado = (dt: Date | null | undefined) =>
-      !!dt && dt >= mesAnteriorStart && dt < mesAnteriorEnd;
-    // Quando há dateRange ativo, usar clientesPeriodo (snapshot do fim do período);
-    // caso contrário, lista crua de clientes (compatibilidade com comportamento anterior).
     const source = dateRange ? clientesPeriodo : clientes;
-    return source.filter(c => {
-      if (INACTIVE_PHASES.includes(c.faseAtual)) return false;
-      if (isPedrolo(c.cfo)) return inMesPassado(c.dataAssinatura);
-      if (isMari(c.cfo)) {
-        // Assessoria Financeira: recorrente → fica na carteira todo mês
-        if (c.temAssessoriaFinanceira) return true;
-        // Diagnóstico / Turnaround / Valuation: só no mês da assinatura
-        return inMesPassado(c.dataAssinatura);
-      }
-      return true;
-    });
-  }, [clientes, clientesPeriodo, dateRange]);
+    return source.filter(isClienteNaCarteira);
+  }, [clientes, clientesPeriodo, dateRange, isClienteNaCarteira]);
+
+
 
 
   // A1: Count churns per CFO
