@@ -439,11 +439,13 @@ function GroupBlock({
   rows,
   rowMap,
   cols,
+  onRowClick,
 }: {
   title: string;
   rows: RowCfg[];
   rowMap: Map<string, Indicator26Row>;
   cols: { key: string; label: string; strong?: boolean }[];
+  onRowClick?: (cfg: RowCfg) => void;
 }) {
   return (
     <>
@@ -458,10 +460,16 @@ function GroupBlock({
       {rows.map((cfg) => {
         const row = rowMap.get(normalize(cfg.label));
         return (
-          <tr key={cfg.label} className="border-b last:border-0 hover:bg-muted/20">
-            <td className="sticky left-0 z-10 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap">
+          <tr
+            key={cfg.label}
+            onClick={() => onRowClick?.(cfg)}
+            className="border-b last:border-0 hover:bg-primary/5 cursor-pointer transition-colors"
+            title="Clique para ver evolução mês a mês"
+          >
+            <td className="sticky left-0 z-10 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap group-hover:bg-primary/5">
               {cfg.label}
             </td>
+
             {cols.map((c) => {
               const v = row?.values?.[c.key] ?? null;
               const good =
