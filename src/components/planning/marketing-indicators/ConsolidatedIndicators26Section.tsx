@@ -414,9 +414,25 @@ export function ConsolidatedIndicators26Section() {
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+
+      {trendRow && (
+        <IndicatorTrendDialog
+          open={!!trendRow}
+          onOpenChange={(v) => !v && setTrendRow(null)}
+          label={trendRow.label}
+          fmt={trendRow.fmt}
+          bench={trendRow.bench}
+          series={MONTH_TREND_KEYS.map((m) => ({
+            key: m.key,
+            label: m.label,
+            value: rowMap.get(normalize(trendRow.label))?.values?.[m.key] ?? null,
+          }))}
+        />
+      )}
     </Card>
   );
 }
+
 
 function GroupBlock({
   title,
