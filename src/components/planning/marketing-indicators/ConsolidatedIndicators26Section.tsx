@@ -12,6 +12,29 @@ import {
 import { cn } from "@/lib/utils";
 import { useIndicators26Raw, type Indicator26Row } from "@/hooks/useIndicators26Raw";
 import { useIndicators26Live } from "@/hooks/useIndicators26Live";
+import { IndicatorTrendDialog } from "./IndicatorTrendDialog";
+
+// Chaves de meses puros (sem Q* nem totais) para o gráfico de tendência
+const MONTH_TREND_KEYS: { key: string; label: string }[] = [
+  { key: "jul25", label: "Jul/25" },
+  { key: "ago25", label: "Ago/25" },
+  { key: "set25", label: "Set/25" },
+  { key: "out25", label: "Out/25" },
+  { key: "nov25", label: "Nov/25" },
+  { key: "dez25", label: "Dez/25" },
+  { key: "jan", label: "Jan/26" },
+  { key: "fev", label: "Fev/26" },
+  { key: "mar", label: "Mar/26" },
+  { key: "abr", label: "Abr/26" },
+  { key: "mai", label: "Mai/26" },
+  { key: "jun", label: "Jun/26" },
+  { key: "jul", label: "Jul/26" },
+  { key: "ago", label: "Ago/26" },
+  { key: "set", label: "Set/26" },
+  { key: "out", label: "Out/26" },
+  { key: "nov", label: "Nov/26" },
+  { key: "dez", label: "Dez/26" },
+];
 
 // Colunas que vêm da PLANILHA (histórico 2025 — fonte da verdade para 2025)
 const SHEET_COL_KEYS = new Set([
@@ -229,6 +252,7 @@ export function ConsolidatedIndicators26Section() {
   const { rows: liveRows, lastUpdate: liveUpdate, isLoading: liveLoading } = useIndicators26Live();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [trendRow, setTrendRow] = useState<{ label: string; fmt: Fmt; bench?: number } | null>(null);
 
   // Colunas dinâmicas: 2026 até mês atual + Qs fechados + bloco fixo 2025 + TOTAL 2026.
   const COLS = useMemo(() => buildCols(new Date()), []);
@@ -380,7 +404,7 @@ export function ConsolidatedIndicators26Section() {
                       );
                       if (visibleRows.length === 0) return null;
                       return (
-                        <GroupBlock key={g.title} title={g.title} rows={visibleRows} rowMap={rowMap} cols={COLS} />
+                        <GroupBlock key={g.title} title={g.title} rows={visibleRows} rowMap={rowMap} cols={COLS} onRowClick={(cfg) => setTrendRow({ label: cfg.label, fmt: cfg.fmt, bench: cfg.bench })} />
                       );
                     })}
                   </tbody>
@@ -390,20 +414,38 @@ export function ConsolidatedIndicators26Section() {
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+
+      {trendRow && (
+        <IndicatorTrendDialog
+          open={!!trendRow}
+          onOpenChange={(v) => !v && setTrendRow(null)}
+          label={trendRow.label}
+          fmt={trendRow.fmt}
+          bench={trendRow.bench}
+          series={MONTH_TREND_KEYS.map((m) => ({
+            key: m.key,
+            label: m.label,
+            value: rowMap.get(normalize(trendRow.label))?.values?.[m.key] ?? null,
+          }))}
+        />
+      )}
     </Card>
   );
 }
+
 
 function GroupBlock({
   title,
   rows,
   rowMap,
   cols,
+  onRowClick,
 }: {
   title: string;
   rows: RowCfg[];
   rowMap: Map<string, Indicator26Row>;
   cols: { key: string; label: string; strong?: boolean }[];
+  onRowClick?: (cfg: RowCfg) => void;
 }) {
   return (
     <>
@@ -418,10 +460,16 @@ function GroupBlock({
       {rows.map((cfg) => {
         const row = rowMap.get(normalize(cfg.label));
         return (
-          <tr key={cfg.label} className="border-b last:border-0 hover:bg-muted/20">
-            <td className="sticky left-0 z-10 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap">
+          <tr
+            key={cfg.label}
+            onClick={() => onRowClick?.(cfg)}
+            className="border-b last:border-0 hover:bg-primary/5 cursor-pointer transition-colors"
+            title="Clique para ver evolução mês a mês"
+          >
+            <td className="sticky left-0 z-10 bg-background px-3 py-1.5 text-left font-medium whitespace-nowrap group-hover:bg-primary/5">
               {cfg.label}
             </td>
+
             {cols.map((c) => {
               const v = row?.values?.[c.key] ?? null;
               const good =
