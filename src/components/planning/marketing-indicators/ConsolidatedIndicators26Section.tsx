@@ -12,6 +12,29 @@ import {
 import { cn } from "@/lib/utils";
 import { useIndicators26Raw, type Indicator26Row } from "@/hooks/useIndicators26Raw";
 import { useIndicators26Live } from "@/hooks/useIndicators26Live";
+import { IndicatorTrendDialog } from "./IndicatorTrendDialog";
+
+// Chaves de meses puros (sem Q* nem totais) para o gráfico de tendência
+const MONTH_TREND_KEYS: { key: string; label: string }[] = [
+  { key: "jul25", label: "Jul/25" },
+  { key: "ago25", label: "Ago/25" },
+  { key: "set25", label: "Set/25" },
+  { key: "out25", label: "Out/25" },
+  { key: "nov25", label: "Nov/25" },
+  { key: "dez25", label: "Dez/25" },
+  { key: "jan", label: "Jan/26" },
+  { key: "fev", label: "Fev/26" },
+  { key: "mar", label: "Mar/26" },
+  { key: "abr", label: "Abr/26" },
+  { key: "mai", label: "Mai/26" },
+  { key: "jun", label: "Jun/26" },
+  { key: "jul", label: "Jul/26" },
+  { key: "ago", label: "Ago/26" },
+  { key: "set", label: "Set/26" },
+  { key: "out", label: "Out/26" },
+  { key: "nov", label: "Nov/26" },
+  { key: "dez", label: "Dez/26" },
+];
 
 // Colunas que vêm da PLANILHA (histórico 2025 — fonte da verdade para 2025)
 const SHEET_COL_KEYS = new Set([
