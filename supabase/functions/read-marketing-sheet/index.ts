@@ -396,32 +396,84 @@ serve(async (req) => {
 
     // ===== Modo RAW: grade completa da aba "Indicadores 26" (todas as linhas, colunas B..R) =====
     if (mode === 'raw') {
-      const { rows } = await fetchSheetData(TAB_CONFIGS[2026].name);
-      // B..R -> 1..17 (coluna A = label, índice 0)
+      const [res26, res25] = await Promise.allSettled([
+        fetchSheetData(TAB_CONFIGS[2026].name),
+        fetchSheetData(TAB_CONFIGS[2025].name),
+      ]);
+      const rows26 = res26.status === 'fulfilled' ? res26.value.rows : [];
+      const rows25 = res25.status === 'fulfilled' ? res25.value.rows : [];
+
+      // B..R -> 1..17 (coluna A = label, índice 0) — layout da aba "Indicadores 26"
       const COL_KEYS = [
         'jan', 'fev', 'mar', 'q1', 'abr', 'mai', 'jun', 'q2',
         'jul25', 'ago25', 'set25', 'q325', 'out25', 'nov25', 'dez25', 'q425', 'total2026',
       ];
       const isError = (v: unknown) =>
         typeof v === 'string' && /#(DIV\/0!|REF!|N\/A|VALUE!)/.test(v);
+      const cellNum = (cell: any): number | null => {
+        const v = cell?.v;
+        if (v === null || v === undefined || v === '' || isError(v) || typeof v !== 'number') return null;
+        return Math.round(v * 10000) / 10000;
+      };
+
+      // Índice 2025: metricKey -> { jul25..q425 } lido da aba "Indicadores 25"
+      // Layout Indicadores 25: J=9 Jul, K=10 Ago, L=11 Set, M=12 Q3, N=13 Out, O=14 Nov, P=15 Dez, Q=16 Q4
+      const KEYS_25: { key: string; col: number }[] = [
+        { key: 'jul25', col: 9 },
+        { key: 'ago25', col: 10 },
+        { key: 'set25', col: 11 },
+        { key: 'q325', col: 12 },
+        { key: 'out25', col: 13 },
+        { key: 'nov25', col: 14 },
+        { key: 'dez25', col: 15 },
+        { key: 'q425', col: 16 },
+      ];
+      const idx25ByMetric = new Map<string, Record<string, number | null>>();
+      const idx25ByLabel = new Map<string, Record<string, number | null>>();
+      for (const row of rows25) {
+        const cells = row?.c || [];
+        const label = cells[0]?.v;
+        if (typeof label !== 'string' || !label.trim()) continue;
+        const vals: Record<string, number | null> = {};
+        let hasAny = false;
+        for (const { key, col } of KEYS_25) {
+          const n = cellNum(cells[col]);
+          vals[key] = n;
+          if (n !== null) hasAny = true;
+        }
+        if (!hasAny) continue;
+        const mk = findMetricKey(label);
+        if (mk) idx25ByMetric.set(mk, vals);
+        idx25ByLabel.set(normalizeText(label), vals);
+      }
+
       const out: { label: string; values: Record<string, number | null> }[] = [];
       let lastUpdate: string | null = null;
-      for (const row of rows) {
+      for (const row of rows26) {
         const cells = row?.c || [];
         const label = cells[0]?.v;
         if (typeof label !== 'string' || !label.trim()) continue;
         const values: Record<string, number | null> = {};
         let hasAny = false;
         COL_KEYS.forEach((k, i) => {
-          const cell = cells[i + 1];
-          const v = cell?.v;
-          if (v === null || v === undefined || v === '' || isError(v) || typeof v !== 'number') {
-            values[k] = null;
-          } else {
-            values[k] = Math.round(v * 10000) / 10000;
-            hasAny = true;
-          }
+          const n = cellNum(cells[i + 1]);
+          values[k] = n;
+          if (n !== null) hasAny = true;
         });
+
+        // Mescla 2025 vindo da aba "Indicadores 25" (sobrescreve valores vazios/zerados de 2026)
+        const mk = findMetricKey(label);
+        const vals25 =
+          (mk && idx25ByMetric.get(mk)) || idx25ByLabel.get(normalizeText(label)) || null;
+        if (vals25) {
+          for (const { key } of KEYS_25) {
+            if (vals25[key] !== null && vals25[key] !== undefined) {
+              values[key] = vals25[key];
+              hasAny = true;
+            }
+          }
+        }
+
         if (hasAny) out.push({ label: label.trim(), values });
         // sentinela de "Última atualização" (linha do rodapé)
         for (const c of cells) {
@@ -433,6 +485,7 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
+
 
     console.log('Fetching marketing sheet data:', { startDate, endDate });
 
