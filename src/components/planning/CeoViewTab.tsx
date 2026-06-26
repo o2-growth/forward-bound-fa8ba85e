@@ -320,21 +320,41 @@ export function CeoViewTab() {
     };
   }, [hr.headcountByTime, hr.turnoverByTime, hr.headcountTotal, hr.turnoverGeral, hr.tempoMedioDeCasaDias, hr.admissoesNoPeriodo, hr.desligadosNoPeriodo]);
 
-  // ─── NPS — prioriza dados ao vivo (mesma fonte da aba NPS); fallback no snapshot Q4/2025 ──
+  // ─── NPS — filtrado pelo período via raw.npsRows; fallback no snapshot Q4/2025 ──
   const nps = useMemo(() => {
     const live = npsQuery.data;
-    const liveScore = live?.metrics?.nps?.score;
-    const hasLive = typeof liveScore === "number" && (live?.kpis?.respostas ?? 0) > 0;
-    if (hasLive && live) {
-      return {
-        score: live.metrics.nps.score,
-        meta: live.metrics.nps.meta,
-        csat: live.metrics.csat.score,
-        promotores: live.npsDistribution.promotores,
-        detratores: live.npsDistribution.detratores,
-        neutros: live.npsDistribution.neutros,
-        source: "live" as const,
-      };
+    const raw = live?.raw;
+    if (raw) {
+      const fromMs = startDate.getTime();
+      const toMs = endDate.getTime();
+      const rowsInPeriod = (raw.npsRows ?? []).filter((r: any) => {
+        const ent = r?.["Entrada"];
+        if (!ent) return false;
+        const t = new Date(ent).getTime();
+        return !Number.isNaN(t) && t >= fromMs && t <= toMs;
+      });
+
+      if (rowsInPeriod.length > 0) {
+        const proc = processNpsData(
+          rowsInPeriod,
+          raw.cfoMap,
+          raw.titleMap,
+          raw.npsPipeId,
+          raw.totalEligible,
+          raw.cfoEligibleMap,
+        );
+        if (typeof proc?.metrics?.nps?.score === "number" && (proc?.kpis?.respostas ?? 0) > 0) {
+          return {
+            score: proc.metrics.nps.score,
+            meta: proc.metrics.nps.meta,
+            csat: proc.metrics.csat.score,
+            promotores: proc.npsDistribution.promotores,
+            detratores: proc.npsDistribution.detratores,
+            neutros: proc.npsDistribution.neutros,
+            source: "live" as const,
+          };
+        }
+      }
     }
     return {
       score: NPS_METRICS.nps.score,
@@ -345,7 +365,8 @@ export function CeoViewTab() {
       neutros: NPS_DISTRIBUTION.neutros,
       source: "snapshot" as const,
     };
-  }, [npsQuery.data]);
+  }, [npsQuery.data, startDate, endDate]);
+
 
   // ─── Relatórios por área ──────────────────────────────
   const generatedAt = format(new Date(), "dd/MM/yyyy HH:mm");
