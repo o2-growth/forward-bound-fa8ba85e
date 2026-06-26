@@ -287,6 +287,8 @@ export function MarketingIndicatorsTab() {
         produto: c.produto, valor: c.valor,
         valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
         valorEducacao: c.valorEducacao, bu: 'Modelo Atual',
+        sdr: (c as any).sdr || (c as any).responsavel || undefined,
+        closer: (c as any).closer || undefined,
       });
     }
 
