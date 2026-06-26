@@ -3109,8 +3109,10 @@ export function IndicatorsTab() {
                 { value: 'outbound', label: LEAD_SOURCE_LABELS.outbound },
                 { value: 'evento', label: LEAD_SOURCE_LABELS.evento },
                 { value: 'indicacao', label: LEAD_SOURCE_LABELS.indicacao },
+                { value: 'monetizacao', label: LEAD_SOURCE_LABELS.monetizacao },
                 { value: 'sem_origem', label: LEAD_SOURCE_LABELS.sem_origem },
               ]}
+
               selected={selectedOrigens}
               onSelectionChange={(v) => setSelectedOrigens(v as LeadSource[])}
               placeholder="Todas Origens"
