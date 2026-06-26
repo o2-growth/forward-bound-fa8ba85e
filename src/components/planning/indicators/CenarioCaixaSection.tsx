@@ -81,7 +81,8 @@ function buildCenario(sourceItems: DetailItem[]): CenarioData {
       setup: cash.setup,
       pontual: cash.pontual,
       total: cash.total,
-    };
+      regra: BU_RULE_SHORT[bu] || "—",
+    } as DetailItem;
   });
   return { items, total, grossTotal, byBu, count: sourceItems.length };
 }
