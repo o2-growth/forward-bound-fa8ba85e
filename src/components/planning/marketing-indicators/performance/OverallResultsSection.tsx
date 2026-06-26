@@ -381,7 +381,7 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
             <KpiCard icon={FileText}   label="Qtd Propostas"         value={num(kpis.qtdP)}       delta={deltaIcon(kpis.qtdP, kpis.qtdPprev)} subtitle={`Anterior: ${num(kpis.qtdPprev)}`} />
             <KpiCard icon={Wallet}     label="Valor Vendas"          value={brlK(kpis.valorV)}    delta={deltaIcon(kpis.valorV, kpis.valorVprev)} subtitle={`Anterior: ${brlK(kpis.valorVprev)}`} />
             <KpiCard icon={Target}     label="Ticket Médio (Venda)"  value={brlK(kpis.tmV)}       delta={deltaIcon(kpis.tmV, kpis.tmVprev)} subtitle={`TM Proposta: ${brlK(kpis.tmP)}`} />
-            <KpiCard icon={TrendingUp} label="% Realizado Meta"      value={pct(metaPctRealizado)} delta={deltaIcon(metaPctRealizado, metaPctPrev)} subtitle={`Meta estimada: ${num(metaQtd)} vendas`} highlight={metaPctRealizado >= 0.8 ? "good" : metaPctRealizado >= 0.4 ? "warn" : "bad"} />
+            <KpiCard icon={TrendingUp} label="% Realizado Meta"      value={pct(metaPctRealizado)} delta={deltaIcon(metaPctRealizado, metaPctPrev)} subtitle={metaQtd > 0 ? `Meta: ${num(metaQtdEffective)} vendas · ${brlK(metaValorEffective)} (${pct(metaValorPct)})` : `Meta estimada: ${num(metaQtdEffective)} vendas (clique em Metas)`} highlight={metaPctRealizado >= 0.8 ? "good" : metaPctRealizado >= 0.4 ? "warn" : "bad"} />
           </div>
 
           {/* ─── Linha 2: Métricas tiles + por Origem + Evolução ──────────── */}
