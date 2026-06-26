@@ -55,7 +55,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   outros: "Outros",
 };
 
-type GroupKey = "origem" | "produto" | "bu";
+type GroupKey = "origem" | "produto" | "bu" | "sdr" | "closer";
 type Granularity = "day" | "week" | "month";
 type MetricKey =
   | "qtd_vendas" | "valor_vendas" | "tm_venda"
