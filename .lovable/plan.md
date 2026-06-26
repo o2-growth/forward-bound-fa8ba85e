@@ -1,45 +1,20 @@
-## Problema
+Plano para corrigir o MQL mostrando 200:
 
-- Acelerômetro **Comercial → MQLs** mostra **215** (01–26/06/2026).
-- Hero **Marketing → CPMQL** mostra **200 MQLs no período** (01–30/06/2026).
+1. Ajustar a fonte usada no hero da aba Marketing
+- O número exibido em “MQLs no período” vem de `pipefyVolumes` em `MarketingIndicatorsTab.tsx`.
+- Hoje ele soma: Modelo Atual 107 + O2 TAX 0 + Franquia 92 + Oxy Hacker 1 = 200.
+- Pelo Comercial, o Modelo Atual inclui também Outbound dentro da mesma BU; na aba Marketing o Outbound já é carregado, mas não entra em `pipefyVolumes`.
 
-Mesmo com período maior, Marketing fica abaixo do Comercial — ou seja, **fontes diferentes**.
+2. Espelhar exatamente a regra do acelerômetro Comercial
+- Incluir `outboundGetCards('mql').length` no cálculo de MQLs da aba Marketing.
+- Fazer o mesmo para as demais etapas (`leads`, `rm`, `rr`, `proposta`, `venda`) porque o Comercial trata Outbound como extensão do Modelo Atual, não como uma BU separada.
+- Manter Franquia e Oxy Hacker usando `getQtyForPeriod`, como já está alinhado com o Comercial quando não há filtro de pessoa.
 
-## Causa raiz
+3. Validar no navegador como usuário final
+- Abrir a aba Marketing no mesmo período.
+- Confirmar que o card CPMQL/MQL deixa de mostrar 200 e passa a bater com o acelerômetro Comercial.
+- Conferir console/logs para ver o breakdown final: Modelo Atual + Outbound + O2 TAX + Franquia + Oxy Hacker.
 
-Em `src/components/planning/MarketingIndicatorsTab.tsx` (`pipefyVolumes`, linhas 484-501) cada BU conta MQLs assim:
-
-```
-counts.mqls += maGetCards('mql').length;
-counts.mqls += o2GetCards('mql').length;
-counts.mqls += franquiaGetCards('mql').length;  // analytics cards
-counts.mqls += oxyGetCards('mql').length;       // analytics cards
-```
-
-Já o acelerômetro do Comercial em `IndicatorsTab.tsx` (`getRealizedForIndicator`, linhas 1057+), **sem filtros** de Closer/SDR/Origem, usa para Franquia e Oxy Hacker as funções **`getFranquiaQty(...)` / `getOxyHackerQty(...)`** (hooks de metas/sheets — fonte canônica de "realizado"). Os hooks de analytics de Franquia/Oxy aplicam regras diferentes (cumulativo, faixa de investimento etc.) e geram um total menor.
-
-Resultado: as duas telas usam fontes distintas para as mesmas BUs → divergência.
-
-## O que vai mudar
-
-Alinhar `pipefyVolumes` em `MarketingIndicatorsTab.tsx` à **mesma lógica do acelerômetro Comercial sem filtros**, para todas as etapas usadas no hero/cards (leads, mqls, rms, rrs, propostas, vendas):
-
-- **Modelo Atual** → `modeloAtualAnalytics.getCardsForIndicator(ind).length` (igual ao Comercial).
-- **O2 TAX** → `o2TaxAnalytics.getDetailItemsForIndicator(ind).length` (igual ao Comercial).
-- **Oxy Hacker** → `getOxyHackerQty(ind, startDate, endDate)` (substituindo `oxyGetCards`).
-- **Franquia** → `getFranquiaQty(ind, startDate, endDate)` (substituindo `franquiaGetCards`).
-
-Resto da tela (cards de atribuição, funil por fonte, drill-downs etc.) **continua** usando `*GetCards` porque depende dos cards individuais — só o contador agregado do hero e dos cards de etapa muda.
-
-## Arquivos afetados
-
-- `src/components/planning/MarketingIndicatorsTab.tsx`
-  - Importar/usar `useOxyHackerMetas` e `useExpansaoMetas` (já existem no projeto e são usados pelo `IndicatorsTab`) para obter `getOxyHackerQty` e `getFranquiaQty`.
-  - Reescrever o `useMemo` de `pipefyVolumes` (linhas ~484-501) usando a fonte acima.
-  - Manter dependências corretas no array do `useMemo`.
-
-## Validação
-
-1. Abrir aba Marketing no mesmo período do print do Comercial (01–26/06/2026) e conferir se o número de MQLs no hero CPMQL bate com o acelerômetro (215).
-2. Conferir também Leads, RM, RR, Propostas e Vendas batendo com os acelerômetros do Comercial sem filtros.
-3. Verificar que CAC/CPMQL e demais cálculos derivados (que dividem investimento por essas quantidades) refletem os novos valores.
+4. Escopo limitado
+- Não mexer em planilha, metas, nem em banco.
+- Não alterar a lógica de qualificação de MQL por BU; apenas alinhar a agregação da aba Marketing com a agregação Comercial.
