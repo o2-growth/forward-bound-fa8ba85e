@@ -1,107 +1,89 @@
-## Objetivo
 
-Inserir uma nova seção **"Performance de Campanhas"** na aba Indicadores → Marketing, posicionada **logo abaixo do card CPV** e **acima** de tudo que existe hoje (Visão Total, Online vs Offline, Curva, Cohort, Campanhas). O conteúdo atual permanece intacto por enquanto — decidiremos depois o que remover, à medida que novas telas chegarem.
+# Resultados Gerais — Dashboard interativo (estilo V4)
 
-Visual inspirado no print Power BI enviado, porém adaptado ao tema dark / design tokens do projeto (sem vermelho corporativo do print; usar verde/primário + cores por canal já em uso).
+Replicar a tela de referência o mais fiel possível, trocando "Pedidos/Ingressos/Cupom" pelos equivalentes no nosso negócio (Vendas / Propostas / Origem) e mantendo todo o restante. Vai dentro da aba **Indicadores → Marketing**, logo abaixo do novo "Funil Comparativo por Fonte".
 
-## Estrutura da nova seção
+## Onde entra
 
-### 1. Strip de KPIs no topo (6 cards)
+Nova seção `OverallResultsSection.tsx` em `src/components/planning/marketing-indicators/performance/`, registrada na `MarketingIndicatorsTab.tsx`. Respeita o `dateRange` global da aba.
 
-Layout em linha (responsivo, 2/3/6 colunas conforme largura):
+## Layout (espelhando o V4)
 
 ```text
-[Meta Inv] [Google Inv] [TOTAL Inv]   [Meta Vendas] [Google Vendas] [TOTAL Vendas]
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ RESULTADOS GERAIS • Período: 01/01 → 12/07                       [⚙ filtros]│
+├──────────┬──────────┬───────────────┬───────────────┬──────────────────────┤
+│ KPI 1    │ KPI 2    │ KPI 3         │ KPI 4         │ KPI 5                 │
+│ Qtd      │ Qtd      │ Valor Vendas  │ Ticket Médio  │ % Realizado Meta      │
+│ Vendas   │ Propostas│ R$ ...        │ (Venda)       │ ...% (meta R$ X)      │
+│ Last Wk  │ Last Wk  │ Last Wk       │ TM Proposta   │ Last Wk: ...          │
+├──────────┴──────────┴───────┬───────┴───────────────┴──────────────────────┤
+│ Métricas (6 tiles clicáveis)│ por Origem (lista barras) │ Evolução temporal│
+│  Qtd Vendas · TM Venda      │   Meta Ads     ...       │ [Mês/Sem/Dia ▾]  │
+│  Qtd Propostas · TM Prop.   │   Google Ads   ...       │ [Vendas/Valor ▾] │
+│  Valor Propostas · % Meta   │   CRM/Direto   ...       │ area chart       │
+│  (clique → ativa métrica)   │   Indicações   ...       │                  │
+├─────────────────────────────┼──────────────┬───────────┼──────────────────┤
+│ por Cidade (barras)         │ por Origem   │ por Estado│ Tabela de Vendas │
+│   São Paulo  87             │ (mesma do    │   SP 182  │ Data · Cliente · │
+│   Belo Horiz 25             │  topo, aqui  │   MG  47  │ Produto · Valor  │
+│   ...                       │  como mini)  │   ...     │ (paginada)       │
+└─────────────────────────────┴──────────────┴───────────┴──────────────────┘
 ```
 
-- Cada canal Meta/Google mostra ícone (logo simplificado já existente), label "Investimento" / "Vendas", valor grande.
-- "Outros" (Outbound + Eventos + Orgânico) aparece como terceiro bloco quando houver dado — agrupando todas as fontes não-pagas/diretas.
-- Os dois cards "TOTAL" recebem destaque visual (borda/gradient primary) para diferenciar dos canais.
-- Valores Vendas seguem o toggle de métrica (quantidade vs R$).
+## Comportamento interativo
 
-### 2. Barra de controles
+- **Filtros globais da seção** (header): período (sincronizado com a aba), Origem, Produto, BU, SDR/Closer.
+- **KPIs do topo**: clique → abre `DetailSheet` listando as vendas/propostas com colunas (cabeçalho fixo, igual padrão já implementado).
+- **Tiles "Métricas"**: clique seleciona qual métrica alimenta o **gráfico de evolução** (Qtd Vendas, TM Venda, Qtd Propostas, TM Proposta, Valor Propostas, % Meta). Tile ativo destacado.
+- **Granularidade do gráfico**: Dia / Semana / Mês (selector).
+- **Listas "por Origem / Cidade / Estado / Produto"**: cada barra é filtro cruzado — clicar filtra todas as outras visões da seção (cross-filter estilo Power BI). Botão "Limpar filtros".
+- **Tabela inferior**: ordenável por coluna, paginada, exportável CSV. Linha clicável → abre o card no Pipefy (deep-link já existe em `mem://tech/pipefy/deep-linking-config-v2`).
+- **Comparativo "Last Week / Last Period"**: cada KPI mostra delta vs período anterior de mesmo tamanho.
+- **Meta editável**: campo "Meta de Vendas (R$)" na engrenagem do header — persistido em `marketing_overall_metas` (nova tabela leve: month/year/meta_vendas/meta_qtd) ou reusar `monetary_metas` se fizer sentido.
 
-- À esquerda: **"Exibir por:"** seletor com opções `Data` (dia), `Semana`, `Mês`.
-- À direita: **tabs de métrica** — `Investimento`, `Impressões`, `Cliques`, `Vendas`, `CPV`, `CPC`, `Faturamento`, `ROAS`, `ROI`. Tab ativa muda o que é plotado nos gráficos abaixo.
-- Toggle adicional **"Quantidade ↔ R$"** (switch) — só habilita quando a métrica selecionada for Vendas/Faturamento (afeta também o KPI Vendas no strip).
+## Fontes de dados (o que já temos vs falta)
 
-### 3. Três gráficos de área (lado a lado)
+**Já temos no dash:**
+- ✅ Qtd Vendas, Valor (MRR/Setup/Pontual), Ticket Médio, % Meta → via `salesInPeriod`, `realRevenue`, `monetary_metas`.
+- ✅ Qtd Propostas + Valor Propostas → cards na fase "Proposta enviada / Follow Up" + valor do card.
+- ✅ Por Origem/Fonte → `detectChannel(card)` (Meta, Google, CRM, Indicação, Evento, Orgânico).
+- ✅ Por Produto → campo `produto` no AttributionCard.
+- ✅ Por SDR/Closer → já filtramos hoje.
+- ✅ Evolução temporal mensal → já agregamos em outras seções.
+- ✅ Tabela detalhada (Data assinatura · Cliente · Qtd · Valor) → `salesCards` ordenado por `dataAssinatura`.
+- ✅ Comparativo "Last Week" → calculável (mesmo intervalo deslocado).
 
-Um gráfico por canal (Meta / Google / Outros), cada um com:
+**NÃO temos hoje (preciso confirmar antes de implementar):**
+- ❌ **Cidade do lead/cliente** — campo `cidade` não existe no `AttributionCard`. Opções: (a) adicionar mapeamento do Pipefy se o pipe tem o campo; (b) puxar via Meta Ads `actions_by_region` (apenas para leads atribuídos a Meta); (c) deixar bloco oculto até termos a fonte.
+- ❌ **Estado/UF** — mesma situação da cidade. Meta Ads expõe **breakdown por região** (estado BR) no insights endpoint. Para Google Ads é `geo_target_region`. Pode ser implementado **só para leads atribuídos a campanhas Meta/Google** — leads CRM/orgânicos não terão UF a menos que adicionemos no formulário.
+- ❌ **"por Cupom"** — não usamos cupons. Substituir por **"por SDR" ou "por Indicador" ou "por Campanha"**. (precisa decisão)
+- ❌ **% Realizado Meta de Qtd (2.000 pedidos)** — temos meta de valor (R$), não de quantidade. Adicionar campo `meta_qtd_vendas` na tabela de metas.
+- ❌ **Qtd Ingressos** — não temos equivalente direto (multi-itens por venda). Estou substituindo por **Qtd Propostas** que é o que faz sentido no funil B2B.
 
-- Mini-header: ícone do canal + valor agregado no período.
-- Área temporal (Recharts `AreaChart`) com gradient sutil na cor do canal:
-  - Meta → azul (já usado no projeto)
-  - Google → verde
-  - Outros → laranja/âmbar
-- Linha de tendência tracejada (regressão linear simples) sobreposta.
-- Labels nos picos (top 3 pontos) com o valor.
-- Eixo X: datas formatadas (`dd 'de' MMM` em pt-BR).
+## Implementação técnica
 
-### 4. Bloco inferior em duas colunas
+**Arquivos novos:**
+- `src/components/planning/marketing-indicators/performance/OverallResultsSection.tsx` (orquestrador)
+- `.../overall-results/KpiStrip.tsx` — 5 cards do topo com delta vs período anterior
+- `.../overall-results/MetricsTilesGrid.tsx` — 6 tiles selecionáveis
+- `.../overall-results/BreakdownList.tsx` — componente reusável para "por Origem / Cidade / Estado / Produto" (barras horizontais + scroll + clique)
+- `.../overall-results/EvolutionChart.tsx` — area chart com seletor de métrica + granularidade
+- `.../overall-results/SalesTable.tsx` — tabela paginada com header fixo
+- `src/hooks/useOverallResults.ts` — agrega vendas + propostas + breakdowns + série temporal a partir de `allAttributionCards`, `salesInPeriod` e `allCampaigns`
+- (opcional, se aprovado) Migration `marketing_overall_metas` com `meta_vendas_valor` e `meta_vendas_qtd` por mês
 
-**Coluna esquerda — Resumo detalhado por canal:**
-Tabela compacta com uma linha por canal (Meta Ads, Google Ads, Outros) e colunas:
+**Cross-filter:** estado local `{ origem?, produto?, cidade?, estado?, sdr? }` em `OverallResultsSection`; cada filho recebe e aplica antes de renderizar. Métricas do topo respeitam o cross-filter.
 
-`Investimento | Impressões | Cliques | Vendas | CPV | CPC | Faturamento | ROAS`
+**Last week / período anterior:** o hook calcula 2× — período atual e período anterior de mesmo tamanho — e devolve `{ atual, anterior, delta% }`.
 
-Header do canal em destaque (negrito + cor do canal).
+**Performance:** memoização agressiva por `dateRange` + filtros; sem novas requisições — tudo derivado de dados já carregados pela aba.
 
-**Coluna direita — "Vendas por Data e Fonte":**
+## Perguntas para destravar antes de eu construir
 
-- Gráfico de barras empilhadas (Recharts `BarChart` com `stackId`).
-- Eixo X: datas no mesmo agrupamento do seletor "Exibir por".
-- Stacks por canal nas mesmas cores.
-- Labels no topo de cada barra com o total empilhado.
-- Legenda no topo.
+1. **"por Cupom"** vira o quê no nosso caso? (Sugiro **"por SDR"** ou **"por Indicador/Closer"**.)
+2. **Cidade/Estado**: posso começar mostrando **apenas leads atribuídos a Meta/Google** (com breakdown geográfico vindo da API de insights) e deixar os outros como "n/d"? Ou prefere ocultar os blocos até termos o campo no formulário de captura?
+3. **Meta de quantidade de vendas** (o "2.000" do print): criar campo separado em metas mensais ou só calcular a partir da meta de valor ÷ ticket médio?
+4. **"Qtd Ingressos"**: confirmo a troca por **Qtd Propostas**? (alternativa: Qtd MQLs.)
 
-## Fontes de dados (já existem no projeto)
-
-- **Investimento / Impressões / Cliques / CPC** por canal e por dia:
-  - Meta → `useMetaCampaigns(from, to)` (insights diários agregáveis).
-  - Google → `useGoogleCampaigns(from, to)`.
-  - Por dia: `useInvestmentByMonth` é mensal — vamos estender para diário ou agregar a partir dos `insights` retornados pelas Edge Functions `fetch-meta-campaigns` / `fetch-google-campaigns` (já trazem breakdown). Se o breakdown diário não vier, pediremos `time_increment=1` (Meta) e granularidade `DAY` (Google) nas próprias edge functions.
-- **Vendas (quantidade e R$)** atribuídas por canal:
-  - Já temos `useMarketingAttribution(allAttributionCards, allCampaigns, campaignNamesMap)` que devolve `channelSummaries` com cards atribuídos a cada canal.
-  - Para quantidade: contar cards na fase "Venda" (regra existente em `sales-phase-universal-definition` + dedup mensal).
-  - Para R$: somar `valorMRR + valorSetup + valorPontual` (sem Educação) dos mesmos cards.
-  - Série temporal por `dataAssinatura` (ou `dataEntrada` quando ausente) agrupada por dia/semana/mês.
-- **Faturamento / ROAS / ROI**: derivados — `faturamento = vendas R$`, `ROAS = faturamento / investimento`, `ROI = (faturamento - investimento) / investimento`.
-- **"Outros"**: cards sem `gclid`/`fbclid`/campanha identificável; agrupa Outbound, Eventos, Orgânico (sem investimento → CPV/ROAS não se aplicam, ficam "—").
-
-## Arquivos
-
-**Novo diretório** `src/components/planning/marketing-indicators/performance/`:
-
-- `PerformanceByChannelSection.tsx` — orquestrador, recebe `dateRange`, `selectedBU`, dados já carregados pelo pai (não re-buscar APIs).
-- `ChannelKpiStrip.tsx` — strip de 6 cards.
-- `MetricControls.tsx` — "Exibir por" + tabs de métrica + toggle Qtd/R$.
-- `ChannelTrendChart.tsx` — gráfico de área reutilizável (recebe canal + série).
-- `ChannelSummaryTable.tsx` — tabela detalhada inferior esquerda.
-- `SalesByDateSourceChart.tsx` — barras empilhadas inferior direita.
-- `usePerformanceByChannel.ts` (hook em `src/hooks/`) — recebe `metaCampaigns`, `googleCampaigns`, `allAttributionCards`, `dateRange`, `granularity`, `metric`, `valueMode` e devolve `{ kpis, series, summary }` memoizado.
-
-**Editar** `src/components/planning/MarketingIndicatorsTab.tsx`:
-
-- Importar `PerformanceByChannelSection` e renderizar logo após o `CacTotalCard` (CPV) e antes da `OnlineOfflineSection`.
-- Passar props já existentes no escopo: `dateRange`, `selectedBU`, `metaCampaigns`, `googleCampaigns`, `allAttributionCards`, `campaignNamesMap`.
-
-**Possível ajuste em edge functions** (só se breakdown diário não vier hoje):
-
-- `supabase/functions/fetch-meta-campaigns/index.ts` — adicionar `time_increment: 1` opcional.
-- `supabase/functions/fetch-google-campaigns/index.ts` — adicionar `segments.date` opcional.
-
-Investigarei o payload atual primeiro; se já houver granularidade suficiente, não alteraremos edge functions nesta etapa.
-
-## Detalhes visuais
-
-- Card raiz: `Card` shadcn com `border-border/40` e leve `bg-card/50`.
-- Título: `Performance por Canal` + subtítulo `Investimento, vendas e tendência por origem`.
-- Cores: usar tokens (`hsl(var(--chart-1..4))`) e cores já estabelecidas para Meta/Google em `marketingChannelGroup.ts`.
-- Animações: fade-in sutil ao trocar de métrica (`transition-opacity duration-300`).
-- Sem hardcode de `text-white`/`bg-black`.
-- Mantém comportamento do filtro de BU do topo (`selectedBU`) — todos os dados respeitam o filtro.
-
-## Fora do escopo (próximas telas que você trará)
-
-Outras visões do dashboard (cohort, online/offline novo, etc.) ficam para os próximos pedidos — uma tela por vez, como combinado.
+Depois das respostas, parto direto para a implementação.
