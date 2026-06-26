@@ -254,7 +254,18 @@ export function CeoViewTab() {
   const operacao = useMemo(() => {
     const data = ops.data;
     const kpis = data?.kpis;
-    const dossier = data?.churnDossier ?? [];
+    const dossierAll = data?.churnDossier ?? [];
+
+    // Filtrar dossier pelo período selecionado na Visão CEO
+    const fromMs = dateRange.from ? dateRange.from.getTime() : -Infinity;
+    const toMs = dateRange.to ? dateRange.to.getTime() : Infinity;
+    const dossier = dossierAll.filter((c: any) => {
+      const raw = c.dataEncerramento;
+      if (!raw) return false;
+      const t = raw instanceof Date ? raw.getTime() : new Date(raw).getTime();
+      if (Number.isNaN(t)) return false;
+      return t >= fromMs && t <= toMs;
+    });
 
     // Churn agrupado por CFO (squad responsável)
     const bySquadMap = new Map<string, { count: number; mrr: number }>();
@@ -270,18 +281,26 @@ export function CeoViewTab() {
       .sort((a, b) => b.count - a.count);
     const churnMrrTotal = churnBySquad.reduce((s, c) => s + c.mrr, 0);
 
+    const churnQtd = dossier.length;
+    const clientesAtivos = kpis?.totalAtivos ?? null;
+    const retencaoRate =
+      clientesAtivos != null && clientesAtivos + churnQtd > 0
+        ? 100 - (churnQtd / (clientesAtivos + churnQtd)) * 100
+        : kpis?.retencaoRate ?? null;
+
     return {
-      clientesAtivos: kpis?.totalAtivos ?? null,
+      clientesAtivos,
       mrrBase: kpis?.mrrTotal ?? null,
       tratativas: kpis?.tratativasAtivas ?? null,
-      churnQtd: kpis?.churn ?? dossier.length,
+      churnQtd,
       churnRate: kpis?.churnRate ?? null,
-      retencaoRate: kpis?.retencaoRate ?? null,
+      retencaoRate,
       mrrEmRisco: kpis?.mrrEmRisco ?? null,
       churnBySquad,
       churnMrrTotal,
     };
-  }, [ops.data]);
+  }, [ops.data, dateRange.from, dateRange.to]);
+
 
   // ─── Pessoas ──────────────────────────────────────────
   const pessoas = useMemo(() => {
