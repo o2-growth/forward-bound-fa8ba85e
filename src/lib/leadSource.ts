@@ -32,7 +32,7 @@
 //   classifyLeadSource({ campanha: '120238490879180418' })                      => 'inbound'
 //   classifyLeadSource({})                                                      => 'sem_origem'
 
-export type LeadSource = 'inbound' | 'outbound' | 'evento' | 'indicacao' | 'sem_origem';
+export type LeadSource = 'inbound' | 'outbound' | 'evento' | 'indicacao' | 'monetizacao' | 'sem_origem';
 
 export interface ClassifyInput {
   tipoOrigem?: string | null;
@@ -47,8 +47,14 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   outbound: 'Outbound',
   evento: 'Eventos',
   indicacao: 'Indicação',
+  monetizacao: 'Monetização',
   sem_origem: 'Sem origem',
 };
+
+// Sentinel value used by useMonetizacaoAnalytics to tag cards coming from
+// the "Funil de Monetização" pipe so classifyLeadSource maps them to 'monetizacao'.
+export const MONETIZACAO_ORIGEM_SENTINEL = '__monetizacao__';
+
 
 const norm = (s?: string | null): string => {
   if (!s) return '';
