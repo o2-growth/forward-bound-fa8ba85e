@@ -357,6 +357,7 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                   BU: {cf.bu}
                   <X className="h-3 w-3 cursor-pointer" onClick={() => setCf(p => ({ ...p, bu: undefined }))} />
                 </Badge>
+              )}
               {cf.sdr && (
                 <Badge variant="secondary" className="gap-1">
                   SDR: {cf.sdr}
