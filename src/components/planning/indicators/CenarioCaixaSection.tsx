@@ -324,10 +324,9 @@ export function CenarioCaixaSection(props: AggregateInput) {
           { key: "name", label: "Empresa" },
           { key: "bu", label: "BU" },
           {
-            key: "regra",
+            key: "regra" as any,
             label: "% aplicada",
-            format: (_v: any, row: any) =>
-              BU_RULE_SHORT[(row?.bu as string) || ""] || "—",
+            format: (v: any) => v ?? "—",
           },
           { key: "phase", label: "Fase Atual", format: columnFormatters.phase },
           { key: "closer", label: "Closer" },
