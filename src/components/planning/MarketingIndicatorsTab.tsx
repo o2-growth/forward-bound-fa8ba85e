@@ -221,10 +221,10 @@ export function MarketingIndicatorsTab() {
   } = useO2TaxMetas(dateRange.from, dateRange.to);
 
   // Fetch Expansão (Franquia) revenue data from Pipefy
-  const { getValueForPeriod: getFranquiaValue } = useExpansaoMetas(dateRange.from, dateRange.to);
+  const { getValueForPeriod: getFranquiaValue, getQtyForPeriod: getFranquiaQty } = useExpansaoMetas(dateRange.from, dateRange.to);
 
   // Fetch Oxy Hacker revenue data from Pipefy
-  const { getValueForPeriod: getOxyHackerValue } = useOxyHackerMetas(dateRange.from, dateRange.to);
+  const { getValueForPeriod: getOxyHackerValue, getQtyForPeriod: getOxyHackerQty } = useOxyHackerMetas(dateRange.from, dateRange.to);
 
   // Calculate real revenue combining data from selected BUs
   const realRevenue = useMemo(() => {
