@@ -594,12 +594,13 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-            <MetricCard label="Clientes ativos" value={fmtInt(operacao.clientesAtivos)} />
-            <MetricCard label="MRR base" value={fmt(operacao.mrrBase)} />
-            <MetricCard label="Tratativas ativas" value={fmtInt(operacao.tratativas)} />
-            <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} tone="danger" />
+            <MetricCard label="Clientes ativos" value={fmtInt(operacao.clientesAtivos)} sublabel="base atual (snapshot)" />
+            <MetricCard label="MRR base" value={fmt(operacao.mrrBase)} sublabel="base atual (snapshot)" />
+            <MetricCard label="Tratativas ativas" value={fmtInt(operacao.tratativas)} sublabel="base atual (snapshot)" />
+            <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} tone="danger" sublabel="no período" />
             <MetricCard label="Retenção" value={fmtPct(operacao.retencaoRate)} />
-            <MetricCard label="MRR em risco" value={fmt(operacao.mrrEmRisco)} tone="danger" />
+            <MetricCard label="MRR em risco" value={fmt(operacao.mrrEmRisco)} tone="danger" sublabel="base atual (snapshot)" />
+
           </div>
           {churnSquadData.length > 0 && (
             <div>
