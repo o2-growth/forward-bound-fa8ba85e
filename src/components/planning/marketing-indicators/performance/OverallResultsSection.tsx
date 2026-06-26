@@ -193,6 +193,8 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
       const k =
         key === "origem" ? CHANNEL_LABEL[detectChannel(c)] || "Outros" :
         key === "produto" ? (c.produto || "—") :
+        key === "sdr" ? (c.sdr || "—") :
+        key === "closer" ? (c.closer || "—") :
         (c.bu || "—");
       const cur = map.get(k) || { qtd: 0, valor: 0 };
       cur.qtd += 1;
@@ -207,6 +209,8 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
   const byOrigem = useMemo(() => breakdown("origem"), [allSalesInPeriod]);
   const byProduto = useMemo(() => breakdown("produto"), [allSalesInPeriod]);
   const byBu = useMemo(() => breakdown("bu"), [allSalesInPeriod]);
+  const bySdr = useMemo(() => breakdown("sdr"), [allSalesInPeriod]);
+  const byCloser = useMemo(() => breakdown("closer"), [allSalesInPeriod]);
 
   // Série temporal
   const timeseries = useMemo(() => {
