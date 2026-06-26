@@ -569,6 +569,8 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                       <TableHead className="text-xs">Produto</TableHead>
                       <TableHead className="text-xs">BU</TableHead>
                       <TableHead className="text-xs">Origem</TableHead>
+                      <TableHead className="text-xs">SDR</TableHead>
+                      <TableHead className="text-xs">Closer</TableHead>
                       <TableHead className="text-xs text-right">MRR</TableHead>
                       <TableHead className="text-xs text-right">Setup</TableHead>
                       <TableHead className="text-xs text-right">Pontual</TableHead>
