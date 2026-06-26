@@ -1,16 +1,31 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { DetailItem } from '@/components/planning/indicators/DetailSheet';
+import { MONETIZACAO_ORIGEM_SENTINEL } from '@/lib/leadSource';
 
-/**
- * Hook do Funil de Monetização — lê do pipe `pipefy_moviment_contrato`
- * (já sincronizado no banco externo). Inclui movimentos de Upsell,
- * Cross-sell (mapeado a partir de "Novo produto"), Troca de produto e Downsell.
- *
- * A tabela é de MOVIMENTOS (mesmo card aparece N vezes). Aqui deduplicamos
- * por ID mantendo a linha mais recente por Entrada, e usamos "Fase Atual"
- * como fase corrente.
- */
+export type MonetizacaoIndicatorType = 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
+
+// Fases do pipe Monetização que contam como "Proposta enviada" no acelerômetro comercial
+const PROPOSTA_PHASES = new Set([
+  'Proposta em Elaboração',
+  'Proposta enviada / Follow Up',
+]);
+
+// Fases do pipe Monetização que contam como "Venda" no acelerômetro comercial
+const VENDA_PHASES = new Set([
+  'Aprovado pelo Cliente',
+  'Jurídico',
+  'Faturamento',
+  'Concluído',
+]);
+
+function mapFaseToIndicator(fase: string): MonetizacaoIndicatorType | null {
+  if (VENDA_PHASES.has(fase)) return 'venda';
+  if (PROPOSTA_PHASES.has(fase)) return 'proposta';
+  return null;
+}
+
+
 
 export const MONETIZACAO_FASES_ORDER = [
   'Start form',
@@ -82,6 +97,8 @@ interface MonetizacaoAnalytics {
     ticketMedio: number;
   };
   toDetailItem: (card: MonetizacaoCard) => DetailItem;
+  getDetailItemsForIndicator: (indicator: MonetizacaoIndicatorType) => DetailItem[];
+
   isLoading: boolean;
   error: unknown;
 }
@@ -194,17 +211,47 @@ export function useMonetizacaoAnalytics(
   const valorGanho = cards.filter((c) => c.ganho).reduce((s, c) => s + c.valorTotal, 0);
   const ticketMedio = cards.length > 0 ? valorPipeline / cards.length : 0;
 
-  const toDetailItem = (card: MonetizacaoCard): DetailItem => ({
-    id: card.id,
-    name: card.titulo || card.id,
-    phase: card.faseAtual,
-    date: card.entrada,
-    value: card.valorTotal,
-    total: card.valorTotal,
-    responsible: card.responsavel,
-    reason: card.motivoPerda || undefined,
-    product: card.tipo,
-  });
+  const toDetailItem = (card: MonetizacaoCard): DetailItem => {
+    const mrr =
+      (card.valores['valor_cfoaas'] || 0) +
+      (card.valores['valor_oxy'] || 0) +
+      (card.valores['valor_assessoria_mrr'] || 0) +
+      (card.valores['valor_bpo'] || 0) +
+      (card.valores['valor_coordenador_financeiro'] || 0);
+    const setup = card.valores['valor_setup'] || 0;
+    const pontual =
+      (card.valores['valor_diagn_stico'] || 0) +
+      (card.valores['valor_turnaround'] || 0) +
+      (card.valores['valor_valuation'] || 0);
+    const value = mrr + setup + pontual;
+    return {
+      id: card.id,
+      name: card.titulo || card.id,
+      phase: card.faseAtual,
+      date: card.entrada,
+      value,
+      total: value,
+      mrr,
+      setup,
+      pontual,
+      responsible: card.responsavel,
+      reason: card.motivoPerda || undefined,
+      product: card.tipo,
+      bu: 'Monetização',
+      tipoOrigem: MONETIZACAO_ORIGEM_SENTINEL,
+    };
+  };
+
+  // Mapeia cards para itens de drill-down do acelerômetro comercial
+  // (Proposta / Venda). MQL / RM / RR não existem nesse pipe.
+  const getDetailItemsForIndicator = (
+    indicator: MonetizacaoIndicatorType,
+  ): DetailItem[] => {
+    if (indicator !== 'proposta' && indicator !== 'venda') return [];
+    return cards
+      .filter((c) => mapFaseToIndicator(c.faseAtual) === indicator)
+      .map(toDetailItem);
+  };
 
   return {
     cards,
@@ -217,7 +264,9 @@ export function useMonetizacaoAnalytics(
       ticketMedio,
     },
     toDetailItem,
+    getDetailItemsForIndicator,
     isLoading,
     error,
   };
+
 }

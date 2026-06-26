@@ -1172,9 +1172,18 @@ export function IndicatorsTab() {
       }
     }
 
+    // MONETIZAÇÃO (origem transversal — não depende de BU, Closer ou SDR)
+    // Conta apenas Proposta e Venda; pipe não gera MQL/RM/RR.
+    if (
+      (indicator.key === 'proposta' || indicator.key === 'venda') &&
+      (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
+    ) {
+      total += monetizacaoAnalytics.getDetailItemsForIndicator(indicator.key).length;
+    }
 
     return total;
   };
+
 
   const buildChartData = (indicator: IndicatorConfig) => {
     // Helper: agrupa cards (com filtro de closer/SDR aplicado) na mesma granularidade
@@ -1596,10 +1605,17 @@ export function IndicatorsTab() {
         }
       }
     }
-
+    // MONETIZAÇÃO (transversal): só Proposta e Venda
+    if (
+      (indicatorKey === 'proposta' || indicatorKey === 'venda') &&
+      (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
+    ) {
+      items = [...items, ...monetizacaoAnalytics.getDetailItemsForIndicator(indicatorKey)];
+    }
 
     return items;
   };
+
 
   // Pre-compute items for each indicator for Weekly/Monthly comparison panels.
   // This avoids stale-closure issues when passing getItemsForIndicator as a callback.
@@ -2435,7 +2451,22 @@ export function IndicatorsTab() {
       });
     };
 
+    // Helper: soma da Monetização para indicadores monetários (transversal)
+    const monetizacaoVenda = monetizacaoAnalytics.getDetailItemsForIndicator('venda');
+    const includeMonetizacao =
+      selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao');
+    const sumMonet = (field: 'mrr' | 'setup' | 'pontual' | 'total'): number => {
+      if (!includeMonetizacao) return 0;
+      return monetizacaoVenda.reduce((s, it) => s + ((it as any)[field] || 0), 0);
+    };
+
+
     switch (indicator.key) {
+      // Monetização transversal: soma só quando origem inclui 'monetizacao' (ou está sem filtro)
+      // Mapeia valores do drill-down (já com MRR/Setup/Pontual calculados).
+      // Não depende de BU/Closer/SDR — pipe é separado.
+      // (executado mais abaixo dentro de cada case)
+
       case 'faturamento': {
         let total = 0;
 
@@ -2475,7 +2506,9 @@ export function IndicatorsTab() {
           }
         }
 
+        total += sumMonet('total');
         return total;
+
       }
 
       case 'sla': {
@@ -2514,7 +2547,9 @@ export function IndicatorsTab() {
           const cards = filtered ?? o2TaxAnalytics.getCardsForIndicator('venda');
           total += cards.reduce((acc, card) => acc + (card.valorMRR || 0), 0);
         }
+        total += sumMonet('mrr');
         return total;
+
       }
 
       case 'setup': {
@@ -2532,7 +2567,9 @@ export function IndicatorsTab() {
           const cards = filtered ?? o2TaxAnalytics.getCardsForIndicator('venda');
           total += cards.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
         }
+        total += sumMonet('setup');
         return total;
+
       }
 
       case 'pontual': {
@@ -2568,7 +2605,9 @@ export function IndicatorsTab() {
             total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
           }
         }
+        total += sumMonet('pontual');
         return total;
+
       }
 
       default:
@@ -3109,8 +3148,10 @@ export function IndicatorsTab() {
                 { value: 'outbound', label: LEAD_SOURCE_LABELS.outbound },
                 { value: 'evento', label: LEAD_SOURCE_LABELS.evento },
                 { value: 'indicacao', label: LEAD_SOURCE_LABELS.indicacao },
+                { value: 'monetizacao', label: LEAD_SOURCE_LABELS.monetizacao },
                 { value: 'sem_origem', label: LEAD_SOURCE_LABELS.sem_origem },
               ]}
+
               selected={selectedOrigens}
               onSelectionChange={(v) => setSelectedOrigens(v as LeadSource[])}
               placeholder="Todas Origens"
