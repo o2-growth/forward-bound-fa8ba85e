@@ -2547,7 +2547,9 @@ export function IndicatorsTab() {
           const cards = filtered ?? o2TaxAnalytics.getCardsForIndicator('venda');
           total += cards.reduce((acc, card) => acc + (card.valorMRR || 0), 0);
         }
+        total += sumMonet('mrr');
         return total;
+
       }
 
       case 'setup': {
