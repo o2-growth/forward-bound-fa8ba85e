@@ -2605,7 +2605,9 @@ export function IndicatorsTab() {
             total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
           }
         }
+        total += sumMonet('pontual');
         return total;
+
       }
 
       default:
