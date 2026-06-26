@@ -1092,11 +1092,11 @@ export function CeoViewTab() {
         />
         <CardContent>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            <MetricCard label="NPS" value={String(nps.score)} sublabel={`meta ${nps.meta}`} tone={nps.score >= nps.meta ? "success" : "default"} />
-            <MetricCard label="CSAT" value={`${nps.csat}%`} />
-            <MetricCard label="Promotores" value={`${nps.promotores.pct}%`} sublabel={`${nps.promotores.count} clientes`} tone="success" />
-            <MetricCard label="Neutros" value={`${nps.neutros.pct}%`} sublabel={`${nps.neutros.count} clientes`} />
-            <MetricCard label="Detratores" value={`${nps.detratores.pct}%`} sublabel={`${nps.detratores.count} clientes`} tone="danger" />
+            <MetricCard label="NPS" value={String(nps.score)} sublabel={`meta ${nps.meta}`} tone={nps.score >= nps.meta ? "success" : "default"} onClick={() => openDrill(drillNps())} />
+            <MetricCard label="CSAT" value={`${nps.csat}%`} onClick={() => openDrill(drillCsat())} />
+            <MetricCard label="Promotores" value={`${nps.promotores.pct}%`} sublabel={`${nps.promotores.count} clientes`} tone="success" onClick={() => openDrill(drillPromotores())} />
+            <MetricCard label="Neutros" value={`${nps.neutros.pct}%`} sublabel={`${nps.neutros.count} clientes`} onClick={() => openDrill(drillNeutros())} />
+            <MetricCard label="Detratores" value={`${nps.detratores.pct}%`} sublabel={`${nps.detratores.count} clientes`} tone="danger" onClick={() => openDrill(drillDetratores())} />
           </div>
         </CardContent>
       </Card>
