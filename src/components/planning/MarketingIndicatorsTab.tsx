@@ -45,6 +45,7 @@ import { useMarketingSheetData } from "@/hooks/useMarketingSheetData";
 import { OnlineOfflineSection } from "./marketing-indicators/OnlineOfflineSection";
 import { ConversionCurveSection } from "./marketing-indicators/ConversionCurveSection";
 import { CohortTable } from "./marketing-indicators/CohortTable";
+import { PerformanceByChannelSection } from "./marketing-indicators/performance/PerformanceByChannelSection";
 
 
 
@@ -773,6 +774,12 @@ export function MarketingIndicatorsTab() {
       <CacTotalCard
         investment={investmentTotalForRange}
         sales={salesInPeriod.length}
+      />
+
+      {/* ===== NEW: Performance por Canal (Power BI-style) ===== */}
+      <PerformanceByChannelSection
+        dateRange={dateRange}
+        salesCards={salesInPeriod}
       />
 
       {/* ===== NEW: Online vs Offline ===== */}
