@@ -173,8 +173,12 @@ export function CeoViewTab() {
   const o2tax = useO2TaxMetas(startDate, endDate);
   const expansao = useExpansaoMetas(startDate, endDate);
   const oxyHacker = useOxyHackerMetas(startDate, endDate);
+  const outbound = useOutboundAnalytics(startDate, endDate);
+  const monetizacao = useMonetizacaoAnalytics(startDate, endDate);
   const metaCampaigns = useMetaCampaigns(startDate, endDate);
   const googleCampaigns = useGoogleCampaigns(startDate, endDate);
+  const marketingSheet = useMarketingSheetData({ startDate, endDate });
+  const npsQuery = useNpsData();
   const ops = useOperationsData();
   const hr = useHrData({ startDate, endDate });
 
@@ -182,16 +186,26 @@ export function CeoViewTab() {
     modeloAtual.isLoading || o2tax.isLoading || expansao.isLoading || oxyHacker.isLoading || hr.isLoading;
 
   // ─── Comercial / Receita ──────────────────────────────
+  // Mesma base do acelerômetro Comercial: 4 BUs + Outbound + Funil Monetização (apenas "Concluído").
   const comercial = useMemo(() => {
+    const outboundVendaCards = outbound.getCardsForIndicator("venda");
+    const outboundValor = outboundVendaCards.reduce((s, c) => s + (c.valor || 0), 0);
+
+    const monetVendaItems = monetizacao.getDetailItemsForIndicator("venda");
+    const monetValor = monetVendaItems.reduce((s, i) => s + (i.value || 0), 0);
+
     const buSales = [
       { key: "Modelo Atual", qty: modeloAtual.getQtyForPeriod("venda", startDate, endDate), value: modeloAtual.getValueForPeriod("venda", startDate, endDate) },
       { key: "O2 Tax", qty: o2tax.getQtyForPeriod("venda", startDate, endDate), value: o2tax.getValueForPeriod("venda", startDate, endDate) },
       { key: "Franquia", qty: expansao.getQtyForPeriod("venda", startDate, endDate), value: expansao.getValueForPeriod("venda", startDate, endDate) },
       { key: "Oxy Hacker", qty: oxyHacker.getQtyForPeriod("venda", startDate, endDate), value: oxyHacker.getValueForPeriod("venda", startDate, endDate) },
+      { key: "Outbound", qty: outboundVendaCards.length, value: outboundValor },
+      { key: "Monetização", qty: monetVendaItems.length, value: monetValor },
     ];
     const totalSales = buSales.reduce((s, b) => s + b.qty, 0);
     const totalRevenue = buSales.reduce((s, b) => s + b.value, 0);
 
+    // MRR novo: regra do projeto — apenas Modelo Atual + O2 TAX entram no MRR recorrente novo.
     const mrrNovo = (modeloAtual.getMrrForPeriod?.(startDate, endDate) ?? 0) + (o2tax.getMrrForPeriod?.(startDate, endDate) ?? 0);
     const arr = mrrNovo * 12;
     const ticketMedio = totalSales > 0 ? totalRevenue / totalSales : null;
@@ -199,7 +213,7 @@ export function CeoViewTab() {
     const bestBu = [...buSales].sort((a, b) => b.value - a.value)[0];
 
     return { buSales, totalSales, totalRevenue, mrrNovo, arr, ticketMedio, bestBu };
-  }, [modeloAtual, o2tax, expansao, oxyHacker, startDate, endDate]);
+  }, [modeloAtual, o2tax, expansao, oxyHacker, outbound, monetizacao, startDate, endDate]);
 
   // ─── Aquisição / Marketing ────────────────────────────
   const aquisicao = useMemo(() => {
@@ -208,15 +222,19 @@ export function CeoViewTab() {
     const metaLeads = (metaCampaigns.data ?? []).reduce((s, c) => s + (c.leads || 0), 0);
     const googleLeads = (googleCampaigns.data ?? []).reduce((s, c) => s + (c.leads || 0), 0);
 
-    const mediaInvestment = metaSpend + googleSpend;
+    // Mesma fonte da aba Marketing: prioriza planilha consolidada (`midiaTotal`),
+    // com fallback para soma direta de Meta + Google via API.
+    const sheetTotal = marketingSheet.data?.midiaTotal ?? 0;
+    const mediaInvestment = sheetTotal > 0 ? sheetTotal : metaSpend + googleSpend;
     const totalLeads = metaLeads + googleLeads;
 
-    // MQLs reais por BU (mesma lógica das abas de indicadores)
+    // MQLs reais por BU + Outbound (alinhado ao acelerômetro Comercial e à aba Marketing).
     const totalMqls =
       modeloAtual.getQtyForPeriod("mql", startDate, endDate) +
       o2tax.getQtyForPeriod("mql", startDate, endDate) +
       expansao.getQtyForPeriod("mql", startDate, endDate) +
-      oxyHacker.getQtyForPeriod("mql", startDate, endDate);
+      oxyHacker.getQtyForPeriod("mql", startDate, endDate) +
+      outbound.getCardsForIndicator("mql").length;
 
     const custoMql = totalMqls > 0 ? mediaInvestment / totalMqls : null;
     const cpl = totalLeads > 0 ? mediaInvestment / totalLeads : null;
@@ -230,7 +248,7 @@ export function CeoViewTab() {
     const bestChannel = ranked[0] ?? null;
 
     return { metaSpend, googleSpend, mediaInvestment, metaLeads, googleLeads, totalLeads, totalMqls, custoMql, cpl, channels, bestChannel };
-  }, [metaCampaigns.data, googleCampaigns.data, modeloAtual, o2tax, expansao, oxyHacker, startDate, endDate]);
+  }, [metaCampaigns.data, googleCampaigns.data, marketingSheet.data, modeloAtual, o2tax, expansao, oxyHacker, outbound, startDate, endDate]);
 
   // ─── Operação / Churn ─────────────────────────────────
   const operacao = useMemo(() => {
