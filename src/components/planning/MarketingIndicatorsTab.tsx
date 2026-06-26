@@ -345,6 +345,8 @@ export function MarketingIndicatorsTab() {
         produto: c.produto, valor: c.valor,
         valorMRR: c.valorMRR, valorSetup: c.valorSetup, valorPontual: c.valorPontual,
         bu: 'O2 TAX',
+        sdr: (c as any).responsavel || (c as any).sdr || undefined,
+        closer: (c as any).closer || undefined,
       });
     }
 
