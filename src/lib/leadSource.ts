@@ -130,8 +130,14 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   const campanha = norm(c.campanha);
   const sdr = norm(c.sdr);
 
+  // 0) MONETIZAÇÃO — sentinel injetado por useMonetizacaoAnalytics
+  if ((c.tipoOrigem || '').trim() === MONETIZACAO_ORIGEM_SENTINEL) {
+    return 'monetizacao';
+  }
+
   const allEmpty = !tipo && !origem && !fonte && !campanha && !sdr;
   if (allEmpty) return 'sem_origem';
+
 
   // 1) EVENTO — prioridade máxima
   if (
