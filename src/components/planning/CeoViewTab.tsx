@@ -7,10 +7,14 @@ import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
 import { useO2TaxMetas } from "@/hooks/useO2TaxMetas";
 import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
 import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
+import { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
+import { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
 import { useMetaCampaigns } from "@/hooks/useMetaCampaigns";
 import { useGoogleCampaigns } from "@/hooks/useGoogleCampaigns";
+import { useMarketingSheetData } from "@/hooks/useMarketingSheetData";
 import { useOperationsData } from "@/hooks/useOperationsData";
 import { useHrData } from "@/hooks/useHrData";
+import { useNpsData } from "@/hooks/useNpsData";
 import { NPS_METRICS, NPS_DISTRIBUTION } from "./nps/npsData";
 import { openCeoReport, type ReportSection } from "./ceo/ceoReport";
 import {
