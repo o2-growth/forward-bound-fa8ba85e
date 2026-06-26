@@ -1,8 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Users, FileText, Wallet, Target, TrendingUp, MapPin, Building2,
   Calendar as CalIcon, ChevronRight, X, Info, ArrowUpRight, ArrowDownRight,
+  Settings, UserCircle2, UserCheck,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from "@/components/ui/card";
