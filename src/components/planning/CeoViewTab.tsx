@@ -301,15 +301,32 @@ export function CeoViewTab() {
     };
   }, [hr.headcountByTime, hr.turnoverByTime, hr.headcountTotal, hr.turnoverGeral, hr.tempoMedioDeCasaDias, hr.admissoesNoPeriodo, hr.desligadosNoPeriodo]);
 
-  // ─── NPS (base Q4 2025) ───────────────────────────────
-  const nps = {
-    score: NPS_METRICS.nps.score,
-    meta: NPS_METRICS.nps.meta,
-    csat: NPS_METRICS.csat.score,
-    promotores: NPS_DISTRIBUTION.promotores,
-    detratores: NPS_DISTRIBUTION.detratores,
-    neutros: NPS_DISTRIBUTION.neutros,
-  };
+  // ─── NPS — prioriza dados ao vivo (mesma fonte da aba NPS); fallback no snapshot Q4/2025 ──
+  const nps = useMemo(() => {
+    const live = npsQuery.data;
+    const liveScore = live?.metrics?.nps?.score;
+    const hasLive = typeof liveScore === "number" && (live?.kpis?.respostas ?? 0) > 0;
+    if (hasLive && live) {
+      return {
+        score: live.metrics.nps.score,
+        meta: live.metrics.nps.meta,
+        csat: live.metrics.csat.score,
+        promotores: live.npsDistribution.promotores,
+        detratores: live.npsDistribution.detratores,
+        neutros: live.npsDistribution.neutros,
+        source: "live" as const,
+      };
+    }
+    return {
+      score: NPS_METRICS.nps.score,
+      meta: NPS_METRICS.nps.meta,
+      csat: NPS_METRICS.csat.score,
+      promotores: NPS_DISTRIBUTION.promotores,
+      detratores: NPS_DISTRIBUTION.detratores,
+      neutros: NPS_DISTRIBUTION.neutros,
+      source: "snapshot" as const,
+    };
+  }, [npsQuery.data]);
 
   // ─── Relatórios por área ──────────────────────────────
   const generatedAt = format(new Date(), "dd/MM/yyyy HH:mm");
