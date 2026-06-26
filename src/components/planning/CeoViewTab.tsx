@@ -84,25 +84,37 @@ interface MetricCardProps {
   placeholder?: boolean;
   large?: boolean;
   tone?: "default" | "danger" | "success";
+  onClick?: () => void;
 }
-function MetricCard({ label, value, sublabel, icon, placeholder, large, tone = "default" }: MetricCardProps) {
+function MetricCard({ label, value, sublabel, icon, placeholder, large, tone = "default", onClick }: MetricCardProps) {
   const toneCls =
     tone === "danger"
       ? "border-destructive/40"
       : tone === "success"
         ? "border-green-500/40"
         : "border-border";
+  const interactive = !!onClick && !placeholder;
+  const Comp: any = interactive ? "button" : "div";
   return (
-    <div
-      className={`flex flex-col items-center justify-center rounded-lg border p-4 ${
+    <Comp
+      type={interactive ? "button" : undefined}
+      onClick={onClick}
+      className={`group relative flex w-full flex-col items-center justify-center rounded-lg border p-4 text-left ${
         large ? "min-h-[120px]" : "min-h-[90px]"
-      } ${placeholder ? "bg-muted/30 border-dashed border-muted-foreground/30" : `bg-card ${toneCls}`}`}
+      } ${placeholder ? "bg-muted/30 border-dashed border-muted-foreground/30" : `bg-card ${toneCls}`} ${
+        interactive ? "cursor-pointer transition hover:border-primary/50 hover:bg-accent/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring" : ""
+      }`}
     >
       {icon && <div className="mb-1 text-muted-foreground">{icon}</div>}
       <span className={`font-bold leading-tight text-foreground ${large ? "text-2xl" : "text-lg"}`}>{value}</span>
       <span className="mt-0.5 text-center text-xs leading-tight text-muted-foreground">{label}</span>
       {sublabel && <span className="mt-0.5 text-[10px] italic text-muted-foreground/60">{sublabel}</span>}
-    </div>
+      {interactive && (
+        <span className="absolute right-2 top-2 text-[10px] text-muted-foreground/40 opacity-0 transition group-hover:opacity-100">
+          ver detalhes →
+        </span>
+      )}
+    </Comp>
   );
 }
 
