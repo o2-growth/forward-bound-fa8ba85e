@@ -46,6 +46,7 @@ import { OnlineOfflineSection } from "./marketing-indicators/OnlineOfflineSectio
 import { ConversionCurveSection } from "./marketing-indicators/ConversionCurveSection";
 import { CohortTable } from "./marketing-indicators/CohortTable";
 import { PerformanceByChannelSection } from "./marketing-indicators/performance/PerformanceByChannelSection";
+import { CreativeAdPerformanceSection } from "./marketing-indicators/performance/CreativeAdPerformanceSection";
 
 
 
@@ -780,6 +781,14 @@ export function MarketingIndicatorsTab() {
       <PerformanceByChannelSection
         dateRange={dateRange}
         salesCards={salesInPeriod}
+      />
+
+      {/* ===== NEW: Performance de Campanhas — Criativos ===== */}
+      <CreativeAdPerformanceSection
+        dateRange={dateRange}
+        salesCards={salesInPeriod}
+        campaignFunnels={campaignFunnels}
+        allCampaigns={allCampaigns}
       />
 
       {/* ===== NEW: Online vs Offline ===== */}
