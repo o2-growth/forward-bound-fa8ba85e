@@ -986,11 +986,11 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            <MetricCard label="Total de vendas" value={fmtInt(comercial.totalSales)} />
-            <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} />
-            <MetricCard label="MRR novo" value={fmt(comercial.mrrNovo)} />
-            <MetricCard label="Ticket médio" value={fmt(comercial.ticketMedio)} sublabel="receita / vendas" />
-            <MetricCard label="Melhor BU" value={comercial.bestBu?.key ?? "—"} sublabel={comercial.bestBu ? fmt(comercial.bestBu.value) : undefined} tone="success" />
+            <MetricCard label="Total de vendas" value={fmtInt(comercial.totalSales)} onClick={() => openDrill(drillTotalVendas())} />
+            <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} onClick={() => openDrill(drillFaturamento())} />
+            <MetricCard label="MRR novo" value={fmt(comercial.mrrNovo)} onClick={() => openDrill(drillArr())} />
+            <MetricCard label="Ticket médio" value={fmt(comercial.ticketMedio)} sublabel="receita / vendas" onClick={() => openDrill(drillTicket())} />
+            <MetricCard label="Melhor BU" value={comercial.bestBu?.key ?? "—"} sublabel={comercial.bestBu ? fmt(comercial.bestBu.value) : undefined} tone="success" onClick={() => openDrill(drillMelhorBu())} />
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
