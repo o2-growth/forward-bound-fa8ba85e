@@ -97,6 +97,8 @@ interface MonetizacaoAnalytics {
     ticketMedio: number;
   };
   toDetailItem: (card: MonetizacaoCard) => DetailItem;
+  getDetailItemsForIndicator: (indicator: MonetizacaoIndicatorType) => DetailItem[];
+
   isLoading: boolean;
   error: unknown;
 }
