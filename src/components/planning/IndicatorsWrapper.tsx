@@ -1,9 +1,9 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { IndicatorsTab } from "@/components/planning/IndicatorsTab";
 import { MarketingIndicatorsTab } from "@/components/planning/MarketingIndicatorsTab";
-import { GrowthTab } from "@/components/planning/GrowthTab";
+import { CeoViewTab } from "@/components/planning/CeoViewTab";
 import { PessoasTab } from "@/components/planning/PessoasTab";
-import { BarChart3, TrendingUp, Rocket, Users } from "lucide-react";
+import { BarChart3, TrendingUp, Crown, Users } from "lucide-react";
 
 export function IndicatorsWrapper() {
   return (
@@ -18,8 +18,8 @@ export function IndicatorsWrapper() {
           <span className="hidden sm:inline">Marketing</span>
         </TabsTrigger>
         <TabsTrigger value="growth" className="gap-2">
-          <Rocket className="h-4 w-4" />
-          <span className="hidden sm:inline">Growth</span>
+          <Crown className="h-4 w-4" />
+          <span className="hidden sm:inline">Visão CEO</span>
         </TabsTrigger>
         <TabsTrigger value="pessoas" className="gap-2">
           <Users className="h-4 w-4" />
@@ -36,7 +36,7 @@ export function IndicatorsWrapper() {
       </TabsContent>
 
       <TabsContent value="growth" className="mt-0">
-        <GrowthTab />
+        <CeoViewTab />
       </TabsContent>
 
       <TabsContent value="pessoas" className="mt-0">
