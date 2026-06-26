@@ -467,7 +467,7 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
             </Card>
           </div>
 
-          {/* ─── Linha 3: por Produto + por BU + por Estado/Cidade (placeholder) + Tabela ─── */}
+          {/* ─── Linha 3: por Produto + por BU + por SDR + por Closer ─── */}
           <div className="grid grid-cols-12 gap-4">
             <Card className="col-span-12 lg:col-span-3 p-3 border-border/50">
               <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">por Produto</div>
@@ -481,21 +481,55 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
               <BarList items={byBu} onClick={(name) => setCf(p => ({ ...p, bu: name }))} />
             </Card>
 
-            <Card className="col-span-12 lg:col-span-3 p-3 border-border/50 bg-muted/10 border-dashed">
+            <Card className="col-span-12 lg:col-span-3 p-3 border-border/50">
+              <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1">
+                <UserCircle2 className="h-3 w-3" /> por SDR
+              </div>
+              <BarList items={bySdr} onClick={(name) => setCf(p => ({ ...p, sdr: name }))} />
+            </Card>
+
+            <Card className="col-span-12 lg:col-span-3 p-3 border-border/50">
+              <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1">
+                <UserCheck className="h-3 w-3" /> por Closer
+              </div>
+              <BarList items={byCloser} onClick={(name) => setCf(p => ({ ...p, closer: name }))} />
+            </Card>
+          </div>
+
+          {/* ─── Linha 4: Totalizadores + nota Cidade/Estado ─── */}
+          <div className="grid grid-cols-12 gap-4">
+            <Card className="col-span-12 lg:col-span-6 p-3 border-border/50 bg-muted/10 border-dashed">
               <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1">
                 <MapPin className="h-3 w-3" /> por Estado / Cidade
               </div>
-              <div className="flex flex-col items-center justify-center h-[200px] text-center px-2">
-                <Info className="h-8 w-8 text-muted-foreground/50 mb-2" />
+              <div className="flex items-start gap-3 px-2">
+                <Info className="h-6 w-6 text-muted-foreground/50 mt-1 shrink-0" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Dados geográficos virão do <b>Meta Insights breakdown=region</b> (Meta Ads)
-                  e do <b>geo_target_region</b> (Google Ads) — atribuídos por campanha.
-                </p>
-                <p className="text-[10px] text-muted-foreground/70 mt-2 italic">
+                  e do <b>geo_target_region</b> (Google Ads), com atribuição por campanha.
                   Para leads CRM/orgânicos é necessário adicionar campo de UF/Cidade no formulário de captura.
                 </p>
               </div>
             </Card>
+
+            <Card className="col-span-12 lg:col-span-6 p-3 border-border/50">
+              <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Totalizadores</div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                <Row label="Vendas no período"        value={num(kpis.qtdV)} />
+                <Row label="Receita total"            value={brlK(kpis.valorV)} bold />
+                <Row label="Propostas no período"     value={num(kpis.qtdP)} />
+                <Row label="Pipeline de propostas"    value={brlK(kpis.valorP)} />
+                <Row label="Taxa Proposta → Venda"    value={kpis.qtdP > 0 ? pct(kpis.qtdV / kpis.qtdP) : "—"} />
+                <Row label="BUs ativas"               value={String(byBu.length)} />
+                <Row label="Origens detectadas"       value={String(byOrigem.length)} />
+                <Row label="SDRs / Closers"           value={`${bySdr.length} / ${byCloser.length}`} />
+              </div>
+            </Card>
+          </div>
+
+          {/* legacy totalizadores card removido — agora consolidado acima */}
+          <div className="hidden">
+            <Card><div /></Card>
 
             <Card className="col-span-12 lg:col-span-3 p-3 border-border/50">
               <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Totalizadores</div>
