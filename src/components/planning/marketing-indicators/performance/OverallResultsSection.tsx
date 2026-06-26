@@ -1,8 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Users, FileText, Wallet, Target, TrendingUp, MapPin, Building2,
   Calendar as CalIcon, ChevronRight, X, Info, ArrowUpRight, ArrowDownRight,
+  Settings, UserCircle2, UserCheck,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from "@/components/ui/card";
@@ -50,7 +55,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   outros: "Outros",
 };
 
-type GroupKey = "origem" | "produto" | "bu";
+type GroupKey = "origem" | "produto" | "bu" | "sdr" | "closer";
 type Granularity = "day" | "week" | "month";
 type MetricKey =
   | "qtd_vendas" | "valor_vendas" | "tm_venda"
@@ -83,17 +88,50 @@ function inRange(d: Date | null | undefined, from: Date, to: Date) {
 // ─── component ───────────────────────────────────────────────────────────────
 export function OverallResultsSection({ dateRange, allAttributionCards, salesCards }: Props) {
   // Cross-filter state
-  const [cf, setCf] = useState<{ origem?: string; produto?: string; bu?: string }>({});
+  const [cf, setCf] = useState<{ origem?: string; produto?: string; bu?: string; sdr?: string; closer?: string }>({});
   const [granularity, setGranularity] = useState<Granularity>("month");
   const [activeMetric, setActiveMetric] = useState<MetricKey>("valor_vendas");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const pageSize = 15;
 
+  // Meta editável (persistida em localStorage por mês corrente do período)
+  const metaKey = `overall_meta_${dateRange.from.getFullYear()}_${dateRange.from.getMonth() + 1}`;
+  const [metaQtdInput, setMetaQtdInput] = useState<string>("");
+  const [metaValorInput, setMetaValorInput] = useState<string>("");
+  const [metaQtd, setMetaQtd] = useState<number>(0);
+  const [metaValor, setMetaValor] = useState<number>(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(metaKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setMetaQtd(Number(parsed.qtd) || 0);
+        setMetaValor(Number(parsed.valor) || 0);
+        setMetaQtdInput(String(parsed.qtd ?? ""));
+        setMetaValorInput(String(parsed.valor ?? ""));
+      } else {
+        setMetaQtd(0); setMetaValor(0); setMetaQtdInput(""); setMetaValorInput("");
+      }
+    } catch { /* ignore */ }
+  }, [metaKey]);
+
+  const saveMeta = () => {
+    const qtd = Number(metaQtdInput) || 0;
+    const valor = Number(metaValorInput) || 0;
+    localStorage.setItem(metaKey, JSON.stringify({ qtd, valor }));
+    setMetaQtd(qtd); setMetaValor(valor);
+    setSettingsOpen(false);
+  };
+
   const passesCf = (c: AttributionCard) => {
     if (cf.origem && detectChannel(c) !== cf.origem) return false;
     if (cf.produto && (c.produto || "—") !== cf.produto) return false;
     if (cf.bu && c.bu !== cf.bu) return false;
+    if (cf.sdr && (c.sdr || "—") !== cf.sdr) return false;
+    if (cf.closer && (c.closer || "—") !== cf.closer) return false;
     return true;
   };
 
@@ -141,10 +179,12 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
     return { qtdV, valorV, tmV, qtdP, valorP, tmP, qtdVprev, valorVprev, tmVprev, qtdPprev, valorPprev, tmPprev };
   }, [allSalesInPeriod, propostasInPeriod, allSalesPrev, propostasPrev]);
 
-  // Meta (calculada a partir de TM se não houver registro explícito)
-  const metaQtd = kpis.tmV > 0 ? Math.round((kpis.valorV / kpis.tmV) * 1.2) : 100; // placeholder leve
-  const metaPctRealizado = metaQtd > 0 ? kpis.qtdV / metaQtd : 0;
-  const metaPctPrev = metaQtd > 0 ? kpis.qtdVprev / metaQtd : 0;
+  // Meta: usa valor salvo no localStorage; fallback estimado por TM se vazio
+  const metaQtdEffective = metaQtd > 0 ? metaQtd : (kpis.tmV > 0 ? Math.round((kpis.valorV / kpis.tmV) * 1.2) : 100);
+  const metaValorEffective = metaValor > 0 ? metaValor : (metaQtdEffective * (kpis.tmV || 0));
+  const metaPctRealizado = metaQtdEffective > 0 ? kpis.qtdV / metaQtdEffective : 0;
+  const metaPctPrev = metaQtdEffective > 0 ? kpis.qtdVprev / metaQtdEffective : 0;
+  const metaValorPct = metaValorEffective > 0 ? kpis.valorV / metaValorEffective : 0;
 
   // Breakdowns
   const breakdown = (key: GroupKey) => {
@@ -153,6 +193,8 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
       const k =
         key === "origem" ? CHANNEL_LABEL[detectChannel(c)] || "Outros" :
         key === "produto" ? (c.produto || "—") :
+        key === "sdr" ? (c.sdr || "—") :
+        key === "closer" ? (c.closer || "—") :
         (c.bu || "—");
       const cur = map.get(k) || { qtd: 0, valor: 0 };
       cur.qtd += 1;
@@ -167,6 +209,8 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
   const byOrigem = useMemo(() => breakdown("origem"), [allSalesInPeriod]);
   const byProduto = useMemo(() => breakdown("produto"), [allSalesInPeriod]);
   const byBu = useMemo(() => breakdown("bu"), [allSalesInPeriod]);
+  const bySdr = useMemo(() => breakdown("sdr"), [allSalesInPeriod]);
+  const byCloser = useMemo(() => breakdown("closer"), [allSalesInPeriod]);
 
   // Série temporal
   const timeseries = useMemo(() => {
@@ -257,11 +301,42 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                 Dashboard interativo de vendas, propostas e breakdown por origem, produto e BU. Clique nas listas para filtrar.
               </p>
             </div>
-            {hasAnyFilter && (
-              <Button variant="outline" size="sm" onClick={() => setCf({})} className="gap-1">
-                <X className="h-3 w-3" /> Limpar filtros
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {hasAnyFilter && (
+                <Button variant="outline" size="sm" onClick={() => setCf({})} className="gap-1">
+                  <X className="h-3 w-3" /> Limpar filtros
+                </Button>
+              )}
+              <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Settings className="h-3 w-3" /> Metas
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Metas — {dateRange.from.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3 py-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Meta de Qtd de Vendas</Label>
+                      <Input type="number" value={metaQtdInput} onChange={(e) => setMetaQtdInput(e.target.value)} placeholder="ex: 50" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Meta de Valor de Vendas (R$)</Label>
+                      <Input type="number" value={metaValorInput} onChange={(e) => setMetaValorInput(e.target.value)} placeholder="ex: 500000" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Salvo localmente neste navegador. Deixe vazio para usar estimativa automática (Valor ÷ Ticket Médio).
+                    </p>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setSettingsOpen(false)}>Cancelar</Button>
+                    <Button onClick={saveMeta}>Salvar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
           {hasAnyFilter && (
             <div className="flex flex-wrap gap-2 mt-3">
@@ -283,6 +358,18 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                   <X className="h-3 w-3 cursor-pointer" onClick={() => setCf(p => ({ ...p, bu: undefined }))} />
                 </Badge>
               )}
+              {cf.sdr && (
+                <Badge variant="secondary" className="gap-1">
+                  SDR: {cf.sdr}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setCf(p => ({ ...p, sdr: undefined }))} />
+                </Badge>
+              )}
+              {cf.closer && (
+                <Badge variant="secondary" className="gap-1">
+                  Closer: {cf.closer}
+                  <X className="h-3 w-3 cursor-pointer" onClick={() => setCf(p => ({ ...p, closer: undefined }))} />
+                </Badge>
+              )}
             </div>
           )}
         </CardHeader>
@@ -294,7 +381,7 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
             <KpiCard icon={FileText}   label="Qtd Propostas"         value={num(kpis.qtdP)}       delta={deltaIcon(kpis.qtdP, kpis.qtdPprev)} subtitle={`Anterior: ${num(kpis.qtdPprev)}`} />
             <KpiCard icon={Wallet}     label="Valor Vendas"          value={brlK(kpis.valorV)}    delta={deltaIcon(kpis.valorV, kpis.valorVprev)} subtitle={`Anterior: ${brlK(kpis.valorVprev)}`} />
             <KpiCard icon={Target}     label="Ticket Médio (Venda)"  value={brlK(kpis.tmV)}       delta={deltaIcon(kpis.tmV, kpis.tmVprev)} subtitle={`TM Proposta: ${brlK(kpis.tmP)}`} />
-            <KpiCard icon={TrendingUp} label="% Realizado Meta"      value={pct(metaPctRealizado)} delta={deltaIcon(metaPctRealizado, metaPctPrev)} subtitle={`Meta estimada: ${num(metaQtd)} vendas`} highlight={metaPctRealizado >= 0.8 ? "good" : metaPctRealizado >= 0.4 ? "warn" : "bad"} />
+            <KpiCard icon={TrendingUp} label="% Realizado Meta"      value={pct(metaPctRealizado)} delta={deltaIcon(metaPctRealizado, metaPctPrev)} subtitle={metaQtd > 0 ? `Meta: ${num(metaQtdEffective)} vendas · ${brlK(metaValorEffective)} (${pct(metaValorPct)})` : `Meta estimada: ${num(metaQtdEffective)} vendas (clique em Metas)`} highlight={metaPctRealizado >= 0.8 ? "good" : metaPctRealizado >= 0.4 ? "warn" : "bad"} />
           </div>
 
           {/* ─── Linha 2: Métricas tiles + por Origem + Evolução ──────────── */}
@@ -380,7 +467,7 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
             </Card>
           </div>
 
-          {/* ─── Linha 3: por Produto + por BU + por Estado/Cidade (placeholder) + Tabela ─── */}
+          {/* ─── Linha 3: por Produto + por BU + por SDR + por Closer ─── */}
           <div className="grid grid-cols-12 gap-4">
             <Card className="col-span-12 lg:col-span-3 p-3 border-border/50">
               <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">por Produto</div>
@@ -394,21 +481,55 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
               <BarList items={byBu} onClick={(name) => setCf(p => ({ ...p, bu: name }))} />
             </Card>
 
-            <Card className="col-span-12 lg:col-span-3 p-3 border-border/50 bg-muted/10 border-dashed">
+            <Card className="col-span-12 lg:col-span-3 p-3 border-border/50">
+              <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1">
+                <UserCircle2 className="h-3 w-3" /> por SDR
+              </div>
+              <BarList items={bySdr} onClick={(name) => setCf(p => ({ ...p, sdr: name }))} />
+            </Card>
+
+            <Card className="col-span-12 lg:col-span-3 p-3 border-border/50">
+              <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1">
+                <UserCheck className="h-3 w-3" /> por Closer
+              </div>
+              <BarList items={byCloser} onClick={(name) => setCf(p => ({ ...p, closer: name }))} />
+            </Card>
+          </div>
+
+          {/* ─── Linha 4: Totalizadores + nota Cidade/Estado ─── */}
+          <div className="grid grid-cols-12 gap-4">
+            <Card className="col-span-12 lg:col-span-6 p-3 border-border/50 bg-muted/10 border-dashed">
               <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1">
                 <MapPin className="h-3 w-3" /> por Estado / Cidade
               </div>
-              <div className="flex flex-col items-center justify-center h-[200px] text-center px-2">
-                <Info className="h-8 w-8 text-muted-foreground/50 mb-2" />
+              <div className="flex items-start gap-3 px-2">
+                <Info className="h-6 w-6 text-muted-foreground/50 mt-1 shrink-0" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Dados geográficos virão do <b>Meta Insights breakdown=region</b> (Meta Ads)
-                  e do <b>geo_target_region</b> (Google Ads) — atribuídos por campanha.
-                </p>
-                <p className="text-[10px] text-muted-foreground/70 mt-2 italic">
+                  e do <b>geo_target_region</b> (Google Ads), com atribuição por campanha.
                   Para leads CRM/orgânicos é necessário adicionar campo de UF/Cidade no formulário de captura.
                 </p>
               </div>
             </Card>
+
+            <Card className="col-span-12 lg:col-span-6 p-3 border-border/50">
+              <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Totalizadores</div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                <Row label="Vendas no período"        value={num(kpis.qtdV)} />
+                <Row label="Receita total"            value={brlK(kpis.valorV)} bold />
+                <Row label="Propostas no período"     value={num(kpis.qtdP)} />
+                <Row label="Pipeline de propostas"    value={brlK(kpis.valorP)} />
+                <Row label="Taxa Proposta → Venda"    value={kpis.qtdP > 0 ? pct(kpis.qtdV / kpis.qtdP) : "—"} />
+                <Row label="BUs ativas"               value={String(byBu.length)} />
+                <Row label="Origens detectadas"       value={String(byOrigem.length)} />
+                <Row label="SDRs / Closers"           value={`${bySdr.length} / ${byCloser.length}`} />
+              </div>
+            </Card>
+          </div>
+
+          {/* legacy totalizadores card removido — agora consolidado acima */}
+          <div className="hidden">
+            <Card><div /></Card>
 
             <Card className="col-span-12 lg:col-span-3 p-3 border-border/50">
               <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Totalizadores</div>
@@ -448,6 +569,8 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                       <TableHead className="text-xs">Produto</TableHead>
                       <TableHead className="text-xs">BU</TableHead>
                       <TableHead className="text-xs">Origem</TableHead>
+                      <TableHead className="text-xs">SDR</TableHead>
+                      <TableHead className="text-xs">Closer</TableHead>
                       <TableHead className="text-xs text-right">MRR</TableHead>
                       <TableHead className="text-xs text-right">Setup</TableHead>
                       <TableHead className="text-xs text-right">Pontual</TableHead>
@@ -462,6 +585,8 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                         <TableCell>{c.produto || "—"}</TableCell>
                         <TableCell>{c.bu}</TableCell>
                         <TableCell>{CHANNEL_LABEL[detectChannel(c)]}</TableCell>
+                        <TableCell className="max-w-[120px] truncate">{c.sdr || "—"}</TableCell>
+                        <TableCell className="max-w-[120px] truncate">{c.closer || "—"}</TableCell>
                         <TableCell className="text-right tabular-nums">{brlK(c.valorMRR || 0)}</TableCell>
                         <TableCell className="text-right tabular-nums">{brlK(c.valorSetup || 0)}</TableCell>
                         <TableCell className="text-right tabular-nums">{brlK(c.valorPontual || 0)}</TableCell>
@@ -470,7 +595,7 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                     ))}
                     {pageRows.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8 text-xs">
+                        <TableCell colSpan={11} className="text-center text-muted-foreground py-8 text-xs">
                           Nenhuma venda encontrada
                         </TableCell>
                       </TableRow>
