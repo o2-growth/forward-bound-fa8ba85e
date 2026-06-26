@@ -17,6 +17,7 @@ import { useHrData } from "@/hooks/useHrData";
 import { useNpsData, processNpsData } from "@/hooks/useNpsData";
 import { NPS_METRICS, NPS_DISTRIBUTION } from "./nps/npsData";
 import { openCeoReport, type ReportSection } from "./ceo/ceoReport";
+import { CeoMetricDialog, type CeoMetricDialogPayload, type CeoBreakdownRow } from "./ceo/CeoMetricDialog";
 import {
   BarChart,
   Bar,
