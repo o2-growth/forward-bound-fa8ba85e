@@ -179,10 +179,12 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
     return { qtdV, valorV, tmV, qtdP, valorP, tmP, qtdVprev, valorVprev, tmVprev, qtdPprev, valorPprev, tmPprev };
   }, [allSalesInPeriod, propostasInPeriod, allSalesPrev, propostasPrev]);
 
-  // Meta (calculada a partir de TM se não houver registro explícito)
-  const metaQtd = kpis.tmV > 0 ? Math.round((kpis.valorV / kpis.tmV) * 1.2) : 100; // placeholder leve
-  const metaPctRealizado = metaQtd > 0 ? kpis.qtdV / metaQtd : 0;
-  const metaPctPrev = metaQtd > 0 ? kpis.qtdVprev / metaQtd : 0;
+  // Meta: usa valor salvo no localStorage; fallback estimado por TM se vazio
+  const metaQtdEffective = metaQtd > 0 ? metaQtd : (kpis.tmV > 0 ? Math.round((kpis.valorV / kpis.tmV) * 1.2) : 100);
+  const metaValorEffective = metaValor > 0 ? metaValor : (metaQtdEffective * (kpis.tmV || 0));
+  const metaPctRealizado = metaQtdEffective > 0 ? kpis.qtdV / metaQtdEffective : 0;
+  const metaPctPrev = metaQtdEffective > 0 ? kpis.qtdVprev / metaQtdEffective : 0;
+  const metaValorPct = metaValorEffective > 0 ? kpis.valorV / metaValorEffective : 0;
 
   // Breakdowns
   const breakdown = (key: GroupKey) => {
