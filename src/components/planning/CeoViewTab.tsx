@@ -181,6 +181,10 @@ export function CeoViewTab() {
   const { from: startDate, to: endDate } = dateRange;
   const periodLabel = `${format(startDate, "dd/MM/yyyy")} – ${format(endDate, "dd/MM/yyyy")}`;
 
+  // Drill-down state — abre painel com detalhamento ao clicar em um indicador
+  const [drill, setDrill] = useState<CeoMetricDialogPayload | null>(null);
+  const openDrill = (payload: CeoMetricDialogPayload) => setDrill(payload);
+
   // ─── Hooks de dados (mesmas fontes das abas do dash) ──
   const modeloAtual = useModeloAtualMetas(startDate, endDate);
   const o2tax = useO2TaxMetas(startDate, endDate);
