@@ -936,10 +936,10 @@ export function CeoViewTab() {
 
       {/* ── KPIs de destaque ── */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} sublabel={`${comercial.totalSales} vendas`} icon={<DollarSign className="h-5 w-5" />} large />
-        <MetricCard label="ARR (novo MRR)" value={fmt(comercial.arr)} sublabel="MRR novo × 12" icon={<TrendingUp className="h-5 w-5" />} large />
-        <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} sublabel={operacao.retencaoRate != null ? `Retenção ${fmtPct(operacao.retencaoRate)}` : "base atual"} icon={<AlertTriangle className="h-5 w-5" />} large tone="danger" />
-        <MetricCard label="NPS" value={String(nps.score)} sublabel={nps.source === "live" ? "dados ao vivo" : "Q4 2025"} icon={<HeartHandshake className="h-5 w-5" />} large tone={nps.score >= nps.meta ? "success" : "default"} />
+        <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} sublabel={`${comercial.totalSales} vendas`} icon={<DollarSign className="h-5 w-5" />} large onClick={() => openDrill(drillFaturamento())} />
+        <MetricCard label="ARR (novo MRR)" value={fmt(comercial.arr)} sublabel="MRR novo × 12" icon={<TrendingUp className="h-5 w-5" />} large onClick={() => openDrill(drillArr())} />
+        <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} sublabel={operacao.retencaoRate != null ? `Retenção ${fmtPct(operacao.retencaoRate)}` : "base atual"} icon={<AlertTriangle className="h-5 w-5" />} large tone="danger" onClick={() => openDrill(drillChurn())} />
+        <MetricCard label="NPS" value={String(nps.score)} sublabel={nps.source === "live" ? "dados ao vivo" : "Q4 2025"} icon={<HeartHandshake className="h-5 w-5" />} large tone={nps.score >= nps.meta ? "success" : "default"} onClick={() => openDrill(drillNps())} />
       </div>
 
       {/* ── 1. Aquisição & Marketing ── */}
