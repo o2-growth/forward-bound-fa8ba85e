@@ -12,10 +12,8 @@ const PROPOSTA_PHASES = new Set([
 ]);
 
 // Fases do pipe Monetização que contam como "Venda" no acelerômetro comercial
+// Regra: ganho/venda APENAS quando o card chega em Concluído.
 const VENDA_PHASES = new Set([
-  'Aprovado pelo Cliente',
-  'Jurídico',
-  'Faturamento',
   'Concluído',
 ]);
 
