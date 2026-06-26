@@ -1605,10 +1605,17 @@ export function IndicatorsTab() {
         }
       }
     }
-
+    // MONETIZAÇÃO (transversal): só Proposta e Venda
+    if (
+      (indicatorKey === 'proposta' || indicatorKey === 'venda') &&
+      (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
+    ) {
+      items = [...items, ...monetizacaoAnalytics.getDetailItemsForIndicator(indicatorKey)];
+    }
 
     return items;
   };
+
 
   // Pre-compute items for each indicator for Weekly/Monthly comparison panels.
   // This avoids stale-closure issues when passing getItemsForIndicator as a callback.
