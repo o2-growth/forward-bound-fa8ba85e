@@ -17,6 +17,7 @@ import { useHrData } from "@/hooks/useHrData";
 import { useNpsData, processNpsData } from "@/hooks/useNpsData";
 import { NPS_METRICS, NPS_DISTRIBUTION } from "./nps/npsData";
 import { openCeoReport, type ReportSection } from "./ceo/ceoReport";
+import { CeoMetricDialog, type CeoMetricDialogPayload, type CeoBreakdownRow } from "./ceo/CeoMetricDialog";
 import {
   BarChart,
   Bar,
@@ -84,25 +85,37 @@ interface MetricCardProps {
   placeholder?: boolean;
   large?: boolean;
   tone?: "default" | "danger" | "success";
+  onClick?: () => void;
 }
-function MetricCard({ label, value, sublabel, icon, placeholder, large, tone = "default" }: MetricCardProps) {
+function MetricCard({ label, value, sublabel, icon, placeholder, large, tone = "default", onClick }: MetricCardProps) {
   const toneCls =
     tone === "danger"
       ? "border-destructive/40"
       : tone === "success"
         ? "border-green-500/40"
         : "border-border";
+  const interactive = !!onClick && !placeholder;
+  const Comp: any = interactive ? "button" : "div";
   return (
-    <div
-      className={`flex flex-col items-center justify-center rounded-lg border p-4 ${
+    <Comp
+      type={interactive ? "button" : undefined}
+      onClick={onClick}
+      className={`group relative flex w-full flex-col items-center justify-center rounded-lg border p-4 text-left ${
         large ? "min-h-[120px]" : "min-h-[90px]"
-      } ${placeholder ? "bg-muted/30 border-dashed border-muted-foreground/30" : `bg-card ${toneCls}`}`}
+      } ${placeholder ? "bg-muted/30 border-dashed border-muted-foreground/30" : `bg-card ${toneCls}`} ${
+        interactive ? "cursor-pointer transition hover:border-primary/50 hover:bg-accent/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring" : ""
+      }`}
     >
       {icon && <div className="mb-1 text-muted-foreground">{icon}</div>}
       <span className={`font-bold leading-tight text-foreground ${large ? "text-2xl" : "text-lg"}`}>{value}</span>
       <span className="mt-0.5 text-center text-xs leading-tight text-muted-foreground">{label}</span>
       {sublabel && <span className="mt-0.5 text-[10px] italic text-muted-foreground/60">{sublabel}</span>}
-    </div>
+      {interactive && (
+        <span className="absolute right-2 top-2 text-[10px] text-muted-foreground/40 opacity-0 transition group-hover:opacity-100">
+          ver detalhes →
+        </span>
+      )}
+    </Comp>
   );
 }
 
@@ -167,6 +180,10 @@ export function CeoViewTab() {
   });
   const { from: startDate, to: endDate } = dateRange;
   const periodLabel = `${format(startDate, "dd/MM/yyyy")} – ${format(endDate, "dd/MM/yyyy")}`;
+
+  // Drill-down state — abre painel com detalhamento ao clicar em um indicador
+  const [drill, setDrill] = useState<CeoMetricDialogPayload | null>(null);
+  const openDrill = (payload: CeoMetricDialogPayload) => setDrill(payload);
 
   // ─── Hooks de dados (mesmas fontes das abas do dash) ──
   const modeloAtual = useModeloAtualMetas(startDate, endDate);
@@ -298,6 +315,9 @@ export function CeoViewTab() {
       mrrEmRisco: kpis?.mrrEmRisco ?? null,
       churnBySquad,
       churnMrrTotal,
+      dossier,
+      cfoDistribution: data?.cfoDistribution ?? [],
+      tratativasAtivas: data?.tratativasAtivas ?? [],
     };
   }, [ops.data, dateRange.from, dateRange.to]);
 
@@ -473,6 +493,412 @@ export function CeoViewTab() {
     });
   };
 
+  // ─── Builders de drill-down (clique em cada indicador) ─
+  const buSalesRows: CeoBreakdownRow[] = comercial.buSales.map((b) => ({
+    label: b.key,
+    value: fmtFull(b.value),
+    extra: `${fmtInt(b.qty)} venda(s)`,
+    tone: b.value > 0 ? "default" : "muted",
+  }));
+
+  const drillFaturamento = (): CeoMetricDialogPayload => ({
+    title: "Faturamento no período",
+    value: fmtFull(comercial.totalRevenue),
+    subtitle: periodLabel,
+    description: `${fmtInt(comercial.totalSales)} vendas · Ticket médio ${fmtFull(comercial.ticketMedio)}`,
+    breakdown: {
+      title: "Por BU (Modelo Atual + O2 TAX + Franquia + Oxy Hacker + Outbound + Monetização)",
+      rows: buSalesRows,
+      totalsLabel: "Total",
+      totalsValue: fmtFull(comercial.totalRevenue),
+    },
+    notes: [
+      "Faturamento = soma do valor total de cada venda no período (MRR + Setup + Pontual, excluindo Educação).",
+      "Monetização entra apenas com cards em fase 'Concluído'.",
+    ],
+  });
+
+  const drillArr = (): CeoMetricDialogPayload => ({
+    title: "ARR (novo MRR)",
+    value: fmtFull(comercial.arr),
+    subtitle: periodLabel,
+    description: `MRR novo no período: ${fmtFull(comercial.mrrNovo)} × 12`,
+    breakdown: {
+      title: "MRR novo por BU",
+      rows: [
+        { label: "Modelo Atual", value: fmtFull(modeloAtual.getMrrForPeriod?.(startDate, endDate) ?? 0) },
+        { label: "O2 TAX", value: fmtFull(o2tax.getMrrForPeriod?.(startDate, endDate) ?? 0) },
+      ],
+      totalsLabel: "MRR novo total",
+      totalsValue: fmtFull(comercial.mrrNovo),
+    },
+    notes: ["Regra do projeto: MRR novo recorrente considera apenas Modelo Atual + O2 TAX."],
+  });
+
+  const drillTotalVendas = (): CeoMetricDialogPayload => ({
+    title: "Total de vendas",
+    value: fmtInt(comercial.totalSales),
+    subtitle: periodLabel,
+    breakdown: {
+      title: "Vendas por BU",
+      rows: comercial.buSales.map((b) => ({ label: b.key, value: fmtInt(b.qty), extra: fmtFull(b.value) })),
+      totalsLabel: "Total",
+      totalsValue: fmtInt(comercial.totalSales),
+    },
+  });
+
+  const drillTicket = (): CeoMetricDialogPayload => ({
+    title: "Ticket médio",
+    value: fmtFull(comercial.ticketMedio),
+    subtitle: periodLabel,
+    description: `${fmtFull(comercial.totalRevenue)} de faturamento ÷ ${fmtInt(comercial.totalSales)} vendas`,
+    breakdown: {
+      title: "Ticket médio por BU",
+      rows: comercial.buSales.map((b) => ({
+        label: b.key,
+        value: b.qty > 0 ? fmtFull(b.value / b.qty) : "—",
+        extra: `${fmtInt(b.qty)} venda(s) · ${fmtFull(b.value)}`,
+      })),
+    },
+  });
+
+  const drillMelhorBu = (): CeoMetricDialogPayload => ({
+    title: "Melhor BU do período",
+    value: comercial.bestBu?.key ?? "—",
+    subtitle: periodLabel,
+    description: comercial.bestBu ? `${fmtFull(comercial.bestBu.value)} em ${fmtInt(comercial.bestBu.qty)} venda(s)` : undefined,
+    breakdown: {
+      title: "Ranking por faturamento",
+      rows: [...comercial.buSales]
+        .sort((a, b) => b.value - a.value)
+        .map((b, i) => ({ label: `${i + 1}. ${b.key}`, value: fmtFull(b.value), extra: `${fmtInt(b.qty)} venda(s)` })),
+    },
+  });
+
+  // ─── Aquisição
+  const drillInvestimento = (): CeoMetricDialogPayload => ({
+    title: "Investimento em mídia",
+    value: fmtFull(aquisicao.mediaInvestment),
+    subtitle: periodLabel,
+    description: marketingSheet.data?.midiaTotal ? "Fonte: planilha consolidada de Marketing" : "Fonte: APIs Meta + Google",
+    breakdown: {
+      title: "Por canal",
+      rows: aquisicao.channels.map((c) => ({
+        label: c.name,
+        value: fmtFull(c.investment),
+        extra: `${fmtInt(c.leads)} leads · CPL ${fmtFull(c.cpl)}`,
+      })),
+      totalsLabel: "Total",
+      totalsValue: fmtFull(aquisicao.mediaInvestment),
+    },
+  });
+
+  const drillLeads = (): CeoMetricDialogPayload => ({
+    title: "Leads no período",
+    value: fmtInt(aquisicao.totalLeads),
+    subtitle: periodLabel,
+    breakdown: {
+      title: "Por canal",
+      rows: aquisicao.channels.map((c) => ({
+        label: c.name,
+        value: fmtInt(c.leads),
+        extra: `CPL ${fmtFull(c.cpl)} · invest. ${fmtFull(c.investment)}`,
+      })),
+      totalsLabel: "Total",
+      totalsValue: fmtInt(aquisicao.totalLeads),
+    },
+  });
+
+  const drillMqls = (): CeoMetricDialogPayload => {
+    const rows: CeoBreakdownRow[] = [
+      { label: "Modelo Atual", value: fmtInt(modeloAtual.getQtyForPeriod("mql", startDate, endDate)) },
+      { label: "O2 TAX", value: fmtInt(o2tax.getQtyForPeriod("mql", startDate, endDate)) },
+      { label: "Franquia (Expansão)", value: fmtInt(expansao.getQtyForPeriod("mql", startDate, endDate)) },
+      { label: "Oxy Hacker", value: fmtInt(oxyHacker.getQtyForPeriod("mql", startDate, endDate)) },
+      { label: "Outbound", value: fmtInt(outbound.getCardsForIndicator("mql").length) },
+    ];
+    return {
+      title: "MQLs no período",
+      value: fmtInt(aquisicao.totalMqls),
+      subtitle: periodLabel,
+      breakdown: { title: "Por BU", rows, totalsLabel: "Total", totalsValue: fmtInt(aquisicao.totalMqls) },
+      notes: ["Mesma base do acelerômetro comercial (BUs + Outbound)."],
+    };
+  };
+
+  const drillCustoMql = (): CeoMetricDialogPayload => ({
+    title: "Custo por MQL",
+    value: fmtFull(aquisicao.custoMql),
+    subtitle: periodLabel,
+    description: `${fmtFull(aquisicao.mediaInvestment)} de investimento ÷ ${fmtInt(aquisicao.totalMqls)} MQLs`,
+    breakdown: {
+      title: "Decomposição",
+      rows: [
+        { label: "Investimento total", value: fmtFull(aquisicao.mediaInvestment) },
+        { label: "MQLs (todas as BUs)", value: fmtInt(aquisicao.totalMqls) },
+      ],
+    },
+  });
+
+  const drillMelhorCanal = (): CeoMetricDialogPayload => ({
+    title: "Melhor canal de aquisição",
+    value: aquisicao.bestChannel?.name ?? "—",
+    subtitle: periodLabel,
+    description: aquisicao.bestChannel
+      ? `${fmtInt(aquisicao.bestChannel.leads)} leads · CPL ${fmtFull(aquisicao.bestChannel.cpl)}`
+      : undefined,
+    breakdown: {
+      title: "Ranking por leads (desempate: menor CPL)",
+      rows: [...aquisicao.channels]
+        .sort((a, b) => b.leads - a.leads || (a.cpl ?? Infinity) - (b.cpl ?? Infinity))
+        .map((c, i) => ({
+          label: `${i + 1}. ${c.name}`,
+          value: `${fmtInt(c.leads)} leads`,
+          extra: `Invest. ${fmtFull(c.investment)} · CPL ${fmtFull(c.cpl)}`,
+        })),
+    },
+  });
+
+  // ─── Operação
+  const churnTable = {
+    title: "Lista de churns no período",
+    columns: [
+      { key: "empresa", label: "Empresa" },
+      { key: "cfo", label: "CFO/Squad" },
+      { key: "mrr", label: "MRR perdido", align: "right" as const, format: (r: any) => fmtFull(r.mrr) },
+      { key: "lt", label: "LT (meses)", align: "right" as const, format: (r: any) => (r.lt != null ? String(r.lt) : "—") },
+      { key: "data", label: "Encerrado em", format: (r: any) => (r.data ? format(new Date(r.data), "dd/MM/yyyy") : "—") },
+    ],
+    rows: operacao.dossier.map((c: any) => ({
+      empresa: c.empresa || c.titulo || "—",
+      cfo: c.cfo || "Sem responsável",
+      mrr: c.mrr || 0,
+      lt: c.lifetimeMeses ?? c.lt ?? null,
+      data: c.dataEncerramento ?? null,
+    })),
+    emptyMessage: "Sem churns registrados no período.",
+  };
+
+  const drillChurn = (): CeoMetricDialogPayload => ({
+    title: "Churn (logos) no período",
+    value: fmtInt(operacao.churnQtd),
+    subtitle: periodLabel,
+    description: `MRR perdido: ${fmtFull(operacao.churnMrrTotal)} · Retenção ${fmtPct(operacao.retencaoRate)}`,
+    breakdown: {
+      title: "Por squad (CFO responsável)",
+      rows: operacao.churnBySquad.map((c) => ({
+        label: c.squad,
+        value: `${fmtInt(c.count)} churn(s)`,
+        extra: fmtFull(c.mrr),
+        tone: "danger",
+      })),
+      totalsLabel: "Total",
+      totalsValue: `${fmtInt(operacao.churnQtd)} churn(s) · ${fmtFull(operacao.churnMrrTotal)}`,
+    },
+    table: churnTable,
+  });
+
+  const cfoRows = operacao.cfoDistribution.map((c) => ({
+    label: c.cfo || "Sem responsável",
+    value: `${fmtInt(c.clientes)} clientes`,
+    extra: fmtFull(c.mrr),
+  }));
+
+  const drillClientesAtivos = (): CeoMetricDialogPayload => ({
+    title: "Clientes ativos",
+    value: fmtInt(operacao.clientesAtivos),
+    subtitle: "Snapshot atual — não filtra por período",
+    badge: "snapshot",
+    breakdown: { title: "Por CFO/Squad", rows: cfoRows },
+  });
+
+  const drillMrrBase = (): CeoMetricDialogPayload => ({
+    title: "MRR base",
+    value: fmtFull(operacao.mrrBase),
+    subtitle: "Snapshot atual — não filtra por período",
+    badge: "snapshot",
+    breakdown: { title: "Por CFO/Squad", rows: cfoRows },
+  });
+
+  const drillTratativas = (): CeoMetricDialogPayload => ({
+    title: "Tratativas ativas",
+    value: fmtInt(operacao.tratativas),
+    subtitle: "Snapshot atual — não filtra por período",
+    badge: "snapshot",
+    table: {
+      title: "Tratativas em andamento",
+      columns: [
+        { key: "empresa", label: "Empresa" },
+        { key: "cfo", label: "CFO" },
+        { key: "motivo", label: "Motivo" },
+        { key: "faseAtual", label: "Fase atual" },
+        { key: "diasEmTratativa", label: "Dias", align: "right" as const },
+      ],
+      rows: operacao.tratativasAtivas as any[],
+      emptyMessage: "Nenhuma tratativa ativa.",
+    },
+  });
+
+  const drillRetencao = (): CeoMetricDialogPayload => ({
+    title: "Retenção",
+    value: fmtPct(operacao.retencaoRate),
+    subtitle: periodLabel,
+    description: `Considera ${fmtInt(operacao.churnQtd)} churn(s) sobre ${fmtInt((operacao.clientesAtivos ?? 0) + operacao.churnQtd)} clientes (base + churn).`,
+    table: churnTable,
+  });
+
+  const drillMrrRisco = (): CeoMetricDialogPayload => ({
+    title: "MRR em risco",
+    value: fmtFull(operacao.mrrEmRisco),
+    subtitle: "Snapshot atual — soma de MRR de clientes em tratativa",
+    badge: "snapshot",
+    table: {
+      title: "Tratativas ativas",
+      columns: [
+        { key: "empresa", label: "Empresa" },
+        { key: "cfo", label: "CFO" },
+        { key: "motivo", label: "Motivo" },
+        { key: "faseAtual", label: "Fase atual" },
+      ],
+      rows: operacao.tratativasAtivas as any[],
+    },
+  });
+
+  // ─── Pessoas
+  const ativosList = (hr.rawPessoas ?? []).filter((p: any) => {
+    const s = (p["Situação"] ?? "").toString().trim().toLowerCase();
+    return s === "ativo";
+  });
+  const admissoesList = (hr.rawPessoas ?? []).filter((p: any) => {
+    const d = p["Data de contratação"];
+    if (!d) return false;
+    const t = new Date(d).getTime();
+    return !Number.isNaN(t) && t >= startDate.getTime() && t <= endDate.getTime();
+  });
+  const desligadosList = (hr.rawPessoas ?? []).filter((p: any) => {
+    const s = (p["Situação"] ?? "").toString().trim().toLowerCase();
+    if (!(s === "inativo" || s === "desligado")) return false;
+    const d = p.updated_at;
+    if (!d) return false;
+    const t = new Date(d).getTime();
+    return !Number.isNaN(t) && t >= startDate.getTime() && t <= endDate.getTime();
+  });
+
+  const pessoaCols = [
+    { key: "Nome", label: "Nome" },
+    { key: "Cargo", label: "Cargo" },
+    { key: "Time", label: "Time" },
+    { key: "Data de contratação", label: "Admissão", format: (r: any) => (r["Data de contratação"] ? format(new Date(r["Data de contratação"]), "dd/MM/yyyy") : "—") },
+  ];
+
+  const drillHeadcount = (): CeoMetricDialogPayload => ({
+    title: "Headcount",
+    value: fmtInt(pessoas.headcount),
+    subtitle: "Colaboradores ativos hoje",
+    badge: "snapshot",
+    breakdown: {
+      title: "Por time",
+      rows: pessoas.topTimes.map((t) => ({ label: t.group, value: fmtInt(t.count) })),
+    },
+    table: { title: "Lista de ativos", columns: pessoaCols, rows: ativosList as any[] },
+  });
+
+  const drillTurnover = (): CeoMetricDialogPayload => ({
+    title: "Turnover",
+    value: fmtPct(pessoas.turnover),
+    subtitle: periodLabel,
+    description: `${fmtInt(pessoas.desligados)} desligados ÷ headcount médio`,
+    breakdown: {
+      title: "Por time",
+      rows: pessoas.turnoverTimes.map((t) => ({
+        label: t.group,
+        value: fmtPct(t.pct),
+        extra: `${fmtInt(t.desligados)} de ${fmtInt(t.headcount)}`,
+        tone: t.pct > 10 ? "danger" : "default",
+      })),
+    },
+  });
+
+  const drillTempoCasa = (): CeoMetricDialogPayload => ({
+    title: "Tempo médio de casa",
+    value: pessoas.tempoCasa != null ? `${Math.round(pessoas.tempoCasa / 30)} meses` : "—",
+    subtitle: "Média dos colaboradores ativos",
+    description: pessoas.tempoCasa != null ? `${Math.round(pessoas.tempoCasa)} dias em média.` : undefined,
+    badge: "snapshot",
+  });
+
+  const drillAdmissoes = (): CeoMetricDialogPayload => ({
+    title: "Admissões",
+    value: fmtInt(pessoas.admissoes),
+    subtitle: periodLabel,
+    table: { title: "Pessoas admitidas no período", columns: pessoaCols, rows: admissoesList as any[], emptyMessage: "Sem admissões no período." },
+  });
+
+  const drillDesligados = (): CeoMetricDialogPayload => ({
+    title: "Desligamentos",
+    value: fmtInt(pessoas.desligados),
+    subtitle: periodLabel,
+    table: {
+      title: "Pessoas desligadas no período",
+      columns: [
+        ...pessoaCols,
+        { key: "updated_at", label: "Desligamento", format: (r: any) => (r.updated_at ? format(new Date(r.updated_at), "dd/MM/yyyy") : "—") },
+      ],
+      rows: desligadosList as any[],
+      emptyMessage: "Sem desligamentos no período.",
+    },
+  });
+
+  // ─── NPS
+  const drillNps = (): CeoMetricDialogPayload => ({
+    title: "NPS",
+    value: String(nps.score),
+    subtitle: nps.source === "live" ? `Dados ao vivo · ${periodLabel}` : "Snapshot Q4/2025",
+    badge: nps.source,
+    description: `Meta ${nps.meta}`,
+    breakdown: {
+      title: "Distribuição",
+      rows: [
+        { label: "Promotores", value: `${nps.promotores.pct}%`, extra: `${fmtInt(nps.promotores.count)} clientes`, tone: "success" },
+        { label: "Neutros", value: `${nps.neutros.pct}%`, extra: `${fmtInt(nps.neutros.count)} clientes` },
+        { label: "Detratores", value: `${nps.detratores.pct}%`, extra: `${fmtInt(nps.detratores.count)} clientes`, tone: "danger" },
+      ],
+    },
+    notes: ["NPS = % Promotores − % Detratores"],
+  });
+
+  const drillCsat = (): CeoMetricDialogPayload => ({
+    title: "CSAT",
+    value: `${nps.csat}%`,
+    subtitle: nps.source === "live" ? `Dados ao vivo · ${periodLabel}` : "Snapshot Q4/2025",
+    badge: nps.source,
+    description: "Customer Satisfaction Score — média da satisfação reportada.",
+  });
+
+  const drillPromotores = (): CeoMetricDialogPayload => ({
+    title: "Promotores",
+    value: `${nps.promotores.pct}%`,
+    subtitle: nps.source === "live" ? `Dados ao vivo · ${periodLabel}` : "Snapshot Q4/2025",
+    badge: nps.source,
+    description: `${fmtInt(nps.promotores.count)} clientes deram nota 9 ou 10.`,
+  });
+  const drillNeutros = (): CeoMetricDialogPayload => ({
+    title: "Neutros",
+    value: `${nps.neutros.pct}%`,
+    subtitle: nps.source === "live" ? `Dados ao vivo · ${periodLabel}` : "Snapshot Q4/2025",
+    badge: nps.source,
+    description: `${fmtInt(nps.neutros.count)} clientes deram nota 7 ou 8.`,
+  });
+  const drillDetratores = (): CeoMetricDialogPayload => ({
+    title: "Detratores",
+    value: `${nps.detratores.pct}%`,
+    subtitle: nps.source === "live" ? `Dados ao vivo · ${periodLabel}` : "Snapshot Q4/2025",
+    badge: nps.source,
+    description: `${fmtInt(nps.detratores.count)} clientes deram nota de 0 a 6.`,
+  });
+
+
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -510,10 +936,10 @@ export function CeoViewTab() {
 
       {/* ── KPIs de destaque ── */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} sublabel={`${comercial.totalSales} vendas`} icon={<DollarSign className="h-5 w-5" />} large />
-        <MetricCard label="ARR (novo MRR)" value={fmt(comercial.arr)} sublabel="MRR novo × 12" icon={<TrendingUp className="h-5 w-5" />} large />
-        <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} sublabel={operacao.retencaoRate != null ? `Retenção ${fmtPct(operacao.retencaoRate)}` : "base atual"} icon={<AlertTriangle className="h-5 w-5" />} large tone="danger" />
-        <MetricCard label="NPS" value={String(nps.score)} sublabel={nps.source === "live" ? "dados ao vivo" : "Q4 2025"} icon={<HeartHandshake className="h-5 w-5" />} large tone={nps.score >= nps.meta ? "success" : "default"} />
+        <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} sublabel={`${comercial.totalSales} vendas`} icon={<DollarSign className="h-5 w-5" />} large onClick={() => openDrill(drillFaturamento())} />
+        <MetricCard label="ARR (novo MRR)" value={fmt(comercial.arr)} sublabel="MRR novo × 12" icon={<TrendingUp className="h-5 w-5" />} large onClick={() => openDrill(drillArr())} />
+        <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} sublabel={operacao.retencaoRate != null ? `Retenção ${fmtPct(operacao.retencaoRate)}` : "base atual"} icon={<AlertTriangle className="h-5 w-5" />} large tone="danger" onClick={() => openDrill(drillChurn())} />
+        <MetricCard label="NPS" value={String(nps.score)} sublabel={nps.source === "live" ? "dados ao vivo" : "Q4 2025"} icon={<HeartHandshake className="h-5 w-5" />} large tone={nps.score >= nps.meta ? "success" : "default"} onClick={() => openDrill(drillNps())} />
       </div>
 
       {/* ── 1. Aquisição & Marketing ── */}
@@ -526,11 +952,11 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            <MetricCard label="Investimento mídia" value={fmt(aquisicao.mediaInvestment)} sublabel="Meta + Google" />
-            <MetricCard label="Leads" value={fmtInt(aquisicao.totalLeads)} />
-            <MetricCard label="MQLs" value={fmtInt(aquisicao.totalMqls)} />
-            <MetricCard label="Custo por MQL" value={fmt(aquisicao.custoMql)} sublabel="invest. / MQLs" />
-            <MetricCard label="Melhor canal" value={aquisicao.bestChannel?.name ?? "—"} sublabel={aquisicao.bestChannel ? `${fmtInt(aquisicao.bestChannel.leads)} leads · CPL ${fmt(aquisicao.bestChannel.cpl)}` : undefined} />
+            <MetricCard label="Investimento mídia" value={fmt(aquisicao.mediaInvestment)} sublabel="Meta + Google" onClick={() => openDrill(drillInvestimento())} />
+            <MetricCard label="Leads" value={fmtInt(aquisicao.totalLeads)} onClick={() => openDrill(drillLeads())} />
+            <MetricCard label="MQLs" value={fmtInt(aquisicao.totalMqls)} onClick={() => openDrill(drillMqls())} />
+            <MetricCard label="Custo por MQL" value={fmt(aquisicao.custoMql)} sublabel="invest. / MQLs" onClick={() => openDrill(drillCustoMql())} />
+            <MetricCard label="Melhor canal" value={aquisicao.bestChannel?.name ?? "—"} sublabel={aquisicao.bestChannel ? `${fmtInt(aquisicao.bestChannel.leads)} leads · CPL ${fmt(aquisicao.bestChannel.cpl)}` : undefined} onClick={() => openDrill(drillMelhorCanal())} />
           </div>
           {aquisicao.mediaInvestment > 0 && (
             <div className="h-64">
@@ -560,11 +986,11 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            <MetricCard label="Total de vendas" value={fmtInt(comercial.totalSales)} />
-            <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} />
-            <MetricCard label="MRR novo" value={fmt(comercial.mrrNovo)} />
-            <MetricCard label="Ticket médio" value={fmt(comercial.ticketMedio)} sublabel="receita / vendas" />
-            <MetricCard label="Melhor BU" value={comercial.bestBu?.key ?? "—"} sublabel={comercial.bestBu ? fmt(comercial.bestBu.value) : undefined} tone="success" />
+            <MetricCard label="Total de vendas" value={fmtInt(comercial.totalSales)} onClick={() => openDrill(drillTotalVendas())} />
+            <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} onClick={() => openDrill(drillFaturamento())} />
+            <MetricCard label="MRR novo" value={fmt(comercial.mrrNovo)} onClick={() => openDrill(drillArr())} />
+            <MetricCard label="Ticket médio" value={fmt(comercial.ticketMedio)} sublabel="receita / vendas" onClick={() => openDrill(drillTicket())} />
+            <MetricCard label="Melhor BU" value={comercial.bestBu?.key ?? "—"} sublabel={comercial.bestBu ? fmt(comercial.bestBu.value) : undefined} tone="success" onClick={() => openDrill(drillMelhorBu())} />
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -594,12 +1020,12 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-            <MetricCard label="Clientes ativos" value={fmtInt(operacao.clientesAtivos)} sublabel="base atual (snapshot)" />
-            <MetricCard label="MRR base" value={fmt(operacao.mrrBase)} sublabel="base atual (snapshot)" />
-            <MetricCard label="Tratativas ativas" value={fmtInt(operacao.tratativas)} sublabel="base atual (snapshot)" />
-            <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} tone="danger" sublabel="no período" />
-            <MetricCard label="Retenção" value={fmtPct(operacao.retencaoRate)} />
-            <MetricCard label="MRR em risco" value={fmt(operacao.mrrEmRisco)} tone="danger" sublabel="base atual (snapshot)" />
+            <MetricCard label="Clientes ativos" value={fmtInt(operacao.clientesAtivos)} sublabel="base atual (snapshot)" onClick={() => openDrill(drillClientesAtivos())} />
+            <MetricCard label="MRR base" value={fmt(operacao.mrrBase)} sublabel="base atual (snapshot)" onClick={() => openDrill(drillMrrBase())} />
+            <MetricCard label="Tratativas ativas" value={fmtInt(operacao.tratativas)} sublabel="base atual (snapshot)" onClick={() => openDrill(drillTratativas())} />
+            <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} tone="danger" sublabel="no período" onClick={() => openDrill(drillChurn())} />
+            <MetricCard label="Retenção" value={fmtPct(operacao.retencaoRate)} onClick={() => openDrill(drillRetencao())} />
+            <MetricCard label="MRR em risco" value={fmt(operacao.mrrEmRisco)} tone="danger" sublabel="base atual (snapshot)" onClick={() => openDrill(drillMrrRisco())} />
 
           </div>
           {churnSquadData.length > 0 && (
@@ -631,11 +1057,11 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            <MetricCard label="Headcount" value={fmtInt(pessoas.headcount)} />
-            <MetricCard label="Turnover" value={fmtPct(pessoas.turnover)} tone={pessoas.turnover != null && pessoas.turnover > 10 ? "danger" : "default"} />
-            <MetricCard label="Tempo médio de casa" value={pessoas.tempoCasa != null ? `${Math.round(pessoas.tempoCasa / 30)} m` : "—"} sublabel="meses" />
-            <MetricCard label="Admissões" value={fmtInt(pessoas.admissoes)} />
-            <MetricCard label="Desligamentos" value={fmtInt(pessoas.desligados)} />
+            <MetricCard label="Headcount" value={fmtInt(pessoas.headcount)} onClick={() => openDrill(drillHeadcount())} />
+            <MetricCard label="Turnover" value={fmtPct(pessoas.turnover)} tone={pessoas.turnover != null && pessoas.turnover > 10 ? "danger" : "default"} onClick={() => openDrill(drillTurnover())} />
+            <MetricCard label="Tempo médio de casa" value={pessoas.tempoCasa != null ? `${Math.round(pessoas.tempoCasa / 30)} m` : "—"} sublabel="meses" onClick={() => openDrill(drillTempoCasa())} />
+            <MetricCard label="Admissões" value={fmtInt(pessoas.admissoes)} onClick={() => openDrill(drillAdmissoes())} />
+            <MetricCard label="Desligamentos" value={fmtInt(pessoas.desligados)} onClick={() => openDrill(drillDesligados())} />
           </div>
           {turnoverTimeData.length > 0 && (
             <div>
@@ -666,14 +1092,16 @@ export function CeoViewTab() {
         />
         <CardContent>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            <MetricCard label="NPS" value={String(nps.score)} sublabel={`meta ${nps.meta}`} tone={nps.score >= nps.meta ? "success" : "default"} />
-            <MetricCard label="CSAT" value={`${nps.csat}%`} />
-            <MetricCard label="Promotores" value={`${nps.promotores.pct}%`} sublabel={`${nps.promotores.count} clientes`} tone="success" />
-            <MetricCard label="Neutros" value={`${nps.neutros.pct}%`} sublabel={`${nps.neutros.count} clientes`} />
-            <MetricCard label="Detratores" value={`${nps.detratores.pct}%`} sublabel={`${nps.detratores.count} clientes`} tone="danger" />
+            <MetricCard label="NPS" value={String(nps.score)} sublabel={`meta ${nps.meta}`} tone={nps.score >= nps.meta ? "success" : "default"} onClick={() => openDrill(drillNps())} />
+            <MetricCard label="CSAT" value={`${nps.csat}%`} onClick={() => openDrill(drillCsat())} />
+            <MetricCard label="Promotores" value={`${nps.promotores.pct}%`} sublabel={`${nps.promotores.count} clientes`} tone="success" onClick={() => openDrill(drillPromotores())} />
+            <MetricCard label="Neutros" value={`${nps.neutros.pct}%`} sublabel={`${nps.neutros.count} clientes`} onClick={() => openDrill(drillNeutros())} />
+            <MetricCard label="Detratores" value={`${nps.detratores.pct}%`} sublabel={`${nps.detratores.count} clientes`} tone="danger" onClick={() => openDrill(drillDetratores())} />
           </div>
         </CardContent>
       </Card>
+
+      <CeoMetricDialog payload={drill} open={!!drill} onOpenChange={(o) => !o && setDrill(null)} />
     </div>
   );
 }
