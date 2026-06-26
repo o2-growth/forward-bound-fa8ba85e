@@ -47,6 +47,7 @@ import { ConversionCurveSection } from "./marketing-indicators/ConversionCurveSe
 import { CohortTable } from "./marketing-indicators/CohortTable";
 import { PerformanceByChannelSection } from "./marketing-indicators/performance/PerformanceByChannelSection";
 import { CreativeAdPerformanceSection } from "./marketing-indicators/performance/CreativeAdPerformanceSection";
+import { SourceFunnelSection } from "./marketing-indicators/performance/SourceFunnelSection";
 
 
 
@@ -789,7 +790,16 @@ export function MarketingIndicatorsTab() {
         salesCards={salesInPeriod}
         campaignFunnels={campaignFunnels}
         allCampaigns={allCampaigns}
+       />
+
+      {/* ===== NEW: Funil Comparativo por Fonte ===== */}
+      <SourceFunnelSection
+        dateRange={dateRange}
+        allCampaigns={allCampaigns}
+        allAttributionCards={allAttributionCards}
+        salesCards={salesInPeriod}
       />
+
 
       {/* ===== NEW: Online vs Offline ===== */}
       <OnlineOfflineSection
