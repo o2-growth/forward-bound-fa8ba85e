@@ -215,10 +215,10 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
               {sortedItems.length} {sortedItems.length === 1 ? 'registro' : 'registros'}
             </span>
           </div>
-          <div className="border rounded-lg overflow-x-auto">
+          <div className="border rounded-lg overflow-auto max-h-[55vh]">
             <Table>
-              <TableHeader>
-                <TableRow>
+              <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
+                <TableRow className="bg-background hover:bg-background">
                   {columns.map((col) => (
                     <TableHead 
                       key={col.key}
