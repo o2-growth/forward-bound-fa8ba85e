@@ -481,9 +481,9 @@ export function MarketingIndicatorsTab() {
   }, [data.channels, channelSummaries, googleAdsApiTotals, metaAdsApiTotals]);
 
   // Count real volumes mirroring the Commercial accelerometer (no Closer/SDR filter
-  // branch in IndicatorsTab.getRealizedForIndicator): Modelo Atual + O2 TAX from
-  // analytics hooks, Franquia + Oxy Hacker from metas hooks (sheets/movements)
-  // to keep the same source of truth as the Comercial dashboard.
+  // branch in IndicatorsTab.getRealizedForIndicator): Modelo Atual includes Outbound,
+  // O2 TAX comes from analytics hooks, and Franquia + Oxy Hacker from metas hooks
+  // (sheets/movements) to keep the same source of truth as the Comercial dashboard.
   const pipefyVolumes = useMemo(() => {
     const indicators = ['leads', 'mql', 'rm', 'rr', 'proposta', 'venda'] as const;
     const counts = { leads: 0, mqls: 0, rms: 0, rrs: 0, propostas: 0, vendas: 0 };
@@ -494,6 +494,7 @@ export function MarketingIndicatorsTab() {
     for (const ind of indicators) {
       const key = countKeys[ind];
       counts[key] += maGetCards(ind).length;
+      counts[key] += outboundGetCards(ind).length;
       counts[key] += o2GetCards(ind).length;
       counts[key] += getFranquiaQty(ind as any, dateRange.from, dateRange.to);
       counts[key] += getOxyHackerQty(ind as any, dateRange.from, dateRange.to);
@@ -501,7 +502,7 @@ export function MarketingIndicatorsTab() {
 
     console.log('[MarketingIndicatorsTab] pipefyVolumes (aligned w/ Comercial):', counts);
     return counts;
-  }, [maGetCards, o2GetCards, getFranquiaQty, getOxyHackerQty, dateRange.from, dateRange.to]);
+  }, [maGetCards, outboundGetCards, o2GetCards, getFranquiaQty, getOxyHackerQty, dateRange.from, dateRange.to]);
 
   // ===== New sections data (Cohort / Curva / Online-Offline / CAC) =====
   const leadsAttributionCards = useMemo<AttributionCard[]>(() => {
