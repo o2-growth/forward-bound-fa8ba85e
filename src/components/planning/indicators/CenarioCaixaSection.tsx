@@ -25,25 +25,56 @@ const formatCurrency = (v: number) =>
     maximumFractionDigits: 0,
   }).format(v);
 
+const formatPct = (v: number) =>
+  `${(v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+
+// Resumo da regra por BU (texto curto entre parênteses)
+const BU_RULE_SHORT: Record<string, string> = {
+  "Modelo Atual": "75% Setup + 50% Pontual",
+  Outbound: "75% Setup + 50% Pontual",
+  Franquia: "70% do Pontual",
+  "Oxy Hacker": "70% do Pontual",
+  "Monetização": "sem entrada de caixa",
+};
+
 type Cenario = "Realista" | "Otimista";
 
 interface CenarioData {
   items: DetailItem[]; // items com mrr/setup/pontual/total já em valor de CAIXA
   total: number;
-  byBu: Record<string, { total: number; count: number }>;
+  grossTotal: number; // soma bruta antes das % (MRR+Setup+Pontual)
+  byBu: Record<
+    string,
+    { total: number; gross: number; count: number; pontualGross: number; setupGross: number; mrrGross: number }
+  >;
   count: number;
 }
 
 function buildCenario(sourceItems: DetailItem[]): CenarioData {
-  const byBu: Record<string, { total: number; count: number }> = {};
+  const byBu: CenarioData["byBu"] = {};
   let total = 0;
+  let grossTotal = 0;
   const items: DetailItem[] = sourceItems.map((it) => {
     const cash = computeCashFromCard(it);
+    const grossItem = (it.mrr || 0) + (it.setup || 0) + (it.pontual || 0);
     total += cash.total;
+    grossTotal += grossItem;
     const bu = (it.bu as string) || "—";
-    if (!byBu[bu]) byBu[bu] = { total: 0, count: 0 };
+    if (!byBu[bu])
+      byBu[bu] = {
+        total: 0,
+        gross: 0,
+        count: 0,
+        pontualGross: 0,
+        setupGross: 0,
+        mrrGross: 0,
+      };
     byBu[bu].total += cash.total;
+    byBu[bu].gross += grossItem;
     byBu[bu].count += 1;
+    byBu[bu].pontualGross += it.pontual || 0;
+    byBu[bu].setupGross += it.setup || 0;
+    byBu[bu].mrrGross += it.mrr || 0;
     return {
       ...it,
       mrr: cash.mrr,
@@ -52,7 +83,7 @@ function buildCenario(sourceItems: DetailItem[]): CenarioData {
       total: cash.total,
     };
   });
-  return { items, total, byBu, count: sourceItems.length };
+  return { items, total, grossTotal, byBu, count: sourceItems.length };
 }
 
 const BU_BAR_COLOR: Record<string, string> = {
@@ -60,6 +91,7 @@ const BU_BAR_COLOR: Record<string, string> = {
   Outbound: "bg-blue-500",
   Franquia: "bg-green-500",
   "Oxy Hacker": "bg-purple-500",
+  "Monetização": "bg-orange-500",
 };
 
 export function CenarioCaixaSection(props: AggregateInput) {
@@ -92,6 +124,7 @@ export function CenarioCaixaSection(props: AggregateInput) {
     const buEntries = Object.entries(data.byBu).sort(
       (a, b) => b[1].total - a[1].total,
     );
+    const efetiva = data.grossTotal > 0 ? data.total / data.grossTotal : 0;
     return (
       <div className="flex flex-col rounded-lg border p-4 gap-3">
         <div className="flex items-baseline justify-between">
@@ -103,7 +136,65 @@ export function CenarioCaixaSection(props: AggregateInput) {
             {data.count} {data.count === 1 ? "card" : "cards"}
           </Badge>
         </div>
-        <div className="text-2xl font-bold">{formatCurrency(data.total)}</div>
+
+        <div className="flex items-center gap-2">
+          <div className="text-2xl font-bold">{formatCurrency(data.total)}</div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-sm text-xs">
+                <p className="font-semibold mb-1">Como esse valor foi calculado</p>
+                <ul className="space-y-0.5">
+                  <li>
+                    Soma bruta dos cards (MRR+Setup+Pontual):{" "}
+                    <span className="font-medium">
+                      {formatCurrency(data.grossTotal)}
+                    </span>
+                  </li>
+                  <li>
+                    Caixa projetado após aplicar % por BU:{" "}
+                    <span className="font-medium">
+                      {formatCurrency(data.total)}
+                    </span>
+                  </li>
+                  <li>
+                    % efetiva sobre o bruto:{" "}
+                    <span className="font-medium">{formatPct(efetiva)}</span>
+                  </li>
+                </ul>
+                <p className="mt-2 font-semibold">Por BU:</p>
+                <ul className="space-y-0.5">
+                  {buEntries.map(([bu, info]) => {
+                    const pct = info.gross > 0 ? info.total / info.gross : 0;
+                    return (
+                      <li key={bu}>
+                        {bu}: {formatCurrency(info.total)} ÷{" "}
+                        {formatCurrency(info.gross)} ={" "}
+                        <span className="font-medium">{formatPct(pct)}</span>{" "}
+                        <span className="opacity-70">
+                          ({BU_RULE_SHORT[bu] || "—"})
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground -mt-1 leading-snug">
+          ≈ {formatPct(efetiva)} do bruto ({formatCurrency(data.grossTotal)}).
+          Regras: 70% do Pontual (Franquia / Oxy Hacker) · 0% MRR + 75% Setup +
+          50% Pontual (Modelo Atual / Outbound).
+        </p>
 
         <div className="flex flex-col gap-1.5">
           {buEntries.length === 0 && (
@@ -113,14 +204,23 @@ export function CenarioCaixaSection(props: AggregateInput) {
           )}
           {buEntries.map(([bu, info]) => {
             const pct = data.total > 0 ? (info.total / data.total) * 100 : 0;
+            const ruleShort = BU_RULE_SHORT[bu];
             return (
               <div key={bu} className="flex flex-col gap-0.5">
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-muted-foreground">
+                <div className="flex justify-between text-[11px] gap-2">
+                  <span className="text-muted-foreground truncate">
                     {bu}{" "}
                     <span className="opacity-60">({info.count})</span>
+                    {ruleShort && (
+                      <span className="opacity-60 ml-1">— {ruleShort}</span>
+                    )}
                   </span>
-                  <span className="font-medium">{formatCurrency(info.total)}</span>
+                  <span className="font-medium whitespace-nowrap">
+                    {formatCurrency(info.total)}
+                    <span className="opacity-60 font-normal ml-1">
+                      / {formatCurrency(info.gross)}
+                    </span>
+                  </span>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                   <div
@@ -147,7 +247,12 @@ export function CenarioCaixaSection(props: AggregateInput) {
     );
   };
 
-  const activeData = openCenario === "Otimista" ? otimista : openCenario === "Realista" ? realista : null;
+  const activeData =
+    openCenario === "Otimista"
+      ? otimista
+      : openCenario === "Realista"
+        ? realista
+        : null;
 
   return (
     <Card>
@@ -157,28 +262,44 @@ export function CenarioCaixaSection(props: AggregateInput) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button type="button" className="text-muted-foreground hover:text-foreground">
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <Info className="h-4 w-4" />
                 </button>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs text-xs">
-                <p className="font-semibold mb-1">Regras de % por BU (sobre cada card):</p>
+                <p className="font-semibold mb-1">
+                  Cada card é multiplicado pelas % da sua BU:
+                </p>
                 <ul className="space-y-0.5">
-                  <li>• Modelo Atual / Outbound: 0% MRR · 75% Setup · 50% Pontual</li>
-                  <li>• Franquia / Oxy Hacker: 70% do Pontual</li>
+                  <li>
+                    • Modelo Atual / Outbound: 0% MRR · 75% Setup · 50% Pontual
+                  </li>
+                  <li>
+                    • Franquia / Oxy Hacker: 70% do Pontual (MRR e Setup
+                    ignorados)
+                  </li>
                 </ul>
                 <p className="mt-2">
-                  <span className="font-semibold">Realista:</span> 100% dos Quentes ·{" "}
-                  <span className="font-semibold">Otimista:</span> 100% dos Quentes + Mornos.
+                  <span className="font-semibold">Realista:</span> soma de 100%
+                  dos cards Quentes ·{" "}
+                  <span className="font-semibold">Otimista:</span> Quentes +
+                  Mornos.
                 </p>
-                <p className="mt-1 opacity-70">MRR considerado como valor mensal (1×).</p>
+                <p className="mt-1 opacity-70">
+                  MRR considerado como valor mensal (1×). A % é aplicada sobre o
+                  valor de cada card individualmente.
+                </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Projeção de entrada de caixa a partir dos cards taggeados na Temperatura.
-          Escopo atual: <span className="font-medium">{scopeLabel}</span>.
+          Projeção de entrada de caixa a partir dos cards taggeados na
+          Temperatura. Escopo atual:{" "}
+          <span className="font-medium">{scopeLabel}</span>.
         </p>
       </CardHeader>
       <CardContent>
@@ -201,12 +322,30 @@ export function CenarioCaixaSection(props: AggregateInput) {
         columns={[
           { key: "name", label: "Empresa" },
           { key: "bu", label: "BU" },
+          {
+            key: "regra",
+            label: "% aplicada",
+            format: (_v: any, row: any) =>
+              BU_RULE_SHORT[(row?.bu as string) || ""] || "—",
+          },
           { key: "phase", label: "Fase Atual", format: columnFormatters.phase },
           { key: "closer", label: "Closer" },
           { key: "mrr", label: "MRR (caixa)", format: columnFormatters.currency },
-          { key: "setup", label: "Setup (caixa)", format: columnFormatters.currency },
-          { key: "pontual", label: "Pontual (caixa)", format: columnFormatters.currency },
-          { key: "total", label: "Total Caixa", format: columnFormatters.currency },
+          {
+            key: "setup",
+            label: "Setup (caixa)",
+            format: columnFormatters.currency,
+          },
+          {
+            key: "pontual",
+            label: "Pontual (caixa)",
+            format: columnFormatters.currency,
+          },
+          {
+            key: "total",
+            label: "Total Caixa",
+            format: columnFormatters.currency,
+          },
           { key: "date", label: "Entrada", format: columnFormatters.date },
         ]}
       />
