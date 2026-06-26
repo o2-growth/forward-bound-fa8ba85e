@@ -7,10 +7,14 @@ import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
 import { useO2TaxMetas } from "@/hooks/useO2TaxMetas";
 import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
 import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
+import { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
+import { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
 import { useMetaCampaigns } from "@/hooks/useMetaCampaigns";
 import { useGoogleCampaigns } from "@/hooks/useGoogleCampaigns";
+import { useMarketingSheetData } from "@/hooks/useMarketingSheetData";
 import { useOperationsData } from "@/hooks/useOperationsData";
 import { useHrData } from "@/hooks/useHrData";
+import { useNpsData } from "@/hooks/useNpsData";
 import { NPS_METRICS, NPS_DISTRIBUTION } from "./nps/npsData";
 import { openCeoReport, type ReportSection } from "./ceo/ceoReport";
 import {
@@ -169,8 +173,12 @@ export function CeoViewTab() {
   const o2tax = useO2TaxMetas(startDate, endDate);
   const expansao = useExpansaoMetas(startDate, endDate);
   const oxyHacker = useOxyHackerMetas(startDate, endDate);
+  const outbound = useOutboundAnalytics(startDate, endDate);
+  const monetizacao = useMonetizacaoAnalytics(startDate, endDate);
   const metaCampaigns = useMetaCampaigns(startDate, endDate);
   const googleCampaigns = useGoogleCampaigns(startDate, endDate);
+  const marketingSheet = useMarketingSheetData({ startDate, endDate });
+  const npsQuery = useNpsData();
   const ops = useOperationsData();
   const hr = useHrData({ startDate, endDate });
 
@@ -178,16 +186,26 @@ export function CeoViewTab() {
     modeloAtual.isLoading || o2tax.isLoading || expansao.isLoading || oxyHacker.isLoading || hr.isLoading;
 
   // ─── Comercial / Receita ──────────────────────────────
+  // Mesma base do acelerômetro Comercial: 4 BUs + Outbound + Funil Monetização (apenas "Concluído").
   const comercial = useMemo(() => {
+    const outboundVendaCards = outbound.getCardsForIndicator("venda");
+    const outboundValor = outboundVendaCards.reduce((s, c) => s + (c.valor || 0), 0);
+
+    const monetVendaItems = monetizacao.getDetailItemsForIndicator("venda");
+    const monetValor = monetVendaItems.reduce((s, i) => s + (i.value || 0), 0);
+
     const buSales = [
       { key: "Modelo Atual", qty: modeloAtual.getQtyForPeriod("venda", startDate, endDate), value: modeloAtual.getValueForPeriod("venda", startDate, endDate) },
       { key: "O2 Tax", qty: o2tax.getQtyForPeriod("venda", startDate, endDate), value: o2tax.getValueForPeriod("venda", startDate, endDate) },
       { key: "Franquia", qty: expansao.getQtyForPeriod("venda", startDate, endDate), value: expansao.getValueForPeriod("venda", startDate, endDate) },
       { key: "Oxy Hacker", qty: oxyHacker.getQtyForPeriod("venda", startDate, endDate), value: oxyHacker.getValueForPeriod("venda", startDate, endDate) },
+      { key: "Outbound", qty: outboundVendaCards.length, value: outboundValor },
+      { key: "Monetização", qty: monetVendaItems.length, value: monetValor },
     ];
     const totalSales = buSales.reduce((s, b) => s + b.qty, 0);
     const totalRevenue = buSales.reduce((s, b) => s + b.value, 0);
 
+    // MRR novo: regra do projeto — apenas Modelo Atual + O2 TAX entram no MRR recorrente novo.
     const mrrNovo = (modeloAtual.getMrrForPeriod?.(startDate, endDate) ?? 0) + (o2tax.getMrrForPeriod?.(startDate, endDate) ?? 0);
     const arr = mrrNovo * 12;
     const ticketMedio = totalSales > 0 ? totalRevenue / totalSales : null;
@@ -195,7 +213,7 @@ export function CeoViewTab() {
     const bestBu = [...buSales].sort((a, b) => b.value - a.value)[0];
 
     return { buSales, totalSales, totalRevenue, mrrNovo, arr, ticketMedio, bestBu };
-  }, [modeloAtual, o2tax, expansao, oxyHacker, startDate, endDate]);
+  }, [modeloAtual, o2tax, expansao, oxyHacker, outbound, monetizacao, startDate, endDate]);
 
   // ─── Aquisição / Marketing ────────────────────────────
   const aquisicao = useMemo(() => {
@@ -204,15 +222,19 @@ export function CeoViewTab() {
     const metaLeads = (metaCampaigns.data ?? []).reduce((s, c) => s + (c.leads || 0), 0);
     const googleLeads = (googleCampaigns.data ?? []).reduce((s, c) => s + (c.leads || 0), 0);
 
-    const mediaInvestment = metaSpend + googleSpend;
+    // Mesma fonte da aba Marketing: prioriza planilha consolidada (`midiaTotal`),
+    // com fallback para soma direta de Meta + Google via API.
+    const sheetTotal = marketingSheet.data?.midiaTotal ?? 0;
+    const mediaInvestment = sheetTotal > 0 ? sheetTotal : metaSpend + googleSpend;
     const totalLeads = metaLeads + googleLeads;
 
-    // MQLs reais por BU (mesma lógica das abas de indicadores)
+    // MQLs reais por BU + Outbound (alinhado ao acelerômetro Comercial e à aba Marketing).
     const totalMqls =
       modeloAtual.getQtyForPeriod("mql", startDate, endDate) +
       o2tax.getQtyForPeriod("mql", startDate, endDate) +
       expansao.getQtyForPeriod("mql", startDate, endDate) +
-      oxyHacker.getQtyForPeriod("mql", startDate, endDate);
+      oxyHacker.getQtyForPeriod("mql", startDate, endDate) +
+      outbound.getCardsForIndicator("mql").length;
 
     const custoMql = totalMqls > 0 ? mediaInvestment / totalMqls : null;
     const cpl = totalLeads > 0 ? mediaInvestment / totalLeads : null;
@@ -226,7 +248,7 @@ export function CeoViewTab() {
     const bestChannel = ranked[0] ?? null;
 
     return { metaSpend, googleSpend, mediaInvestment, metaLeads, googleLeads, totalLeads, totalMqls, custoMql, cpl, channels, bestChannel };
-  }, [metaCampaigns.data, googleCampaigns.data, modeloAtual, o2tax, expansao, oxyHacker, startDate, endDate]);
+  }, [metaCampaigns.data, googleCampaigns.data, marketingSheet.data, modeloAtual, o2tax, expansao, oxyHacker, outbound, startDate, endDate]);
 
   // ─── Operação / Churn ─────────────────────────────────
   const operacao = useMemo(() => {
@@ -279,15 +301,32 @@ export function CeoViewTab() {
     };
   }, [hr.headcountByTime, hr.turnoverByTime, hr.headcountTotal, hr.turnoverGeral, hr.tempoMedioDeCasaDias, hr.admissoesNoPeriodo, hr.desligadosNoPeriodo]);
 
-  // ─── NPS (base Q4 2025) ───────────────────────────────
-  const nps = {
-    score: NPS_METRICS.nps.score,
-    meta: NPS_METRICS.nps.meta,
-    csat: NPS_METRICS.csat.score,
-    promotores: NPS_DISTRIBUTION.promotores,
-    detratores: NPS_DISTRIBUTION.detratores,
-    neutros: NPS_DISTRIBUTION.neutros,
-  };
+  // ─── NPS — prioriza dados ao vivo (mesma fonte da aba NPS); fallback no snapshot Q4/2025 ──
+  const nps = useMemo(() => {
+    const live = npsQuery.data;
+    const liveScore = live?.metrics?.nps?.score;
+    const hasLive = typeof liveScore === "number" && (live?.kpis?.respostas ?? 0) > 0;
+    if (hasLive && live) {
+      return {
+        score: live.metrics.nps.score,
+        meta: live.metrics.nps.meta,
+        csat: live.metrics.csat.score,
+        promotores: live.npsDistribution.promotores,
+        detratores: live.npsDistribution.detratores,
+        neutros: live.npsDistribution.neutros,
+        source: "live" as const,
+      };
+    }
+    return {
+      score: NPS_METRICS.nps.score,
+      meta: NPS_METRICS.nps.meta,
+      csat: NPS_METRICS.csat.score,
+      promotores: NPS_DISTRIBUTION.promotores,
+      detratores: NPS_DISTRIBUTION.detratores,
+      neutros: NPS_DISTRIBUTION.neutros,
+      source: "snapshot" as const,
+    };
+  }, [npsQuery.data]);
 
   // ─── Relatórios por área ──────────────────────────────
   const generatedAt = format(new Date(), "dd/MM/yyyy HH:mm");
@@ -434,7 +473,7 @@ export function CeoViewTab() {
         <MetricCard label="Faturamento" value={fmt(comercial.totalRevenue)} sublabel={`${comercial.totalSales} vendas`} icon={<DollarSign className="h-5 w-5" />} large />
         <MetricCard label="ARR (novo MRR)" value={fmt(comercial.arr)} sublabel="MRR novo × 12" icon={<TrendingUp className="h-5 w-5" />} large />
         <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} sublabel={operacao.retencaoRate != null ? `Retenção ${fmtPct(operacao.retencaoRate)}` : "base atual"} icon={<AlertTriangle className="h-5 w-5" />} large tone="danger" />
-        <MetricCard label="NPS" value={String(nps.score)} sublabel="Q4 2025" icon={<HeartHandshake className="h-5 w-5" />} large tone={nps.score >= nps.meta ? "success" : "default"} />
+        <MetricCard label="NPS" value={String(nps.score)} sublabel={nps.source === "live" ? "dados ao vivo" : "Q4 2025"} icon={<HeartHandshake className="h-5 w-5" />} large tone={nps.score >= nps.meta ? "success" : "default"} />
       </div>
 
       {/* ── 1. Aquisição & Marketing ── */}
@@ -581,7 +620,7 @@ export function CeoViewTab() {
         <SectionHeader
           icon={<Target className="h-4 w-4 text-muted-foreground" />}
           title="Experiência do Cliente (NPS)"
-          description="Satisfação e lealdade da base (Q4 2025)"
+          description={nps.source === "live" ? "Satisfação e lealdade da base (dados ao vivo)" : "Satisfação e lealdade da base (snapshot Q4 2025)"}
           onReport={() => handleAreaReport("nps", "Experiência do Cliente (NPS)")}
         />
         <CardContent>
