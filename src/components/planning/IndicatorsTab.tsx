@@ -2567,7 +2567,9 @@ export function IndicatorsTab() {
           const cards = filtered ?? o2TaxAnalytics.getCardsForIndicator('venda');
           total += cards.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
         }
+        total += sumMonet('setup');
         return total;
+
       }
 
       case 'pontual': {
