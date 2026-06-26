@@ -14,7 +14,7 @@ import { useGoogleCampaigns } from "@/hooks/useGoogleCampaigns";
 import { useMarketingSheetData } from "@/hooks/useMarketingSheetData";
 import { useOperationsData } from "@/hooks/useOperationsData";
 import { useHrData } from "@/hooks/useHrData";
-import { useNpsData } from "@/hooks/useNpsData";
+import { useNpsData, processNpsData } from "@/hooks/useNpsData";
 import { NPS_METRICS, NPS_DISTRIBUTION } from "./nps/npsData";
 import { openCeoReport, type ReportSection } from "./ceo/ceoReport";
 import {
