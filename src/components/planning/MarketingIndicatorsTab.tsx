@@ -801,6 +801,15 @@ export function MarketingIndicatorsTab() {
         salesCards={salesInPeriod}
       />
 
+      {/* ===== NEW: Resultados Gerais (V4-style dashboard) ===== */}
+      <OverallResultsSection
+        dateRange={dateRange}
+        allAttributionCards={allAttributionCards}
+        salesCards={salesInPeriod}
+      />
+
+
+
 
       {/* ===== NEW: Online vs Offline ===== */}
       <OnlineOfflineSection
