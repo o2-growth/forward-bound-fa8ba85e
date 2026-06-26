@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIndicators26Raw, type Indicator26Row } from "@/hooks/useIndicators26Raw";
 import { useIndicators26Live } from "@/hooks/useIndicators26Live";
+import { useTimeEFerramentasFromDre } from "@/hooks/useTimeEFerramentasFromDre";
 import { IndicatorTrendDialog } from "./IndicatorTrendDialog";
 
 // Chaves de meses puros (sem Q* nem totais) para o gráfico de tendência
@@ -262,6 +263,17 @@ export function ConsolidatedIndicators26Section() {
     return s;
   }, [COLS]);
 
+  // Time e Ferramentas vindo direto do DRE Oxy detalhado — ano inteiro de 2026.
+  const tfDre = useTimeEFerramentasFromDre({
+    startDate: useMemo(() => new Date(2026, 0, 1), []),
+    endDate: useMemo(() => new Date(2026, 11, 31), []),
+  });
+  const MONTH_KEY_TO_PERIOD: Record<string, string> = {
+    jan: "2026-01", fev: "2026-02", mar: "2026-03", abr: "2026-04",
+    mai: "2026-05", jun: "2026-06", jul: "2026-07", ago: "2026-08",
+    set: "2026-09", out: "2026-10", nov: "2026-11", dez: "2026-12",
+  };
+
   // Index ao vivo por label normalizado
   const liveMap = useMemo(() => {
     const m = new Map<string, Record<string, number | null>>();
@@ -279,6 +291,8 @@ export function ConsolidatedIndicators26Section() {
     const sheetMap = new Map<string, Indicator26Row>();
     for (const r of sheetRows) sheetMap.set(normalize(r.label), r);
 
+    const tfLabelKey = normalize("Time e ferramentas");
+
     for (const labelKey of allLabels) {
       const sheetRow = sheetMap.get(labelKey);
       const liveVals = liveMap.get(labelKey);
@@ -291,10 +305,33 @@ export function ConsolidatedIndicators26Section() {
           merged[c.key] = sheetRow?.values?.[c.key] ?? null;
         }
       }
+
+      // Override autoritativo: linha "Time e ferramentas" → DRE Oxy detalhado
+      if (labelKey === tfLabelKey && tfDre.total > 0) {
+        let total2026 = 0;
+        for (const [monthKey, period] of Object.entries(MONTH_KEY_TO_PERIOD)) {
+          const v = tfDre.byMonthMap[period]?.total;
+          if (v !== undefined && v > 0) {
+            merged[monthKey] = v;
+            total2026 += v;
+          }
+        }
+        // Quarters somam só meses que vieram do DRE
+        const qMap: Record<string, string[]> = {
+          q1: ["jan", "fev", "mar"], q2: ["abr", "mai", "jun"],
+          q3: ["jul", "ago", "set"], q4: ["out", "nov", "dez"],
+        };
+        for (const [qKey, months] of Object.entries(qMap)) {
+          const vals = months.map((mk) => merged[mk]).filter((v): v is number => typeof v === "number" && v > 0);
+          if (vals.length > 0) merged[qKey] = vals.reduce((a, b) => a + b, 0);
+        }
+        if (total2026 > 0) merged.total2026 = total2026;
+      }
+
       m.set(labelKey, { label, values: merged });
     }
     return m;
-  }, [sheetRows, liveRows, liveMap, COLS, LIVE_COL_KEYS]);
+  }, [sheetRows, liveRows, liveMap, COLS, LIVE_COL_KEYS, tfDre.byMonthMap, tfDre.total]);
 
 
   const q = normalize(query);

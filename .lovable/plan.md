@@ -1,89 +1,76 @@
 
-# Resultados Gerais — Dashboard interativo (estilo V4)
+## Objetivo
+Substituir o valor da linha **"Time e ferramentas"** (hoje vindo da planilha `Indicadores 26` via `useMarketingSheetData`) por um cálculo direto do DRE Oxy detalhado, igual ao que já fazemos no squad dos CFOs — mas agora cobrindo **a Oxy inteira** (todos os times de todas as BUs + ferramentas/softwares de todas as áreas).
 
-Replicar a tela de referência o mais fiel possível, trocando "Pedidos/Ingressos/Cupom" pelos equivalentes no nosso negócio (Vendas / Propostas / Origem) e mantendo todo o restante. Vai dentro da aba **Indicadores → Marketing**, logo abaixo do novo "Funil Comparativo por Fonte".
+Esse valor alimenta:
+- A linha "Time e ferramentas" da seção **Indicadores 26 consolidada** (`ConsolidatedIndicators26Section`)
+- O cálculo de **CAC** do hero `InvestmentCacMqlHero` → CAC = (Mídia + Time e ferramentas) ÷ Vendas
+- A coluna `cacOpex` em `MarketingIndicatorsTab.tsx` (linha 707)
 
-## Onde entra
+## O que já temos pronto
+- `useSquadCostFromDre` → drill-down por CNPJ/CPF/nome para vincular lançamentos a pessoas (escopo: apenas categorias CaaS dos squads de CFO).
+- `usePersonnelCostByBu` → já agrega TODAS as categorias de **pessoal** (regex `equipe|benef|estagiari|...|terceiros`) por BU + corporativo. Hoje é usado para custo de pessoal e turnover. Já cobre Oxy inteira.
+- `fetch-oxy-finance` edge function com action `dre_categories` (pega todas as categorias de grupos do DRE).
 
-Nova seção `OverallResultsSection.tsx` em `src/components/planning/marketing-indicators/performance/`, registrada na `MarketingIndicatorsTab.tsx`. Respeita o `dateRange` global da aba.
+## Estrutura confirmada no DRE Oxy (junho/26)
 
-## Layout (espelhando o V4)
+**Grupos relevantes:**
+| Grupo (code) | Função |
+|---|---|
+| `Custos CaaS/SaaS/CS/Expansão/Tax` (CV) | Equipe + Softwares & Ferramentas da BU |
+| `Despesas com Pessoal` (DX) | Salários, Pró-labore, Benefícios, FGTS/INSS, Cursos/Treinamentos, Serviços de Terceiros (corporativo) |
+| `Despesas de Marketing` (DX) | Assessoria MKT, Softwares e Ferramentas - Marketing, Serviços de Terceiros MKT |
+| `Despesas Comerciais` (DX) | Comissão de Parceiros, Comissionamentos & Premiações, Softwares e Ferramentas - Comercial, Serviços de Terceiros Comercial |
+| `Despesas Administrativas` (DX) | Softwares e Ferramentas - Administrativo, Assessoria de Informática, Eventos Internos |
 
-```text
-┌─────────────────────────────────────────────────────────────────────────────┐
-│ RESULTADOS GERAIS • Período: 01/01 → 12/07                       [⚙ filtros]│
-├──────────┬──────────┬───────────────┬───────────────┬──────────────────────┤
-│ KPI 1    │ KPI 2    │ KPI 3         │ KPI 4         │ KPI 5                 │
-│ Qtd      │ Qtd      │ Valor Vendas  │ Ticket Médio  │ % Realizado Meta      │
-│ Vendas   │ Propostas│ R$ ...        │ (Venda)       │ ...% (meta R$ X)      │
-│ Last Wk  │ Last Wk  │ Last Wk       │ TM Proposta   │ Last Wk: ...          │
-├──────────┴──────────┴───────┬───────┴───────────────┴──────────────────────┤
-│ Métricas (6 tiles clicáveis)│ por Origem (lista barras) │ Evolução temporal│
-│  Qtd Vendas · TM Venda      │   Meta Ads     ...       │ [Mês/Sem/Dia ▾]  │
-│  Qtd Propostas · TM Prop.   │   Google Ads   ...       │ [Vendas/Valor ▾] │
-│  Valor Propostas · % Meta   │   CRM/Direto   ...       │ area chart       │
-│  (clique → ativa métrica)   │   Indicações   ...       │                  │
-├─────────────────────────────┼──────────────┬───────────┼──────────────────┤
-│ por Cidade (barras)         │ por Origem   │ por Estado│ Tabela de Vendas │
-│   São Paulo  87             │ (mesma do    │   SP 182  │ Data · Cliente · │
-│   Belo Horiz 25             │  topo, aqui  │   MG  47  │ Produto · Valor  │
-│   ...                       │  como mini)  │   ...     │ (paginada)       │
-└─────────────────────────────┴──────────────┴───────────┴──────────────────┘
-```
+**Categorias que classifico como TIME (toda a empresa):**
+- Por BU: `Equipe CaaS/SaaS/CS/Expansão/Tax`, `Benefícios - <BU>`, `Remuneração de Estagiários - <BU>`, `Custo com Deslocamento/Alimentação/Viagens - <BU>`
+- Corporativo (Despesas com Pessoal): `Salários`, `Benefícios`, `FGTS`, `INSS`, `Pró-labore sócios`, `Distribuição de Lucros`, `Remuneração de Estagiários`, `Rescisões`, `Cursos e Treinamentos`, `Menor Aprendiz`, `Serviços de Terceiros`, `Férias`, `13º`, `Seguro de Vida`, `Produtos O2 - Endomarketing`
+- Marketing: `Assessoria Marketing`, `Serviços de Terceiros Marketing`, `Alimentação/Deslocamento/Viagens - Marketing`
+- Comercial: `Comissão de Parceiros`, `Comissionamentos e Premiações Equipe`, `Serviços de Terceiros Comercial`, `Alimentação/Deslocamento - Comercial`
+- Administrativo: `Alimentação/Deslocamento/Viagens - Administrativo`
 
-## Comportamento interativo
+**Categorias que classifico como FERRAMENTAS:**
+- `Softwares e Ferramentas - CaaS`
+- `Softwares e Ferramentas - SaaS`
+- `Softwares e Ferramentas - Customer Success`
+- `Softwares e Ferramentas - Expansão`
+- `Softwares e Ferramentas - Tax`
+- `Softwares e Ferramentas - Marketing`
+- `Softwares e Ferramentas - Comercial`
+- `Softwares e Ferramentas - Administrativo`
+- `Assessoria de informática` (Administrativo)
 
-- **Filtros globais da seção** (header): período (sincronizado com a aba), Origem, Produto, BU, SDR/Closer.
-- **KPIs do topo**: clique → abre `DetailSheet` listando as vendas/propostas com colunas (cabeçalho fixo, igual padrão já implementado).
-- **Tiles "Métricas"**: clique seleciona qual métrica alimenta o **gráfico de evolução** (Qtd Vendas, TM Venda, Qtd Propostas, TM Proposta, Valor Propostas, % Meta). Tile ativo destacado.
-- **Granularidade do gráfico**: Dia / Semana / Mês (selector).
-- **Listas "por Origem / Cidade / Estado / Produto"**: cada barra é filtro cruzado — clicar filtra todas as outras visões da seção (cross-filter estilo Power BI). Botão "Limpar filtros".
-- **Tabela inferior**: ordenável por coluna, paginada, exportável CSV. Linha clicável → abre o card no Pipefy (deep-link já existe em `mem://tech/pipefy/deep-linking-config-v2`).
-- **Comparativo "Last Week / Last Period"**: cada KPI mostra delta vs período anterior de mesmo tamanho.
-- **Meta editável**: campo "Meta de Vendas (R$)" na engrenagem do header — persistido em `marketing_overall_metas` (nova tabela leve: month/year/meta_vendas/meta_qtd) ou reusar `monetary_metas` se fizer sentido.
+> Soma em jun/26: Time ≈ R$ 540k + Ferramentas ≈ R$ 13,5k (5 Softwares & Ferramentas + Assessoria informática). Posso refinar quando você confirmar o que entra/sai.
 
-## Fontes de dados (o que já temos vs falta)
+## Implementação
 
-**Já temos no dash:**
-- ✅ Qtd Vendas, Valor (MRR/Setup/Pontual), Ticket Médio, % Meta → via `salesInPeriod`, `realRevenue`, `monetary_metas`.
-- ✅ Qtd Propostas + Valor Propostas → cards na fase "Proposta enviada / Follow Up" + valor do card.
-- ✅ Por Origem/Fonte → `detectChannel(card)` (Meta, Google, CRM, Indicação, Evento, Orgânico).
-- ✅ Por Produto → campo `produto` no AttributionCard.
-- ✅ Por SDR/Closer → já filtramos hoje.
-- ✅ Evolução temporal mensal → já agregamos em outras seções.
-- ✅ Tabela detalhada (Data assinatura · Cliente · Qtd · Valor) → `salesCards` ordenado por `dataAssinatura`.
-- ✅ Comparativo "Last Week" → calculável (mesmo intervalo deslocado).
+1. **Novo hook** `src/hooks/useTimeEFerramentasFromDre.ts`
+   - Reaproveita `fetchDreGroups` + `fetchDreCategories` (mesma assinatura do `usePersonnelCostByBu`).
+   - Classifica cada categoria em 3 buckets via regex sobre o label:
+     - `FERRAMENTAS_RE = /software.*ferrament|ferrament.*software|assessoria de informatica/i`
+     - `TIME_RE` igual ao `PERSONNEL_RE` atual **+** `assessoria marketing|comiss[aã]o de parceiros|comissionamento|premiac|servic.*terceiro.*marketing|servic.*terceiro.*comercial`
+   - Retorna `{ time, ferramentas, total, serie: { period, time, ferramentas }[], categoriasTime[], categoriasFerramentas[], isLoading, error }`.
+   - Suporte ao mesmo range mensal/YTD que o resto da aba.
 
-**NÃO temos hoje (preciso confirmar antes de implementar):**
-- ❌ **Cidade do lead/cliente** — campo `cidade` não existe no `AttributionCard`. Opções: (a) adicionar mapeamento do Pipefy se o pipe tem o campo; (b) puxar via Meta Ads `actions_by_region` (apenas para leads atribuídos a Meta); (c) deixar bloco oculto até termos a fonte.
-- ❌ **Estado/UF** — mesma situação da cidade. Meta Ads expõe **breakdown por região** (estado BR) no insights endpoint. Para Google Ads é `geo_target_region`. Pode ser implementado **só para leads atribuídos a campanhas Meta/Google** — leads CRM/orgânicos não terão UF a menos que adicionemos no formulário.
-- ❌ **"por Cupom"** — não usamos cupons. Substituir por **"por SDR" ou "por Indicador" ou "por Campanha"**. (precisa decisão)
-- ❌ **% Realizado Meta de Qtd (2.000 pedidos)** — temos meta de valor (R$), não de quantidade. Adicionar campo `meta_qtd_vendas` na tabela de metas.
-- ❌ **Qtd Ingressos** — não temos equivalente direto (multi-itens por venda). Estou substituindo por **Qtd Propostas** que é o que faz sentido no funil B2B.
+2. **Integrar no `MarketingIndicatorsTab.tsx`**
+   - Substituir `sheetData?.timeFerramentas` por `dreData.total` (com fallback para o valor da planilha quando a query falhar ou estiver fora do range coberto pelo DRE).
+   - Recalcular `cacOpex` com o novo número e adicionar tooltip explicando origem (DRE Oxy: Time + Ferramentas).
 
-## Implementação técnica
+3. **Integrar no `ConsolidatedIndicators26Section.tsx`**
+   - Para a linha `Time e ferramentas`: priorizar valor do hook DRE quando a coluna for um mês de 2026 dentro do range do DRE.
+   - Tornar a linha clicável (já existe `IndicatorTrendDialog`) e detalhar o breakdown Time vs Ferramentas com lista de categorias.
 
-**Arquivos novos:**
-- `src/components/planning/marketing-indicators/performance/OverallResultsSection.tsx` (orquestrador)
-- `.../overall-results/KpiStrip.tsx` — 5 cards do topo com delta vs período anterior
-- `.../overall-results/MetricsTilesGrid.tsx` — 6 tiles selecionáveis
-- `.../overall-results/BreakdownList.tsx` — componente reusável para "por Origem / Cidade / Estado / Produto" (barras horizontais + scroll + clique)
-- `.../overall-results/EvolutionChart.tsx` — area chart com seletor de métrica + granularidade
-- `.../overall-results/SalesTable.tsx` — tabela paginada com header fixo
-- `src/hooks/useOverallResults.ts` — agrega vendas + propostas + breakdowns + série temporal a partir de `allAttributionCards`, `salesInPeriod` e `allCampaigns`
-- (opcional, se aprovado) Migration `marketing_overall_metas` com `meta_vendas_valor` e `meta_vendas_qtd` por mês
+4. **Telemetria** – `console.debug` com diagnóstico (igual ao squad-cost) para validarmos mês a mês.
 
-**Cross-filter:** estado local `{ origem?, produto?, cidade?, estado?, sdr? }` em `OverallResultsSection`; cada filho recebe e aplica antes de renderizar. Métricas do topo respeitam o cross-filter.
+## Detalhes técnicos
+- Range: usa `dateRange` global da aba (mesmo do hero).
+- DRE retorna por mês — somamos só os meses dentro do filtro (`periodInRange` igual ao `usePersonnelCostByBu`).
+- Sem mudanças de schema, sem novas tabelas. Apenas reuso de edge function existente.
 
-**Last week / período anterior:** o hook calcula 2× — período atual e período anterior de mesmo tamanho — e devolve `{ atual, anterior, delta% }`.
+## Antes de eu codar, confirma 3 pontos:
+1. **Pró-labore sócios** (≈R$ 41,5k/mês) entra no "Time"? *(faz parte do custo do time, mas alguns dashboards isolam)*
+2. **Comissão de Parceiros + Comissionamentos** (R$ 18,5k/mês em jun) — entra em "Time" ou tratamos como custo de mídia/comercial separado?
+3. **Eventos Internos** (R$ 3,2k) e **Assessoria Contábil/Financeira/Jurídica/RH** (≈R$ 23k) — entram em "Time e ferramentas" ou só nas "Despesas totais"?
 
-**Performance:** memoização agressiva por `dateRange` + filtros; sem novas requisições — tudo derivado de dados já carregados pela aba.
-
-## Perguntas para destravar antes de eu construir
-
-1. **"por Cupom"** vira o quê no nosso caso? (Sugiro **"por SDR"** ou **"por Indicador/Closer"**.)
-2. **Cidade/Estado**: posso começar mostrando **apenas leads atribuídos a Meta/Google** (com breakdown geográfico vindo da API de insights) e deixar os outros como "n/d"? Ou prefere ocultar os blocos até termos o campo no formulário de captura?
-3. **Meta de quantidade de vendas** (o "2.000" do print): criar campo separado em metas mensais ou só calcular a partir da meta de valor ÷ ticket médio?
-4. **"Qtd Ingressos"**: confirmo a troca por **Qtd Propostas**? (alternativa: Qtd MQLs.)
-
-Depois das respostas, parto direto para a implementação.
+Posso já assumir defaults (1 ✅ Sim, 2 ✅ Sim em Time, 3 ❌ Não — entram só em Despesas totais), mas prefiro alinhar antes para não retrabalhar.

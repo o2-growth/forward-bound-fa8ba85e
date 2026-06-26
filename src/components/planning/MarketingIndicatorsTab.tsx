@@ -42,6 +42,7 @@ import { CacTotalCard } from "./marketing-indicators/CacTotalCard";
 import { InvestmentCacMqlHero } from "./marketing-indicators/InvestmentCacMqlHero";
 import { ConsolidatedIndicators26Section } from "./marketing-indicators/ConsolidatedIndicators26Section";
 import { useMarketingSheetData } from "@/hooks/useMarketingSheetData";
+import { useTimeEFerramentasFromDre } from "@/hooks/useTimeEFerramentasFromDre";
 import { OnlineOfflineSection } from "./marketing-indicators/OnlineOfflineSection";
 import { ConversionCurveSection } from "./marketing-indicators/ConversionCurveSection";
 import { CohortTable } from "./marketing-indicators/CohortTable";
@@ -693,18 +694,26 @@ export function MarketingIndicatorsTab() {
     endDate: dateRange.to,
   });
 
+  // Time e Ferramentas — autoritativo via DRE Oxy detalhado (toda a Oxy, não só squad CFO).
+  const tfDre = useTimeEFerramentasFromDre({
+    startDate: dateRange.from,
+    endDate: dateRange.to,
+  });
+
   // Breakdown de spend real por canal (Meta / Google) a partir dos canais enriquecidos.
   const investmentMeta = enrichedChannels.find(c => c.id === 'meta_ads')?.investment ?? 0;
   const investmentGoogle = enrichedChannels.find(c => c.id === 'google_ads')?.investment ?? 0;
 
   // CAC (definição da planilha) = (Mídia + Time e ferramentas) ÷ Vendas.
-  // FONTE A DEFINIR: `timeFerramentas` ainda não vem do backend — usamos o que a planilha já
-  // expõe (sheetData.cac) como número autoritativo e derivamos o OPEX por diferença.
+  // OPEX agora vem do DRE Oxy detalhado; fallback para planilha enquanto DRE carrega.
   const cacMidia = investmentTotalForRange;
   const vendasPeriodo = salesInPeriod.length;
-  const cacReal = sheetData?.cac ?? (vendasPeriodo > 0 ? cacMidia / vendasPeriodo : 0);
-  // Preferir o OPEX real (Time e ferramentas) quando o backend já o expõe; senão derivar por diferença.
-  const cacOpex = sheetData?.timeFerramentas ?? Math.max(0, cacReal * vendasPeriodo - cacMidia);
+  const cacOpex = tfDre.total > 0
+    ? tfDre.total
+    : (sheetData?.timeFerramentas ?? 0);
+  const cacReal = vendasPeriodo > 0
+    ? (cacMidia + cacOpex) / vendasPeriodo
+    : (sheetData?.cac ?? 0);
 
   return (
     <div className="space-y-6">
