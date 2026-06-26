@@ -215,7 +215,7 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
               {sortedItems.length} {sortedItems.length === 1 ? 'registro' : 'registros'}
             </span>
           </div>
-          <div className="border rounded-lg overflow-auto max-h-[55vh]">
+          <div className="border rounded-lg">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
                 <TableRow className="bg-background hover:bg-background">
