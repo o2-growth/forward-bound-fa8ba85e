@@ -209,17 +209,47 @@ export function useMonetizacaoAnalytics(
   const valorGanho = cards.filter((c) => c.ganho).reduce((s, c) => s + c.valorTotal, 0);
   const ticketMedio = cards.length > 0 ? valorPipeline / cards.length : 0;
 
-  const toDetailItem = (card: MonetizacaoCard): DetailItem => ({
-    id: card.id,
-    name: card.titulo || card.id,
-    phase: card.faseAtual,
-    date: card.entrada,
-    value: card.valorTotal,
-    total: card.valorTotal,
-    responsible: card.responsavel,
-    reason: card.motivoPerda || undefined,
-    product: card.tipo,
-  });
+  const toDetailItem = (card: MonetizacaoCard): DetailItem => {
+    const mrr =
+      (card.valores['valor_cfoaas'] || 0) +
+      (card.valores['valor_oxy'] || 0) +
+      (card.valores['valor_assessoria_mrr'] || 0) +
+      (card.valores['valor_bpo'] || 0) +
+      (card.valores['valor_coordenador_financeiro'] || 0);
+    const setup = card.valores['valor_setup'] || 0;
+    const pontual =
+      (card.valores['valor_diagn_stico'] || 0) +
+      (card.valores['valor_turnaround'] || 0) +
+      (card.valores['valor_valuation'] || 0);
+    const value = mrr + setup + pontual;
+    return {
+      id: card.id,
+      name: card.titulo || card.id,
+      phase: card.faseAtual,
+      date: card.entrada,
+      value,
+      total: value,
+      mrr,
+      setup,
+      pontual,
+      responsible: card.responsavel,
+      reason: card.motivoPerda || undefined,
+      product: card.tipo,
+      bu: 'Monetização',
+      tipoOrigem: MONETIZACAO_ORIGEM_SENTINEL,
+    };
+  };
+
+  // Mapeia cards para itens de drill-down do acelerômetro comercial
+  // (Proposta / Venda). MQL / RM / RR não existem nesse pipe.
+  const getDetailItemsForIndicator = (
+    indicator: MonetizacaoIndicatorType,
+  ): DetailItem[] => {
+    if (indicator !== 'proposta' && indicator !== 'venda') return [];
+    return cards
+      .filter((c) => mapFaseToIndicator(c.faseAtual) === indicator)
+      .map(toDetailItem);
+  };
 
   return {
     cards,
@@ -232,7 +262,9 @@ export function useMonetizacaoAnalytics(
       ticketMedio,
     },
     toDetailItem,
+    getDetailItemsForIndicator,
     isLoading,
     error,
   };
+
 }
