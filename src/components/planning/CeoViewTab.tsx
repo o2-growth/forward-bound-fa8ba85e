@@ -620,7 +620,7 @@ export function CeoViewTab() {
         <SectionHeader
           icon={<Target className="h-4 w-4 text-muted-foreground" />}
           title="Experiência do Cliente (NPS)"
-          description="Satisfação e lealdade da base (Q4 2025)"
+          description={nps.source === "live" ? "Satisfação e lealdade da base (dados ao vivo)" : "Satisfação e lealdade da base (snapshot Q4 2025)"}
           onReport={() => handleAreaReport("nps", "Experiência do Cliente (NPS)")}
         />
         <CardContent>
