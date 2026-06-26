@@ -1172,9 +1172,18 @@ export function IndicatorsTab() {
       }
     }
 
+    // MONETIZAÇÃO (origem transversal — não depende de BU, Closer ou SDR)
+    // Conta apenas Proposta e Venda; pipe não gera MQL/RM/RR.
+    if (
+      (indicator.key === 'proposta' || indicator.key === 'venda') &&
+      (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
+    ) {
+      total += monetizacaoAnalytics.getDetailItemsForIndicator(indicator.key).length;
+    }
 
     return total;
   };
+
 
   const buildChartData = (indicator: IndicatorConfig) => {
     // Helper: agrupa cards (com filtro de closer/SDR aplicado) na mesma granularidade
