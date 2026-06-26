@@ -585,6 +585,8 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                         <TableCell>{c.produto || "—"}</TableCell>
                         <TableCell>{c.bu}</TableCell>
                         <TableCell>{CHANNEL_LABEL[detectChannel(c)]}</TableCell>
+                        <TableCell className="max-w-[120px] truncate">{c.sdr || "—"}</TableCell>
+                        <TableCell className="max-w-[120px] truncate">{c.closer || "—"}</TableCell>
                         <TableCell className="text-right tabular-nums">{brlK(c.valorMRR || 0)}</TableCell>
                         <TableCell className="text-right tabular-nums">{brlK(c.valorSetup || 0)}</TableCell>
                         <TableCell className="text-right tabular-nums">{brlK(c.valorPontual || 0)}</TableCell>
@@ -593,7 +595,7 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                     ))}
                     {pageRows.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8 text-xs">
+                        <TableCell colSpan={11} className="text-center text-muted-foreground py-8 text-xs">
                           Nenhuma venda encontrada
                         </TableCell>
                       </TableRow>
