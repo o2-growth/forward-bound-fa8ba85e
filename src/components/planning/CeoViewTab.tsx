@@ -1057,11 +1057,11 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            <MetricCard label="Headcount" value={fmtInt(pessoas.headcount)} />
-            <MetricCard label="Turnover" value={fmtPct(pessoas.turnover)} tone={pessoas.turnover != null && pessoas.turnover > 10 ? "danger" : "default"} />
-            <MetricCard label="Tempo médio de casa" value={pessoas.tempoCasa != null ? `${Math.round(pessoas.tempoCasa / 30)} m` : "—"} sublabel="meses" />
-            <MetricCard label="Admissões" value={fmtInt(pessoas.admissoes)} />
-            <MetricCard label="Desligamentos" value={fmtInt(pessoas.desligados)} />
+            <MetricCard label="Headcount" value={fmtInt(pessoas.headcount)} onClick={() => openDrill(drillHeadcount())} />
+            <MetricCard label="Turnover" value={fmtPct(pessoas.turnover)} tone={pessoas.turnover != null && pessoas.turnover > 10 ? "danger" : "default"} onClick={() => openDrill(drillTurnover())} />
+            <MetricCard label="Tempo médio de casa" value={pessoas.tempoCasa != null ? `${Math.round(pessoas.tempoCasa / 30)} m` : "—"} sublabel="meses" onClick={() => openDrill(drillTempoCasa())} />
+            <MetricCard label="Admissões" value={fmtInt(pessoas.admissoes)} onClick={() => openDrill(drillAdmissoes())} />
+            <MetricCard label="Desligamentos" value={fmtInt(pessoas.desligados)} onClick={() => openDrill(drillDesligados())} />
           </div>
           {turnoverTimeData.length > 0 && (
             <div>
