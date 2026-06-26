@@ -952,11 +952,11 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
-            <MetricCard label="Investimento mídia" value={fmt(aquisicao.mediaInvestment)} sublabel="Meta + Google" />
-            <MetricCard label="Leads" value={fmtInt(aquisicao.totalLeads)} />
-            <MetricCard label="MQLs" value={fmtInt(aquisicao.totalMqls)} />
-            <MetricCard label="Custo por MQL" value={fmt(aquisicao.custoMql)} sublabel="invest. / MQLs" />
-            <MetricCard label="Melhor canal" value={aquisicao.bestChannel?.name ?? "—"} sublabel={aquisicao.bestChannel ? `${fmtInt(aquisicao.bestChannel.leads)} leads · CPL ${fmt(aquisicao.bestChannel.cpl)}` : undefined} />
+            <MetricCard label="Investimento mídia" value={fmt(aquisicao.mediaInvestment)} sublabel="Meta + Google" onClick={() => openDrill(drillInvestimento())} />
+            <MetricCard label="Leads" value={fmtInt(aquisicao.totalLeads)} onClick={() => openDrill(drillLeads())} />
+            <MetricCard label="MQLs" value={fmtInt(aquisicao.totalMqls)} onClick={() => openDrill(drillMqls())} />
+            <MetricCard label="Custo por MQL" value={fmt(aquisicao.custoMql)} sublabel="invest. / MQLs" onClick={() => openDrill(drillCustoMql())} />
+            <MetricCard label="Melhor canal" value={aquisicao.bestChannel?.name ?? "—"} sublabel={aquisicao.bestChannel ? `${fmtInt(aquisicao.bestChannel.leads)} leads · CPL ${fmt(aquisicao.bestChannel.cpl)}` : undefined} onClick={() => openDrill(drillMelhorCanal())} />
           </div>
           {aquisicao.mediaInvestment > 0 && (
             <div className="h-64">
