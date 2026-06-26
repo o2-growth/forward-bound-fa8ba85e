@@ -48,6 +48,7 @@ import { CohortTable } from "./marketing-indicators/CohortTable";
 import { PerformanceByChannelSection } from "./marketing-indicators/performance/PerformanceByChannelSection";
 import { CreativeAdPerformanceSection } from "./marketing-indicators/performance/CreativeAdPerformanceSection";
 import { SourceFunnelSection } from "./marketing-indicators/performance/SourceFunnelSection";
+import { OverallResultsSection } from "./marketing-indicators/performance/OverallResultsSection";
 
 
 
