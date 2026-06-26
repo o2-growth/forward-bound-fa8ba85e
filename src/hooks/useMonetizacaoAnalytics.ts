@@ -1,10 +1,30 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { DetailItem } from '@/components/planning/indicators/DetailSheet';
+import { MONETIZACAO_ORIGEM_SENTINEL } from '@/lib/leadSource';
 
-/**
- * Hook do Funil de Monetização — lê do pipe `pipefy_moviment_contrato`
- * (já sincronizado no banco externo). Inclui movimentos de Upsell,
+export type MonetizacaoIndicatorType = 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
+
+// Fases do pipe Monetização que contam como "Proposta enviada" no acelerômetro comercial
+const PROPOSTA_PHASES = new Set([
+  'Proposta em Elaboração',
+  'Proposta enviada / Follow Up',
+]);
+
+// Fases do pipe Monetização que contam como "Venda" no acelerômetro comercial
+const VENDA_PHASES = new Set([
+  'Aprovado pelo Cliente',
+  'Jurídico',
+  'Faturamento',
+  'Concluído',
+]);
+
+function mapFaseToIndicator(fase: string): MonetizacaoIndicatorType | null {
+  if (VENDA_PHASES.has(fase)) return 'venda';
+  if (PROPOSTA_PHASES.has(fase)) return 'proposta';
+  return null;
+}
+
  * Cross-sell (mapeado a partir de "Novo produto"), Troca de produto e Downsell.
  *
  * A tabela é de MOVIMENTOS (mesmo card aparece N vezes). Aqui deduplicamos
