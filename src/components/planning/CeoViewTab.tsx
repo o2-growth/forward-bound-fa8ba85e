@@ -1020,12 +1020,12 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-            <MetricCard label="Clientes ativos" value={fmtInt(operacao.clientesAtivos)} sublabel="base atual (snapshot)" />
-            <MetricCard label="MRR base" value={fmt(operacao.mrrBase)} sublabel="base atual (snapshot)" />
-            <MetricCard label="Tratativas ativas" value={fmtInt(operacao.tratativas)} sublabel="base atual (snapshot)" />
-            <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} tone="danger" sublabel="no período" />
-            <MetricCard label="Retenção" value={fmtPct(operacao.retencaoRate)} />
-            <MetricCard label="MRR em risco" value={fmt(operacao.mrrEmRisco)} tone="danger" sublabel="base atual (snapshot)" />
+            <MetricCard label="Clientes ativos" value={fmtInt(operacao.clientesAtivos)} sublabel="base atual (snapshot)" onClick={() => openDrill(drillClientesAtivos())} />
+            <MetricCard label="MRR base" value={fmt(operacao.mrrBase)} sublabel="base atual (snapshot)" onClick={() => openDrill(drillMrrBase())} />
+            <MetricCard label="Tratativas ativas" value={fmtInt(operacao.tratativas)} sublabel="base atual (snapshot)" onClick={() => openDrill(drillTratativas())} />
+            <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} tone="danger" sublabel="no período" onClick={() => openDrill(drillChurn())} />
+            <MetricCard label="Retenção" value={fmtPct(operacao.retencaoRate)} onClick={() => openDrill(drillRetencao())} />
+            <MetricCard label="MRR em risco" value={fmt(operacao.mrrEmRisco)} tone="danger" sublabel="base atual (snapshot)" onClick={() => openDrill(drillMrrRisco())} />
 
           </div>
           {churnSquadData.length > 0 && (
