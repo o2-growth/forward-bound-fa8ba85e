@@ -2452,6 +2452,11 @@ export function IndicatorsTab() {
     };
 
     switch (indicator.key) {
+      // Monetização transversal: soma só quando origem inclui 'monetizacao' (ou está sem filtro)
+      // Mapeia valores do drill-down (já com MRR/Setup/Pontual calculados).
+      // Não depende de BU/Closer/SDR — pipe é separado.
+      // (executado mais abaixo dentro de cada case)
+
       case 'faturamento': {
         let total = 0;
 
