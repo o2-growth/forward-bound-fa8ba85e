@@ -2506,7 +2506,9 @@ export function IndicatorsTab() {
           }
         }
 
+        total += sumMonet('total');
         return total;
+
       }
 
       case 'sla': {
