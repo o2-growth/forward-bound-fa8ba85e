@@ -14,7 +14,7 @@ import { useGoogleCampaigns } from "@/hooks/useGoogleCampaigns";
 import { useMarketingSheetData } from "@/hooks/useMarketingSheetData";
 import { useOperationsData } from "@/hooks/useOperationsData";
 import { useHrData } from "@/hooks/useHrData";
-import { useNpsData } from "@/hooks/useNpsData";
+import { useNpsData, processNpsData } from "@/hooks/useNpsData";
 import { NPS_METRICS, NPS_DISTRIBUTION } from "./nps/npsData";
 import { openCeoReport, type ReportSection } from "./ceo/ceoReport";
 import {
@@ -320,21 +320,41 @@ export function CeoViewTab() {
     };
   }, [hr.headcountByTime, hr.turnoverByTime, hr.headcountTotal, hr.turnoverGeral, hr.tempoMedioDeCasaDias, hr.admissoesNoPeriodo, hr.desligadosNoPeriodo]);
 
-  // ─── NPS — prioriza dados ao vivo (mesma fonte da aba NPS); fallback no snapshot Q4/2025 ──
+  // ─── NPS — filtrado pelo período via raw.npsRows; fallback no snapshot Q4/2025 ──
   const nps = useMemo(() => {
     const live = npsQuery.data;
-    const liveScore = live?.metrics?.nps?.score;
-    const hasLive = typeof liveScore === "number" && (live?.kpis?.respostas ?? 0) > 0;
-    if (hasLive && live) {
-      return {
-        score: live.metrics.nps.score,
-        meta: live.metrics.nps.meta,
-        csat: live.metrics.csat.score,
-        promotores: live.npsDistribution.promotores,
-        detratores: live.npsDistribution.detratores,
-        neutros: live.npsDistribution.neutros,
-        source: "live" as const,
-      };
+    const raw = live?.raw;
+    if (raw) {
+      const fromMs = startDate.getTime();
+      const toMs = endDate.getTime();
+      const rowsInPeriod = (raw.npsRows ?? []).filter((r: any) => {
+        const ent = r?.["Entrada"];
+        if (!ent) return false;
+        const t = new Date(ent).getTime();
+        return !Number.isNaN(t) && t >= fromMs && t <= toMs;
+      });
+
+      if (rowsInPeriod.length > 0) {
+        const proc = processNpsData(
+          rowsInPeriod,
+          raw.cfoMap,
+          raw.titleMap,
+          raw.npsPipeId,
+          raw.totalEligible,
+          raw.cfoEligibleMap,
+        );
+        if (typeof proc?.metrics?.nps?.score === "number" && (proc?.kpis?.respostas ?? 0) > 0) {
+          return {
+            score: proc.metrics.nps.score,
+            meta: proc.metrics.nps.meta,
+            csat: proc.metrics.csat.score,
+            promotores: proc.npsDistribution.promotores,
+            detratores: proc.npsDistribution.detratores,
+            neutros: proc.npsDistribution.neutros,
+            source: "live" as const,
+          };
+        }
+      }
     }
     return {
       score: NPS_METRICS.nps.score,
@@ -345,7 +365,8 @@ export function CeoViewTab() {
       neutros: NPS_DISTRIBUTION.neutros,
       source: "snapshot" as const,
     };
-  }, [npsQuery.data]);
+  }, [npsQuery.data, startDate, endDate]);
+
 
   // ─── Relatórios por área ──────────────────────────────
   const generatedAt = format(new Date(), "dd/MM/yyyy HH:mm");
@@ -573,12 +594,13 @@ export function CeoViewTab() {
         />
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-            <MetricCard label="Clientes ativos" value={fmtInt(operacao.clientesAtivos)} />
-            <MetricCard label="MRR base" value={fmt(operacao.mrrBase)} />
-            <MetricCard label="Tratativas ativas" value={fmtInt(operacao.tratativas)} />
-            <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} tone="danger" />
+            <MetricCard label="Clientes ativos" value={fmtInt(operacao.clientesAtivos)} sublabel="base atual (snapshot)" />
+            <MetricCard label="MRR base" value={fmt(operacao.mrrBase)} sublabel="base atual (snapshot)" />
+            <MetricCard label="Tratativas ativas" value={fmtInt(operacao.tratativas)} sublabel="base atual (snapshot)" />
+            <MetricCard label="Churn (logos)" value={fmtInt(operacao.churnQtd)} tone="danger" sublabel="no período" />
             <MetricCard label="Retenção" value={fmtPct(operacao.retencaoRate)} />
-            <MetricCard label="MRR em risco" value={fmt(operacao.mrrEmRisco)} tone="danger" />
+            <MetricCard label="MRR em risco" value={fmt(operacao.mrrEmRisco)} tone="danger" sublabel="base atual (snapshot)" />
+
           </div>
           {churnSquadData.length > 0 && (
             <div>
