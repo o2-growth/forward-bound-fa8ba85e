@@ -301,11 +301,42 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
                 Dashboard interativo de vendas, propostas e breakdown por origem, produto e BU. Clique nas listas para filtrar.
               </p>
             </div>
-            {hasAnyFilter && (
-              <Button variant="outline" size="sm" onClick={() => setCf({})} className="gap-1">
-                <X className="h-3 w-3" /> Limpar filtros
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {hasAnyFilter && (
+                <Button variant="outline" size="sm" onClick={() => setCf({})} className="gap-1">
+                  <X className="h-3 w-3" /> Limpar filtros
+                </Button>
+              )}
+              <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1">
+                    <Settings className="h-3 w-3" /> Metas
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Metas — {dateRange.from.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-3 py-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Meta de Qtd de Vendas</Label>
+                      <Input type="number" value={metaQtdInput} onChange={(e) => setMetaQtdInput(e.target.value)} placeholder="ex: 50" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Meta de Valor de Vendas (R$)</Label>
+                      <Input type="number" value={metaValorInput} onChange={(e) => setMetaValorInput(e.target.value)} placeholder="ex: 500000" />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Salvo localmente neste navegador. Deixe vazio para usar estimativa automática (Valor ÷ Ticket Médio).
+                    </p>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setSettingsOpen(false)}>Cancelar</Button>
+                    <Button onClick={saveMeta}>Salvar</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
           {hasAnyFilter && (
             <div className="flex flex-wrap gap-2 mt-3">
