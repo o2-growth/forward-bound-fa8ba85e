@@ -310,6 +310,9 @@ export function CeoViewTab() {
       mrrEmRisco: kpis?.mrrEmRisco ?? null,
       churnBySquad,
       churnMrrTotal,
+      dossier,
+      cfoDistribution: data?.cfoDistribution ?? [],
+      tratativasAtivas: data?.tratativasAtivas ?? [],
     };
   }, [ops.data, dateRange.from, dateRange.to]);
 
