@@ -226,6 +226,8 @@ export interface AttributionCard {
   valorPontual: number;
   valorEducacao?: number;
   bu: string;
+  sdr?: string;
+  closer?: string;
 }
 
 export interface CampaignFunnel {
