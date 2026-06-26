@@ -88,17 +88,50 @@ function inRange(d: Date | null | undefined, from: Date, to: Date) {
 // ─── component ───────────────────────────────────────────────────────────────
 export function OverallResultsSection({ dateRange, allAttributionCards, salesCards }: Props) {
   // Cross-filter state
-  const [cf, setCf] = useState<{ origem?: string; produto?: string; bu?: string }>({});
+  const [cf, setCf] = useState<{ origem?: string; produto?: string; bu?: string; sdr?: string; closer?: string }>({});
   const [granularity, setGranularity] = useState<Granularity>("month");
   const [activeMetric, setActiveMetric] = useState<MetricKey>("valor_vendas");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const pageSize = 15;
 
+  // Meta editável (persistida em localStorage por mês corrente do período)
+  const metaKey = `overall_meta_${dateRange.from.getFullYear()}_${dateRange.from.getMonth() + 1}`;
+  const [metaQtdInput, setMetaQtdInput] = useState<string>("");
+  const [metaValorInput, setMetaValorInput] = useState<string>("");
+  const [metaQtd, setMetaQtd] = useState<number>(0);
+  const [metaValor, setMetaValor] = useState<number>(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(metaKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setMetaQtd(Number(parsed.qtd) || 0);
+        setMetaValor(Number(parsed.valor) || 0);
+        setMetaQtdInput(String(parsed.qtd ?? ""));
+        setMetaValorInput(String(parsed.valor ?? ""));
+      } else {
+        setMetaQtd(0); setMetaValor(0); setMetaQtdInput(""); setMetaValorInput("");
+      }
+    } catch { /* ignore */ }
+  }, [metaKey]);
+
+  const saveMeta = () => {
+    const qtd = Number(metaQtdInput) || 0;
+    const valor = Number(metaValorInput) || 0;
+    localStorage.setItem(metaKey, JSON.stringify({ qtd, valor }));
+    setMetaQtd(qtd); setMetaValor(valor);
+    setSettingsOpen(false);
+  };
+
   const passesCf = (c: AttributionCard) => {
     if (cf.origem && detectChannel(c) !== cf.origem) return false;
     if (cf.produto && (c.produto || "—") !== cf.produto) return false;
     if (cf.bu && c.bu !== cf.bu) return false;
+    if (cf.sdr && (c.sdr || "—") !== cf.sdr) return false;
+    if (cf.closer && (c.closer || "—") !== cf.closer) return false;
     return true;
   };
 
