@@ -25,12 +25,7 @@ function mapFaseToIndicator(fase: string): MonetizacaoIndicatorType | null {
   return null;
 }
 
- * Cross-sell (mapeado a partir de "Novo produto"), Troca de produto e Downsell.
- *
- * A tabela é de MOVIMENTOS (mesmo card aparece N vezes). Aqui deduplicamos
- * por ID mantendo a linha mais recente por Entrada, e usamos "Fase Atual"
- * como fase corrente.
- */
+
 
 export const MONETIZACAO_FASES_ORDER = [
   'Start form',
