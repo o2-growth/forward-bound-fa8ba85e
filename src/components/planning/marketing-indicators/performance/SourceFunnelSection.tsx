@@ -14,6 +14,13 @@ interface Props {
   allCampaigns: CampaignData[];
   allAttributionCards: AttributionCard[]; // all cards (any stage)
   salesCards: AttributionCard[];          // dedup'd sales (Contrato/Ganho)
+  /**
+   * Totais autoritativos (mesmos números do Indicador Comercial). Quando
+   * presentes, sobrescrevem leads/mqls/rms/rrs/propostas no caso `all`,
+   * garantindo paridade total entre as duas telas. Vendas continuam vindo
+   * de `salesCards` para preservar a regra de dedup mensal.
+   */
+  pipefyTotals?: { leads: number; mqls: number; rms: number; rrs: number; propostas: number; vendas: number };
 }
 
 const SOURCE_OPTIONS: { value: SourceKey; label: string; color: string }[] = [
