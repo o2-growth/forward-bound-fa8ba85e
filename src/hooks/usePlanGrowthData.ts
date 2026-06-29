@@ -325,6 +325,8 @@ export function usePlanGrowthData() {
   const { mrrBaseData, isLoading: isLoadingMrrBase } = useMrrBase();
   const hasSeeded = useRef(false);
   const hasAutoLocked = useRef(false);
+  // Evita loop de re-render: só publica no contexto quando o payload muda.
+  const lastPublishedRef = useRef<string>("");
 
   // MRR Base por mês — fonte da verdade: tabela mrr_base_monthly.
   // Para meses sem valor (futuros), projeta a partir do último mês conhecido com churn 5% a.m.
@@ -730,7 +732,7 @@ export function usePlanGrowthData() {
   // Publish data to context whenever funnel data changes
   useEffect(() => {
     
-    setMetasPorBU({
+    const metasPayload = {
       modelo_atual: Object.fromEntries(
         modeloAtualFunnel.map(d => [d.month, d.faturamentoMeta])
       ),
@@ -743,14 +745,14 @@ export function usePlanGrowthData() {
       franquia: Object.fromEntries(
         franquiaFunnel.map(d => [d.month, d.faturamentoMeta])
       ),
-    });
-    
+    };
+
     // Use fixed operational targets for external BUs instead of reverse funnel calculations
     const o2TaxOperationalMetas = distributeAnnualToMonthly(externalBUAnnualMetas.o2Tax);
     const oxyHackerOperationalMetas = distributeAnnualToMonthly(externalBUAnnualMetas.oxyHacker);
     const franquiaOperationalMetas = distributeAnnualToMonthly(externalBUAnnualMetas.franquia);
     
-    setFunnelData({
+    const funnelPayload = {
       modeloAtual: modeloAtualFunnel.map(d => ({
         month: d.month,
         leads: Math.round(d.leads),
@@ -795,7 +797,14 @@ export function usePlanGrowthData() {
         investimento: Math.round(franquiaFunnel[index]?.investimento || 0),
         faturamento: Math.round(franquiaMonthly[metas.month] || 0),
       })),
-    });
+    };
+
+    // Guard contra loop: só publica se o payload realmente mudou.
+    const signature = JSON.stringify([metasPayload, funnelPayload]);
+    if (signature === lastPublishedRef.current) return;
+    lastPublishedRef.current = signature;
+    setMetasPorBU(metasPayload);
+    setFunnelData(funnelPayload);
   }, [modeloAtualFunnel, o2TaxFunnel, oxyHackerFunnel, franquiaFunnel]);
 
   return {
