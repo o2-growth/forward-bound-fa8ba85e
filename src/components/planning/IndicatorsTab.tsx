@@ -1610,6 +1610,7 @@ export function IndicatorsTab() {
     // MONETIZAÇÃO (transversal): só Proposta e Venda
     if (
       (indicatorKey === 'proposta' || indicatorKey === 'venda') &&
+      isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
       items = [...items, ...monetizacaoAnalytics.getDetailItemsForIndicator(indicatorKey)];
