@@ -361,7 +361,7 @@ export function useMarketingAttribution(
       });
     }
     return result;
-  }, [allCards, cardInfos]);
+  }, [allCards, cardInfos, dedupSet]);
 
   // Build funnel by individual ad/creative (campaign::conjunto::anuncio::channel)
   const adCreativeFunnels = useMemo(() => {
