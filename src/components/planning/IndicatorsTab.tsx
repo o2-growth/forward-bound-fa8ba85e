@@ -1177,6 +1177,7 @@ export function IndicatorsTab() {
     // Conta apenas Proposta e Venda; pipe não gera MQL/RM/RR.
     if (
       (indicator.key === 'proposta' || indicator.key === 'venda') &&
+      isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
       total += monetizacaoAnalytics.getDetailItemsForIndicator(indicator.key).length;
