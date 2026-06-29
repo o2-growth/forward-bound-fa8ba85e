@@ -156,13 +156,13 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
 
   const propostasInPeriod = useMemo(() => {
     return allAttributionCards.filter(c =>
-      passesCf(c) && PROPOSTA_PHASES.has(c.fase) && inRange(c.dataEntrada, dateRange.from, dateRange.to)
+      passesCf(c) && isPropostaOrBeyond(c) && inRange(c.dataEntrada, dateRange.from, dateRange.to)
     );
   }, [allAttributionCards, cf, dateRange]);
 
   const propostasPrev = useMemo(() => {
     return allAttributionCards.filter(c =>
-      passesCf(c) && PROPOSTA_PHASES.has(c.fase) && inRange(c.dataEntrada, prevRange.from, prevRange.to)
+      passesCf(c) && isPropostaOrBeyond(c) && inRange(c.dataEntrada, prevRange.from, prevRange.to)
     );
   }, [allAttributionCards, cf, prevRange]);
 
