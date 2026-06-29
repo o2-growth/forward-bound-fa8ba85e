@@ -61,7 +61,7 @@ const formatNum = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigi
 const formatPct = (n: number) => (n * 100).toFixed(2) + "%";
 
 export function SourceFunnelSection({
-  dateRange, allCampaigns, allAttributionCards, salesCards,
+  dateRange, allCampaigns, allAttributionCards, salesCards, pipefyTotals,
 }: Props) {
   const [source, setSource] = useState<SourceKey>("all");
 
