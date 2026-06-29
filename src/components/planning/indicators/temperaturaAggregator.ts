@@ -155,8 +155,8 @@ export function aggregateByTemperatura({
     let added = 0;
     for (const card of monetizacaoAnalytics.cards) {
       if (!MONETIZACAO_QUENTE_TIPOS.has(card.tipo)) continue;
-      // Exclui cards perdidos (fase Perdido ou motivo de perda preenchido)
-      if (card.perdido || isLostPhase(card.faseAtual)) continue;
+      // Exclui cards perdidos ou já ganhos (Concluído)
+      if (card.perdido || card.ganho || isLostPhase(card.faseAtual) || isWonPhase(card.faseAtual)) continue;
       const entradaTime = card.entrada
         ? new Date(card.entrada).getTime()
         : NaN;
