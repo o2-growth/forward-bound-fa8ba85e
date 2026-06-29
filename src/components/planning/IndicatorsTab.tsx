@@ -1177,6 +1177,7 @@ export function IndicatorsTab() {
     // Conta apenas Proposta e Venda; pipe não gera MQL/RM/RR.
     if (
       (indicator.key === 'proposta' || indicator.key === 'venda') &&
+      isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
       total += monetizacaoAnalytics.getDetailItemsForIndicator(indicator.key).length;
@@ -1609,6 +1610,7 @@ export function IndicatorsTab() {
     // MONETIZAÇÃO (transversal): só Proposta e Venda
     if (
       (indicatorKey === 'proposta' || indicatorKey === 'venda') &&
+      isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
       items = [...items, ...monetizacaoAnalytics.getDetailItemsForIndicator(indicatorKey)];
@@ -2455,7 +2457,8 @@ export function IndicatorsTab() {
     // Helper: soma da Monetização para indicadores monetários (transversal)
     const monetizacaoVenda = monetizacaoAnalytics.getDetailItemsForIndicator('venda');
     const includeMonetizacao =
-      selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao');
+      isConsolidado &&
+      (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'));
     const sumMonet = (field: 'mrr' | 'setup' | 'pontual' | 'total'): number => {
       if (!includeMonetizacao) return 0;
       return monetizacaoVenda.reduce((s, it) => s + ((it as any)[field] || 0), 0);
