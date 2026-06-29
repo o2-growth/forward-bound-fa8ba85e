@@ -29,6 +29,9 @@ const normalize = (s: unknown): string =>
 const LOST_PHASES = new Set(["perdido", "perda", "lost", "descartado"]);
 const isLostPhase = (fase: unknown): boolean => LOST_PHASES.has(normalize(fase));
 
+const WON_PHASES = new Set(["ganho", "contrato assinado", "concluido"]);
+const isWonPhase = (fase: unknown): boolean => WON_PHASES.has(normalize(fase));
+
 type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
 type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
 type OutboundAnalyticsT = ReturnType<typeof useOutboundAnalytics>;
