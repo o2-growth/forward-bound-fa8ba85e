@@ -850,6 +850,21 @@ export function IndicatorsTab() {
     return selectedOrigens.includes(source);
   };
 
+  // Filtra itens da Monetização (pipe Cross-sell/Upsell/Troca) pelos filtros de
+  // Closer/SDR ativos. O pipe não tem SDR, então qualquer filtro de SDR específico
+  // remove a contribuição da Monetização. Closer casa contra `responsible`.
+  const getFilteredMonetizacaoItems = (
+    indicatorKey: 'proposta' | 'venda',
+  ) => {
+    const items = monetizacaoAnalytics.getDetailItemsForIndicator(indicatorKey);
+    const hasSdrFilter = effectiveSelectedSDRs.filter(s => s !== NO_SDR_VALUE).length > 0;
+    if (hasSdrFilter) return [];
+    if (effectiveSelectedClosers.length === 0) return items;
+    return items.filter((it: any) => matchesCloserFilter(it.responsible));
+  };
+
+
+
   // Month name mapping for funnelData lookup
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   
@@ -1180,8 +1195,9 @@ export function IndicatorsTab() {
       isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
-      total += monetizacaoAnalytics.getDetailItemsForIndicator(indicator.key).length;
+      total += getFilteredMonetizacaoItems(indicator.key as 'proposta' | 'venda').length;
     }
+
 
     return total;
   };
@@ -1613,7 +1629,7 @@ export function IndicatorsTab() {
       isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
-      items = [...items, ...monetizacaoAnalytics.getDetailItemsForIndicator(indicatorKey)];
+      items = [...items, ...getFilteredMonetizacaoItems(indicatorKey as 'proposta' | 'venda')];
     }
 
     return items;
@@ -2455,7 +2471,7 @@ export function IndicatorsTab() {
     };
 
     // Helper: soma da Monetização para indicadores monetários (transversal)
-    const monetizacaoVenda = monetizacaoAnalytics.getDetailItemsForIndicator('venda');
+    const monetizacaoVenda = getFilteredMonetizacaoItems('venda');
     const includeMonetizacao =
       isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'));
