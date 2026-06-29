@@ -2471,7 +2471,7 @@ export function IndicatorsTab() {
     };
 
     // Helper: soma da Monetização para indicadores monetários (transversal)
-    const monetizacaoVenda = monetizacaoAnalytics.getDetailItemsForIndicator('venda');
+    const monetizacaoVenda = getFilteredMonetizacaoItems('venda');
     const includeMonetizacao =
       isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'));
