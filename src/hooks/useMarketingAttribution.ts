@@ -1,32 +1,13 @@
 import { useMemo } from "react";
 import { AttributionCard, CampaignFunnel, ChannelId, ChannelSummary, CampaignData } from "@/components/planning/marketing-indicators/types";
-
-// Phase to funnel stage mapping (same logic as analytics hooks)
-type FunnelStage = 'leads' | 'mqls' | 'rms' | 'rrs' | 'propostas' | 'vendas';
-
-const PHASE_FUNNEL_MAP: Record<string, FunnelStage> = {
-  'Novos Leads': 'leads',
-  'Start form': 'leads',
-  'MQLs': 'mqls',
-  'MQL': 'mqls',
-  'Tentativas de contato': 'mqls',
-  'Material ISCA': 'mqls',
-  'Reunião agendada / Qualificado': 'rms',
-  'Reunião Realizada': 'rrs',
-  '1° Reunião Realizada - Apresentação': 'rrs',
-  '1° Reunião Realizada': 'rrs',
-  'Proposta enviada / Follow Up': 'propostas',
-  'Enviar para assinatura': 'propostas',
-  'Contrato assinado': 'vendas',
-};
-
-// Cumulative funnel order: a card at stage X also counts for all earlier stages
-const FUNNEL_ORDER: FunnelStage[] = ['leads', 'mqls', 'rms', 'rrs', 'propostas', 'vendas'];
-
-function getCumulativeStages(stage: FunnelStage): FunnelStage[] {
-  const idx = FUNNEL_ORDER.indexOf(stage);
-  return FUNNEL_ORDER.slice(0, idx + 1);
-}
+import {
+  PHASE_FUNNEL_MAP,
+  FUNNEL_ORDER,
+  getCumulativeStages,
+  cardRevenue,
+  cardTcv,
+  type FunnelStage,
+} from "@/lib/marketingFunnelAggregator";
 
 function isMetaCampaignId(value: string): boolean {
   return /^\d{10,}$/.test(value.trim());
@@ -123,7 +104,16 @@ export function useMarketingAttribution(
   allCards: AttributionCard[],
   allApiCampaigns: CampaignData[] | null | undefined,
   campaignNamesMap?: Map<string, string> | null,
+  dedupedSalesCards?: AttributionCard[],
 ) {
+  // When the caller passes the authoritative set of deduped sales (mirroring
+  // the Commercial Indicator), we restrict 'vendas' counting and receita/tcv
+  // accumulation to those card ids. Otherwise we fall back to the old
+  // behavior (any card whose fase maps to the 'vendas' stage).
+  const dedupSet = useMemo(() => {
+    if (!dedupedSalesCards) return null;
+    return new Set(dedupedSalesCards.map((c) => String(c.id)));
+  }, [dedupedSalesCards]);
   // Pre-process: per-card best stage + metadata
   const cardInfos = useMemo(() => {
     const cardBestStage = new Map<string, { campaign: string; conjunto: string; anuncio: string; channel: ChannelId; stages: Set<string>; card: AttributionCard }>();
@@ -249,13 +239,16 @@ export function useMarketingAttribution(
       }
       const entry = campaignMap.get(key)!;
       for (const stage of info.stages) {
+        if (stage === 'vendas' && dedupSet && !dedupSet.has(cardId)) continue;
         (entry[stage as keyof typeof entry] as Set<string>).add(cardId);
       }
-      if (info.stages.has('vendas')) {
-        entry.receita += (info.card.valorMRR || 0) + (info.card.valorSetup || 0) + (info.card.valorPontual || 0) + (info.card.valorEducacao || 0);
-        entry.tcv += ((info.card.valorMRR || 0) * 12) + (info.card.valorSetup || 0) + (info.card.valorPontual || 0);
+      const isSale = dedupSet ? dedupSet.has(cardId) : info.stages.has('vendas');
+      if (isSale) {
+        entry.receita += cardRevenue(info.card);
+        entry.tcv += cardTcv(info.card);
       }
     }
+    
     
     // Merge entries that resolve to the same campaign identity
     const mergedMap = new Map<string, {
@@ -319,7 +312,7 @@ export function useMarketingAttribution(
     
     funnels.sort((a, b) => b.leads - a.leads);
     return funnels;
-  }, [allCards, cardInfos, apiLookup, allApiCampaigns, campaignNamesMap]);
+  }, [allCards, cardInfos, apiLookup, allApiCampaigns, campaignNamesMap, dedupSet]);
 
   // Build funnel by adSet/adGroup (campaign::conjunto::channel)
   const adSetFunnels = useMemo(() => {
@@ -344,13 +337,16 @@ export function useMarketingAttribution(
       }
       const entry = adSetMap.get(key)!;
       for (const stage of info.stages) {
+        if (stage === 'vendas' && dedupSet && !dedupSet.has(cardId)) continue;
         (entry[stage as keyof typeof entry] as Set<string>).add(cardId);
       }
-      if (info.stages.has('vendas')) {
-        entry.receita += (info.card.valorMRR || 0) + (info.card.valorSetup || 0) + (info.card.valorPontual || 0) + (info.card.valorEducacao || 0);
-        entry.tcv += ((info.card.valorMRR || 0) * 12) + (info.card.valorSetup || 0) + (info.card.valorPontual || 0);
+      const isSale = dedupSet ? dedupSet.has(cardId) : info.stages.has('vendas');
+      if (isSale) {
+        entry.receita += cardRevenue(info.card);
+        entry.tcv += cardTcv(info.card);
       }
     }
+    
     
     // Convert to CampaignFunnel map keyed by normalized "campaign::conjunto"
     const result = new Map<string, CampaignFunnel>();
@@ -365,7 +361,7 @@ export function useMarketingAttribution(
       });
     }
     return result;
-  }, [allCards, cardInfos]);
+  }, [allCards, cardInfos, dedupSet]);
 
   // Build funnel by individual ad/creative (campaign::conjunto::anuncio::channel)
   const adCreativeFunnels = useMemo(() => {
@@ -393,11 +389,13 @@ export function useMarketingAttribution(
       }
       const entry = adMap.get(key)!;
       for (const stage of info.stages) {
+        if (stage === 'vendas' && dedupSet && !dedupSet.has(cardId)) continue;
         (entry[stage as keyof typeof entry] as Set<string>).add(cardId);
       }
-      if (info.stages.has('vendas')) {
-        entry.receita += (info.card.valorMRR || 0) + (info.card.valorSetup || 0) + (info.card.valorPontual || 0) + (info.card.valorEducacao || 0);
-        entry.tcv += ((info.card.valorMRR || 0) * 12) + (info.card.valorSetup || 0) + (info.card.valorPontual || 0);
+      const isSale = dedupSet ? dedupSet.has(cardId) : info.stages.has('vendas');
+      if (isSale) {
+        entry.receita += cardRevenue(info.card);
+        entry.tcv += cardTcv(info.card);
       }
     }
     
@@ -413,7 +411,7 @@ export function useMarketingAttribution(
       });
     }
     return result;
-  }, [allCards, cardInfos]);
+  }, [allCards, cardInfos, dedupSet]);
 
   // Channel summaries
   const channelSummaries = useMemo(() => {

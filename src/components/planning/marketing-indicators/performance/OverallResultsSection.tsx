@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AttributionCard } from "../../marketing-indicators/types";
 import { detectChannel } from "@/hooks/useMarketingAttribution";
+import { PHASE_FUNNEL_MAP, FUNNEL_ORDER, cardRevenue } from "@/lib/marketingFunnelAggregator";
 
 interface Props {
   dateRange: { from: Date; to: Date };
@@ -70,13 +71,18 @@ const METRIC_LABEL: Record<MetricKey, string> = {
   tm_proposta: "Ticket Médio (Proposta)",
 };
 
-const PROPOSTA_PHASES = new Set([
-  "Proposta enviada / Follow Up",
-  "Enviar para assinatura",
-]);
+// Propostas em escopo cumulativo (igual ao Indicador Comercial): qualquer card
+// cuja fase atual mapeia para 'propostas' ou estágio posterior. Isso evita
+// subcontar propostas que já avançaram para venda/perdido no período.
+const PROPOSTAS_STAGE_IDX = FUNNEL_ORDER.indexOf("propostas");
+function isPropostaOrBeyond(c: AttributionCard) {
+  const stage = PHASE_FUNNEL_MAP[c.fase];
+  if (!stage) return false;
+  return FUNNEL_ORDER.indexOf(stage) >= PROPOSTAS_STAGE_IDX;
+}
 
 function cardValue(c: AttributionCard) {
-  return (c.valorMRR || 0) + (c.valorSetup || 0) + (c.valorPontual || 0);
+  return cardRevenue(c);
 }
 
 function inRange(d: Date | null | undefined, from: Date, to: Date) {
@@ -150,13 +156,13 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
 
   const propostasInPeriod = useMemo(() => {
     return allAttributionCards.filter(c =>
-      passesCf(c) && PROPOSTA_PHASES.has(c.fase) && inRange(c.dataEntrada, dateRange.from, dateRange.to)
+      passesCf(c) && isPropostaOrBeyond(c) && inRange(c.dataEntrada, dateRange.from, dateRange.to)
     );
   }, [allAttributionCards, cf, dateRange]);
 
   const propostasPrev = useMemo(() => {
     return allAttributionCards.filter(c =>
-      passesCf(c) && PROPOSTA_PHASES.has(c.fase) && inRange(c.dataEntrada, prevRange.from, prevRange.to)
+      passesCf(c) && isPropostaOrBeyond(c) && inRange(c.dataEntrada, prevRange.from, prevRange.to)
     );
   }, [allAttributionCards, cf, prevRange]);
 

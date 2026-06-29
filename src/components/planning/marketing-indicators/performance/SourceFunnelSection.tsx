@@ -14,6 +14,13 @@ interface Props {
   allCampaigns: CampaignData[];
   allAttributionCards: AttributionCard[]; // all cards (any stage)
   salesCards: AttributionCard[];          // dedup'd sales (Contrato/Ganho)
+  /**
+   * Totais autoritativos (mesmos números do Indicador Comercial). Quando
+   * presentes, sobrescrevem leads/mqls/rms/rrs/propostas no caso `all`,
+   * garantindo paridade total entre as duas telas. Vendas continuam vindo
+   * de `salesCards` para preservar a regra de dedup mensal.
+   */
+  pipefyTotals?: { leads: number; mqls: number; rms: number; rrs: number; propostas: number; vendas: number };
 }
 
 const SOURCE_OPTIONS: { value: SourceKey; label: string; color: string }[] = [
@@ -54,7 +61,7 @@ const formatNum = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigi
 const formatPct = (n: number) => (n * 100).toFixed(2) + "%";
 
 export function SourceFunnelSection({
-  dateRange, allCampaigns, allAttributionCards, salesCards,
+  dateRange, allCampaigns, allAttributionCards, salesCards, pipefyTotals,
 }: Props) {
   const [source, setSource] = useState<SourceKey>("all");
 
@@ -107,6 +114,19 @@ export function SourceFunnelSection({
     }
     counts.vendas = vendasSet;
 
+    // Override leads/mqls/rms/rrs/propostas com os totais autoritativos do
+    // Indicador Comercial quando a fonte é "Todas" — fonte única de verdade.
+    if (source === "all" && pipefyTotals) {
+      return {
+        leads: pipefyTotals.leads,
+        mqls: pipefyTotals.mqls,
+        rms: pipefyTotals.rms,
+        rrs: pipefyTotals.rrs,
+        propostas: pipefyTotals.propostas,
+        vendas: counts.vendas.size,
+      };
+    }
+
     return {
       leads: counts.leads.size,
       mqls: counts.mqls.size,
@@ -115,7 +135,7 @@ export function SourceFunnelSection({
       propostas: counts.propostas.size,
       vendas: counts.vendas.size,
     };
-  }, [allAttributionCards, salesCards, source]);
+  }, [allAttributionCards, salesCards, source, pipefyTotals]);
 
   const vendas = funnelCounts.vendas;
   const cpv = vendas > 0 ? investment / vendas : 0;
