@@ -1195,8 +1195,9 @@ export function IndicatorsTab() {
       isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
-      total += monetizacaoAnalytics.getDetailItemsForIndicator(indicator.key).length;
+      total += getFilteredMonetizacaoItems(indicator.key as 'proposta' | 'venda').length;
     }
+
 
     return total;
   };
