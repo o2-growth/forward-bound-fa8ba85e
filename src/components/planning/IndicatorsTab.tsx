@@ -2457,7 +2457,8 @@ export function IndicatorsTab() {
     // Helper: soma da Monetização para indicadores monetários (transversal)
     const monetizacaoVenda = monetizacaoAnalytics.getDetailItemsForIndicator('venda');
     const includeMonetizacao =
-      selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao');
+      isConsolidado &&
+      (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'));
     const sumMonet = (field: 'mrr' | 'setup' | 'pontual' | 'total'): number => {
       if (!includeMonetizacao) return 0;
       return monetizacaoVenda.reduce((s, it) => s + ((it as any)[field] || 0), 0);
