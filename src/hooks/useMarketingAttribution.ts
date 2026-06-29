@@ -104,7 +104,16 @@ export function useMarketingAttribution(
   allCards: AttributionCard[],
   allApiCampaigns: CampaignData[] | null | undefined,
   campaignNamesMap?: Map<string, string> | null,
+  dedupedSalesCards?: AttributionCard[],
 ) {
+  // When the caller passes the authoritative set of deduped sales (mirroring
+  // the Commercial Indicator), we restrict 'vendas' counting and receita/tcv
+  // accumulation to those card ids. Otherwise we fall back to the old
+  // behavior (any card whose fase maps to the 'vendas' stage).
+  const dedupSet = useMemo(() => {
+    if (!dedupedSalesCards) return null;
+    return new Set(dedupedSalesCards.map((c) => String(c.id)));
+  }, [dedupedSalesCards]);
   // Pre-process: per-card best stage + metadata
   const cardInfos = useMemo(() => {
     const cardBestStage = new Map<string, { campaign: string; conjunto: string; anuncio: string; channel: ChannelId; stages: Set<string>; card: AttributionCard }>();
