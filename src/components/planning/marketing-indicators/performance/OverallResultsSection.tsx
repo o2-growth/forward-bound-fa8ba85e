@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AttributionCard } from "../../marketing-indicators/types";
 import { detectChannel } from "@/hooks/useMarketingAttribution";
+import { PHASE_FUNNEL_MAP, FUNNEL_ORDER, cardRevenue } from "@/lib/marketingFunnelAggregator";
 
 interface Props {
   dateRange: { from: Date; to: Date };
