@@ -411,7 +411,7 @@ export function useMarketingAttribution(
       });
     }
     return result;
-  }, [allCards, cardInfos]);
+  }, [allCards, cardInfos, dedupSet]);
 
   // Channel summaries
   const channelSummaries = useMemo(() => {
