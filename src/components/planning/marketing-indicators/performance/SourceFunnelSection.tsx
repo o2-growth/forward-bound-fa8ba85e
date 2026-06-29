@@ -214,83 +214,144 @@ export function SourceFunnelSection({
           </Card>
         </div>
 
-        {/* Funnel grid: [label] [bar] [conv%] [custo] */}
-        <div className="rounded-lg border border-border/50 bg-card/30 p-4">
-          <div className="grid grid-cols-12 gap-3 mb-3 text-xs font-medium text-muted-foreground">
-            <div className="col-span-3">Etapa</div>
-            <div className="col-span-5">Quantidade</div>
-            <div className="col-span-2 text-center">Conv. %</div>
-            <div className="col-span-2 text-right">Custo / etapa</div>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {/* Funil cônico (afunila dos dois lados) */}
+          <div className="rounded-lg border border-border/50 bg-card/30 p-4">
+            <div className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+              Funil — visão cônica
+            </div>
+            <div className="flex flex-col gap-1 items-stretch">
+              {rows.map((row, idx) => {
+                const widthPct = Math.max((row.value / maxValue) * 100, 8);
+                const prev = idx > 0 ? rows[idx - 1].value : null;
+                const conv = prev && prev > 0 ? row.value / prev : null;
+                const next = idx < rows.length - 1 ? rows[idx + 1] : null;
+                const nextWidthPct = next ? Math.max((next.value / maxValue) * 100, 8) : null;
+                const Icon = row.icon;
+                const isLast = idx === rows.length - 1;
+                return (
+                  <div key={row.key} className="flex flex-col items-center">
+                    {/* Stage block — centrado, afunila dos dois lados */}
+                    <div
+                      className="relative h-12 rounded-md flex items-center justify-center px-4 gap-2 transition-all duration-500"
+                      style={{
+                        width: `${widthPct}%`,
+                        background: `linear-gradient(180deg, ${sourceColor}dd, ${sourceColor})`,
+                        minWidth: 140,
+                      }}
+                    >
+                      <Icon className="h-4 w-4 text-white/90" />
+                      <span className="text-base font-bold text-white tabular-nums drop-shadow">
+                        {formatNum(row.value)}
+                      </span>
+                      <span className="text-[11px] font-medium text-white/90 uppercase tracking-wide whitespace-nowrap">
+                        {row.label}
+                      </span>
+                    </div>
+                    {/* Conector trapezoidal + conv% */}
+                    {!isLast && nextWidthPct !== null && (
+                      <div className="relative w-full h-8 flex flex-col items-center justify-center">
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            background: `${sourceColor}22`,
+                            clipPath: `polygon(${(100 - widthPct) / 2}% 0, ${(100 + widthPct) / 2}% 0, ${(100 + nextWidthPct) / 2}% 100%, ${(100 - nextWidthPct) / 2}% 100%)`,
+                          }}
+                        />
+                        {conv !== null && (
+                          <span
+                            className={cn(
+                              "relative text-xs font-mono font-semibold px-2 py-0.5 rounded bg-background/80 backdrop-blur",
+                              conv >= 0.5 ? "text-emerald-500" :
+                              conv >= 0.1 ? "text-foreground" :
+                              "text-amber-500"
+                            )}
+                          >
+                            {formatPct(conv)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="space-y-2">
-            {rows.map((row, idx) => {
-              const widthPct = (row.value / maxValue) * 100;
-              const prev = idx > 0 ? rows[idx - 1].value : null;
-              const conv = prev && prev > 0 ? row.value / prev : null;
-              const cost = row.value > 0 ? investment / row.value : 0;
-              const Icon = row.icon;
+          {/* Tabela detalhada original */}
+          <div className="rounded-lg border border-border/50 bg-card/30 p-4">
+            <div className="grid grid-cols-12 gap-3 mb-3 text-xs font-medium text-muted-foreground">
+              <div className="col-span-3">Etapa</div>
+              <div className="col-span-5">Quantidade</div>
+              <div className="col-span-2 text-center">Conv. %</div>
+              <div className="col-span-2 text-right">Custo / etapa</div>
+            </div>
 
-              return (
-                <div key={row.key} className="grid grid-cols-12 gap-3 items-center">
-                  {/* Label */}
-                  <div className="col-span-3 flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm">{row.label}</span>
-                  </div>
+            <div className="space-y-2">
+              {rows.map((row, idx) => {
+                const widthPct = (row.value / maxValue) * 100;
+                const prev = idx > 0 ? rows[idx - 1].value : null;
+                const conv = prev && prev > 0 ? row.value / prev : null;
+                const cost = row.value > 0 ? investment / row.value : 0;
+                const Icon = row.icon;
 
-                  {/* Bar with value inside */}
-                  <div className="col-span-5">
-                    <div className="relative h-10 bg-muted/40 rounded-md overflow-hidden">
-                      <div
-                        className="h-full rounded-md flex items-center justify-end pr-3 transition-all duration-500"
-                        style={{
-                          width: `${Math.max(widthPct, 6)}%`,
-                          background: `linear-gradient(90deg, ${sourceColor}cc, ${sourceColor})`,
-                        }}
-                      >
-                        <span className="text-sm font-bold text-white tabular-nums drop-shadow">
-                          {formatNum(row.value)}
-                        </span>
+                return (
+                  <div key={row.key} className="grid grid-cols-12 gap-3 items-center">
+                    <div className="col-span-3 flex items-center gap-2">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-sm">{row.label}</span>
+                    </div>
+
+                    <div className="col-span-5">
+                      <div className="relative h-10 bg-muted/40 rounded-md overflow-hidden">
+                        <div
+                          className="h-full rounded-md flex items-center justify-end pr-3 transition-all duration-500"
+                          style={{
+                            width: `${Math.max(widthPct, 6)}%`,
+                            background: `linear-gradient(90deg, ${sourceColor}cc, ${sourceColor})`,
+                          }}
+                        >
+                          <span className="text-sm font-bold text-white tabular-nums drop-shadow">
+                            {formatNum(row.value)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Conversion to next */}
-                  <div className="col-span-2 text-center">
-                    {conv !== null ? (
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "font-mono text-xs",
-                          conv >= 0.5 ? "border-emerald-500/40 text-emerald-500" :
-                          conv >= 0.1 ? "border-border" :
-                          "border-amber-500/40 text-amber-500"
-                        )}
-                      >
-                        {formatPct(conv)}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </div>
+                    <div className="col-span-2 text-center">
+                      {conv !== null ? (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "font-mono text-xs",
+                            conv >= 0.5 ? "border-emerald-500/40 text-emerald-500" :
+                            conv >= 0.1 ? "border-border" :
+                            "border-amber-500/40 text-amber-500"
+                          )}
+                        >
+                          {formatPct(conv)}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
 
-                  {/* Cost per stage */}
-                  <div className="col-span-2 text-right">
-                    {investment > 0 && row.value > 0 ? (
-                      <span className="text-sm font-medium tabular-nums">{formatBRLk(cost)}</span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
+                    <div className="col-span-2 text-right">
+                      {investment > 0 && row.value > 0 ? (
+                        <span className="text-sm font-medium tabular-nums">{formatBRLk(cost)}</span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
+            <p className="text-[10px] text-muted-foreground italic mt-4">
+              Conv. % = etapa atual ÷ etapa anterior. Custo / etapa = Investimento ÷ Quantidade da etapa (CPM, CPC, CPL, CPMQL, CPRM, CPRR, CPP, CPV).
+            </p>
           </div>
-
-          <p className="text-[10px] text-muted-foreground italic mt-4">
-            Conv. % = etapa atual ÷ etapa anterior. Custo / etapa = Investimento ÷ Quantidade da etapa (CPM, CPC, CPL, CPMQL, CPRM, CPRR, CPP, CPV).
-          </p>
         </div>
       </CardContent>
     </Card>
