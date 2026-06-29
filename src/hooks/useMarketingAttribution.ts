@@ -1,32 +1,13 @@
 import { useMemo } from "react";
 import { AttributionCard, CampaignFunnel, ChannelId, ChannelSummary, CampaignData } from "@/components/planning/marketing-indicators/types";
-
-// Phase to funnel stage mapping (same logic as analytics hooks)
-type FunnelStage = 'leads' | 'mqls' | 'rms' | 'rrs' | 'propostas' | 'vendas';
-
-const PHASE_FUNNEL_MAP: Record<string, FunnelStage> = {
-  'Novos Leads': 'leads',
-  'Start form': 'leads',
-  'MQLs': 'mqls',
-  'MQL': 'mqls',
-  'Tentativas de contato': 'mqls',
-  'Material ISCA': 'mqls',
-  'Reunião agendada / Qualificado': 'rms',
-  'Reunião Realizada': 'rrs',
-  '1° Reunião Realizada - Apresentação': 'rrs',
-  '1° Reunião Realizada': 'rrs',
-  'Proposta enviada / Follow Up': 'propostas',
-  'Enviar para assinatura': 'propostas',
-  'Contrato assinado': 'vendas',
-};
-
-// Cumulative funnel order: a card at stage X also counts for all earlier stages
-const FUNNEL_ORDER: FunnelStage[] = ['leads', 'mqls', 'rms', 'rrs', 'propostas', 'vendas'];
-
-function getCumulativeStages(stage: FunnelStage): FunnelStage[] {
-  const idx = FUNNEL_ORDER.indexOf(stage);
-  return FUNNEL_ORDER.slice(0, idx + 1);
-}
+import {
+  PHASE_FUNNEL_MAP,
+  FUNNEL_ORDER,
+  getCumulativeStages,
+  cardRevenue,
+  cardTcv,
+  type FunnelStage,
+} from "@/lib/marketingFunnelAggregator";
 
 function isMetaCampaignId(value: string): boolean {
   return /^\d{10,}$/.test(value.trim());
