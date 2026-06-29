@@ -239,13 +239,16 @@ export function useMarketingAttribution(
       }
       const entry = campaignMap.get(key)!;
       for (const stage of info.stages) {
+        if (stage === 'vendas' && dedupSet && !dedupSet.has(cardId)) continue;
         (entry[stage as keyof typeof entry] as Set<string>).add(cardId);
       }
-      if (info.stages.has('vendas')) {
-        entry.receita += (info.card.valorMRR || 0) + (info.card.valorSetup || 0) + (info.card.valorPontual || 0) + (info.card.valorEducacao || 0);
-        entry.tcv += ((info.card.valorMRR || 0) * 12) + (info.card.valorSetup || 0) + (info.card.valorPontual || 0);
+      const isSale = dedupSet ? dedupSet.has(cardId) : info.stages.has('vendas');
+      if (isSale) {
+        entry.receita += cardRevenue(info.card);
+        entry.tcv += cardTcv(info.card);
       }
     }
+    
     
     // Merge entries that resolve to the same campaign identity
     const mergedMap = new Map<string, {
