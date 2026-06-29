@@ -19,6 +19,16 @@ const MONETIZACAO_QUENTE_TIPOS = new Set([
   "Troca de produto",
 ]);
 
+const normalize = (s: unknown): string =>
+  String(s ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+
+const LOST_PHASES = new Set(["perdido", "perda", "lost", "descartado"]);
+const isLostPhase = (fase: unknown): boolean => LOST_PHASES.has(normalize(fase));
+
 type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
 type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
 type OutboundAnalyticsT = ReturnType<typeof useOutboundAnalytics>;
