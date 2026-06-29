@@ -3250,6 +3250,14 @@ export function IndicatorsTab() {
 
 
 
+      {/* Canal Eventos · G4 — quebra por subcategoria */}
+      <EventosG4Section
+        modeloAtualCards={modeloAtualAnalyticsRaw.cards}
+        o2TaxCards={o2TaxAnalytics.cards}
+        franquiaCards={franquiaAnalytics.cards}
+        oxyHackerCards={oxyHackerAnalytics.cards}
+        outboundCards={outboundAnalytics.cards}
+      />
 
       {/* Funil de Monetização (pipe pipefy_moviment_contrato) */}
       <MonetizacaoSection startDate={startDate} endDate={endDate} />
