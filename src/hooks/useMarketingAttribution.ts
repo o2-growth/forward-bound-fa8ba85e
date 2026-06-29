@@ -312,7 +312,7 @@ export function useMarketingAttribution(
     
     funnels.sort((a, b) => b.leads - a.leads);
     return funnels;
-  }, [allCards, cardInfos, apiLookup, allApiCampaigns, campaignNamesMap]);
+  }, [allCards, cardInfos, apiLookup, allApiCampaigns, campaignNamesMap, dedupSet]);
 
   // Build funnel by adSet/adGroup (campaign::conjunto::channel)
   const adSetFunnels = useMemo(() => {
