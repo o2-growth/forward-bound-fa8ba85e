@@ -82,7 +82,8 @@ export function ComercialSection({ dateRange }: Props) {
   const fnLast3 = useFunnelRealized(last3Start, last3End);
   const fnMtd = useFunnelRealized(mtdStart, new Date());
 
-  const isLoading = modeloAtual.isLoading || o2tax.isLoading;
+  // Só o bloco de pipe depende dos analytics pesados; o resto renderiza na hora.
+  const pipeLoading = modeloAtual.isLoading || o2tax.isLoading || franquia.isLoading || oxyHacker.isLoading || outbound.isLoading;
 
   // ─── Pipe em negociação (temperatura) ───
   const pipe = useMemo(() => {
@@ -193,10 +194,6 @@ export function ComercialSection({ dateRange }: Props) {
     };
   }, [fnLastMonth, fnLast3, fnMtd]);
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-  }
-
   return (
     <div className="space-y-6">
       {/* ── Overview histórico ── */}
@@ -235,18 +232,26 @@ export function ComercialSection({ dateRange }: Props) {
           <p className="text-xs text-muted-foreground">Volume R$ em negociação, dividido por temperatura e por closer / canal / BU / produto.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <MetricCard label="Pipe total" value={fmt(pipe.total)} icon={<ShoppingCart className="h-5 w-5" />} large source={SRC_PIPE} />
-            <MetricCard label="Quente" value={fmt(pipe.quente)} icon={<Flame className="h-5 w-5" />} tone="success" source={SRC_PIPE} />
-            <MetricCard label="Morno" value={fmt(pipe.morno)} icon={<Thermometer className="h-5 w-5" />} source={SRC_PIPE} />
-            <MetricCard label="Frio" value={fmt(pipe.frio)} icon={<Snowflake className="h-5 w-5" />} tone="danger" source={SRC_PIPE} />
-          </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <PipeBreakdown title="Por closer" rows={pipe.byCloser} />
-            <PipeBreakdown title="Por canal" rows={pipe.byCanal} />
-            <PipeBreakdown title="Por BU" rows={pipe.byBu} />
-            <PipeBreakdown title="Por produto" rows={pipe.byProduto} />
-          </div>
+          {pipeLoading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" /> Carregando pipe de vendas…
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <MetricCard label="Pipe total" value={fmt(pipe.total)} icon={<ShoppingCart className="h-5 w-5" />} large source={SRC_PIPE} />
+                <MetricCard label="Quente" value={fmt(pipe.quente)} icon={<Flame className="h-5 w-5" />} tone="success" source={SRC_PIPE} />
+                <MetricCard label="Morno" value={fmt(pipe.morno)} icon={<Thermometer className="h-5 w-5" />} source={SRC_PIPE} />
+                <MetricCard label="Frio" value={fmt(pipe.frio)} icon={<Snowflake className="h-5 w-5" />} tone="danger" source={SRC_PIPE} />
+              </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <PipeBreakdown title="Por closer" rows={pipe.byCloser} />
+                <PipeBreakdown title="Por canal" rows={pipe.byCanal} />
+                <PipeBreakdown title="Por BU" rows={pipe.byBu} />
+                <PipeBreakdown title="Por produto" rows={pipe.byProduto} />
+              </div>
+            </>
+          )}
           <AiNote />
         </CardContent>
       </Card>

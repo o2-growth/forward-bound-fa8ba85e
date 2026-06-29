@@ -1,14 +1,21 @@
-import { useState } from "react";
+import { useState, lazy, Suspense, type ComponentType } from "react";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { DateRangePickerGA } from "./DateRangePickerGA";
-import { ComercialSection } from "./ceo/ComercialSection";
-import { PessoalSection } from "./ceo/PessoalSection";
-import { FinanceiroSection } from "./ceo/FinanceiroSection";
-import { DreSection } from "./ceo/DreSection";
-import { CaixaSection } from "./ceo/CaixaSection";
-import { ShoppingCart, Users, Wallet, FileSpreadsheet, Banknote, Printer, Info } from "lucide-react";
+import { ShoppingCart, Users, Wallet, FileSpreadsheet, Banknote, Printer, Info, Loader2 } from "lucide-react";
+
+// Lazy-load: cada seção (e seus hooks pesados) só carrega quando a aba abre.
+type SectionProps = { dateRange: { from: Date; to: Date } };
+const ComercialSection = lazy(() => import("./ceo/ComercialSection").then((m) => ({ default: m.ComercialSection as ComponentType<SectionProps> })));
+const PessoalSection = lazy(() => import("./ceo/PessoalSection").then((m) => ({ default: m.PessoalSection as ComponentType<SectionProps> })));
+const FinanceiroSection = lazy(() => import("./ceo/FinanceiroSection").then((m) => ({ default: m.FinanceiroSection as ComponentType<SectionProps> })));
+const DreSection = lazy(() => import("./ceo/DreSection").then((m) => ({ default: m.DreSection as ComponentType<SectionProps> })));
+const CaixaSection = lazy(() => import("./ceo/CaixaSection").then((m) => ({ default: m.CaixaSection as ComponentType<SectionProps> })));
+
+function SectionFallback() {
+  return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+}
 
 const TABS = [
   { key: "comercial", label: "Comercial", icon: ShoppingCart },
@@ -68,11 +75,11 @@ export function CeoViewTab() {
           })}
         </TabsList>
 
-        <TabsContent value="comercial" className="mt-6"><ComercialSection dateRange={dateRange} /></TabsContent>
-        <TabsContent value="pessoal" className="mt-6"><PessoalSection dateRange={dateRange} /></TabsContent>
-        <TabsContent value="financeiro" className="mt-6"><FinanceiroSection dateRange={dateRange} /></TabsContent>
-        <TabsContent value="dre" className="mt-6"><DreSection dateRange={dateRange} /></TabsContent>
-        <TabsContent value="caixa" className="mt-6"><CaixaSection dateRange={dateRange} /></TabsContent>
+        <TabsContent value="comercial" className="mt-6"><Suspense fallback={<SectionFallback />}><ComercialSection dateRange={dateRange} /></Suspense></TabsContent>
+        <TabsContent value="pessoal" className="mt-6"><Suspense fallback={<SectionFallback />}><PessoalSection dateRange={dateRange} /></Suspense></TabsContent>
+        <TabsContent value="financeiro" className="mt-6"><Suspense fallback={<SectionFallback />}><FinanceiroSection dateRange={dateRange} /></Suspense></TabsContent>
+        <TabsContent value="dre" className="mt-6"><Suspense fallback={<SectionFallback />}><DreSection dateRange={dateRange} /></Suspense></TabsContent>
+        <TabsContent value="caixa" className="mt-6"><Suspense fallback={<SectionFallback />}><CaixaSection dateRange={dateRange} /></Suspense></TabsContent>
       </Tabs>
     </div>
   );
