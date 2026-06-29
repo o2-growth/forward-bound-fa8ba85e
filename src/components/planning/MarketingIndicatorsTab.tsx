@@ -828,6 +828,7 @@ export function MarketingIndicatorsTab() {
         allCampaigns={allCampaigns}
         allAttributionCards={allAttributionCards}
         salesCards={salesInPeriod}
+        pipefyTotals={pipefyVolumes}
       />
 
       {/* ===== NEW: Resultados Gerais (V4-style dashboard) ===== */}
