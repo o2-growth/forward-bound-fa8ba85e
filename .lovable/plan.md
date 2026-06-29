@@ -1,12 +1,16 @@
-## Objetivo
-Excluir também da contagem de Quente/Morno/Frio os cards cuja **fase atual** é `Ganho` ou `Contrato assinado` (venda já fechada não deve aparecer no pipeline quente).
+## Problema
+Cards do funil de Monetização (Cross-sell/Upsell/Troca) hoje são tratados como transversais — entram em Propostas/Vendas independentemente do filtro de BU. Resultado: ao filtrar só **Franquia**, os 3 Cross-sell da Mariana continuam aparecendo no drill-down de Propostas.
 
 ## Mudança
-Arquivo único: `src/components/planning/indicators/temperaturaAggregator.ts`
+Arquivo único: `src/components/planning/IndicatorsTab.tsx`
 
-1. Adicionar set `WON_PHASES = {"ganho", "contrato assinado"}` e helper `isWonPhase(fase)` usando o mesmo `normalize()` já criado.
-2. No loop principal (Modelo Atual / Outbound / Franquia / Oxy Hacker): além do `isLostPhase`, pular também `isWonPhase(card.faseAtual)` — não conta em nenhum bucket nem em `semTag`.
-3. No bloco de Monetização: pular cards com `faseAtual === "Concluído"` (equivalente a Ganho neste pipe — `card.ganho === true` já existe) além das checagens atuais.
+Tornar a inclusão da Monetização condicional ao filtro de BU: só incluir quando **nenhuma BU específica está filtrada** (`isConsolidado`, ou seja, todas as 4 BUs selecionadas). Quando o usuário restringe a uma ou mais BUs específicas, a Monetização sai completamente do cálculo.
+
+Pontos de alteração (3):
+1. `calculateTotalForIndicator` (linhas ~1178-1183): adicionar `isConsolidado &&` na condição que inclui Monetização.
+2. `getItemsForIndicator` (linhas ~1610-1615): mesma guarda `isConsolidado &&`.
+3. Soma transversal monetária (linhas ~2455-2466): `includeMonetizacao` passa a exigir `isConsolidado` além do filtro de origem.
 
 ## Fora de escopo
-Acelerômetro de vendas e Cenário de Caixa continuam contando vendas normalmente — a exclusão é só na seção Temperatura.
+- O acelerômetro/Cenário de Caixa/Temperatura usando `monetizacaoAnalytics` já recebem `selectedBUs` no aggregator quando aplicável; não alterar.
+- Seção `MonetizacaoSection` (visualização própria do funil) continua mostrando tudo — é o painel dedicado.
