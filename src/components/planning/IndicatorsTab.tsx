@@ -1629,7 +1629,7 @@ export function IndicatorsTab() {
       isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
-      items = [...items, ...monetizacaoAnalytics.getDetailItemsForIndicator(indicatorKey)];
+      items = [...items, ...getFilteredMonetizacaoItems(indicatorKey as 'proposta' | 'venda')];
     }
 
     return items;
