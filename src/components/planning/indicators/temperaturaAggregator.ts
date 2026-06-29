@@ -130,6 +130,8 @@ export function aggregateByTemperatura({
     }
 
     for (const card of byId.values()) {
+      // Exclui cards na fase Perdido — não contam como Quente/Morno/Frio nem como Sem Tag
+      if (isLostPhase((card as any).faseAtual)) continue;
       if (card.temperatura) {
         const item = src.toDetail(card);
         buckets[card.temperatura as Temperatura].push({
