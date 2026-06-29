@@ -114,6 +114,19 @@ export function SourceFunnelSection({
     }
     counts.vendas = vendasSet;
 
+    // Override leads/mqls/rms/rrs/propostas com os totais autoritativos do
+    // Indicador Comercial quando a fonte é "Todas" — fonte única de verdade.
+    if (source === "all" && pipefyTotals) {
+      return {
+        leads: pipefyTotals.leads,
+        mqls: pipefyTotals.mqls,
+        rms: pipefyTotals.rms,
+        rrs: pipefyTotals.rrs,
+        propostas: pipefyTotals.propostas,
+        vendas: counts.vendas.size,
+      };
+    }
+
     return {
       leads: counts.leads.size,
       mqls: counts.mqls.size,
@@ -122,7 +135,7 @@ export function SourceFunnelSection({
       propostas: counts.propostas.size,
       vendas: counts.vendas.size,
     };
-  }, [allAttributionCards, salesCards, source]);
+  }, [allAttributionCards, salesCards, source, pipefyTotals]);
 
   const vendas = funnelCounts.vendas;
   const cpv = vendas > 0 ? investment / vendas : 0;
