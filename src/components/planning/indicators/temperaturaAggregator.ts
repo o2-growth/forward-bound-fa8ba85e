@@ -29,6 +29,9 @@ const normalize = (s: unknown): string =>
 const LOST_PHASES = new Set(["perdido", "perda", "lost", "descartado"]);
 const isLostPhase = (fase: unknown): boolean => LOST_PHASES.has(normalize(fase));
 
+const WON_PHASES = new Set(["ganho", "contrato assinado", "concluido"]);
+const isWonPhase = (fase: unknown): boolean => WON_PHASES.has(normalize(fase));
+
 type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
 type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
 type OutboundAnalyticsT = ReturnType<typeof useOutboundAnalytics>;
@@ -130,8 +133,8 @@ export function aggregateByTemperatura({
     }
 
     for (const card of byId.values()) {
-      // Exclui cards na fase Perdido — não contam como Quente/Morno/Frio nem como Sem Tag
-      if (isLostPhase((card as any).faseAtual)) continue;
+      // Exclui cards na fase Perdido ou já fechados (Ganho/Contrato assinado)
+      if (isLostPhase((card as any).faseAtual) || isWonPhase((card as any).faseAtual)) continue;
       if (card.temperatura) {
         const item = src.toDetail(card);
         buckets[card.temperatura as Temperatura].push({
@@ -152,8 +155,8 @@ export function aggregateByTemperatura({
     let added = 0;
     for (const card of monetizacaoAnalytics.cards) {
       if (!MONETIZACAO_QUENTE_TIPOS.has(card.tipo)) continue;
-      // Exclui cards perdidos (fase Perdido ou motivo de perda preenchido)
-      if (card.perdido || isLostPhase(card.faseAtual)) continue;
+      // Exclui cards perdidos ou já ganhos (Concluído)
+      if (card.perdido || card.ganho || isLostPhase(card.faseAtual) || isWonPhase(card.faseAtual)) continue;
       const entradaTime = card.entrada
         ? new Date(card.entrada).getTime()
         : NaN;
