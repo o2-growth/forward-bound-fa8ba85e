@@ -35,6 +35,7 @@ const norm = (s?: string | null): string =>
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[-_/]+/g, " ")
     .trim();
 
 const has = (h: string, n: string) => !!h && h.includes(n);
@@ -43,12 +44,18 @@ export interface EventClassifyInput {
   origemLead?: string | null;
   tipoOrigem?: string | null;
   campanha?: string | null;
+  fonte?: string | null;
 }
 
 export function classifyEventSubcategory(
   c: EventClassifyInput,
 ): EventSubcategory {
-  const haystack = [norm(c.origemLead), norm(c.tipoOrigem), norm(c.campanha)]
+  const haystack = [
+    norm(c.origemLead),
+    norm(c.tipoOrigem),
+    norm(c.campanha),
+    norm(c.fonte),
+  ]
     .filter(Boolean)
     .join(" | ");
 
@@ -65,12 +72,19 @@ export function classifyEventSubcategory(
   if (
     has(haystack, "presencial") ||
     has(haystack, "imersao") ||
-    has(haystack, "imersão") ||
     has(haystack, "experience") ||
     has(haystack, "experiencia")
   ) {
     return "Evento Presencial";
   }
-  if (isG4) return "G4 — Outros";
+  // G4 + cidade/data sem token de formato → tratar como Evento Presencial
+  // (ex.: "G4 São Paulo - 6 de Maio"). Detecta presença de "g4" + outro token
+  // alfabético no haystack além de "g4".
+  if (isG4) {
+    const tokens = haystack.split(/[\s|]+/).filter((t) => t && t !== "g4");
+    if (tokens.length > 0) return "Evento Presencial";
+    return "G4 — Outros";
+  }
   return "Outros Eventos";
 }
+

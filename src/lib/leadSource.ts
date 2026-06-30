@@ -62,8 +62,10 @@ const norm = (s?: string | null): string => {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
+    .replace(/[-_/]+/g, ' ')
     .trim();
 };
+
 
 const contains = (haystack: string, needle: string): boolean =>
   haystack.length > 0 && haystack.includes(needle);
@@ -139,14 +141,19 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   if (allEmpty) return 'sem_origem';
 
 
-  // 1) EVENTO — prioridade máxima
-  if (
-    containsAny(tipo, ['evento']) ||
-    containsAny(origem, ['evento', 'talkshow', 'summit', 'g4', '4am']) ||
-    contains(campanha, 'evento')
-  ) {
+  // 1) EVENTO — prioridade máxima. Procura tokens de evento em QUALQUER um
+  //    dos 4 campos (tipo, origem, fonte, campanha). Hífens já foram
+  //    normalizados em espaço pelo `norm`, então "Live-G4-18-junho" casa.
+  const eventHaystack = [tipo, origem, fonte, campanha].filter(Boolean).join(' | ');
+  const EVENT_TOKENS = [
+    'g4', 'summit', 'talkshow', 'talk show', '4am', 'evento',
+    'imersao', 'presencial', 'webinar', 'palestra', 'workshop', 'speaker',
+    'live g4',
+  ];
+  if (containsAny(eventHaystack, EVENT_TOKENS)) {
     return 'evento';
   }
+
 
   // 2) OUTBOUND — apenas via sinal explícito em tipoOrigem
   //    (useOutboundAnalytics injeta tipoOrigem="Prospecção Ativa" nos cards

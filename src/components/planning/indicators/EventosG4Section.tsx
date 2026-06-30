@@ -162,7 +162,9 @@ export function EventosG4Section({
         origemLead: c.origemLead,
         tipoOrigem: c.tipoOrigem,
         campanha: c.campanha,
+        fonte: c.fonte,
       });
+
       if (!byCat.has(sub)) byCat.set(sub, []);
       byCat.get(sub)!.push(c);
     }
@@ -233,7 +235,9 @@ export function EventosG4Section({
         origemLead: c.origemLead,
         tipoOrigem: c.tipoOrigem,
         campanha: c.campanha,
+        fonte: c.fonte,
       });
+
       const mrr = c.valorMRR || 0;
       const setup = c.valorSetup || 0;
       const pontual = c.valorPontual || 0;
