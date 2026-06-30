@@ -742,16 +742,37 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
     return (indicator: string): DetailItem[] => {
       const result: DetailItem[] = [];
       const seenIds = new Set<string>();
-      
+
+      // MQL: contar por DATA DE CRIAÇÃO + FATURAMENTO ≥ R$ 500k, INDEPENDENTE da fase.
+      // Mesma regra de getCardsForIndicator('mql'), garantindo paridade com o drilldown.
+      if (indicator === 'mql') {
+        for (const card of mqlByCreation) {
+          if (!card.dataCriacao) continue;
+          if (excludedMqlIds.has(card.id)) continue;
+          const creationTime = card.dataCriacao.getTime();
+          if (
+            creationTime >= startTime &&
+            creationTime <= endTime &&
+            isO2TaxMqlQualified(card.faixa) &&
+            !seenIds.has(card.id)
+          ) {
+            seenIds.add(card.id);
+            result.push(toDetailItem(card));
+          }
+        }
+        console.log(`[O2 TAX Analytics] getDetailItemsWithFullHistory(mql by creation): ${result.length} unique cards`);
+        return result;
+      }
+
       const cardHistories = getCardsWithFullHistory;
-      
+
       for (const [cardId, movements] of cardHistories.entries()) {
         if (seenIds.has(cardId)) continue;
-        
+
         // Find movement matching the indicator
         const matchingMovement = movements.find(m => {
           const movementIndicator = PHASE_TO_INDICATOR[m.fase];
-          
+
           if (indicator === 'leads') {
             return m.fase === 'Start form' || m.fase === 'MQL';
           } else if (indicator === 'venda') {
@@ -761,17 +782,17 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
           }
           return movementIndicator === indicator;
         });
-        
+
         if (matchingMovement) {
           seenIds.add(cardId);
           result.push(toDetailItem(matchingMovement));
         }
       }
-      
+
       console.log(`[O2 TAX Analytics] getDetailItemsWithFullHistory(${indicator}): ${result.length} unique cards`);
       return result;
     };
-  }, [getCardsWithFullHistory]);
+  }, [getCardsWithFullHistory, mqlByCreation, excludedMqlIds, startTime, endTime]);
 
   // SLA: Average time from card creation to "Tentativas de Contato" phase (case-insensitive)
   const getAverageSlaMinutes = useMemo(() => {
