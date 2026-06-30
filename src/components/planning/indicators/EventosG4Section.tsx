@@ -162,7 +162,9 @@ export function EventosG4Section({
         origemLead: c.origemLead,
         tipoOrigem: c.tipoOrigem,
         campanha: c.campanha,
+        fonte: c.fonte,
       });
+
       if (!byCat.has(sub)) byCat.set(sub, []);
       byCat.get(sub)!.push(c);
     }
