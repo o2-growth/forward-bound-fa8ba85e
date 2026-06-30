@@ -26,6 +26,10 @@ export interface O2TaxCard {
   setor: string | null;
   duracao: number; // Duration calculated dynamically from Entrada/Saída
   produto?: string; // Sub-produto vendido (campo "Produtos" do Pipefy)
+  tipoOrigem?: string;
+  origemLead?: string;
+  fonte?: string;
+  campanha?: string;
 }
 
 // O2 TAX MQL qualifying tiers (>= R$ 500k)
