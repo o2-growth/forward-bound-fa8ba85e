@@ -150,6 +150,10 @@ function parseRawCard(row: any): O2TaxCard {
     setor: row['Setor'] || null,
     duracao,
     produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
+    tipoOrigem: row['Tipo de Origem do lead'] || undefined,
+    origemLead: row['Origem do lead'] || undefined,
+    fonte: row['Fonte'] || undefined,
+    campanha: row['Campanha'] || undefined,
   };
 }
 
