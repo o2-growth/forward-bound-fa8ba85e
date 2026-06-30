@@ -235,7 +235,9 @@ export function EventosG4Section({
         origemLead: c.origemLead,
         tipoOrigem: c.tipoOrigem,
         campanha: c.campanha,
+        fonte: c.fonte,
       });
+
       const mrr = c.valorMRR || 0;
       const setup = c.valorSetup || 0;
       const pontual = c.valorPontual || 0;
