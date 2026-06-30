@@ -1,34 +1,44 @@
-# Mapear todos os cards com "g4" como Evento
-
 ## Problema
-Hoje o `classifyLeadSource` só procura tokens de evento em `tipoOrigem`, `origemLead` e `campanha`. Cards com sinal de G4 em **`Fonte`** (ex.: 9 cards de junho/26 com `Fonte = "Live - G4 - 18/06"` e demais campos vazios) caem como **Sem origem** em vez de **Evento**.
 
-Além disso, mesmo nos campos já olhados, a regra de evento exige tokens específicos — basta `g4` aparecer em qualquer um dos quatro campos pra ser Evento.
+Quando você seleciona **Origem = Eventos** (ou qualquer outra origem) no Indicador Comercial, os valores não mudam. Vasculhei o código e achei duas causas reais:
+
+### 1. O2 TAX não carrega os campos de origem
+`useO2TaxAnalytics` não tem `tipoOrigem`, `origemLead`, `fonte`, nem `campanha` — nem no tipo `O2TaxCard`, nem no parse da linha do banco, nem no `toDetailItem`. Consequência: quando o filtro de origem está ativo, todo card de O2 TAX é classificado como **"sem_origem"** e some do resultado (independente de ser evento ou não).
+
+### 2. Valores monetários ignoram o filtro de origem
+Em `IndicatorsTab.getRealizedMonetaryForIndicator`, a flag `filtersActive` só considera **Closer** e **SDR**:
+
+```ts
+const filtersActive = closerFilterActive || sdrFilterActive;
+// se filtersActive === false → retorna null → cai no caminho "sem filtro"
+```
+
+Resultado: se você só seleciona **Origem = Eventos** (sem Closer/SDR), a função devolve `null` em `filteredVendasForBU`, e os cards monetários (Faturamento, MRR, Setup, Pontual) somam **tudo** ignorando o filtro de origem. Por isso "nada muda".
 
 ## Mudanças
 
-### 1. `src/lib/leadSource.ts` — regra de Evento
-Na seção **1) EVENTO**, expandir o gatilho para olhar também `fonte` e considerar `g4` / `live g4` / `live-g4` em qualquer um dos 4 campos (`tipoOrigem`, `origemLead`, `fonte`, `campanha`):
+### `src/hooks/useO2TaxAnalytics.ts`
+- Adicionar `tipoOrigem`, `origemLead`, `fonte`, `campanha` em:
+  - `interface O2TaxCard`
+  - parse da linha do banco (`row['Tipo de origem']`, `row['Origem do lead']`, `row['Fonte']`, `row['Campanha']`)
+  - `toDetailItem` (para o drill-down também classificar corretamente)
 
-- Se o haystack combinado (`tipo + origem + fonte + campanha`, normalizado) contiver qualquer um destes tokens → retornar `'evento'`:
-  - `g4`, `live-g4`, `live g4`, `summit`, `talkshow`, `talk show`, `4am`, `evento`, `imersao`, `presencial`, `webinar`, `palestra`, `workshop`, `speaker`
-- Normalização: além do `NFD` atual, **remover hífens** (`-` → espaço) antes do match, pra `Live-G4-18-junho` casar com `live g4`.
+### `src/components/planning/IndicatorsTab.tsx` — `getRealizedMonetaryForIndicator`
+- Incluir `origemFilterActive = selectedOrigens.length > 0` em `filtersActive`.
+- Em `filteredVendasForBU`:
+  - Não excluir BU inteira só por causa de origem (BU sempre pode ter cards de qualquer origem); excluir BU continua valendo só para Closer/SDR.
+  - Sempre aplicar `matchesOrigemFilter(card)` na filtragem final, mesmo quando só origem está ativa.
+- Ajustar o `sumMonet` da Monetização para também respeitar quando outras origens (que não `monetizacao`) estão selecionadas — já está, mas validar.
 
-### 2. `src/lib/eventSubcategory.ts` — subcategoria
-- Aceitar os mesmos 4 campos no input (`origemLead`, `tipoOrigem`, `campanha`, **`fonte`**) e aplicar a mesma normalização (remoção de hífens).
-- Regra nova: se tiver `g4` + nome de cidade/data **sem** `live`/`summit`/`4am`/`talkshow`/`speaker`/`presencial` → classificar como **Evento Presencial** (em vez do balde `G4 — Outros`). Isso cobre `"G4 São Paulo - 6 de Maio"`.
-- Manter o resto da hierarquia (Summit > Live > 4AM > Talkshow > Speaker > Presencial > G4 — Outros).
+### Verificação
+- Filtrar Origem = **Eventos** em um período conhecido (jun/26 que tem cards G4) e conferir que:
+  - Contadores (MQL, RM, RR, Proposta, Venda) caem para só os cards de evento.
+  - Faturamento / MRR / Setup / Pontual também caem (não ficam no total cheio).
+  - Drill-down lista apenas cards classificados como Evento (inclusive O2 TAX).
+- Limpar filtro e conferir que volta ao consolidado.
 
-### 3. Propagar `fonte` para `classifyEventSubcategory`
-Procurar todos os call-sites de `classifyEventSubcategory` (principalmente `src/components/planning/indicators/EventosG4Section.tsx` e qualquer hook de analytics que classifique evento) e passar `fonte` no objeto de input. Os cards já carregam `fonte` no `AttributionCard` (`src/components/planning/marketing-indicators/types.ts`), então é só repassar.
+## Fora de escopo
 
-## Validação
-Depois da mudança, rodar a mesma query de junho/2026 mentalmente:
-
-- `Live-G4-*` (1.248 cards) → continuam **Evento → G4 Live** ✅
-- `Live - G4` / `Live - G4 - 17-Jun` (52) → continuam **Evento → G4 Live** ✅
-- `G4 São Paulo - 6 de Maio` (2) → passam a ser **Evento → Evento Presencial** ✅
-- `Fonte = "Live - G4 - 18/06"` (9) hoje em "Sem origem" → passam a **Evento → G4 Live** ✅
-- `Funil Diagnóstico O2`, `Webflow Form` → continuam **não-evento** ✅
-
-Nenhuma migração de banco; mudança é só no classificador front-end.
+- Não mexer no classificador `classifyLeadSource` / `eventSubcategory` (estão corretos após o último ajuste).
+- Não mexer em Modelo Atual / Expansão / Oxy Hacker / Monetização — esses já carregam os campos de origem corretamente.
+- Não mexer em chart path (já aplica `matchesOrigemFilter`).

@@ -26,6 +26,10 @@ export interface O2TaxCard {
   setor: string | null;
   duracao: number; // Duration calculated dynamically from Entrada/Saída
   produto?: string; // Sub-produto vendido (campo "Produtos" do Pipefy)
+  tipoOrigem?: string;
+  origemLead?: string;
+  fonte?: string;
+  campanha?: string;
 }
 
 // O2 TAX MQL qualifying tiers (>= R$ 500k)
@@ -146,6 +150,10 @@ function parseRawCard(row: any): O2TaxCard {
     setor: row['Setor'] || null,
     duracao,
     produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
+    tipoOrigem: row['Tipo de Origem do lead'] || undefined,
+    origemLead: row['Origem do lead'] || undefined,
+    fonte: row['Fonte'] || undefined,
+    campanha: row['Campanha'] || undefined,
   };
 }
 
@@ -694,6 +702,10 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
     setup: card.valorSetup,
     pontual: card.valorPontual,
     dataCriacao: card.dataCriacao?.toISOString() || undefined,
+    tipoOrigem: card.tipoOrigem,
+    origemLead: card.origemLead,
+    fonte: card.fonte,
+    campanha: card.campanha,
   });
 
   // COHORT MODE: Get cards with full history for tier conversion analysis
