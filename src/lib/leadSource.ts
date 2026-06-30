@@ -62,8 +62,10 @@ const norm = (s?: string | null): string => {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
+    .replace(/[-_/]+/g, ' ')
     .trim();
 };
+
 
 const contains = (haystack: string, needle: string): boolean =>
   haystack.length > 0 && haystack.includes(needle);
