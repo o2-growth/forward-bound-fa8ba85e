@@ -1,44 +1,45 @@
-## Problema
+## O que encontrei no Pipefy (consulta direta no DB sincronizado, sem gastar requisição na API Pipefy)
 
-Quando você seleciona **Origem = Eventos** (ou qualquer outra origem) no Indicador Comercial, os valores não mudam. Vasculhei o código e achei duas causas reais:
+Filtro: cards do **Modelo Atual** (`pipefy_moviment_cfos`) com "g4" em **Tipo de Origem do lead**, **Origem do lead**, **Fonte** ou **Campanha**, deduplicados por ID.
 
-### 1. O2 TAX não carrega os campos de origem
-`useO2TaxAnalytics` não tem `tipoOrigem`, `origemLead`, `fonte`, nem `campanha` — nem no tipo `O2TaxCard`, nem no parse da linha do banco, nem no `toDetailItem`. Consequência: quando o filtro de origem está ativo, todo card de O2 TAX é classificado como **"sem_origem"** e some do resultado (independente de ser evento ou não).
+### Totais
+| Mês de criação | Cards G4 |
+|---|---|
+| **Jun/2026 (mês atual)** | **616** |
+| Mai/2026 | 561 |
+| Mar/2026 | 21 |
+| Fev/2026 | 2 |
+| Jan/2026 | 1 |
+| Dez/2025 | 1 |
+| Nov/2025 | 17 |
 
-### 2. Valores monetários ignoram o filtro de origem
-Em `IndicatorsTab.getRealizedMonetaryForIndicator`, a flag `filtersActive` só considera **Closer** e **SDR**:
+Expansão (`pipefy_cards_movements_expansao`): **0** cards G4. Não é fonte deste canal.
 
-```ts
-const filtersActive = closerFilterActive || sdrFilterActive;
-// se filtersActive === false → retorna null → cai no caminho "sem filtro"
-```
+### Breakdown da fase atual dos 616 criados em Jun/2026
+| Fase Atual | Cards |
+|---|---|
+| **G4 Tools** | **598** |
+| Novos Leads | 11 |
+| Em Contato | 2 |
+| Reunião Realizada | 1 |
+| Contrato em elaboração | 1 |
+| EVENTOS | 1 |
+| Perdido | 1 |
+| Arquivado | 1 |
 
-Resultado: se você só seleciona **Origem = Eventos** (sem Closer/SDR), a função devolve `null` em `filteredVendasForBU`, e os cards monetários (Faturamento, MRR, Setup, Pontual) somam **tudo** ignorando o filtro de origem. Por isso "nada muda".
+### O que isso significa para o Indicador Comercial
 
-## Mudanças
+1. **Filtro por origem "Eventos" mostra os 616 corretamente** — `classifyLeadSource` já reconhece "g4" em qualquer um dos 4 campos (ajuste anterior). Confirmado.
 
-### `src/hooks/useO2TaxAnalytics.ts`
-- Adicionar `tipoOrigem`, `origemLead`, `fonte`, `campanha` em:
-  - `interface O2TaxCard`
-  - parse da linha do banco (`row['Tipo de origem']`, `row['Origem do lead']`, `row['Fonte']`, `row['Campanha']`)
-  - `toDetailItem` (para o drill-down também classificar corretamente)
+2. **Mas no funil (Leads / MQL / Reunião / Proposta / Venda)** quase nada aparece, porque **598 dos 616 (97%) estão parados na fase "G4 Tools"** — uma fase de "estacionamento" que NÃO conta como Lead nem MQL nas regras atuais (Leads exige entrada em `Novos Leads` ou `MQLs`).
+   - Só 11 viraram Lead efetivo, 2 Em Contato, 1 Reunião, 1 Proposta. Esses sim contam.
 
-### `src/components/planning/IndicatorsTab.tsx` — `getRealizedMonetaryForIndicator`
-- Incluir `origemFilterActive = selectedOrigens.length > 0` em `filtersActive`.
-- Em `filteredVendasForBU`:
-  - Não excluir BU inteira só por causa de origem (BU sempre pode ter cards de qualquer origem); excluir BU continua valendo só para Closer/SDR.
-  - Sempre aplicar `matchesOrigemFilter(card)` na filtragem final, mesmo quando só origem está ativa.
-- Ajustar o `sumMonet` da Monetização para também respeitar quando outras origens (que não `monetizacao`) estão selecionadas — já está, mas validar.
+3. **Conclusão:** o dashboard está correto. Os 616 não somem — eles aparecem em "Eventos" no filtro de origem e na contagem total de cards G4. O funil mostra pouco volume porque a operação ainda não puxou os cards de `G4 Tools` para `Novos Leads`. Isso é **dado faltando no Pipefy**, não bug do dashboard.
 
-### Verificação
-- Filtrar Origem = **Eventos** em um período conhecido (jun/26 que tem cards G4) e conferir que:
-  - Contadores (MQL, RM, RR, Proposta, Venda) caem para só os cards de evento.
-  - Faturamento / MRR / Setup / Pontual também caem (não ficam no total cheio).
-  - Drill-down lista apenas cards classificados como Evento (inclusive O2 TAX).
-- Limpar filtro e conferir que volta ao consolidado.
+### Opções
 
-## Fora de escopo
+- **Opção A — não mexer (recomendado):** o dashboard reflete a realidade. O gargalo está na operação: 598 leads G4 do mês estão na fila "G4 Tools" sem serem trabalhados. Aviso a Mariana/SDRs.
+- **Opção B — incluir "G4 Tools" como Lead:** trato fase `G4 Tools` como entrada equivalente a `Novos Leads` para o canal Eventos/G4. Inflaria leads do mês em ~598 mas distorceria taxa de conversão (Lead → MQL despencaria).
+- **Opção C — criar uma seção "Aguardando triagem G4"** na aba Eventos G4 mostrando volume parado em `G4 Tools` por safra, pra dar visibilidade sem misturar com funil.
 
-- Não mexer no classificador `classifyLeadSource` / `eventSubcategory` (estão corretos após o último ajuste).
-- Não mexer em Modelo Atual / Expansão / Oxy Hacker / Monetização — esses já carregam os campos de origem corretamente.
-- Não mexer em chart path (já aplica `matchesOrigemFilter`).
+Me diz qual opção seguir (ou só confirma A e encerro).
