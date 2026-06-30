@@ -1,39 +1,48 @@
 ## Objetivo
 
-Garantir que um card seja contado como **MQL** sempre que o **faturamento** atinja o threshold da BU (≥ R$ 200k Modelo Atual, ≥ R$ 500k O2 TAX) e tenha sido **criado no período**, sem depender da fase em que está hoje (pode estar em "Novos Leads", "Start form", "Tentativas de contato", "RM", "Proposta", "Ganho", etc.). Continuam excluídos apenas: cards de teste e cards com motivo de perda na lista de exclusão de MQL (Duplicado, Pessoa física fora do ICP, etc.).
+Validar duas regras já no ar:
+1. **MQL por faturamento** (independente da fase): card criado no período + faixa ≥ R$ 200k (Modelo Atual) / ≥ R$ 500k (O2 TAX) deve aparecer como MQL em qualquer fase.
+2. **Filtro de origem "Eventos"**: cards com qualquer sinal "G4" (tipo, origem, fonte ou campanha) devem ser contabilizados quando o filtro Eventos estiver ativo no Indicador Comercial.
 
-## Diagnóstico
+## Validação 1 — MQL por faturamento
 
-Hoje os contadores principais (`getCardsForIndicator('mql')`, `getQtyForPeriod('mql')`, `countForWindow`, `getRawMqlCount`) já usam a regra correta: data de criação + `isMqlQualified(faixa)` — sem checar fase.
+**Fonte de verdade (DB externo via `query-external-db`):**
+- Consulta direta na `pipefy_moviment_cfos` (Modelo Atual) e equivalente O2 TAX para o período atual:
+  - `COUNT(DISTINCT card_id)` onde `"Data Criação" ∈ período` E `"Faixa de faturamento mensal" ∈ MQL_QUALIFYING_TIERS` E não está em motivo de perda excluído E não é card de teste.
+- Quebrar por **fase atual** para confirmar que cards fora de "MQLs" também são contados (ex.: "Novos Leads", "Tentativas de contato", "RM", "Proposta", "Ganho").
 
-Mas o **drilldown em cohort mode** ainda exige que o card tenha entrado fisicamente na fase MQL/Start form:
+**Confirmação visual (Playwright headless em `http://localhost:8080`):**
+- Logar com sessão Supabase injetada, abrir Indicador Comercial.
+- Capturar o número do card "MQL" (Modelo Atual e depois O2 TAX).
+- Clicar no card para abrir o drilldown e contar quantos itens são listados.
+- Conferir que: número no card == itens no drilldown == valor do SQL.
+- Screenshot de cada etapa e dump da lista de fases atuais dos cards exibidos.
 
-- `src/hooks/useModeloAtualAnalytics.ts` linha ~721: `cardIndicator === 'mql' && isMqlQualified(...)` → exige passagem pela fase MQLs.
-- `src/hooks/useO2TaxAnalytics.ts` linhas ~752-762: `movementIndicator === indicator` (cai no fallback) → exige passagem pela fase MQL.
+**Critério de sucesso:** os três valores coincidem e a lista de fases inclui pelo menos uma fase ≠ "MQLs".
 
-Isso explica por que cards com faturamento qualificado aparecem em alguns números mas somem da lista quando o usuário clica para ver detalhes (cohort).
+## Validação 2 — Filtro Origem "Eventos"
 
-## Mudanças
+**Fonte de verdade (DB):**
+- Na `pipefy_moviment_cfos`, contar cards criados no período cujo qualquer campo de origem contenha "g4" (case/acento-insensitive): "Tipo do lead", "Origem", "Origem do lead", "Fonte", "Campanha", "UTM Source", etc. — espelhando a normalização em `src/lib/leadSource.ts` (`classifyLeadSource`).
 
-### 1. `src/hooks/useModeloAtualAnalytics.ts` — `getDetailItemsWithFullHistory`
-Substituir o ramo `if (indicator === 'mql')` por lógica que:
-- Itera `mqlByCreation` (já trazido sem filtro de fase pela query `query_period_by_creation`).
-- Inclui o card se: `dataCriacao ∈ [startTime, endTime]` **E** `isMqlQualified(card.faixa)` **E** `!isTestCard(card.id)` **E** `!excludedMqlIds.has(card.id)`.
-- Dedup por `card.id`, mapeia para `DetailItem` (mesma rotina `toDetailItem`).
-- Mantém comportamento atual para os demais indicadores.
+**Confirmação visual (Playwright):**
+- Abrir Indicador Comercial Consolidado, sem filtro de origem → registrar totais (MQL, Proposta, Venda, Receita).
+- Aplicar filtro Origem = **Eventos**.
+- Conferir que:
+  - Os totais reduzem para o subconjunto Eventos.
+  - O número de leads/MQL com filtro Eventos bate (±0) com o COUNT do SQL acima.
+  - O drilldown de "MQL" com filtro Eventos lista apenas cards G4 (validar amostra de 3-5 títulos contra a coluna de origem no DB).
+- Screenshot do dashboard antes/depois do filtro e da lista do drilldown.
 
-### 2. `src/hooks/useO2TaxAnalytics.ts` — `getDetailItemsWithFullHistory`
-Adicionar antes do `find()`:
-- Se `indicator === 'mql'`: iterar `mqlByCreation` com regra equivalente (`dataCriacao` no período, `isO2TaxMqlQualified(card.faixa)`, `!excludedMqlIds.has(card.id)`, sem `isTestCard` se a hook não usa; manter consistência com `getCardsForIndicator('mql')`), retornar `DetailItem[]` dedup por id.
-- Demais indicadores seguem inalterados.
+**Critério de sucesso:** o filtro de fato reduz os números e os cards listados batem com a query G4.
 
-### 3. Validação rápida (manual no preview)
-- Filtrar período do mês atual em Modelo Atual: número do card "MQL" no topo deve bater com a contagem do drilldown.
-- Idem O2 TAX.
-- Conferir um card conhecido que esteja em "Novos Leads"/"Tentativas de contato" com faturamento ≥ threshold: agora deve aparecer na lista do drilldown MQL.
+## Entregável
+
+Relatório em chat com:
+- Para cada validação: número esperado (SQL), número exibido (UI), diferença, screenshots referenciados em `/tmp/browser/mql-eventos/`.
+- Se houver discrepância, indicar a causa provável (ex.: fase específica não mapeada, campo de origem não normalizado) — sem corrigir; abrir plano de ajuste separado.
 
 ## Fora do escopo
 
-- Expansão (threshold R$ 15k) — não alterar, conforme resposta do usuário.
-- Demais hooks (`useModeloAtualMetas`, `useO2TaxMetas`) — já estão corretos, sem mudanças.
-- Regras de exclusão por motivo de perda — preservadas.
+- Alterações de código. Esta é uma rodada apenas de **validação**.
+- Expansão e Outbound (regra do MQL por faturamento se aplica só a Modelo Atual + O2 TAX, conforme decidido).
