@@ -1,26 +1,34 @@
+# Mapear todos os cards com "g4" como Evento
+
 ## Problema
+Hoje o `classifyLeadSource` só procura tokens de evento em `tipoOrigem`, `origemLead` e `campanha`. Cards com sinal de G4 em **`Fonte`** (ex.: 9 cards de junho/26 com `Fonte = "Live - G4 - 18/06"` e demais campos vazios) caem como **Sem origem** em vez de **Evento**.
 
-Monetização (Cross-sell/Upsell/Troca) só respeita o filtro de BU (`isConsolidado`). Quando o usuário filtra por um Closer específico (ex.: trocar de Mari Luz para outro), os cards de Monetização continuam aparecendo em Propostas/Vendas, porque a filtragem por Closer não está aplicada nesse fluxo.
+Além disso, mesmo nos campos já olhados, a regra de evento exige tokens específicos — basta `g4` aparecer em qualquer um dos quatro campos pra ser Evento.
 
-## Mudança
+## Mudanças
 
-Em `src/components/planning/IndicatorsTab.tsx`, sempre que incluirmos itens da Monetização, aplicar um filtro adicional baseado em `effectiveSelectedClosers` comparando com o campo `responsible` do item (Closer do card no pipe Monetização).
+### 1. `src/lib/leadSource.ts` — regra de Evento
+Na seção **1) EVENTO**, expandir o gatilho para olhar também `fonte` e considerar `g4` / `live g4` / `live-g4` em qualquer um dos 4 campos (`tipoOrigem`, `origemLead`, `fonte`, `campanha`):
 
-Como o pipe de Monetização não tem SDR, o filtro de SDR continua zerando a contribuição da Monetização (já que nenhum item tem SDR para casar). Se o usuário tiver SDR selecionado, removemos Monetização dos cálculos para manter consistência ("se filtrou por SDR específico, Monetização não conta").
+- Se o haystack combinado (`tipo + origem + fonte + campanha`, normalizado) contiver qualquer um destes tokens → retornar `'evento'`:
+  - `g4`, `live-g4`, `live g4`, `summit`, `talkshow`, `talk show`, `4am`, `evento`, `imersao`, `presencial`, `webinar`, `palestra`, `workshop`, `speaker`
+- Normalização: além do `NFD` atual, **remover hífens** (`-` → espaço) antes do match, pra `Live-G4-18-junho` casar com `live g4`.
 
-Pontos a ajustar (4 locais que já consultam Monetização):
-1. `calculateTotalForIndicator` (~linha 1180): contar apenas itens cujo `responsible` esteja em `effectiveSelectedClosers` (quando houver filtro), e zerar se houver `effectiveSelectedSDRs`.
-2. `getItemsForIndicator` (~linha 1613): aplicar o mesmo filtro antes do spread.
-3. Bloco de soma monetária (`monetizacaoVenda`, ~linha 2457): filtrar a lista por Closer/SDR antes de somar `mrr/setup/pontual`.
-4. Criar helper local `getFilteredMonetizacaoItems(indicatorKey)` para evitar repetição e garantir regra única.
+### 2. `src/lib/eventSubcategory.ts` — subcategoria
+- Aceitar os mesmos 4 campos no input (`origemLead`, `tipoOrigem`, `campanha`, **`fonte`**) e aplicar a mesma normalização (remoção de hífens).
+- Regra nova: se tiver `g4` + nome de cidade/data **sem** `live`/`summit`/`4am`/`talkshow`/`speaker`/`presencial` → classificar como **Evento Presencial** (em vez do balde `G4 — Outros`). Isso cobre `"G4 São Paulo - 6 de Maio"`.
+- Manter o resto da hierarquia (Summit > Live > 4AM > Talkshow > Speaker > Presencial > G4 — Outros).
 
-Normalização: usar a mesma normalização (`trim().toLowerCase()` + remover acentos) já padrão no projeto para casar `responsible` ↔ valores do filtro.
+### 3. Propagar `fonte` para `classifyEventSubcategory`
+Procurar todos os call-sites de `classifyEventSubcategory` (principalmente `src/components/planning/indicators/EventosG4Section.tsx` e qualquer hook de analytics que classifique evento) e passar `fonte` no objeto de input. Os cards já carregam `fonte` no `AttributionCard` (`src/components/planning/marketing-indicators/types.ts`), então é só repassar.
 
-Nenhuma mudança em hooks, em outras BUs, ou em UI/labels.
+## Validação
+Depois da mudança, rodar a mesma query de junho/2026 mentalmente:
 
-## Resultado esperado
+- `Live-G4-*` (1.248 cards) → continuam **Evento → G4 Live** ✅
+- `Live - G4` / `Live - G4 - 17-Jun` (52) → continuam **Evento → G4 Live** ✅
+- `G4 São Paulo - 6 de Maio` (2) → passam a ser **Evento → Evento Presencial** ✅
+- `Fonte = "Live - G4 - 18/06"` (9) hoje em "Sem origem" → passam a **Evento → G4 Live** ✅
+- `Funil Diagnóstico O2`, `Webflow Form` → continuam **não-evento** ✅
 
-- Filtrando por Closer = "Mari Luz": só cards de Monetização com `responsavel` = Mari Luz aparecem.
-- Filtrando por outro Closer: cards de Mari Luz somem.
-- Filtrando por qualquer SDR: Monetização não contribui (pipe não tem SDR).
-- Sem filtro de Closer/SDR e BU consolidado: comportamento atual preservado.
+Nenhuma migração de banco; mudança é só no classificador front-end.
