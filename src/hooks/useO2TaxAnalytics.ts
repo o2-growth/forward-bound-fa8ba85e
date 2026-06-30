@@ -702,6 +702,10 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
     setup: card.valorSetup,
     pontual: card.valorPontual,
     dataCriacao: card.dataCriacao?.toISOString() || undefined,
+    tipoOrigem: card.tipoOrigem,
+    origemLead: card.origemLead,
+    fonte: card.fonte,
+    campanha: card.campanha,
   });
 
   // COHORT MODE: Get cards with full history for tier conversion analysis
