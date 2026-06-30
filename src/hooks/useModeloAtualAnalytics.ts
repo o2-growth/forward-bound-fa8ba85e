@@ -703,33 +703,52 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
   const getDetailItemsWithFullHistory = (indicator: IndicatorType): DetailItem[] => {
     const result: DetailItem[] = [];
     const seenIds = new Set<string>();
-    
+
+    // MQL: contar por DATA DE CRIAÇÃO + FATURAMENTO ≥ R$ 200k, INDEPENDENTE da fase atual.
+    // Mesma regra do getCardsForIndicator('mql') / getRawMqlCount, garantindo paridade
+    // entre o número do indicador e a lista do drilldown (inclusive em cohort mode).
+    if (indicator === 'mql') {
+      for (const card of mqlByCreation) {
+        if (!card.dataCriacao) continue;
+        const creationTime = card.dataCriacao.getTime();
+        if (
+          creationTime >= startTime &&
+          creationTime <= endTime &&
+          isMqlQualified(card.faixa) &&
+          !isTestCard(card.id) &&
+          !excludedMqlIds.has(card.id) &&
+          !seenIds.has(card.id)
+        ) {
+          seenIds.add(card.id);
+          result.push(toDetailItem(card));
+        }
+      }
+      console.log(`[Modelo Atual Analytics] getDetailItemsWithFullHistory(mql by creation): ${result.length} unique cards`);
+      return result;
+    }
+
     const cardHistories = getCardsWithFullHistory;
-    
+
     for (const [cardId, movements] of cardHistories.entries()) {
       if (seenIds.has(cardId)) continue;
-      
+
       // Find movement matching the indicator
       const matchingMovement = movements.find(m => {
         const cardIndicator = PHASE_TO_INDICATOR[m.faseDestino];
-        
+
         // LEADS = Union of 'Novos Leads' (leads) + 'MQLs' (mql)
         if (indicator === 'leads') {
           return cardIndicator === 'leads' || cardIndicator === 'mql';
         }
-        // MQL = card entered MQLs phase AND has revenue >= R$ 200k
-        if (indicator === 'mql') {
-          return cardIndicator === 'mql' && isMqlQualified(m.faixa) && !excludedMqlIds.has(cardId);
-        }
         return cardIndicator === indicator;
       });
-      
+
       if (matchingMovement) {
         seenIds.add(cardId);
         result.push(toDetailItem(matchingMovement));
       }
     }
-    
+
     console.log(`[Modelo Atual Analytics] getDetailItemsWithFullHistory(${indicator}): ${result.length} unique cards`);
     return result;
   };

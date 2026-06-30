@@ -1,45 +1,39 @@
-## O que encontrei no Pipefy (consulta direta no DB sincronizado, sem gastar requisição na API Pipefy)
+## Objetivo
 
-Filtro: cards do **Modelo Atual** (`pipefy_moviment_cfos`) com "g4" em **Tipo de Origem do lead**, **Origem do lead**, **Fonte** ou **Campanha**, deduplicados por ID.
+Garantir que um card seja contado como **MQL** sempre que o **faturamento** atinja o threshold da BU (≥ R$ 200k Modelo Atual, ≥ R$ 500k O2 TAX) e tenha sido **criado no período**, sem depender da fase em que está hoje (pode estar em "Novos Leads", "Start form", "Tentativas de contato", "RM", "Proposta", "Ganho", etc.). Continuam excluídos apenas: cards de teste e cards com motivo de perda na lista de exclusão de MQL (Duplicado, Pessoa física fora do ICP, etc.).
 
-### Totais
-| Mês de criação | Cards G4 |
-|---|---|
-| **Jun/2026 (mês atual)** | **616** |
-| Mai/2026 | 561 |
-| Mar/2026 | 21 |
-| Fev/2026 | 2 |
-| Jan/2026 | 1 |
-| Dez/2025 | 1 |
-| Nov/2025 | 17 |
+## Diagnóstico
 
-Expansão (`pipefy_cards_movements_expansao`): **0** cards G4. Não é fonte deste canal.
+Hoje os contadores principais (`getCardsForIndicator('mql')`, `getQtyForPeriod('mql')`, `countForWindow`, `getRawMqlCount`) já usam a regra correta: data de criação + `isMqlQualified(faixa)` — sem checar fase.
 
-### Breakdown da fase atual dos 616 criados em Jun/2026
-| Fase Atual | Cards |
-|---|---|
-| **G4 Tools** | **598** |
-| Novos Leads | 11 |
-| Em Contato | 2 |
-| Reunião Realizada | 1 |
-| Contrato em elaboração | 1 |
-| EVENTOS | 1 |
-| Perdido | 1 |
-| Arquivado | 1 |
+Mas o **drilldown em cohort mode** ainda exige que o card tenha entrado fisicamente na fase MQL/Start form:
 
-### O que isso significa para o Indicador Comercial
+- `src/hooks/useModeloAtualAnalytics.ts` linha ~721: `cardIndicator === 'mql' && isMqlQualified(...)` → exige passagem pela fase MQLs.
+- `src/hooks/useO2TaxAnalytics.ts` linhas ~752-762: `movementIndicator === indicator` (cai no fallback) → exige passagem pela fase MQL.
 
-1. **Filtro por origem "Eventos" mostra os 616 corretamente** — `classifyLeadSource` já reconhece "g4" em qualquer um dos 4 campos (ajuste anterior). Confirmado.
+Isso explica por que cards com faturamento qualificado aparecem em alguns números mas somem da lista quando o usuário clica para ver detalhes (cohort).
 
-2. **Mas no funil (Leads / MQL / Reunião / Proposta / Venda)** quase nada aparece, porque **598 dos 616 (97%) estão parados na fase "G4 Tools"** — uma fase de "estacionamento" que NÃO conta como Lead nem MQL nas regras atuais (Leads exige entrada em `Novos Leads` ou `MQLs`).
-   - Só 11 viraram Lead efetivo, 2 Em Contato, 1 Reunião, 1 Proposta. Esses sim contam.
+## Mudanças
 
-3. **Conclusão:** o dashboard está correto. Os 616 não somem — eles aparecem em "Eventos" no filtro de origem e na contagem total de cards G4. O funil mostra pouco volume porque a operação ainda não puxou os cards de `G4 Tools` para `Novos Leads`. Isso é **dado faltando no Pipefy**, não bug do dashboard.
+### 1. `src/hooks/useModeloAtualAnalytics.ts` — `getDetailItemsWithFullHistory`
+Substituir o ramo `if (indicator === 'mql')` por lógica que:
+- Itera `mqlByCreation` (já trazido sem filtro de fase pela query `query_period_by_creation`).
+- Inclui o card se: `dataCriacao ∈ [startTime, endTime]` **E** `isMqlQualified(card.faixa)` **E** `!isTestCard(card.id)` **E** `!excludedMqlIds.has(card.id)`.
+- Dedup por `card.id`, mapeia para `DetailItem` (mesma rotina `toDetailItem`).
+- Mantém comportamento atual para os demais indicadores.
 
-### Opções
+### 2. `src/hooks/useO2TaxAnalytics.ts` — `getDetailItemsWithFullHistory`
+Adicionar antes do `find()`:
+- Se `indicator === 'mql'`: iterar `mqlByCreation` com regra equivalente (`dataCriacao` no período, `isO2TaxMqlQualified(card.faixa)`, `!excludedMqlIds.has(card.id)`, sem `isTestCard` se a hook não usa; manter consistência com `getCardsForIndicator('mql')`), retornar `DetailItem[]` dedup por id.
+- Demais indicadores seguem inalterados.
 
-- **Opção A — não mexer (recomendado):** o dashboard reflete a realidade. O gargalo está na operação: 598 leads G4 do mês estão na fila "G4 Tools" sem serem trabalhados. Aviso a Mariana/SDRs.
-- **Opção B — incluir "G4 Tools" como Lead:** trato fase `G4 Tools` como entrada equivalente a `Novos Leads` para o canal Eventos/G4. Inflaria leads do mês em ~598 mas distorceria taxa de conversão (Lead → MQL despencaria).
-- **Opção C — criar uma seção "Aguardando triagem G4"** na aba Eventos G4 mostrando volume parado em `G4 Tools` por safra, pra dar visibilidade sem misturar com funil.
+### 3. Validação rápida (manual no preview)
+- Filtrar período do mês atual em Modelo Atual: número do card "MQL" no topo deve bater com a contagem do drilldown.
+- Idem O2 TAX.
+- Conferir um card conhecido que esteja em "Novos Leads"/"Tentativas de contato" com faturamento ≥ threshold: agora deve aparecer na lista do drilldown MQL.
 
-Me diz qual opção seguir (ou só confirma A e encerro).
+## Fora do escopo
+
+- Expansão (threshold R$ 15k) — não alterar, conforme resposta do usuário.
+- Demais hooks (`useModeloAtualMetas`, `useO2TaxMetas`) — já estão corretos, sem mudanças.
+- Regras de exclusão por motivo de perda — preservadas.
