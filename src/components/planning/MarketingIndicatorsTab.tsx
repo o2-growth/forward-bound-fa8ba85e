@@ -921,7 +921,7 @@ export function MarketingIndicatorsTab() {
               }
               return resolved === channelDrillDown.channel;
             })
-            .filter(card => card.fase === 'Contrato assinado')
+            .filter(card => isSaleFase(card.fase))
             .map(card => ({
               id: card.id,
               name: card.titulo,
@@ -941,10 +941,16 @@ export function MarketingIndicatorsTab() {
       )}
 
 
-      {/* Revenue Metrics Cards - Integrated with Modelo Atual data */}
+      {/* Revenue Metrics Cards - Integrated with Modelo Atual data.
+          Meta de Educação usa o realizado como baseline (não há meta própria), então
+          GMV real (mrr+setup+pontual+educ) vs GMV meta compara like-for-like. */}
       <RevenueMetricsCards
         revenue={realRevenue}
-        goals={finalRevenueGoals}
+        goals={{
+          ...finalRevenueGoals,
+          educacao: realRevenue.educacao || 0,
+          gmv: (finalRevenueGoals.mrr || 0) + (finalRevenueGoals.setup || 0) + (finalRevenueGoals.pontual || 0) + (realRevenue.educacao || 0),
+        }}
       />
 
       {/* Cost Per Stage Gauges */}
@@ -999,7 +1005,7 @@ export function MarketingIndicatorsTab() {
                   <p className="text-xs text-muted-foreground">vs Meta</p>
                   <p className={cn(
                     "text-xl font-bold",
-                    data.costPerStage[costDrillDown.costKey] <= finalCostGoals[costDrillDown.costKey] 
+                    enrichedTotals.costPerStage[costDrillDown.costKey] <= finalCostGoals[costDrillDown.costKey] 
                       ? "text-chart-2" 
                       : "text-destructive"
                   )}>
