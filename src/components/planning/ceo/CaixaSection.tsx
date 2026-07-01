@@ -15,9 +15,10 @@ const SRC_CASH: MetricSource = {
 };
 
 const SRC_EXP: MetricSource = {
-  origem: "Oxy Finance — Saídas detalhadas (cashflow_details, movimentType=D)",
-  periodo: "Filtra pelo período selecionado",
-  calculo: "Soma das saídas por categoria/fornecedor no período.",
+  origem: "Oxy Finance — DRE (linhas de custo/despesa: CV, DX, DF, DNO, AD, INV, PROV)",
+  periodo: "Filtra pelo período selecionado (meses do ano corrente)",
+  calculo:
+    "Soma por rubrica contábil do DRE Oxy no intervalo. Mesma fonte do P&L exibido na aba DRE — consistência automática.",
 };
 
 export function CaixaSection({ dateRange }: Props) {
@@ -88,7 +89,7 @@ export function CaixaSection({ dateRange }: Props) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base"><TrendingDown className="h-4 w-4 text-muted-foreground" />Principais saídas do período</CardTitle>
-          <p className="text-xs text-muted-foreground">Top fornecedores / categorias por valor pago, direto do Oxy Finance.</p>
+          <p className="text-xs text-muted-foreground">Rubricas contábeis de custo/despesa do DRE Oxy (mesma fonte do P&L).</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {expenses.isLoading ? (

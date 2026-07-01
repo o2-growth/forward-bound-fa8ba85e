@@ -1,54 +1,39 @@
-## Diagnóstico — o que está (e o que não está) vindo do Oxy DRE hoje na Visão CEO
+## Resultado do teste ponta a ponta da última modificação (Visão CEO)
 
-### ✅ Já puxa do Oxy Finance / DRE detalhado
-- **Aba Pessoal** → Receita por setor (CaaS, SaaS, TAX, Expansão) usa `useOxyFinance` (`caasByMonth`, `saasByMonth`, `dreByBU.o2_tax`, `expansaoByMonth`). Correto.
-- **Aba DRE** → Receita Bruta (RB) por BU mês a mês, via `dreByBU`. Correto, mas **só a linha de RB**.
-- **Aba Caixa** → Entradas / Saídas / Saldo / Acumulado via `cashflowChart`. Correto.
+Rodei as três frentes contra a API real do Oxy Finance (jun/2026):
 
-### ⚠️ Não puxa do Oxy hoje, mas deveria (ou faz sentido puxar)
-1. **Financeiro (Inadimplência / Base de recebíveis)**
-   Hoje mostra só Ativos/Churn do Pipefy Central de Projetos. Não tem nada de contas a receber.
-   → O endpoint `cashflow_details` do Oxy (já implementado em `fetch-oxy-finance`) aceita `movimentType=R` + `isLate=true`, o que resolve inadimplência por prazo/categoria/cliente direto do Oxy.
+### ✅ 1. DRE completo (P&L) — `DreSection`
+Os **codes** que o `PL_ORDER` referencia batem 1:1 com o que a API devolve em `/v2/dre/dre-table`:
+`RECEITA BRUTA, DC, RECEITA LÍQUIDA, CUSTOS VARIÁVEIS, LUCRO BRUTO, DESPESAS FIXAS, EBITDA, RF, DF, RNO, DNO, PROV, RESULTADO LÍQUIDO, AD, INV, RESULTADO FINAL` — todos existem na resposta. Renderiza corretamente com AV%.
 
-2. **DRE completo (P&L, não só RB)**
-   Hoje só expõe Receita Bruta. O bloco "Aguardando fonte" pede DRE completo — mas a Oxy já devolve os outros códigos (`DA`, `MC`, `DO`, `EBITDA`, `RL`) no mesmo endpoint `/v2/dre/dre-table`. O parser em `useOxyFinance` filtra `code !== 'RB'` e descarta tudo.
-   → Alterando o parser para preservar as demais linhas, dá pra montar: Deduções, Custo variável, **Margem de contribuição**, Despesas operacionais, **EBITDA**, **Resultado líquido**, com análise vertical (% sobre receita) — sem depender de nova fonte.
+### ✅ 2. Inadimplência — `FinanceiroSection` / `useOxyReceivables`
+`cashflow_details` com `movimentType=R&isLate=true` retornou **44 clientes vencidos** em jun/2026 (ED TREINAMENTO, WR DISTRIBUIDORA, PGS, OdontoCompany, Data Stone, …). Cards e tabela top-15 funcionam.
 
-3. **Caixa — detalhamento de saídas e Previsto x Realizado**
-   Hoje só tem o gráfico agregado. O `cashflow_details` (movimentType=D) devolve saídas por categoria/subcategoria/fornecedor + `expected` vs `paid` → cobre "principais saídas" e "previsto x realizado" que estão como "Aguardando fonte".
+### ❌ 3. Principais saídas — `CaixaSection` / `useOxyExpenses`
+`cashflow_details` com `movimentType=D` **retorna `data: []` em todos os cenários testados** (jun/26, mai/26, ano-inteiro, tanto com CNPJ formatado quanto "clean"). Ou seja, o card "Principais saídas do período" vai sempre mostrar **"Sem saídas registradas no período."** — a última alteração não está funcional na prática.
 
-4. **Comercial — Realizado do card "Previsto x Realizado + Pace"**
-   Hoje soma `sumVendaValue` do Pipefy (regime de assinatura de contrato). Isso é o certo para o comercial. Mas vale adicionar uma **linha comparativa "Receita contábil (Oxy DRE)"** ao lado, pra CEO ver a divergência entre "vendido" (Pipefy) e "reconhecido" (Oxy). Opcional.
-
-### ✅ Não faz sentido puxar do Oxy
-- **Aba Comercial (pipe em negociação, funil, temperatura, metas de etapa)** → é operação de CRM; Pipefy é a fonte correta. Manter como está.
+Também testei `dre_drill_down` para `DX`/`CV`/`DC` como plano B e também veio vazio — esse endpoint da Oxy não expõe o detalhe.
 
 ---
 
-## Plano de mudanças (só se você aprovar)
+## Correção proposta
 
-### Fase 1 — DRE completo do Oxy (alto impacto, baixo esforço)
-- Ajustar `useOxyFinance` para expor `dreLinesByCode` (Map de `code → { label, byBU/byMonth }`) preservando `DA`, `MC`, `DO`, `EBITDA`, `RL` além de `RB`.
-- Reescrever `DreSection.tsx`: nova tabela com linhas Receita Bruta → Deduções → Receita Líquida → Custo variável → **Margem de contribuição (%)** → Despesas operacionais → **EBITDA (%)** → **Resultado líquido (%)**, com totais e análise vertical.
-- Remover o bloco "Aguardando fonte — DRE completo".
+Trocar a fonte de "Principais saídas" para dados que **já temos em memória** via `useOxyFinance().dreLines` — o DRE devolve todas as linhas de despesa por rótulo (Custos CaaS, Custos SaaS, Custos Customer Success, Despesas de Marketing, Despesas Comerciais, Despesas com Pessoal, Despesas Administrativas, Despesas Financeiras, Amortização da Dívida, Investimentos etc). É a mesma fonte do P&L, garantindo consistência entre as abas.
 
-### Fase 2 — Inadimplência real na aba Financeiro
-- Criar `useOxyReceivables` que chama `fetch-oxy-finance` com `action=cashflow_details, movimentType=R, isLate=true` no período.
-- Novo bloco em `FinanceiroSection`: total inadimplente, buckets por prazo (7/15/30/60/90/120/180/360/720/+720), quebra por BU, por produto, por CFO.
-- Manter Ativos/Churn como estão (Pipefy).
+### Passos
+1. **`src/hooks/useOxyExpenses.ts`** — reescrever para derivar do `dreLines` já carregado em `useOxyFinance`:
+   - Filtrar linhas com `code ∈ {CV, DX, DF, DNO, AD, INV, PROV}` (todas as saídas do P&L).
+   - Recortar por `startDate..endDate` (mês a mês da chave `byMonth`).
+   - Retornar `items = [{ label, total, byMonth }]` já ordenados por `total desc`.
+   - Descontinuar a chamada extra à edge function `cashflow_details?movimentType=D`.
+2. **`src/components/planning/ceo/CaixaSection.tsx`**
+   - Ajustar o texto/`MetricSource` para: *"Oxy Finance — DRE (todas as linhas de custo/despesa: CV, DX, DF, DNO, AD, INV, PROV)"*.
+   - Continuar mostrando top-20 + agregado "+ N outros".
+3. **`supabase/functions/fetch-oxy-finance/index.ts`** — nada a mudar (o endpoint só é chamado por `useOxyReceivables`, que funciona).
 
-### Fase 3 — Caixa detalhado
-- Bloco "Principais saídas" (top categorias/subcategorias/fornecedores) via `cashflow_details, movimentType=D`.
-- Bloco "Previsto × Realizado" do mês (usa `expected` vs `paid` do mesmo endpoint).
-- Projeções 30/60/90: usa `cashflow_details` com janela futura.
+### Como validar depois
+- Abrir Indicadores → Visão CEO → aba Caixa → seção "Principais saídas do período" deve listar rubricas do DRE (Despesas Comerciais, Despesas com Pessoal, Custos CaaS etc.) com valores > 0 para o período filtrado.
+- Somatório do card "Total de saídas (período)" deve bater com `Custos Variáveis + Despesas Fixas + DF + DNO + AD + INV + PROV` do P&L exibido na aba DRE — ficam com a mesma fonte, então consistência é automática.
+- Alternar `dateRange` (ex.: só mai/2026) deve alterar valores.
 
-### Fase 4 (opcional) — Comparativo Pipefy × Oxy na aba Comercial
-- No card "Previsto x Realizado + Pace", adicionar sublinha "Receita contábil (Oxy DRE) no período: R$ X" com badge de divergência vs Pipefy.
-
----
-
-## O que preciso de você
-
-1. **Aprovar as Fases 1–3** (recomendo todas, são complementares).
-2. **Fase 4 é opcional** — quer o comparativo Pipefy vs Oxy no card comercial? (Pode gerar dúvida com o time comercial que só olha Pipefy.)
-3. Confirmar se a estrutura de códigos do DRE Oxy que a API devolve hoje inclui `MC` e `EBITDA` no mesmo endpoint `/v2/dre/dre-table` — se não, precisamos de uma chamada extra. Posso confirmar rodando um probe rápido antes de codar a Fase 1.
+Se preferir manter a intenção original (top de **fornecedores** individuais, não só rubricas contábeis), me diga e a gente investiga outro endpoint da Oxy — mas hoje `cashflow_details?movimentType=D` não devolve essa granularidade.
