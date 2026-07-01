@@ -718,6 +718,39 @@ export type Database = {
         }
         Relationships: []
       }
+      event_investments: {
+        Row: {
+          created_at: string
+          descricao: string | null
+          id: string
+          month: number
+          updated_at: string
+          updated_by: string | null
+          valor: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          month: number
+          updated_at?: string
+          updated_by?: string | null
+          valor?: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          month?: number
+          updated_at?: string
+          updated_by?: string | null
+          valor?: number
+          year?: number
+        }
+        Relationships: []
+      }
       funnel_metas: {
         Row: {
           bu: string

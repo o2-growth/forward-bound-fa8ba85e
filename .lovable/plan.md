@@ -1,46 +1,115 @@
-# Plano — Correções na aba Indicadores · Marketing
 
-Auditoria concluída em toda a aba. Encontrei **3 bugs críticos**, **4 inconsistências de dados** e **5 melhorias de exibição/filtro**. Abaixo agrupo por prioridade — sugiro começar por P1 (bugs que afetam número exibido) e você decide se seguimos com P2/P3 nesta rodada ou em separado.
+# P3 — Marketing: 5 fixes de consistência
 
-## Prioridade 1 — Bugs críticos que mostram número errado
+## 1. Tabela "Indicadores 26" respeitar filtro de data
 
-1. **Denominador de vendas único (`salesInPeriod`)**
-   - Hoje coexistem 3 contagens de venda: `salesInPeriod.length`, `pipefyVolumes.vendas`, `pipefyTotals.vendas`. Divergem entre Hero, PerformanceGauges, CostPerStageGauges e SourceFunnelSection.
-   - Fix: usar `salesInPeriod.length` em todos os pontos (CAC gauge, CPV gauge, ROI LTV, SourceFunnel source="all").
+**Onde:** `ConsolidatedIndicators26Section.tsx`
 
-2. **Comparação com período anterior em "Resultados Gerais" sempre zerada**
-   - `OverallResultsSection` filtra `salesCards` (já do período atual) por `prevRange` → sempre 0, delta arrows sempre −100%.
-   - Fix: buscar vendas do período anterior via hook independente (novo `salesCardsPrev`) e passar para a seção.
+**Mudança:**
+- Derivar `visibleMonths` a partir do `dateRange` (from/to) recebido do `MarketingIndicatorsTab`.
+- Filtrar colunas mensais e recalcular totais/deltas/YTD para o subset.
+- `IndicatorTrendDialog` (linha clicável) já mostra série mês-a-mês — passar `visibleMonths` para destacar apenas o intervalo.
 
-3. **`Ganho` excluído de LTV, avgMRR e drill-down de canal**
-   - `realPerformanceMetrics` e `ChannelAttributionCards` filtram `fase === 'Contrato assinado'` (string match), ignorando `'Ganho'`.
-   - Fix: trocar por `isSaleFase(c.fase)` de `marketingFunnelAggregator.ts`.
+**Esperado:** ao mudar o período no topo, a tabela reflete só os meses selecionados; total da linha soma apenas esses meses.
 
-4. **Meta de GMV sem Educação, mas GMV real com Educação**
-   - `consolidatedRevenueGoals.gmv = mrr+setup+pontual`; real `= mrr+setup+pontual+educacao`. Gera falsa sensação de over-performance.
-   - Fix: incluir educação também na meta (padrão do projeto: Educação só entra em GMV).
+---
 
-## Prioridade 2 — Consistência de dados
+## 2. `selectedBU` propagar para todos os componentes
 
-5. **CAC do PerformanceGauges com denominador diferente do Hero/CacTotalCard** — trocar `pipefyVolumes.vendas` por `salesInPeriod.length`.
-6. **Drill-down do CostPerStageGauges compara valor errado** — modal usa `data.costPerStage[key]` (sheet); trocar por `enrichedTotals.costPerStage[key]` (live).
-7. **CPV em "Performance de Campanhas — Criativos" deflacionado** — divide invest de mídia paga por TODAS as vendas (inclui orgânico/outbound/eventos). Filtrar `salesCards` para `detectChannel ∈ {meta_ads, google_ads}` só nesse KPI strip.
-8. **`PHASE_FUNNEL_MAP` duplicado** em `SourceFunnelSection.tsx` — importar do `marketingFunnelAggregator.ts`.
+**Onde:** `MarketingIndicatorsTab.tsx` + `marketingFunnelAggregator.ts` + seções filhas.
 
-## Prioridade 3 — Exibição/filtros
+**Mudança:**
+- Criar helper `filterCardsByBU(cards, selectedBU)` em `marketingFunnelAggregator.ts` (Modelo Atual = pipe X, O2 TAX = pipe Y, Expansão = pipe Z etc.).
+- Aplicar antes de:
+  - Hero cards (MRR, GMV, vendas, ticket)
+  - Gauges de CAC/CPV/CPP
+  - `SourceFunnelSection` (funil por canal)
+  - `OverallResultsSection` (Resultados Gerais + comparativo prev)
+  - `CostPerStageGauges` (custo por etapa)
+- `salesInPeriod` e `salesInPeriodPrev` também respeitam o filtro.
+- Investimento total continua global (não há investimento por BU segmentado); apenas as vendas/funis filtram.
 
-9. **Tabela Indicadores 26 ignora o filtro de data** (é sempre ano cheio 2026). Ou passar `dateRange`, ou rotular explicitamente "Visão Anual 2026 — não muda com o filtro".
-10. **Filtro `selectedBU` só filtra campanhas** — todos os funis/receita continuam consolidados. Ou propagar para hooks de BU, ou renomear controle para "Filtrar Campanhas por BU".
-11. **Investimento de Eventos fixo em R$25k** (fallback silencioso) — expor no UI e tornar configurável na tela (ou vir de fonte real).
-12. **Online vs Offline compara populações incompatíveis** (leads do período × vendas do período, sem cohort) — adicionar cohort join ou disclaimer.
-13. **Duas fórmulas de LTV coexistindo** (`avgMRR × 12` vs `ARPU × 1/churn`) — padronizar em uma só.
+**Esperado:** selecionar "Modelo Atual" reduz todos os números ao pipe correspondente; "Consolidado" mantém comportamento atual.
 
-## Ordem de execução sugerida
+---
 
-Começar por **P1 (itens 1–4)** numa PR só, validar visualmente cada card, depois P2, e P3 pode virar issues separadas conforme prioridade sua.
+## 3. Investimento de Eventos real (remover R$ 25k hardcoded)
 
-## Perguntas antes de implementar
+**Onde:** cálculo de CAC/CPV/CPP do canal Eventos em `MarketingIndicatorsTab.tsx` e `CostPerStageGauges`.
 
-- Confirma que faço **P1 + P2** agora (8 fixes) e deixo **P3** para depois?
-- Para o item 11 (Eventos): posso tratar como configurável via UI ou você prefere que puxe de uma fonte específica que já exista?
-- Para o item 13 (LTV): mantemos `ARPU × 1/churn` (padrão Indicadores 26) ou `MRR × 12` (mais simples)?
+**Decisão de fonte:** criar tabela dedicada `event_investments` (mensal), editável na tela Admin — mesma UX das outras metas de investimento. Fallback zero.
+
+**Migration:**
+```sql
+CREATE TABLE public.event_investments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  year int NOT NULL,
+  month int NOT NULL CHECK (month BETWEEN 1 AND 12),
+  valor numeric NOT NULL DEFAULT 0,
+  descricao text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  updated_by uuid REFERENCES auth.users(id),
+  UNIQUE (year, month)
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.event_investments TO authenticated;
+GRANT ALL ON public.event_investments TO service_role;
+ALTER TABLE public.event_investments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "authenticated read" ON public.event_investments FOR SELECT TO authenticated USING (true);
+CREATE POLICY "admin write" ON public.event_investments FOR ALL TO authenticated
+  USING (public.has_role(auth.uid(), 'admin')) WITH CHECK (public.has_role(auth.uid(), 'admin'));
+```
+
+**Frontend:**
+- Hook `useEventInvestments(year, month?)`.
+- Nova aba/subseção no Admin ("Investimento Eventos") para edit inline mês-a-mês.
+- Substituir constante `EVENTOS_INVEST = 25000` por `eventInvestments[month]` (soma no range).
+- Migrar automaticamente Jan–Jun/2026 com R$ 25k para não zerar histórico até você editar.
+
+**Esperado:** CAC/CPV/CPP de Eventos reflete o real; admin edita direto no dashboard.
+
+---
+
+## 4. Online vs Offline com cohort correto
+
+**Onde:** `OnlineOfflineSection.tsx` (dentro de Marketing).
+
+**Problema atual:** classifica venda pelo canal *atual* do card na hora do agregado — se um lead entrou em março via Meta Ads mas o campo `fonte` mudou para "Indicação" antes de fechar em junho, ele aparece como Offline.
+
+**Mudança:**
+- Congelar o canal no momento de entrada (usar `dataCriacao` e o valor de `fonte`/`origem` que existia — o Pipefy DB já mantém movimentações; para cards sem histórico usar o snapshot atual mas guardar em `origem_cohort`).
+- Reaproveitar `classifyLeadSource` com override de "canal congelado" via primeiro registro em `phase_history` (já usado em `useFunnelCohortMode`).
+- Aplicar mesma regra em `OverallResultsSection` para consistência.
+
+**Esperado:** venda de junho conta como Online/Offline conforme o canal que originou o lead (não o canal atual).
+
+---
+
+## 5. LTV unificado (uma única fórmula)
+
+**Onde:** hero card LTV, `ChannelAttributionSection` drill-down, `OverallResultsSection`.
+
+**Fórmula canônica:** `LTV = MRR médio × meses de retenção` (a que o hero já usa).
+
+**Mudança:**
+- Extrair para `marketingLtv.ts`: `computeLTV(salesCards, retentionMonths)` retornando `{ ltv, avgMrr, retention }`.
+- `retentionMonths` vem do mesmo local que hoje alimenta o hero (config global ou default 24).
+- Substituir a variante "ticket × 12" do drill-down por essa função.
+- Adicionar tooltip explicando a fórmula em todos os pontos.
+
+**Esperado:** LTV é o mesmo número no card grande, no drill-down por canal e nos resultados gerais.
+
+---
+
+## Ordem de execução
+
+1. Migration `event_investments` + seed Jan–Jun/26 com R$ 25k (isolado, valida rápido).
+2. Helper `filterCardsByBU` + propagação (mudança grande, valida com toggle de BU).
+3. Filtro de data em `ConsolidatedIndicators26Section` (isolado).
+4. `marketingLtv.ts` + substituições (isolado).
+5. Cohort Online/Offline (usa infra do #2, faz por último).
+
+## Fora do escopo
+
+- Não mexer em Comercial, CEO, G4, NPS ou Operação.
+- Não alterar cálculos de MRR/Setup/Pontual/GMV (já validados em P1/P2).
+- Não criar novas metas — só investimento real de Eventos.
