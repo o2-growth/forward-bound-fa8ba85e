@@ -47,18 +47,11 @@ const SRC_FUNNEL: MetricSource = {
   calculo: "Realizado por etapa ÷ meta por etapa; conversão = etapa ÷ etapa anterior.",
 };
 const SRC_PACE: MetricSource = {
-  origem: "Vendas realizadas (Pipefy) vs meta consolidada (useConsolidatedMetas)",
+  origem: "Faturamento realizado (mesma fonte da aba Indicadores Comercial — Oxy Finance para Modelo Atual/Franquia/Oxy Hacker, Pipefy para O2 TAX, + Monetização) vs meta consolidada",
   periodo: "Filtra pelo período selecionado",
   calculo: "Pace = meta × (dias decorridos ÷ dias totais do período).",
 };
 
-function sumVendaValue(...analyticsList: { getCardsForIndicator: (i: any) => { valor?: number }[] }[]): number {
-  let total = 0;
-  for (const a of analyticsList) {
-    for (const c of a.getCardsForIndicator("venda")) total += c.valor || 0;
-  }
-  return total;
-}
 
 export function ComercialSection({ dateRange }: Props) {
   const { from: startDate, to: endDate } = dateRange;
