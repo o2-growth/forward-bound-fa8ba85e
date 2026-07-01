@@ -404,6 +404,7 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
     oxyProductsByMonth,
     caasByMonth,
     saasByMonth,
+    dreLines,
     dreRaw: dreData,
     cashflowChart,
     cashflowByMonth,
