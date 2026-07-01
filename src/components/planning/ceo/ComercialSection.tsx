@@ -233,25 +233,53 @@ export function ComercialSection({ dateRange }: Props) {
 
 
   // ─── Overview histórico ───
+  // Fonte unificada: mesmos analytics da aba Indicadores Comercial (regras de MQL por faturamento,
+  // dedup mensal de venda, exclusão de test cards, Data de assinatura etc.).
+  const OVERVIEW_STAGES: { real: "mql" | "rm" | "rr" | "proposta" | "venda"; label: string }[] = [
+    { real: "mql", label: "MQLs" },
+    { real: "rm", label: "Reuniões agendadas" },
+    { real: "rr", label: "Reuniões realizadas" },
+    { real: "proposta", label: "Propostas" },
+    { real: "venda", label: "Vendas" },
+  ];
+
   const overview = useMemo(() => {
-    const proj = (() => {
-      const totals = fnMtd.getAllTotals("all");
-      const dim = getDaysInMonth(new Date());
-      const elapsed = new Date().getDate();
-      const factor = elapsed > 0 ? dim / elapsed : 1;
+    const sumStage = (hooks: any[], stage: string) =>
+      hooks.reduce((sum, h) => sum + (h.getCardsForIndicator?.(stage)?.length || 0), 0);
+
+    const totalsFor = (hooks: any[]) => {
       const out: Record<string, number> = {};
-      for (const s of FUNNEL_STAGES) out[s.real] = Math.round((totals[s.real] || 0) * factor);
+      for (const s of OVERVIEW_STAGES) out[s.real] = sumStage(hooks, s.real);
       return out;
-    })();
+    };
+
+    const lmHooks = [lmModelo, lmO2tax, lmFranq, lmOxy, lmOut];
+    const l3Hooks = [l3Modelo, l3O2tax, l3Franq, l3Oxy, l3Out];
+    const mtdHooks = [mtdModelo, mtdO2tax, mtdFranq, mtdOxy, mtdOut];
+
+    const lmTotals = totalsFor(lmHooks);
+    const l3Totals = totalsFor(l3Hooks);
+    const mtdTotals = totalsFor(mtdHooks);
+
+    const dim = getDaysInMonth(today);
+    const elapsed = today.getDate();
+    const factor = elapsed > 0 ? dim / elapsed : 1;
+    const proj: Record<string, number> = {};
+    for (const s of OVERVIEW_STAGES) proj[s.real] = Math.round((mtdTotals[s.real] || 0) * factor);
+
+    const l3avg: Record<string, number> = {};
+    for (const s of OVERVIEW_STAGES) l3avg[s.real] = Math.round((l3Totals[s.real] || 0) / 3);
+
     return {
       cols: [
-        { key: "lastMonth", label: "Último mês", totals: fnLastMonth.getAllTotals("all") },
-        { key: "last3avg", label: "Média 3 meses", totals: Object.fromEntries(FUNNEL_STAGES.map((s) => [s.real, Math.round((fnLast3.getAllTotals("all")[s.real] || 0) / 3)])) as Record<string, number> },
-        { key: "mtd", label: "Mês atual (até hoje)", totals: fnMtd.getAllTotals("all") },
+        { key: "lastMonth", label: "Último mês", totals: lmTotals },
+        { key: "last3avg", label: "Média 3 meses", totals: l3avg },
+        { key: "mtd", label: "Mês atual (até hoje)", totals: mtdTotals },
         { key: "proj", label: "Projeção do mês", totals: proj },
       ],
     };
-  }, [fnLastMonth, fnLast3, fnMtd]);
+  }, [lmModelo, lmO2tax, lmFranq, lmOxy, lmOut, l3Modelo, l3O2tax, l3Franq, l3Oxy, l3Out, mtdModelo, mtdO2tax, mtdFranq, mtdOxy, mtdOut]);
+
 
   return (
     <div className="space-y-6">
