@@ -674,7 +674,7 @@ export function MarketingIndicatorsTab() {
     }
 
     return channels;
-  }, [data.channels, channelSummaries, googleAdsApiTotals, metaAdsApiTotals, sheetData]);
+  }, [data.channels, channelSummaries, googleAdsApiTotals, metaAdsApiTotals, sheetData, eventInvestmentRows, dateRange]);
 
   // Count real volumes mirroring the Commercial accelerometer (no Closer/SDR filter
   // branch in IndicatorsTab.getRealizedForIndicator): Modelo Atual includes Outbound,
