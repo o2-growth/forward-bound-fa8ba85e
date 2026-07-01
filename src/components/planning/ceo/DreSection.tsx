@@ -172,6 +172,9 @@ export function DreSection({ dateRange }: Props) {
           {receitaPorBu.diffPct > 0.5 && (
             <p className="text-xs text-amber-600">⚠ Diferença de {fmtPct(receitaPorBu.diffPct)} entre a soma das BUs classificadas e a Receita Bruta Oxy — parte da receita não tem BU mapeada na Oxy (ver linha "Outros / não classificado").</p>
           )}
+          {data.outOfYear > 0 && (
+            <p className="text-xs text-amber-600">⚠ {data.outOfYear} {data.outOfYear === 1 ? "mês foi ignorado" : "meses foram ignorados"} por estar(em) fora do ano carregado pelo Oxy Finance ({2026}).</p>
+          )}
         </CardContent>
       </Card>
 
