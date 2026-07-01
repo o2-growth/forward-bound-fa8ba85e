@@ -248,15 +248,24 @@ function fmtValue(v: number | null | undefined, fmt: Fmt): string {
   }
 }
 
-export function ConsolidatedIndicators26Section() {
-  const { rows: sheetRows, lastUpdate, isFallback, isLoading } = useIndicators26Raw();
-  const { rows: liveRows, lastUpdate: liveUpdate, isLoading: liveLoading } = useIndicators26Live();
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [trendRow, setTrendRow] = useState<{ label: string; fmt: Fmt; bench?: number } | null>(null);
+interface ConsolidatedIndicators26SectionProps {
+  /**
+   * Filtro de data vindo do topo da aba Marketing. Quando informado, o corte
+   * de meses respeita o `to` selecionado em vez de assumir "hoje". Sem esse
+   * prop, a tabela mostrava sempre até o mês corrente independentemente do
+   * filtro.
+   */
+  dateRange?: { from: Date; to: Date };
+}
 
-  // Colunas dinâmicas: 2026 até mês atual + Qs fechados + bloco fixo 2025 + TOTAL 2026.
-  const COLS = useMemo(() => buildCols(new Date()), []);
+export function ConsolidatedIndicators26Section({ dateRange }: ConsolidatedIndicators26SectionProps = {}) {
+  // Se `dateRange.to` cair em 2026, usamos ele como cursor; caso contrário,
+  // mantém o comportamento antigo (mês corrente).
+  const cursor = useMemo(() => {
+    if (dateRange?.to && dateRange.to.getFullYear() === 2026) return dateRange.to;
+    return new Date();
+  }, [dateRange?.to]);
+  const COLS = useMemo(() => buildCols(cursor), [cursor]);
   const LIVE_COL_KEYS = useMemo(() => {
     const s = new Set<string>();
     for (const c of COLS) if (!SHEET_COL_KEYS.has(c.key)) s.add(c.key);
