@@ -918,6 +918,7 @@ export function MarketingIndicatorsTab() {
         dateRange={dateRange}
         allAttributionCards={allAttributionCards}
         salesCards={salesInPeriod}
+        salesCardsPrev={salesInPeriodPrev}
       />
 
 
