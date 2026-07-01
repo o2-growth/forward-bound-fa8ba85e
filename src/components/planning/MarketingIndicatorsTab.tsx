@@ -486,6 +486,56 @@ export function MarketingIndicatorsTab() {
     return all;
   }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards, allAttributionCards, dateRange]);
 
+  // Vendas do período anterior — usado pelo comparativo em "Resultados Gerais".
+  // Versão simplificada de salesInPeriod: só dedup por card+empresa, sem o
+  // fallback de allAttributionCards (que aqui não temos para prev period).
+  const salesInPeriodPrev = useMemo<AttributionCard[]>(() => {
+    const normalize = (s?: string | null) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const stripPrefix = (id: string) => String(id).replace(/^(outbound_|oxy_|o2tax_)/, '');
+    const isValidDate = (d: unknown): d is Date => d instanceof Date && !Number.isNaN(d.getTime());
+    const sources: Array<{ cards: any[]; bu: string; prefix: string; priority: number }> = [
+      { cards: maGetCardsPrev('venda'),       bu: 'Modelo Atual', prefix: '',          priority: 1 },
+      { cards: o2GetCardsPrev('venda'),       bu: 'O2 TAX',       prefix: 'o2tax_',    priority: 2 },
+      { cards: franquiaGetCardsPrev('venda'), bu: 'Franquia',     prefix: '',          priority: 3 },
+      { cards: oxyGetCardsPrev('venda'),      bu: 'Oxy Hacker',   prefix: 'oxy_',      priority: 4 },
+      { cards: outboundGetCardsPrev('venda'), bu: 'Outbound',     prefix: 'outbound_', priority: 5 },
+    ];
+    const byKey = new Map<string, { card: AttributionCard; priority: number }>();
+    for (const { cards, bu, prefix, priority } of sources) {
+      for (const c of cards) {
+        const baseId = stripPrefix(String(c.id));
+        if (isTestCard(baseId)) continue;
+        const empresaKey = normalize((c as any).empresa || c.titulo);
+        const key = `${baseId}|${empresaKey}`;
+        const existing = byKey.get(key);
+        if (existing && existing.priority <= priority) continue;
+        const phaseEntryDate = isValidDate(c.dataEntrada) ? c.dataEntrada : new Date();
+        const signedDate = isValidDate(c.dataAssinatura) ? c.dataAssinatura : phaseEntryDate;
+        byKey.set(key, {
+          priority,
+          card: {
+            id: prefix + c.id,
+            titulo: c.titulo,
+            empresa: (c as any).empresa,
+            fase: c.fase,
+            dataEntrada: phaseEntryDate,
+            dataCriacao: isValidDate(c.dataCriacao) ? c.dataCriacao : phaseEntryDate,
+            dataAssinatura: signedDate,
+            produto: c.produto,
+            valor: c.valor || 0,
+            valorMRR: c.valorMRR || 0,
+            valorSetup: c.valorSetup || 0,
+            valorPontual: c.valorPontual || 0,
+            valorEducacao: c.valorEducacao || 0,
+            bu,
+          },
+        });
+      }
+    }
+    return Array.from(byKey.values()).map(v => v.card);
+  }, [maGetCardsPrev, o2GetCardsPrev, franquiaGetCardsPrev, oxyGetCardsPrev, outboundGetCardsPrev]);
+
   // Resolve archived/deleted campaign names for attribution
   const { data: campaignNamesMap } = useMetaCampaignNames();
 
