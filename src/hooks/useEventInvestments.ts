@@ -20,12 +20,12 @@ export function useEventInvestments() {
     queryKey: ["event_investments"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("event_investments" as any)
+        .from("event_investments")
         .select("id, year, month, valor, descricao, updated_at")
         .order("year", { ascending: true })
         .order("month", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as unknown as EventInvestmentRow[];
+      return (data ?? []) as EventInvestmentRow[];
     },
     staleTime: 5 * 60 * 1000,
   });
