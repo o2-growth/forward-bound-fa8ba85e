@@ -12,7 +12,11 @@ import { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
 import { useFunnelRealized } from "@/hooks/useFunnelRealized";
 import { useFunnelMetas } from "@/hooks/useFunnelMetas";
 import { useConsolidatedMetas } from "@/hooks/useConsolidatedMetas";
+import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
+import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
+import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
 import { aggregateByTemperatura, type Temperatura } from "@/components/planning/indicators/temperaturaAggregator";
+import { computeFaturamentoRealizado, type BuType } from "@/lib/faturamentoAggregator";
 import { fmt, fmtFull, fmtPct, fmtInt, MetricCard, AiNote, type MetricSource } from "./ceoShared";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
