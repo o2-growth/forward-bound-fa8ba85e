@@ -4,14 +4,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Banknote, TrendingDown } from "lucide-react";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useOxyExpenses } from "@/hooks/useOxyExpenses";
-import { fmt, fmtFull, MetricCard, AiNote, type MetricSource } from "./ceoShared";
+import { fmt, fmtFull, MetricCard, AiNote, MONTHS_PT, type MetricSource } from "./ceoShared";
 
 interface Props { dateRange: { from: Date; to: Date }; }
 
 const SRC_CASH: MetricSource = {
   origem: "useOxyFinance — fluxo de caixa (daily_revenue + cashflow Oxy)",
-  periodo: "Mês a mês do ano corrente",
-  calculo: "Entradas − saídas = saldo do mês; acumulado soma os meses anteriores.",
+  periodo: "Filtra pelo período selecionado; acumulado começa em zero no início do intervalo.",
+  calculo: "Entradas − saídas = saldo do mês; acumulado soma os meses anteriores dentro do período.",
 };
 
 const SRC_EXP: MetricSource = {
@@ -26,7 +26,11 @@ export function CaixaSection({ dateRange }: Props) {
   const expenses = useOxyExpenses({ startDate: dateRange.from, endDate: dateRange.to });
 
   const data = useMemo(() => {
-    const chart = (oxy.cashflowChart ?? []).filter((p) => p.month);
+    // Filtra o cashflow pelos meses do período selecionado (mesmo ano)
+    const fromMonth = dateRange.from.getMonth();
+    const toMonth = dateRange.to.getMonth();
+    const monthsInRange = new Set(MONTHS_PT.slice(fromMonth, toMonth + 1));
+    const chart = (oxy.cashflowChart ?? []).filter((p) => p.month && monthsInRange.has(p.month));
     let acc = 0;
     const rows = chart.map((p) => {
       acc += (p.inflows || 0) - (p.outflows || 0);
@@ -35,7 +39,8 @@ export function CaixaSection({ dateRange }: Props) {
     const totalIn = rows.reduce((s, r) => s + r.inflows, 0);
     const totalOut = rows.reduce((s, r) => s + r.outflows, 0);
     return { rows, totalIn, totalOut, saldo: totalIn - totalOut };
-  }, [oxy.cashflowChart]);
+  }, [oxy.cashflowChart, dateRange.from, dateRange.to]);
+
 
   const topSaidas = useMemo(() => expenses.items.slice(0, 20), [expenses.items]);
 
@@ -47,14 +52,15 @@ export function CaixaSection({ dateRange }: Props) {
     <div className="space-y-6">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><Banknote className="h-4 w-4 text-muted-foreground" />Fluxo de caixa acumulado do ano — mês a mês</CardTitle>
-          <p className="text-xs text-muted-foreground">Entradas, saídas, saldo do mês e acumulado do ano.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><Banknote className="h-4 w-4 text-muted-foreground" />Fluxo de caixa — mês a mês (período selecionado)</CardTitle>
+          <p className="text-xs text-muted-foreground">Entradas, saídas, saldo do mês e acumulado dentro do intervalo escolhido.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
-            <MetricCard label="Entradas (ano)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} />
-            <MetricCard label="Saídas (ano)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} />
-            <MetricCard label="Saldo (ano)" value={fmt(data.saldo)} large source={SRC_CASH} />
+            <MetricCard label="Entradas (período)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} />
+            <MetricCard label="Saídas (período)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} />
+            <MetricCard label="Saldo (período)" value={fmt(data.saldo)} large source={SRC_CASH} />
+
           </div>
           <div className="overflow-x-auto">
             <Table>

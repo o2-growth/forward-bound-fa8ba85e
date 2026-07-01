@@ -12,7 +12,11 @@ import { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
 import { useFunnelRealized } from "@/hooks/useFunnelRealized";
 import { useFunnelMetas } from "@/hooks/useFunnelMetas";
 import { useConsolidatedMetas } from "@/hooks/useConsolidatedMetas";
+import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
+import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
+import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
 import { aggregateByTemperatura, type Temperatura } from "@/components/planning/indicators/temperaturaAggregator";
+import { computeFaturamentoRealizado, type BuType } from "@/lib/faturamentoAggregator";
 import { fmt, fmtFull, fmtPct, fmtInt, MetricCard, AiNote, type MetricSource } from "./ceoShared";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -43,18 +47,11 @@ const SRC_FUNNEL: MetricSource = {
   calculo: "Realizado por etapa ÷ meta por etapa; conversão = etapa ÷ etapa anterior.",
 };
 const SRC_PACE: MetricSource = {
-  origem: "Vendas realizadas (Pipefy) vs meta consolidada (useConsolidatedMetas)",
+  origem: "Faturamento realizado (mesma fonte da aba Indicadores Comercial — Oxy Finance para Modelo Atual/Franquia/Oxy Hacker, Pipefy para O2 TAX, + Monetização) vs meta consolidada",
   periodo: "Filtra pelo período selecionado",
   calculo: "Pace = meta × (dias decorridos ÷ dias totais do período).",
 };
 
-function sumVendaValue(...analyticsList: { getCardsForIndicator: (i: any) => { valor?: number }[] }[]): number {
-  let total = 0;
-  for (const a of analyticsList) {
-    for (const c of a.getCardsForIndicator("venda")) total += c.valor || 0;
-  }
-  return total;
-}
 
 export function ComercialSection({ dateRange }: Props) {
   const { from: startDate, to: endDate } = dateRange;
@@ -71,6 +68,11 @@ export function ComercialSection({ dateRange }: Props) {
   const funnelRealized = useFunnelRealized(startDate, endDate);
   const funnelMetas = useFunnelMetas();
   const consolidated = useConsolidatedMetas();
+
+  // Hooks de faturamento realizado (Oxy Finance) — mesma fonte da aba Indicadores Comercial
+  const { getValueForPeriod: getModeloAtualValue } = useModeloAtualMetas(startDate, endDate);
+  const { getValueForPeriod: getExpansaoValue } = useExpansaoMetas(startDate, endDate);
+  const { getValueForPeriod: getOxyHackerValue } = useOxyHackerMetas(startDate, endDate);
 
   // Overview histórico — funil realizado em janelas distintas
   const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
@@ -158,9 +160,24 @@ export function ComercialSection({ dateRange }: Props) {
   }, [funnelRealized, funnelMetas, startDate, endDate]);
 
   // ─── Previsto x realizado + pace (faturamento) ───
+  // Usa a MESMA fonte da aba Indicadores Comercial (Oxy Finance para Modelo Atual/Franquia/Oxy Hacker, Pipefy para O2 TAX, + Monetização)
   const pace = useMemo(() => {
     const metaFat = consolidated.getMetaForPeriod([...ALL_BUS] as any, startDate, endDate, "faturamento" as any);
-    const realizadoFat = sumVendaValue(modeloAtual, o2tax, franquia, oxyHacker, outbound);
+    const monetizacaoVendaItems = monetizacao.getDetailItemsForIndicator("venda") as any[];
+    const realizadoFat = computeFaturamentoRealizado({
+      selectedBUs: [...ALL_BUS] as BuType[],
+      startDate,
+      endDate,
+      modeloAtualAnalytics: modeloAtual as any,
+      o2TaxAnalytics: o2tax as any,
+      oxyHackerAnalytics: oxyHacker as any,
+      franquiaAnalytics: franquia as any,
+      getModeloAtualValue: getModeloAtualValue as any,
+      getOxyHackerValue: getOxyHackerValue as any,
+      getExpansaoValue: getExpansaoValue as any,
+      monetizacaoVendaItems,
+      includeMonetizacao: true, // Consolidado, sem filtro de origem
+    });
     const totalDays = Math.max(differenceInCalendarDays(endDate, startDate) + 1, 1);
     const elapsed = Math.min(Math.max(differenceInCalendarDays(new Date(), startDate) + 1, 0), totalDays);
     const expected = metaFat * (elapsed / totalDays);
@@ -171,7 +188,8 @@ export function ComercialSection({ dateRange }: Props) {
       atingimentoMeta: metaFat > 0 ? (realizadoFat / metaFat) * 100 : null,
       atingimentoPace: expected > 0 ? (realizadoFat / expected) * 100 : null,
     };
-  }, [consolidated, modeloAtual, o2tax, franquia, oxyHacker, outbound, startDate, endDate]);
+  }, [consolidated, modeloAtual, o2tax, franquia, oxyHacker, monetizacao, getModeloAtualValue, getOxyHackerValue, getExpansaoValue, startDate, endDate]);
+
 
   // ─── Overview histórico ───
   const overview = useMemo(() => {
@@ -200,7 +218,7 @@ export function ComercialSection({ dateRange }: Props) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted-foreground" />Overview histórico</CardTitle>
-          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência — para comparar o mês corrente com o passado.</p>
+          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — janela fixa, independente do filtro de período acima.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="overflow-x-auto">

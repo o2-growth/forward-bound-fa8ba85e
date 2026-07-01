@@ -33,25 +33,30 @@ export function DreSection({ dateRange }: Props) {
   const oxy = useOxyFinance();
 
   const data = useMemo(() => {
-    const monthsUpTo = MONTHS_PT.slice(0, dateRange.to.getMonth() + 1);
+    // Respeita o filtro de período: usa apenas os meses entre from..to (mesmo ano).
+    const fromMonth = dateRange.from.getMonth();
+    const toMonth = dateRange.to.getMonth();
+    const monthsInRange = MONTHS_PT.slice(fromMonth, toMonth + 1);
     // agrupa linhas do DRE por code (soma quando há múltiplas ex: vários "CV")
     const byCode = new Map<string, Record<string, number>>();
     for (const line of oxy.dreLines || []) {
       const cur = byCode.get(line.code) || {};
-      for (const m of monthsUpTo) cur[m] = (cur[m] || 0) + (line.byMonth[m as any] || 0);
+      for (const m of monthsInRange) cur[m] = (cur[m] || 0) + (line.byMonth[m as any] || 0);
       byCode.set(line.code, cur);
     }
-    const rbTotal = MONTHS_PT.reduce((s, m) => s + ((byCode.get("RECEITA BRUTA")?.[m]) || 0), 0);
+    // AV% mantém como base a Receita Bruta do MESMO período filtrado
+    const rbTotal = monthsInRange.reduce((s, m) => s + ((byCode.get("RECEITA BRUTA")?.[m]) || 0), 0);
     const rows = PL_ORDER.map((row) => {
       const bm = byCode.get(row.code) || {};
-      const cells = monthsUpTo.map((m) => bm[m] || 0);
+      const cells = monthsInRange.map((m) => bm[m] || 0);
       const total = cells.reduce((s, v) => s + v, 0);
       const av = rbTotal !== 0 ? (total / rbTotal) * 100 : null;
       const label = row.label ?? row.code;
       return { ...row, label, cells, total, av };
     });
-    return { monthsUpTo, rows, rbTotal };
-  }, [oxy.dreLines, dateRange.to]);
+    return { monthsUpTo: monthsInRange, rows, rbTotal };
+  }, [oxy.dreLines, dateRange.from, dateRange.to]);
+
 
   if (oxy.isLoading) {
     return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
