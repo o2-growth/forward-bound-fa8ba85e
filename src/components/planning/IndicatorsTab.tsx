@@ -21,8 +21,20 @@ import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useCloserMetas, BU_CLOSERS, BuType, CloserType } from "@/hooks/useCloserMetas";
 import { useSdrMetas } from "@/hooks/useSdrMetas";
 import { useFunnelMetas } from "@/hooks/useFunnelMetas";
-// Componentes pesados (abaixo do fold) → lazy load com Suspense
-const LossAnalysisSection = lazy(() => import("./indicators/LossAnalysisSection").then(m => ({ default: m.LossAnalysisSection })));
+// Componentes pesados (abaixo do fold) → lazy load com retry on stale chunk
+const lazyWithRetry = <T,>(factory: () => Promise<T>) =>
+  lazy(() =>
+    (factory() as Promise<any>).catch((err) => {
+      // Stale chunk after redeploy: force one hard reload to fetch the new manifest
+      if (!sessionStorage.getItem("__chunk_reload__")) {
+        sessionStorage.setItem("__chunk_reload__", "1");
+        window.location.reload();
+        return new Promise(() => {}) as any;
+      }
+      throw err;
+    })
+  );
+const LossAnalysisSection = lazyWithRetry(() => import("./indicators/LossAnalysisSection").then(m => ({ default: m.LossAnalysisSection })));
 import { format, startOfYear, endOfYear, endOfDay, differenceInDays, eachMonthOfInterval, addDays, eachDayOfInterval, getMonth, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { DateRangePickerGA } from "./DateRangePickerGA";
 import { FunnelDataItem } from "@/contexts/MediaMetasContext";
