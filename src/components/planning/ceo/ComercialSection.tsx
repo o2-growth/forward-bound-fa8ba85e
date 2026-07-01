@@ -218,7 +218,7 @@ export function ComercialSection({ dateRange }: Props) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted-foreground" />Overview histórico</CardTitle>
-          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência — para comparar o mês corrente com o passado.</p>
+          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — janela fixa, independente do filtro de período acima.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="overflow-x-auto">
