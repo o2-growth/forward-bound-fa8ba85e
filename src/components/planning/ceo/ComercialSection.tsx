@@ -340,16 +340,6 @@ export function ComercialSection({ dateRange }: Props) {
         </CardContent>
       </Card>
 
-      {/* ── Previsto x realizado + pace ── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4 text-muted-foreground" />Previsto x Realizado + Pace</CardTitle>
-              </TableBody>
-            </Table>
-          </div>
-          <AiNote />
-        </CardContent>
-      </Card>
 
       {/* ── Previsto x realizado + pace ── */}
       <Card>
