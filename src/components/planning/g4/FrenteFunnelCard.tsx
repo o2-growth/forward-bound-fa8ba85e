@@ -60,7 +60,7 @@ export function FrenteFunnelCard({
       </CardHeader>
 
       <CardContent className="space-y-2">
-        {funnel.map((step, idx) => {
+        {steps.map((step, idx) => {
           const barPct = maxCount > 0 ? (step.count / maxCount) * 100 : 0;
           const isFirst = idx === 0;
 
