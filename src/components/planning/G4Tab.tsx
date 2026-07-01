@@ -21,12 +21,11 @@ import {
 } from "lucide-react";
 import { useG4Analytics } from "@/hooks/useG4Analytics";
 import { G4_PERIOD_START } from "@/lib/g4Events";
+import type { LivesSectionProps } from "./g4/LivesSection";
+import type { EventosSectionProps } from "./g4/EventosSection";
+import type { SellerSectionProps } from "./g4/SellerSection";
 
 // ── Lazy-load das sections (carregam só quando a sub-tab abre) ───────────
-type LivesSectionProps    = { dateRange: { from: Date; to: Date } };
-type EventosSectionProps  = { dateRange: { from: Date; to: Date } };
-type SellerSectionProps   = { dateRange: { from: Date; to: Date } };
-
 const LivesSection   = lazy(() => import("./g4/LivesSection").then((m) => ({ default: m.LivesSection   as unknown as ComponentType<LivesSectionProps>   })));
 const EventosSection = lazy(() => import("./g4/EventosSection").then((m) => ({ default: m.EventosSection as unknown as ComponentType<EventosSectionProps> })));
 const SellerSection  = lazy(() => import("./g4/SellerSection").then((m) => ({ default: m.SellerSection  as unknown as ComponentType<SellerSectionProps>  })));
@@ -258,21 +257,46 @@ export function G4Tab() {
         {/* Lives */}
         <TabsContent value="lives" className="mt-6">
           <Suspense fallback={<SectionFallback />}>
-            <LivesSection dateRange={dateRange} />
+            <LivesSection
+              leads={lives.cards.length}
+              pipe={lives.pipe.aberto}
+              faturamento={lives.dre.receitaBruta}
+              leadTimeMedio={lives.leadTimeMediaDias}
+              funnel={lives.funnel}
+              dre={lives.dre}
+              custosDetalhe={lives.custosDetalhe}
+              livesRows={lives.livesRows}
+            />
           </Suspense>
         </TabsContent>
 
         {/* Eventos */}
         <TabsContent value="eventos" className="mt-6">
           <Suspense fallback={<SectionFallback />}>
-            <EventosSection dateRange={dateRange} />
+            <EventosSection
+              leads={eventos.cards.length}
+              pipe={eventos.pipe.aberto}
+              faturamento={eventos.dre.receitaBruta}
+              leadTimeMedio={eventos.leadTimeMediaDias}
+              funnel={eventos.funnel}
+              dre={eventos.dre}
+              custosDetalhe={eventos.custosDetalhe}
+              eventosRows={eventos.eventosRows}
+            />
           </Suspense>
         </TabsContent>
 
         {/* G4 Seller */}
         <TabsContent value="seller" className="mt-6">
           <Suspense fallback={<SectionFallback />}>
-            <SellerSection dateRange={dateRange} />
+            <SellerSection
+              leads={seller.cards.length}
+              pipe={seller.pipe.aberto}
+              faturamento={seller.dre.receitaBruta}
+              leadTimeMedio={seller.leadTimeMediaDias}
+              funnel={seller.funnel}
+              dre={seller.dre}
+            />
           </Suspense>
         </TabsContent>
       </Tabs>
