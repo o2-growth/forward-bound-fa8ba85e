@@ -24,12 +24,18 @@ const SRC_EXP: MetricSource = {
 export function CaixaSection({ dateRange }: Props) {
   const oxy = useOxyFinance();
   const expenses = useOxyExpenses({ startDate: dateRange.from, endDate: dateRange.to });
+  const OXY_YEAR = 2026;
 
   const data = useMemo(() => {
-    // Filtra o cashflow pelos meses do período selecionado (mesmo ano)
-    const fromMonth = dateRange.from.getMonth();
-    const toMonth = dateRange.to.getMonth();
-    const monthsInRange = new Set(MONTHS_PT.slice(fromMonth, toMonth + 1));
+    // Achado #3 auditoria CEO — iterar por Date e ignorar meses fora do ano Oxy.
+    const monthsInRange = new Set<string>();
+    let outOfYear = 0;
+    const start = new Date(dateRange.from.getFullYear(), dateRange.from.getMonth(), 1);
+    const end = new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), 1);
+    for (let d = start; d <= end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+      if (d.getFullYear() === OXY_YEAR) monthsInRange.add(MONTHS_PT[d.getMonth()]);
+      else outOfYear++;
+    }
     const chart = (oxy.cashflowChart ?? []).filter((p) => p.month && monthsInRange.has(p.month));
     let acc = 0;
     const rows = chart.map((p) => {
@@ -38,7 +44,7 @@ export function CaixaSection({ dateRange }: Props) {
     });
     const totalIn = rows.reduce((s, r) => s + r.inflows, 0);
     const totalOut = rows.reduce((s, r) => s + r.outflows, 0);
-    return { rows, totalIn, totalOut, saldo: totalIn - totalOut };
+    return { rows, totalIn, totalOut, saldo: totalIn - totalOut, outOfYear };
   }, [oxy.cashflowChart, dateRange.from, dateRange.to]);
 
 
