@@ -775,19 +775,18 @@ export function MarketingIndicatorsTab() {
     // CacTotalCard e CPV do CostPerStageGauges — evita 3 números de vendas divergentes.
     const vendas = salesInPeriod.length;
 
-    // avgMRR usa qualquer venda válida (Contrato assinado OU Ganho), não só string match.
-    const vendasCards = allAttributionCards.filter(c => isSaleFase(c.fase));
-    const totalMrrVendas = vendasCards.reduce((sum, c) => sum + (c.valorMRR || 0), 0);
-    const avgMrr = vendasCards.length > 0 ? totalMrrVendas / vendasCards.length : 0;
+    // LTV canônico (marketingLtv.ts): avgMRR × RETENTION_MONTHS. Fonte única
+    // para hero, gauges e qualquer drill-down futuro. Aceita venda em
+    // 'Contrato assinado' e 'Ganho' (via isSaleFase interno).
+    const { avgMrr, ltv } = computeLTV(allAttributionCards, RETENTION_MONTHS);
 
     const roas = investmentForGauges > 0 ? gmv / investmentForGauges : 0;
     // CAC gauge = investmentTotalForRange (Meta+Google API por mês) ÷ vendas — somente mídia, sem OPEX
     // O hero card inclui OPEX (timeFerramentas). As duas métricas são intencionalmente diferentes.
     const cac = vendas > 0 ? investmentTotalForRange / vendas : 0;
-    const ltv = avgMrr * 12;
     const roiLtv = investmentForGauges > 0 ? (ltv * vendas) / investmentForGauges : 0;
 
-    return { roas, cac, ltv, roiLtv };
+    return { roas, cac, ltv, roiLtv, avgMrr };
   }, [enrichedTotals.totalInvestment, investmentTotalForRange, realRevenue.gmv, salesInPeriod, allAttributionCards]);
 
   const handleDateRangeChange = (start: Date, end: Date) => {
