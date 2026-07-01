@@ -236,8 +236,8 @@ export function ComercialSection({ dateRange }: Props) {
       {/* ── Overview histórico ── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted-foreground" />Overview histórico</CardTitle>
-          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — janela fixa, independente do filtro de período acima.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted-foreground" />Overview histórico <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">janela fixa</span></CardTitle>
+          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — <strong>não responde ao filtro de período acima</strong>.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="overflow-x-auto">
