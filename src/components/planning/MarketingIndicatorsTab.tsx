@@ -38,6 +38,7 @@ import { DetailSheet, columnFormatters } from "./indicators/DetailSheet";
 import { BestAdsSection } from "./marketing-indicators/BestAdsSection";
 import { InvestmentForecast } from "./marketing-indicators/InvestmentForecast";
 import { CHANNEL_LABELS, ChannelId, CostPerStage, AttributionCard } from "./marketing-indicators/types";
+import { isSaleFase } from "@/lib/marketingFunnelAggregator";
 import { CacTotalCard } from "./marketing-indicators/CacTotalCard";
 import { InvestmentCacMqlHero } from "./marketing-indicators/InvestmentCacMqlHero";
 import { ConsolidatedIndicators26Section } from "./marketing-indicators/ConsolidatedIndicators26Section";
@@ -115,8 +116,10 @@ export function MarketingIndicatorsTab() {
     const mrr = getMetaForPeriod(allBUs, dateRange.from, dateRange.to, 'mrr');
     const setup = getMetaForPeriod(allBUs, dateRange.from, dateRange.to, 'setup');
     const pontual = getMetaForPeriod(allBUs, dateRange.from, dateRange.to, 'pontual');
-    const gmv = mrr + setup + pontual;
-    return { mrr, setup, pontual, educacao: 0, gmv };
+    // GMV inclui Educação (regra do projeto). Como não há meta específica p/ Educação,
+    // usamos o realizado como "meta" — assim GMV real vs meta compara like-for-like
+    // e não gera falsa impressão de over-performance por Educação sem baseline.
+    return { mrr, setup, pontual, educacao: 0, gmv: mrr + setup + pontual };
   }, [getMetaForPeriod, dateRange, allBUs]);
 
   const consolidatedFunnelGoals = useMemo(() => {
