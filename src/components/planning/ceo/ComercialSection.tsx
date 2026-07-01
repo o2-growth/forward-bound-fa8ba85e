@@ -128,18 +128,37 @@ export function ComercialSection({ dateRange }: Props) {
   }, [modeloAtual, franquia, oxyHacker, outbound, monetizacao, startDate, endDate]);
 
   // ─── Funil: realizado x meta + conversão ───
+  // FONTE UNIFICADA (auditoria CEO — achado #1): usa os mesmos analytics da aba
+  // Indicadores Comercial (regras de MQL por faturamento, dedup mensal de venda etc.),
+  // em vez da tabela funnel_realized (que conta por fase do Pipefy e diverge).
   const funil = useMemo(() => {
-    const realTotals = funnelRealized.getAllTotals("all");
-    // soma metas das BUs para os meses do período
-    const monthsInPeriod: string[] = [];
+    const sumLen = (ind: "leads" | "mql" | "rm" | "rr" | "proposta" | "venda") =>
+      (modeloAtual.getCardsForIndicator(ind)?.length || 0) +
+      (o2tax.getCardsForIndicator(ind)?.length || 0) +
+      (franquia.getCardsForIndicator(ind)?.length || 0) +
+      (oxyHacker.getCardsForIndicator(ind)?.length || 0) +
+      (outbound.getCardsForIndicator(ind)?.length || 0);
+
+    const realTotals = {
+      leads: sumLen("leads"),
+      mql: sumLen("mql"),
+      rm: sumLen("rm"),
+      rr: sumLen("rr"),
+      proposta: sumLen("proposta"),
+      venda: sumLen("venda"),
+    } as Record<"leads" | "mql" | "rm" | "rr" | "proposta" | "venda", number>;
+
+    // Soma metas das BUs para os meses do período (achado #2 — respeitar ano também)
+    const monthYearsInPeriod = new Set<string>();
     for (let d = startOfMonth(startDate); d <= endDate; d = startOfMonth(subMonths(d, -1))) {
-      monthsInPeriod.push(MONTHS[d.getMonth()]);
+      monthYearsInPeriod.add(`${MONTHS[d.getMonth()]}__${d.getFullYear()}`);
     }
     const metaTotals: FunnelMetaRow = { leads: 0, mqls: 0, rms: 0, rrs: 0, propostas: 0, vendas: 0 };
     for (const bu of ALL_BUS) {
-      const rows = funnelMetas.getFunnelForBU(bu) as unknown as (FunnelMetaRow & { month: string })[];
+      const rows = funnelMetas.getFunnelForBU(bu) as unknown as (FunnelMetaRow & { month: string; year?: number })[];
       for (const r of rows || []) {
-        if (!monthsInPeriod.includes(r.month)) continue;
+        const y = r.year ?? 2026;
+        if (!monthYearsInPeriod.has(`${r.month}__${y}`)) continue;
         metaTotals.leads += r.leads || 0;
         metaTotals.mqls += r.mqls || 0;
         metaTotals.rms += r.rms || 0;
@@ -157,7 +176,7 @@ export function ComercialSection({ dateRange }: Props) {
       return { ...s, real, meta, conv, atingimento };
     });
     return { rows };
-  }, [funnelRealized, funnelMetas, startDate, endDate]);
+  }, [modeloAtual, o2tax, franquia, oxyHacker, outbound, funnelMetas, startDate, endDate]);
 
   // ─── Previsto x realizado + pace (faturamento) ───
   // Usa a MESMA fonte da aba Indicadores Comercial (Oxy Finance para Modelo Atual/Franquia/Oxy Hacker, Pipefy para O2 TAX, + Monetização)
@@ -176,7 +195,7 @@ export function ComercialSection({ dateRange }: Props) {
       getOxyHackerValue: getOxyHackerValue as any,
       getExpansaoValue: getExpansaoValue as any,
       monetizacaoVendaItems,
-      includeMonetizacao: true, // Consolidado, sem filtro de origem
+      includeMonetizacao: false, // Auditoria CEO — achado #4: metaFat não inclui Monetização, então realizado também exclui p/ pace fiel
     });
     const totalDays = Math.max(differenceInCalendarDays(endDate, startDate) + 1, 1);
     const elapsed = Math.min(Math.max(differenceInCalendarDays(new Date(), startDate) + 1, 0), totalDays);
@@ -217,8 +236,8 @@ export function ComercialSection({ dateRange }: Props) {
       {/* ── Overview histórico ── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted-foreground" />Overview histórico</CardTitle>
-          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — janela fixa, independente do filtro de período acima.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted-foreground" />Overview histórico <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">janela fixa</span></CardTitle>
+          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — <strong>não responde ao filtro de período acima</strong>.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="overflow-x-auto">
@@ -246,8 +265,8 @@ export function ComercialSection({ dateRange }: Props) {
       {/* ── Pipe de vendas (R$ + temperatura) ── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><ShoppingCart className="h-4 w-4 text-muted-foreground" />Pipe de Vendas em negociação</CardTitle>
-          <p className="text-xs text-muted-foreground">Volume R$ em negociação, dividido por temperatura e por closer / canal / BU / produto.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><ShoppingCart className="h-4 w-4 text-muted-foreground" />Pipe de Vendas em negociação <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">consolidado</span></CardTitle>
+          <p className="text-xs text-muted-foreground">Volume R$ em negociação, dividido por temperatura e por closer / canal / BU / produto. Sempre consolidado (todas as BUs + Outbound + Monetização).</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {pipeLoading ? (
