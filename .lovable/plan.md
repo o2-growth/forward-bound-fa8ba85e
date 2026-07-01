@@ -1,43 +1,46 @@
-## Objetivo
-Congelar os números das lives já realizadas (20/05, 21/05, 17/06, 18/06) com os valores oficiais mostrados na tela, para que o funil e o comparativo parem de recalcular a partir dos cards do Pipefy e passem a exibir sempre esses números.
+# Plano — Correções na aba Indicadores · Marketing
 
-## Números a fixar
+Auditoria concluída em toda a aba. Encontrei **3 bugs críticos**, **4 inconsistências de dados** e **5 melhorias de exibição/filtro**. Abaixo agrupo por prioridade — sugiro começar por P1 (bugs que afetam número exibido) e você decide se seguimos com P2/P3 nesta rodada ou em separado.
 
-| Live | Inscritos | Entraram | Mão | Venda |
-|---|---:|---:|---:|---:|
-| Live 20/05 | 339 | 52 | 3 | 1 |
-| Live 21/05 | 196 | 48 | 3 | 1 |
-| Live 17/06 | 329 | 243 | 9 | 0 |
-| Live 18/06 | 351 | 168 | 5 | 0 |
+## Prioridade 1 — Bugs críticos que mostram número errado
 
-Lives futuras (ex.: 02/07) continuam calculadas a partir dos cards, sem override.
+1. **Denominador de vendas único (`salesInPeriod`)**
+   - Hoje coexistem 3 contagens de venda: `salesInPeriod.length`, `pipefyVolumes.vendas`, `pipefyTotals.vendas`. Divergem entre Hero, PerformanceGauges, CostPerStageGauges e SourceFunnelSection.
+   - Fix: usar `salesInPeriod.length` em todos os pontos (CAC gauge, CPV gauge, ROI LTV, SourceFunnel source="all").
 
-## Onde vai o dado
-Novo arquivo `src/data/livesOfficial.ts` — mapa `dateISO → { inscritos, entraram, mao, venda }`. É a fonte de verdade oficial (você edita ali quando tiver novos números pós-live).
+2. **Comparação com período anterior em "Resultados Gerais" sempre zerada**
+   - `OverallResultsSection` filtra `salesCards` (já do período atual) por `prevRange` → sempre 0, delta arrows sempre −100%.
+   - Fix: buscar vendas do período anterior via hook independente (novo `salesCardsPrev`) e passar para a seção.
 
-Não precisa mexer em banco. Se um dia a tabela `g4_funnel_stages` for populada com esses stages para a mesma live, o valor do banco ganha do arquivo (banco > override > cálculo).
+3. **`Ganho` excluído de LTV, avgMRR e drill-down de canal**
+   - `realPerformanceMetrics` e `ChannelAttributionCards` filtram `fase === 'Contrato assinado'` (string match), ignorando `'Ganho'`.
+   - Fix: trocar por `isSaleFase(c.fase)` de `marketingFunnelAggregator.ts`.
 
-## O que muda no código
+4. **Meta de GMV sem Educação, mas GMV real com Educação**
+   - `consolidatedRevenueGoals.gmv = mrr+setup+pontual`; real `= mrr+setup+pontual+educacao`. Gera falsa sensação de over-performance.
+   - Fix: incluir educação também na meta (padrão do projeto: Educação só entra em GMV).
 
-1. **`src/data/livesOfficial.ts` (novo)**
-   - Exporta `LIVES_OFICIAIS: Record<string, { inscritos; entraram; mao; venda }>` com as 4 lives acima.
-   - Exporta helper `getOverride(dateIso)`.
+## Prioridade 2 — Consistência de dados
 
-2. **`src/components/planning/g4/LivesSection.tsx`**
-   - Ao montar contagens de cada live no `compare`, se houver override → usa override; senão → `computeCounts`.
-   - Ao trocar chip para uma live com override → KPIs e stages do funil usam o override (ainda mesclando com stages manuais do banco pelas etapas intermediárias: diagnóstico, entraram, pico, pitch).
-   - Agregado ("all") = soma dos overrides das lives passadas + `computeCounts` das lives futuras (sem dupla contagem).
+5. **CAC do PerformanceGauges com denominador diferente do Hero/CacTotalCard** — trocar `pipefyVolumes.vendas` por `salesInPeriod.length`.
+6. **Drill-down do CostPerStageGauges compara valor errado** — modal usa `data.costPerStage[key]` (sheet); trocar por `enrichedTotals.costPerStage[key]` (live).
+7. **CPV em "Performance de Campanhas — Criativos" deflacionado** — divide invest de mídia paga por TODAS as vendas (inclui orgânico/outbound/eventos). Filtrar `salesCards` para `detectChannel ∈ {meta_ads, google_ads}` só nesse KPI strip.
+8. **`PHASE_FUNNEL_MAP` duplicado** em `SourceFunnelSection.tsx` — importar do `marketingFunnelAggregator.ts`.
 
-3. **`src/lib/g4Funnel.ts`**
-   - `mergeStages` já respeita valores do DB por cima. Adicionar suporte a `overrideCounts` opcional (usado antes do fallback computado) para que os stages básicos (inscritos/entraram/mão/venda) reflitam o override quando presente.
+## Prioridade 3 — Exibição/filtros
 
-## Comportamento visível
-- Cards do comparativo entre lives exibem exatamente os números da imagem para 20/05, 21/05, 17/06, 18/06.
-- Clicar em qualquer chip dessas lives → KPI row e cone-funnel abrem com os valores oficiais.
-- Chip "Agregado" soma esses valores oficiais + o que vier do Pipefy para lives sem override.
-- Live 02/07 e futuras continuam dinâmicas.
+9. **Tabela Indicadores 26 ignora o filtro de data** (é sempre ano cheio 2026). Ou passar `dateRange`, ou rotular explicitamente "Visão Anual 2026 — não muda com o filtro".
+10. **Filtro `selectedBU` só filtra campanhas** — todos os funis/receita continuam consolidados. Ou propagar para hooks de BU, ou renomear controle para "Filtrar Campanhas por BU".
+11. **Investimento de Eventos fixo em R$25k** (fallback silencioso) — expor no UI e tornar configurável na tela (ou vir de fonte real).
+12. **Online vs Offline compara populações incompatíveis** (leads do período × vendas do período, sem cohort) — adicionar cohort join ou disclaimer.
+13. **Duas fórmulas de LTV coexistindo** (`avgMRR × 12` vs `ARPU × 1/churn`) — padronizar em uma só.
 
-## Fora do escopo
-- Não altero DRE / custos das lives (continuam vindos de `G4_LIVES`).
-- Não altero Eventos nem Seller.
-- Não crio tabela nova no banco.
+## Ordem de execução sugerida
+
+Começar por **P1 (itens 1–4)** numa PR só, validar visualmente cada card, depois P2, e P3 pode virar issues separadas conforme prioridade sua.
+
+## Perguntas antes de implementar
+
+- Confirma que faço **P1 + P2** agora (8 fixes) e deixo **P3** para depois?
+- Para o item 11 (Eventos): posso tratar como configurável via UI ou você prefere que puxe de uma fonte específica que já exista?
+- Para o item 13 (LTV): mantemos `ARPU × 1/churn` (padrão Indicadores 26) ou `MRR × 12` (mais simples)?
