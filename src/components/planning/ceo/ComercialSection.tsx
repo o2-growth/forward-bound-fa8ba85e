@@ -265,8 +265,8 @@ export function ComercialSection({ dateRange }: Props) {
       {/* ── Pipe de vendas (R$ + temperatura) ── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><ShoppingCart className="h-4 w-4 text-muted-foreground" />Pipe de Vendas em negociação</CardTitle>
-          <p className="text-xs text-muted-foreground">Volume R$ em negociação, dividido por temperatura e por closer / canal / BU / produto.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><ShoppingCart className="h-4 w-4 text-muted-foreground" />Pipe de Vendas em negociação <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">consolidado</span></CardTitle>
+          <p className="text-xs text-muted-foreground">Volume R$ em negociação, dividido por temperatura e por closer / canal / BU / produto. Sempre consolidado (todas as BUs + Outbound + Monetização).</p>
         </CardHeader>
         <CardContent className="space-y-4">
           {pipeLoading ? (
