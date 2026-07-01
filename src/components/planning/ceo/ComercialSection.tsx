@@ -314,22 +314,36 @@ export function ComercialSection({ dateRange }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {funil.rows.map((r) => (
-                  <TableRow key={r.real}>
-                    <TableCell className="font-medium">{r.label}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtInt(r.real)}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">{r.meta > 0 ? fmtInt(r.meta) : "—"}</TableCell>
-                    <TableCell>
-                      {r.atingimento != null ? (
-                        <div className="flex items-center gap-2">
-                          <Progress value={Math.min(r.atingimento, 100)} className="h-2" />
-                          <span className="w-12 text-right text-xs tabular-nums">{fmtPct(r.atingimento)}</span>
-                        </div>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{r.conv != null ? fmtPct(r.conv) : "—"}</TableCell>
-                  </TableRow>
-                ))}
+                {FUNNEL_STAGES.map((s) => {
+                  const r = funil.byStage[s.real] ?? { real: 0, meta: 0, conv: null, atingimento: null };
+                  return (
+                    <TableRow key={s.real}>
+                      <TableCell className="font-medium">{s.label}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmtInt(r.real)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">{r.meta > 0 ? fmtInt(r.meta) : "—"}</TableCell>
+                      <TableCell>
+                        {r.atingimento != null ? (
+                          <div className="flex items-center gap-2">
+                            <Progress value={Math.min(r.atingimento, 100)} className="h-2" />
+                            <span className="w-12 text-right text-xs tabular-nums">{fmtPct(r.atingimento)}</span>
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{r.conv != null ? fmtPct(r.conv) : "—"}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <AiNote />
+        </CardContent>
+      </Card>
+
+      {/* ── Previsto x realizado + pace ── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base"><Users className="h-4 w-4 text-muted-foreground" />Previsto x Realizado + Pace</CardTitle>
               </TableBody>
             </Table>
           </div>
