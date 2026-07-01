@@ -54,8 +54,57 @@ export function DreSection({ dateRange }: Props) {
       const label = row.label ?? row.code;
       return { ...row, label, cells, total, av };
     });
-    return { monthsUpTo: monthsInRange, rows, rbTotal };
+    return { monthsUpTo: monthsInRange, rows, rbTotal, byCode };
   }, [oxy.dreLines, dateRange.from, dateRange.to]);
+
+  // ─── Receita por BU (100% Oxy Finance) ──────────────────────────────────────
+  const receitaPorBu = useMemo(() => {
+    const months = data.monthsUpTo;
+    const rbByMonth = months.map((m) => data.byCode.get("RECEITA BRUTA")?.[m] || 0);
+    const rbTotal = rbByMonth.reduce((s, v) => s + v, 0);
+
+    const buLines: {
+      key: string;
+      label: string;
+      kind: "detail" | "subtotal" | "residual";
+      cells: number[];
+      total: number;
+    }[] = [
+      { key: "caas", label: "CaaS (Modelo Atual)", kind: "detail",
+        cells: months.map((m) => oxy.caasByMonth?.[m as any] || 0), total: 0 },
+      { key: "saas", label: "SaaS (Modelo Atual)", kind: "detail",
+        cells: months.map((m) => oxy.saasByMonth?.[m as any] || 0), total: 0 },
+      { key: "o2_tax", label: "O2 TAX", kind: "detail",
+        cells: months.map((m) => oxy.dreByBU?.o2_tax?.[m as any] || 0), total: 0 },
+      { key: "oxy_hacker", label: "Oxy Hacker", kind: "detail",
+        cells: months.map((m) => oxy.dreByBU?.oxy_hacker?.[m as any] || 0), total: 0 },
+      { key: "franquia", label: "Franquia", kind: "detail",
+        cells: months.map((m) => oxy.dreByBU?.franquia?.[m as any] || 0), total: 0 },
+      { key: "expansao", label: "Expansão (Oxy Hacker + Franquia)", kind: "subtotal",
+        cells: months.map((m) => oxy.expansaoByMonth?.[m as any] || 0), total: 0 },
+    ];
+    for (const r of buLines) r.total = r.cells.reduce((s, v) => s + v, 0);
+
+    // Total classificado = CaaS + SaaS + O2 TAX + Expansão (evita dupla contagem com Oxy Hacker/Franquia)
+    const classifiedByMonth = months.map((_, i) =>
+      (buLines[0].cells[i] || 0) + (buLines[1].cells[i] || 0) +
+      (buLines[2].cells[i] || 0) + (buLines[5].cells[i] || 0)
+    );
+    const classifiedTotal = classifiedByMonth.reduce((s, v) => s + v, 0);
+
+    // Resíduo (RB Oxy − classificado) → linha "Outros / não classificado"
+    const outrosCells = rbByMonth.map((v, i) => v - (classifiedByMonth[i] || 0));
+    const outrosTotal = outrosCells.reduce((s, v) => s + v, 0);
+    const hasOutros = Math.abs(outrosTotal) > 0.5;
+
+    const totalCells = rbByMonth;
+    const totalTotal = rbTotal;
+
+    // Diff pct entre "Total classificado + Outros" e RB — deve ser ~0
+    const diffPct = rbTotal !== 0 ? Math.abs((classifiedTotal + outrosTotal - rbTotal) / rbTotal) * 100 : 0;
+
+    return { months, buLines, outrosCells, outrosTotal, hasOutros, totalCells, totalTotal, diffPct };
+  }, [data.monthsUpTo, data.byCode, oxy.caasByMonth, oxy.saasByMonth, oxy.dreByBU, oxy.expansaoByMonth]);
 
 
   if (oxy.isLoading) {
@@ -66,11 +115,11 @@ export function DreSection({ dateRange }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* ── Receita por BU (compat com versão anterior) ── */}
+      {/* ── Receita por BU (100% Oxy Finance) ── */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><FileSpreadsheet className="h-4 w-4 text-muted-foreground" />Receita por BU — mês a mês (acumulado do ano)</CardTitle>
-          <p className="text-xs text-muted-foreground">Receita bruta realizada por BU (Oxy Finance).</p>
+          <CardTitle className="flex items-center gap-2 text-base"><FileSpreadsheet className="h-4 w-4 text-muted-foreground" />Receita por BU — mês a mês (período selecionado)</CardTitle>
+          <p className="text-xs text-muted-foreground">Receita bruta realizada por BU, direto da API Oxy Finance (mesma fonte do DRE completo abaixo). O total bate com a linha "RECEITA BRUTA" do P&L.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="overflow-x-auto">
@@ -78,33 +127,47 @@ export function DreSection({ dateRange }: Props) {
               <TableHeader>
                 <TableRow>
                   <TableHead>BU</TableHead>
-                  {data.monthsUpTo.map((m) => <TableHead key={m} className="text-right">{m}</TableHead>)}
+                  {receitaPorBu.months.map((m) => <TableHead key={m} className="text-right">{m}</TableHead>)}
                   <TableHead className="text-right font-semibold">Total</TableHead>
+                  <TableHead className="text-right font-semibold w-[70px]">AV%</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {([
-                  { key: "modelo_atual", label: "Modelo Atual (CaaS)" },
-                  { key: "o2_tax", label: "O2 Tax" },
-                  { key: "oxy_hacker", label: "Oxy Hacker" },
-                  { key: "franquia", label: "Franquia" },
-                ] as const).map((bu) => {
-                  const byMonth = oxy.dreByBU?.[bu.key] ?? ({} as Record<string, number>);
-                  const cells = data.monthsUpTo.map((m) => byMonth[m] || 0);
-                  const total = cells.reduce((s, v) => s + v, 0);
+                {receitaPorBu.buLines.map((bu) => {
+                  const isSubtotal = bu.kind === "subtotal";
+                  const av = receitaPorBu.totalTotal !== 0 ? (bu.total / receitaPorBu.totalTotal) * 100 : null;
                   return (
-                    <TableRow key={bu.key}>
-                      <TableCell className="font-medium whitespace-nowrap">{bu.label}</TableCell>
-                      {cells.map((v, i) => <TableCell key={i} className="text-right tabular-nums">{v > 0 ? fmt(v, "") : "—"}</TableCell>)}
-                      <TableCell className="text-right tabular-nums font-semibold">{fmtFull(total)}</TableCell>
+                    <TableRow key={bu.key} className={isSubtotal ? "bg-muted/30" : ""}>
+                      <TableCell className={isSubtotal ? "font-semibold whitespace-nowrap" : "font-medium whitespace-nowrap"}>{bu.label}</TableCell>
+                      {bu.cells.map((v, i) => <TableCell key={i} className="text-right tabular-nums">{v !== 0 ? fmt(v, "") : "—"}</TableCell>)}
+                      <TableCell className="text-right tabular-nums font-semibold">{bu.total !== 0 ? fmtFull(bu.total) : "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums text-xs text-muted-foreground">{av != null ? fmtPct(av) : "—"}</TableCell>
                     </TableRow>
                   );
                 })}
+                {receitaPorBu.hasOutros && (
+                  <TableRow className="text-muted-foreground italic">
+                    <TableCell className="whitespace-nowrap">Outros / não classificado</TableCell>
+                    {receitaPorBu.outrosCells.map((v, i) => <TableCell key={i} className="text-right tabular-nums">{v !== 0 ? fmt(v, "") : "—"}</TableCell>)}
+                    <TableCell className="text-right tabular-nums">{fmtFull(receitaPorBu.outrosTotal)}</TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">{receitaPorBu.totalTotal !== 0 ? fmtPct((receitaPorBu.outrosTotal / receitaPorBu.totalTotal) * 100) : "—"}</TableCell>
+                  </TableRow>
+                )}
+                <TableRow className="border-t bg-muted/50 font-semibold">
+                  <TableCell className="whitespace-nowrap">Total período (RB Oxy)</TableCell>
+                  {receitaPorBu.totalCells.map((v, i) => <TableCell key={i} className="text-right tabular-nums">{v !== 0 ? fmt(v, "") : "—"}</TableCell>)}
+                  <TableCell className="text-right tabular-nums">{fmtFull(receitaPorBu.totalTotal)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">100%</TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>
+          {receitaPorBu.diffPct > 0.5 && (
+            <p className="text-xs text-amber-600">⚠ Diferença de {fmtPct(receitaPorBu.diffPct)} entre a soma das BUs classificadas e a Receita Bruta Oxy — parte da receita não tem BU mapeada na Oxy (ver linha "Outros / não classificado").</p>
+          )}
         </CardContent>
       </Card>
+
 
       {/* ── P&L completo (nova) ── */}
       <Card>
