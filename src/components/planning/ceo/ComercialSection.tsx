@@ -64,8 +64,8 @@ export function ComercialSection({ dateRange }: Props) {
   const outbound = useOutboundAnalytics(startDate, endDate);
   const monetizacao = useMonetizacaoAnalytics(startDate, endDate);
 
-  // Funil realizado + metas + meta de faturamento
-  const funnelRealized = useFunnelRealized(startDate, endDate);
+  // Metas + meta de faturamento
+
   const funnelMetas = useFunnelMetas();
   const consolidated = useConsolidatedMetas();
 
