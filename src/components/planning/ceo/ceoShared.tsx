@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Info, Sparkles, DatabaseZap, Loader2 } from "lucide-react";
+import { useCeoAiAnalysis } from "./useCeoAiAnalysis";
 
 // ─── Formatadores ──────────────────────────────────────
 export function fmt(value: number | null | undefined, prefix = "R$ "): string {
