@@ -40,10 +40,11 @@ const PHASE_BG: Record<string, string> = {
 // ── Componente ─────────────────────────────────────────────────────────
 export function FrenteFunnelCard({
   title = "Funil Comercial",
-  funnel,
+  funnel = [],
   leadTimeMedioDias,
 }: FrenteFunnelCardProps) {
-  const maxCount = Math.max(...funnel.map((s) => s.count), 1);
+  const steps = funnel ?? [];
+  const maxCount = Math.max(...steps.map((s) => s.count), 1);
 
   return (
     <Card>
