@@ -208,9 +208,9 @@ export function FunnelDeluxe({
         />
       </div>
 
-      {/* ── Cone funnel ────────────────────────────────────────────── */}
-      <div className="mt-6 rounded-2xl border border-border/40 bg-card/30 p-6">
-        <div className="mb-6 flex flex-col items-start justify-between gap-2 md:flex-row md:items-end">
+      {/* ── Funil analytics (linhas de largura constante) ─────────── */}
+      <div className="mt-6 overflow-hidden rounded-2xl border border-border/40 bg-card/30">
+        <div className="flex flex-col items-start justify-between gap-2 border-b border-border/40 p-6 md:flex-row md:items-end">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Conversão do funil
@@ -226,8 +226,9 @@ export function FunnelDeluxe({
             <div className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Conv. inscritos → venda
             </div>
-            <div className="font-display text-3xl font-bold tabular-nums text-foreground">
-              {pct(convGeral)}
+            <div className="font-display text-4xl font-bold tabular-nums text-foreground">
+              {pct(convGeral).replace("%", "")}
+              <span className="ml-1 text-2xl text-muted-foreground">%</span>
             </div>
           </div>
         </div>
@@ -237,84 +238,99 @@ export function FunnelDeluxe({
             Sem etapas configuradas para este item.
           </p>
         ) : (
-          <div className="space-y-3">
+          <div className="p-6">
             {stages.map((step, idx) => {
-              const widthPct = Math.max(
-                8,
-                topValue > 0 ? (step.value / topValue) * 100 : (step.value / maxValue) * 100,
-              );
               const shareTop =
                 topValue > 0 ? (step.value / topValue) * 100 : 0;
+              const barPct = Math.max(2, shareTop);
               const prev = idx > 0 ? stages[idx - 1].value : step.value;
               const vsPrev = prev > 0 ? (step.value / prev) * 100 : 0;
               const grad =
                 STAGE_GRADIENT[step.key] ?? "from-slate-500 to-slate-600";
-              const glow = STAGE_GLOW[step.key] ?? "";
+              const isLast = idx === stages.length - 1;
+
+              // Cor do texto da ponte conforme saúde da conversão
+              const bridgeTone =
+                idx === 0
+                  ? "text-muted-foreground"
+                  : vsPrev >= 40
+                    ? "text-muted-foreground"
+                    : vsPrev >= 10
+                      ? "text-amber-500/90"
+                      : "text-rose-400/90";
+              const bridgeLabel =
+                idx === 0
+                  ? null
+                  : vsPrev >= 40
+                    ? `${pct(vsPrev)} de retenção`
+                    : vsPrev >= 10
+                      ? `Queda relevante (${pct(vsPrev)})`
+                      : `Queda drástica (${pct(vsPrev)})`;
 
               return (
-                <div
-                  key={step.key}
-                  className="flex items-center gap-3"
-                  style={{
-                    paddingLeft: `${(100 - widthPct) / 2}%`,
-                    paddingRight: `${(100 - widthPct) / 2}%`,
-                  }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div
-                      className={cn(
-                        "relative flex items-center justify-between overflow-hidden rounded-2xl bg-gradient-to-r px-5 py-3.5",
-                        grad,
-                        glow,
-                      )}
-                    >
-                      <div className="flex items-baseline gap-3">
-                        <span className="font-display text-2xl font-bold tabular-nums text-slate-950">
+                <div key={step.key}>
+                  <div className="flex items-center gap-4">
+                    {/* Rótulo fixo */}
+                    <div className="w-32 shrink-0 text-right">
+                      <div className="text-[10px] font-bold uppercase tracking-tighter text-muted-foreground">
+                        Stage {String(idx + 1).padStart(2, "0")}
+                      </div>
+                      <div className="text-sm font-semibold text-foreground">
+                        {step.label}
+                      </div>
+                    </div>
+
+                    {/* Trilho */}
+                    <div className="relative flex h-14 flex-1 items-center overflow-hidden rounded-lg border border-border/50 bg-muted/40 px-4">
+                      <div
+                        className={cn(
+                          "absolute inset-y-0 left-0 bg-gradient-to-r opacity-80",
+                          grad,
+                        )}
+                        style={{ width: `${barPct}%` }}
+                      />
+                      <div className="relative flex w-full items-center justify-between">
+                        <span className="font-display text-2xl font-bold tabular-nums text-foreground">
                           {fmtInt(step.value)}
                         </span>
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-slate-950/80">
-                          {step.label}
-                        </span>
+                        {idx === 0 ? (
+                          <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-400">
+                            100% topo
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                            {pct(shareTop)} do topo · {pct(vsPrev)} vs anterior
+                          </span>
+                        )}
                       </div>
-                      <span className="text-xs font-semibold tabular-nums text-slate-950/85">
-                        {pct(shareTop)} do topo
-                      </span>
                     </div>
-                    {step.hint && (
-                      <div className="mt-1 text-center text-[11px] italic text-muted-foreground">
-                        {step.hint}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Coluna direita: % vs etapa anterior */}
-                  <div className="w-20 shrink-0 text-right">
-                    {idx === 0 ? (
-                      <>
-                        <div className="text-sm font-bold text-foreground">
-                          100%
-                        </div>
-                        <div className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                          Topo do funil
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-sm font-bold tabular-nums text-foreground">
-                          {pct(vsPrev)}
-                        </div>
-                        <div className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                          vs. etapa anterior
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  {step.hint && (
+                    <div className="ml-[144px] mt-1 text-[11px] italic text-muted-foreground">
+                      {step.hint}
+                    </div>
+                  )}
+
+                  {/* Ponte de conversão para próxima etapa */}
+                  {!isLast && (
+                    <div className="ml-[144px] flex h-6 items-center">
+                      <div className="h-full w-0.5 bg-border" />
+                      <div className="ml-4 flex items-center gap-2">
+                        <div className="h-px w-4 bg-border" />
+                        <span className={cn("text-[11px] font-medium", bridgeTone === "text-muted-foreground" ? "text-muted-foreground" : bridgeTone)}>
+                          {bridgeLabel}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
       </div>
+
 
       {/* ── Comparativo ────────────────────────────────────────────── */}
       {compare && compare.length > 0 && (
