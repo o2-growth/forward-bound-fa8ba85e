@@ -1,38 +1,40 @@
-## QA visual da aba Marketing
+## Documento: Auditoria Marketing — P1, P2 e P3
 
-Rodar um smoke test end-to-end contra o preview em `localhost:8080` para validar que as 13 correções aplicadas se comportam corretamente na UI, cobrindo os principais eixos: filtro de data, filtro de BU, hero KPIs, tabela Indicadores 26, e as seções redesenhadas.
+Gerar um arquivo `.docx` para download em `/mnt/documents/auditoria-marketing-p1-p2-p3.docx` consolidando os 13 achados aplicados na aba Marketing, agrupados por prioridade.
 
-### Escopo do teste
+### Estrutura do documento
 
-1. **Autenticar** — restaurar sessão Supabase via `LOVABLE_BROWSER_SUPABASE_*` e navegar para `/` → aba Indicadores → sub-aba Marketing.
-2. **Baseline (Consolidado, ano corrente)** — screenshot da aba inteira em viewport 1280×1800, seção por seção:
-   - Hero (Investimento • CPMQL • CAC)
-   - Indicadores 26
-   - CPV / CAC Total
-   - Performance por Canal
-   - Performance de Campanhas — Criativos
-   - Funil Comparativo por Fonte
-   - Resultados Gerais (com deltas vs período anterior)
-   - Online vs Offline
-   - Curva de Conversão
-   - Cohorts (Entrada / Assinatura)
-3. **Teste do filtro de BU** — selecionar "Modelo Atual", capturar screenshot e confirmar que:
-   - Números do CPV, Performance por Canal, Funil por Fonte, Resultados Gerais, Online/Offline e Cohorts caem (não ficam idênticos ao Consolidado).
-   - Investimento total (Meta+Google) permanece igual (spend não é segmentável por BU).
-4. **Teste do filtro de data** — mudar para "Mês atual" e confirmar que Indicadores 26 corta as colunas em vez de mostrar o ano todo.
-5. **Console/Network** — coletar erros de console e requests que falharam (4xx/5xx) durante a navegação.
-6. **Report** — resumir observações (números vistos por seção, comportamento dos filtros, erros) e anexar as capturas para revisão.
+**Capa / Cabeçalho**
+- Título: "Auditoria da Aba Marketing — Correções P1, P2 e P3"
+- Data de geração e escopo (dashboard O2 / aba Indicadores → Marketing)
 
-### Critérios de aprovação
+**Seção 1 — P1 (Crítico)**
+Para cada item: problema encontrado, correção aplicada, arquivo afetado, resultado esperado.
+1. Denominador de vendas inconsistente → `salesInPeriod.length` unificado
+2. Comparativo período anterior quebrado → hooks `prevRange` em `OverallResultsSection`
+3. Fase "Ganho" excluída de LTV/MRR → incluída no cálculo e drill-down
+4. GMV sem like-for-like → injeção da receita de Educação no baseline
 
-- Sem erros vermelhos no console durante a navegação.
-- Filtro de BU altera visivelmente todas as seções listadas.
-- Filtro de data reduz as colunas de Indicadores 26.
-- Nenhuma seção quebra com "undefined" / spinner infinito / NaN.
+**Seção 2 — P2 (Alto)**
+5. CAC com denominadores divergentes → unificado em `PerformanceGauges`
+6. Drill-down por estágio usando dados estáticos → agora usa `enrichedTotals`
+7. CPV dividindo por vendas totais → estrito a mídia paga
+8. Constantes de funil duplicadas → centralizadas em `SourceFunnelSection`
+
+**Seção 3 — P3 (Médio)**
+9. "Indicadores 26" ignorando filtro de data → cursor de colunas respeita `dateRange`
+10. `selectedBU` só afetava tabela de campanhas → propagado via `marketingBuFilter` a todas as seções
+11. Investimento de Eventos hardcoded (R$ 25k) → tabela `event_investments` + hook `useEventInvestments`
+12. Online vs Offline sem cohort de entrada → validada lógica por `fonte/origem` do lead
+13. LTV com fórmulas divergentes → centralizado em `marketingLtv.ts` (MRR × retenção)
+
+**Seção 4 — QA visual**
+Resumo do teste Playwright: sem erros de console/network, filtros de BU e data funcionais, apenas warning cosmético de `key` no `ConversionsByChannelChart`.
 
 ### Detalhes técnicos
 
-- Script único em `/tmp/browser/mkt-qa/run.py` usando Playwright + Chromium headless.
-- Screenshots em `/tmp/browser/mkt-qa/screenshots/`.
-- Executado como comando shell dentro do sandbox (sem tocar em nenhum arquivo do projeto).
-- Se algum critério falhar, retorno com o achado + evidência antes de propor correção.
+- Gerado com `docx-js` (Node) seguindo o skill/docx: US Letter, Arial, headings customizados, tabelas com `WidthType.DXA`, bullets via `LevelFormat.BULLET`.
+- Após gerar, validar com `validate_document.py` e converter para PDF+imagens só para QA visual interna (não entregar).
+- Entregar via `<presentation-artifact>` apontando para `auditoria-marketing-p1-p2-p3.docx`.
+
+Confirma que quer em `.docx` mesmo? Se preferir PDF ou Markdown eu ajusto antes de gerar.
