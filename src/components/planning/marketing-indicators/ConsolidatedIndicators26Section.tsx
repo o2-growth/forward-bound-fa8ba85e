@@ -259,6 +259,12 @@ interface ConsolidatedIndicators26SectionProps {
 }
 
 export function ConsolidatedIndicators26Section({ dateRange }: ConsolidatedIndicators26SectionProps = {}) {
+  const { rows: sheetRows, lastUpdate, isFallback, isLoading } = useIndicators26Raw();
+  const { rows: liveRows, lastUpdate: liveUpdate, isLoading: liveLoading } = useIndicators26Live();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [trendRow, setTrendRow] = useState<{ label: string; fmt: Fmt; bench?: number } | null>(null);
+
   // Se `dateRange.to` cair em 2026, usamos ele como cursor; caso contrário,
   // mantém o comportamento antigo (mês corrente).
   const cursor = useMemo(() => {
