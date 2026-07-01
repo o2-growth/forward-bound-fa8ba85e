@@ -128,7 +128,7 @@ export function FrenteDreCard({
         {/* Receita Bruta */}
         <DreLine
           label="Receita Bruta"
-          valor={dre.receitaBruta}
+          valor={safeDre.receitaBruta}
           kind="subtotal"
           tone="neutral"
         />
@@ -138,7 +138,7 @@ export function FrenteDreCard({
         {/* Imposto */}
         <DreLine
           label="(−) Imposto 15%"
-          valor={dre.imposto}
+          valor={safeDre.imposto}
           kind="detail-neg"
           tone="neutral"
         />
@@ -146,7 +146,7 @@ export function FrenteDreCard({
         {/* Comissão G4 */}
         <DreLine
           label="(−) Comissão G4 15%"
-          valor={dre.comissaoG4}
+          valor={safeDre.comissaoG4}
           kind="detail-neg"
           tone="neutral"
         />
@@ -154,7 +154,7 @@ export function FrenteDreCard({
         {/* Custos Operacionais (expandível) */}
         <DreLine
           label="(−) Custos Operacionais"
-          valor={dre.custosOperacionais}
+          valor={safeDre.custosOperacionais}
           kind="detail-neg"
           tone="neutral"
           expandable={hasCustosDetalhe}
@@ -181,7 +181,7 @@ export function FrenteDreCard({
         {/* Lucro Líquido */}
         <DreLine
           label="= Lucro Líquido do Canal"
-          valor={Math.abs(dre.lucroLiquido)}
+          valor={Math.abs(safeDre.lucroLiquido)}
           kind="result"
           tone={lucroPositivo ? "positive" : "negative"}
         />
