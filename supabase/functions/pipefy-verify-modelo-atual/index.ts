@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
         const c = e.node;
         if (inJun(c.created_at)) {
           const fat = ((c.fields || []).find((f: any) => f.field?.label === "Faixa de faturamento mensal"))?.value || "";
-          if (MQL_FATURAMENTO.has(fat) && !seenSets.mql.has(c.id)) { seenSets.mql.add(c.id); state.counts.mql++; }
+          if (MQL_FATURAMENTO.has(fat) && !seenSets.mql_creation.has(c.id)) { seenSets.mql_creation.add(c.id); state.counts.mql_creation++; }
         }
         const buckets = new Set<string>();
         for (const ph of c.phases_history || []) {
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
 
     state.seen = {
       rm: [...seenSets.rm], rr: [...seenSets.rr], proposta: [...seenSets.proposta],
-      venda: [...seenSets.venda], mql: [...seenSets.mql],
+      venda: [...seenSets.venda], mql_creation: [...seenSets.mql_creation], mql_phase: [...seenSets.mql_phase],
     };
     return new Response(JSON.stringify({
       done: !hasNext,
