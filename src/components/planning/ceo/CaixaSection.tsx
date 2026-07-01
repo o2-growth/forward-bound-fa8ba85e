@@ -66,8 +66,10 @@ export function CaixaSection({ dateRange }: Props) {
             <MetricCard label="Entradas (período)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} />
             <MetricCard label="Saídas (período)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} />
             <MetricCard label="Saldo (período)" value={fmt(data.saldo)} large source={SRC_CASH} />
-
           </div>
+          {data.outOfYear > 0 && (
+            <p className="text-xs text-amber-600">⚠ {data.outOfYear} {data.outOfYear === 1 ? "mês foi ignorado" : "meses foram ignorados"} por estar(em) fora do ano carregado pelo Oxy Finance (2026).</p>
+          )}
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
