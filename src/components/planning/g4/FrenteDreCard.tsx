@@ -108,7 +108,14 @@ export function FrenteDreCard({
 }: FrenteDreCardProps) {
   const [custosExpanded, setCustosExpanded] = useState(false);
 
-  const lucroPositivo = dre.lucroLiquido >= 0;
+  const safeDre: G4Dre = dre ?? {
+    receitaBruta: 0,
+    imposto: 0,
+    comissaoG4: 0,
+    custosOperacionais: 0,
+    lucroLiquido: 0,
+  };
+  const lucroPositivo = safeDre.lucroLiquido >= 0;
   const hasCustosDetalhe = custosDetalhe && custosDetalhe.length > 0;
 
   return (
