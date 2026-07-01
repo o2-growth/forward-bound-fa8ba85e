@@ -50,10 +50,11 @@ export function LivesSection({
   funnel,
   dre,
   custosDetalhe,
-  livesRows,
+  livesRows = [],
 }: LivesSectionProps) {
-  const totalLeadsLives = livesRows.reduce((s, r) => s + r.leadsGerados, 0);
-  const totalCustoLives = livesRows.reduce((s, r) => s + r.totalCost, 0);
+  const rows = livesRows ?? [];
+  const totalLeadsLives = rows.reduce((s, r) => s + r.leadsGerados, 0);
+  const totalCustoLives = rows.reduce((s, r) => s + r.totalCost, 0);
 
   return (
     <div className="space-y-4">
