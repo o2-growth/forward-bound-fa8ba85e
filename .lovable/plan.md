@@ -1,48 +1,40 @@
-## Objetivo
+## Plano de validação — commit 725803e
 
-Validar duas regras já no ar:
-1. **MQL por faturamento** (independente da fase): card criado no período + faixa ≥ R$ 200k (Modelo Atual) / ≥ R$ 500k (O2 TAX) deve aparecer como MQL em qualquer fase.
-2. **Filtro de origem "Eventos"**: cards com qualquer sinal "G4" (tipo, origem, fonte ou campanha) devem ser contabilizados quando o filtro Eventos estiver ativo no Indicador Comercial.
+Executar 3 blocos de teste end-to-end no preview autenticado, mais checagens gerais. Reportar PASS/FAIL por item com screenshot + logs quando falhar.
 
-## Validação 1 — MQL por faturamento
+### Preparação
+1. `tsgo` no repo para confirmar 0 erros de tipo antes de subir Playwright.
+2. Playwright headless em `http://localhost:8080` restaurando sessão Supabase gerenciada (LOVABLE_BROWSER_*). Viewport 1280x1800. Screenshots em `/tmp/browser/commit-725803e/screenshots/`.
+3. Captura `console` e `network` (foco em `read-marketing-sheet`) durante toda a navegação.
 
-**Fonte de verdade (DB externo via `query-external-db`):**
-- Consulta direta na `pipefy_moviment_cfos` (Modelo Atual) e equivalente O2 TAX para o período atual:
-  - `COUNT(DISTINCT card_id)` onde `"Data Criação" ∈ período` E `"Faixa de faturamento mensal" ∈ MQL_QUALIFYING_TIERS` E não está em motivo de perda excluído E não é card de teste.
-- Quebrar por **fase atual** para confirmar que cards fora de "MQLs" também são contados (ex.: "Novos Leads", "Tentativas de contato", "RM", "Proposta", "Ganho").
+### Teste 1 — Drill-down RR "Fase Atual"
+- Navegar: Planejamento → Indicadores → Comercial.
+- Aplicar filtro Closer = Daniel Trindade.
+- Clicar acelerômetro "Reunião Realizada".
+- Validar cabeçalho da tabela: `Produto | Empresa | Closer | Faixa Faturamento | Fase Atual | Tempo até Reunir | Data` (7 colunas, ordem exata).
+- Coletar valores distintos da coluna "Fase Atual" — falhar se todas forem "Reunião Realizada".
+- Repetir sem filtro de closer.
+- Repetir para acelerômetro "Proposta enviada" e validar que "Fase Atual" mostra Ganho/Perdido/Follow Up (não sempre "Proposta enviada / Follow Up").
 
-**Confirmação visual (Playwright headless em `http://localhost:8080`):**
-- Logar com sessão Supabase injetada, abrir Indicador Comercial.
-- Capturar o número do card "MQL" (Modelo Atual e depois O2 TAX).
-- Clicar no card para abrir o drilldown e contar quantos itens são listados.
-- Conferir que: número no card == itens no drilldown == valor do SQL.
-- Screenshot de cada etapa e dump da lista de fases atuais dos cards exibidos.
+### Teste 2 — Marketing Indicadores
+- Navegar: Planejamento → Marketing → Indicadores.
+- 2.1 Ler tabela Enriched Channels: MQL de Meta Ads e Google Ads deve ser 0.
+- 2.2 Coluna Eventos: capturar valor de investimento; comparar com `investimentoEventos` do JSON de `read-marketing-sheet`. Falhar se hardcoded 25.000 quando a planilha tem valor.
+- 2.3 Conferir Hero CAC (topo) e Gauge CAC (grid). Confirmar sublabel "Somente mídia — OPEX não incluído" no gauge.
+- 2.4 Interceptar resposta de `functions/v1/read-marketing-sheet` via `page.on("response")`; validar presença de `timeFerramentas`, `despesasTotais`, `investimentoEventos`.
 
-**Critério de sucesso:** os três valores coincidem e a lista de fases inclui pelo menos uma fase ≠ "MQLs".
+### Teste 3 — Visão do CEO
+- 3.1 Sub-abas Pessoal e Financeiro: setar DateRange 15/11/2025 → 15/01/2026 e conferir "Receita / pessoa" e "Receita do período" > 0.
+- 3.2 Sub-aba DRE: confirmar linhas Oxy Hacker e Franquia com valores não-zero; comparar totais vs. cards de faturamento em outras abas.
+- 3.3 Sub-aba Financeiro: confirmar card renomeado para "Churn Rate", valor pequeno (ex. 3.5%), sublabel "Histórico total — …" presente.
 
-## Validação 2 — Filtro Origem "Eventos"
+### Checagens gerais
+- `tsgo` = 0 erros.
+- Console = 0 exceções vermelhas durante a navegação (filtrar `Failed to fetch` do lovable.js overlay, que é ruído de dev).
+- Qualquer modal em branco / loading infinito → screenshot + trace de network + arquivo/componente suspeito.
 
-**Fonte de verdade (DB):**
-- Na `pipefy_moviment_cfos`, contar cards criados no período cujo qualquer campo de origem contenha "g4" (case/acento-insensitive): "Tipo do lead", "Origem", "Origem do lead", "Fonte", "Campanha", "UTM Source", etc. — espelhando a normalização em `src/lib/leadSource.ts` (`classifyLeadSource`).
+### Entrega
+Resposta consolidada com tabela PASS/FAIL/warning por item, prints anexados nos casos com divergência e recomendação final (go/no-go para push).
 
-**Confirmação visual (Playwright):**
-- Abrir Indicador Comercial Consolidado, sem filtro de origem → registrar totais (MQL, Proposta, Venda, Receita).
-- Aplicar filtro Origem = **Eventos**.
-- Conferir que:
-  - Os totais reduzem para o subconjunto Eventos.
-  - O número de leads/MQL com filtro Eventos bate (±0) com o COUNT do SQL acima.
-  - O drilldown de "MQL" com filtro Eventos lista apenas cards G4 (validar amostra de 3-5 títulos contra a coluna de origem no DB).
-- Screenshot do dashboard antes/depois do filtro e da lista do drilldown.
-
-**Critério de sucesso:** o filtro de fato reduz os números e os cards listados batem com a query G4.
-
-## Entregável
-
-Relatório em chat com:
-- Para cada validação: número esperado (SQL), número exibido (UI), diferença, screenshots referenciados em `/tmp/browser/mql-eventos/`.
-- Se houver discrepância, indicar a causa provável (ex.: fase específica não mapeada, campo de origem não normalizado) — sem corrigir; abrir plano de ajuste separado.
-
-## Fora do escopo
-
-- Alterações de código. Esta é uma rodada apenas de **validação**.
-- Expansão e Outbound (regra do MQL por faturamento se aplica só a Modelo Atual + O2 TAX, conforme decidido).
+### Nota
+Este plano é somente de teste — nenhum arquivo do projeto será modificado. Se algum item falhar, retorno com diagnóstico e proposta de correção separada antes de qualquer edit.
