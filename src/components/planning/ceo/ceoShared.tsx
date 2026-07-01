@@ -172,6 +172,18 @@ export function AiNote({ title = "Análise (IA)", text, onGenerate, loading }: {
   );
 }
 
+// ─── AiNote com IA plugada (Gemini via Lovable AI Gateway) ──
+import { useCeoAiAnalysis } from "./useCeoAiAnalysis";
+export function AiNoteAuto({ section, title, buildContext }: {
+  section: string;
+  title?: string;
+  buildContext: () => unknown;
+}) {
+  const label = title ?? section;
+  const { text, loading, generate } = useCeoAiAnalysis(section, label, buildContext);
+  return <AiNote title={`Análise IA — ${label}`} text={text} onGenerate={generate} loading={loading} />;
+}
+
 // ─── Placeholder "aguardando fonte de dados" ───────────
 // Para blocos que o CEO pediu mas que ainda não têm fonte no app.
 export function AguardandoFonte({ titulo, descricao, itens }: {
