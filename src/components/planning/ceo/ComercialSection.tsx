@@ -160,9 +160,24 @@ export function ComercialSection({ dateRange }: Props) {
   }, [funnelRealized, funnelMetas, startDate, endDate]);
 
   // ─── Previsto x realizado + pace (faturamento) ───
+  // Usa a MESMA fonte da aba Indicadores Comercial (Oxy Finance para Modelo Atual/Franquia/Oxy Hacker, Pipefy para O2 TAX, + Monetização)
   const pace = useMemo(() => {
     const metaFat = consolidated.getMetaForPeriod([...ALL_BUS] as any, startDate, endDate, "faturamento" as any);
-    const realizadoFat = sumVendaValue(modeloAtual, o2tax, franquia, oxyHacker, outbound);
+    const monetizacaoVendaItems = monetizacao.getCardsForIndicator("venda") as any[];
+    const realizadoFat = computeFaturamentoRealizado({
+      selectedBUs: [...ALL_BUS] as BuType[],
+      startDate,
+      endDate,
+      modeloAtualAnalytics: modeloAtual as any,
+      o2TaxAnalytics: o2tax as any,
+      oxyHackerAnalytics: oxyHacker as any,
+      franquiaAnalytics: franquia as any,
+      getModeloAtualValue: getModeloAtualValue as any,
+      getOxyHackerValue: getOxyHackerValue as any,
+      getExpansaoValue: getExpansaoValue as any,
+      monetizacaoVendaItems,
+      includeMonetizacao: true, // Consolidado, sem filtro de origem
+    });
     const totalDays = Math.max(differenceInCalendarDays(endDate, startDate) + 1, 1);
     const elapsed = Math.min(Math.max(differenceInCalendarDays(new Date(), startDate) + 1, 0), totalDays);
     const expected = metaFat * (elapsed / totalDays);
@@ -173,7 +188,8 @@ export function ComercialSection({ dateRange }: Props) {
       atingimentoMeta: metaFat > 0 ? (realizadoFat / metaFat) * 100 : null,
       atingimentoPace: expected > 0 ? (realizadoFat / expected) * 100 : null,
     };
-  }, [consolidated, modeloAtual, o2tax, franquia, oxyHacker, outbound, startDate, endDate]);
+  }, [consolidated, modeloAtual, o2tax, franquia, oxyHacker, monetizacao, getModeloAtualValue, getOxyHackerValue, getExpansaoValue, startDate, endDate]);
+
 
   // ─── Overview histórico ───
   const overview = useMemo(() => {
