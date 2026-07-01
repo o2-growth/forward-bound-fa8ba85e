@@ -144,19 +144,11 @@ export function MarketingIndicatorsTab() {
     return { leads, mqls, rms, rrs, propostas, vendas, investment };
   }, [funnelData, dateRange]);
 
-  // Build final goals merging DB data over hardcoded defaults.
-  // Educação não tem meta própria — usamos o realizado como baseline para que
-  // GMV real (mrr+setup+pontual+educ) vs Meta compare like-for-like.
+  // Build final goals merging DB data over hardcoded defaults
   const finalRevenueGoals = useMemo(() => {
     const hasDbData = consolidatedRevenueGoals.gmv > 0;
-    const base = hasDbData ? consolidatedRevenueGoals : goals.revenue;
-    const educacaoBaseline = realRevenue.educacao || 0;
-    return {
-      ...base,
-      educacao: educacaoBaseline,
-      gmv: base.mrr + base.setup + base.pontual + educacaoBaseline,
-    };
-  }, [consolidatedRevenueGoals, goals.revenue, realRevenue.educacao]);
+    return hasDbData ? consolidatedRevenueGoals : goals.revenue;
+  }, [consolidatedRevenueGoals, goals.revenue]);
 
   const finalCostGoals = useMemo(() => {
     // Priority 1: DB cost stage metas
