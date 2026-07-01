@@ -10,8 +10,8 @@ interface Props { dateRange: { from: Date; to: Date }; }
 
 const SRC_CASH: MetricSource = {
   origem: "useOxyFinance — fluxo de caixa (daily_revenue + cashflow Oxy)",
-  periodo: "Mês a mês do ano corrente",
-  calculo: "Entradas − saídas = saldo do mês; acumulado soma os meses anteriores.",
+  periodo: "Filtra pelo período selecionado; acumulado começa em zero no início do intervalo.",
+  calculo: "Entradas − saídas = saldo do mês; acumulado soma os meses anteriores dentro do período.",
 };
 
 const SRC_EXP: MetricSource = {
@@ -26,7 +26,11 @@ export function CaixaSection({ dateRange }: Props) {
   const expenses = useOxyExpenses({ startDate: dateRange.from, endDate: dateRange.to });
 
   const data = useMemo(() => {
-    const chart = (oxy.cashflowChart ?? []).filter((p) => p.month);
+    // Filtra o cashflow pelos meses do período selecionado (mesmo ano)
+    const fromMonth = dateRange.from.getMonth();
+    const toMonth = dateRange.to.getMonth();
+    const monthsInRange = new Set(MONTHS_PT.slice(fromMonth, toMonth + 1));
+    const chart = (oxy.cashflowChart ?? []).filter((p) => p.month && monthsInRange.has(p.month));
     let acc = 0;
     const rows = chart.map((p) => {
       acc += (p.inflows || 0) - (p.outflows || 0);
@@ -35,7 +39,8 @@ export function CaixaSection({ dateRange }: Props) {
     const totalIn = rows.reduce((s, r) => s + r.inflows, 0);
     const totalOut = rows.reduce((s, r) => s + r.outflows, 0);
     return { rows, totalIn, totalOut, saldo: totalIn - totalOut };
-  }, [oxy.cashflowChart]);
+  }, [oxy.cashflowChart, dateRange.from, dateRange.to]);
+
 
   const topSaidas = useMemo(() => expenses.items.slice(0, 20), [expenses.items]);
 
