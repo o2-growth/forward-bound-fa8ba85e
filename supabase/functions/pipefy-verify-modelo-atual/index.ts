@@ -15,11 +15,11 @@ const MQL_FATURAMENTO = new Set([
 ]);
 function norm(s: string) { return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim(); }
 const PHASE_BUCKET: Record<string, string> = {
-  [norm("Reunião agendada")]: "rm",
-  [norm("Qualificado")]: "rm",
+  [norm("MQLs")]: "mql_phase",
+  [norm("Reunião agendada / Qualificado")]: "rm",
   [norm("Reunião Realizada")]: "rr",
-  [norm("Proposta enviada")]: "proposta",
-  [norm("Follow Up")]: "proposta",
+  [norm("Enviar proposta")]: "proposta",
+  [norm("Proposta enviada / Follow Up")]: "proposta",
   [norm("Ganho")]: "venda",
   [norm("Contrato assinado")]: "venda",
 };
