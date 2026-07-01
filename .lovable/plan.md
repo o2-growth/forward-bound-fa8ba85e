@@ -1,37 +1,61 @@
-## Objetivo
+# Relatórios de conferência dos acelerômetros
 
-Gerar um arquivo `.xlsx` para conferência dos aceler\u00f4metros da aba **Indicadores Comerciais**, cobrindo o **\u00faltimo m\u00eas fechado** (Nov/2026, referente a `data de assinatura` para vendas e `data de cria\u00e7\u00e3o` para leads/MQL/RM/RR/Proposta), com o **funil completo** (Leads, MQL, RM, RR, Proposta, Venda), quebrado por **BU** e por **Origem**.
+Objetivo: gerar planilhas Excel que permitam bater, célula a célula, os números que aparecem nos acelerômetros (MQL, Reunião Marcada, Reunião Realizada, Proposta Enviada, Venda) contra a fonte bruta no Pipefy — quebrados por **BU** e por **Origem** (as mesmas origens mapeadas em `src/lib/leadSource.ts`, incluindo Eventos→G4 e Funil de Monetização).
 
-## Entreg\u00e1vel
+## O que vai ser entregue
 
-Um \u00fanico arquivo em `/mnt/documents/conferencia-acelerometros-nov-2026.xlsx` com as seguintes abas:
+Um script/edge que gera **um arquivo Excel por estágio do funil**, mais um arquivo consolidado. Cada relatório tem o mesmo formato, então dá pra comparar linha a linha com o dashboard.
 
-1. **Consolidado** \u2014 piv\u00f4 BU \u00d7 Indicador (linhas = BU, colunas = Leads, MQL, RM, RR, Proposta, Venda), com linha de Total.
-2. **Consolidado por Origem** \u2014 piv\u00f4 Origem \u00d7 Indicador, somando todas as BUs.
-3. **Por BU** \u2014 uma aba por BU (Modelo Atual, O2 TAX, Franquia, Oxy Hacker, Outbound, Monetiza\u00e7\u00e3o): linhas = Origem, colunas = indicadores do funil.
-4. **Detalhe por card** \u2014 linha por card contando pelo menos uma vez em algum indicador do m\u00eas, com colunas: `card_id`, `t\u00edtulo`, `empresa`, `BU`, `origem`, `fase atual`, `SDR`, `Closer`, `data cria\u00e7\u00e3o`, `data assinatura`, `MRR`, `Setup`, `Pontual`, `Valor total`, e flags bin\u00e1rias `is_lead`, `is_mql`, `is_rm`, `is_rr`, `is_proposta`, `is_venda`.
+### Arquivos gerados (em `/mnt/documents/`)
 
-## Fonte de dados e regras (bater com o dashboard)
+1. `conferencia-mql-{periodo}.xlsx`
+2. `conferencia-reuniao-marcada-{periodo}.xlsx`
+3. `conferencia-reuniao-realizada-{periodo}.xlsx`
+4. `conferencia-proposta-enviada-{periodo}.xlsx`
+5. `conferencia-venda-{periodo}.xlsx`
+6. `conferencia-consolidado-{periodo}.xlsx` (pivot BU × Origem × Estágio)
 
-- Reaproveitar exatamente a mesma l\u00f3gica dos hooks j\u00e1 usados na aba: `useModeloAtualAnalytics`, `useO2TaxAnalytics`, `useExpansaoAnalytics` (Franquia + Oxy Hacker), `useOutboundAnalytics`, `useMonetizacaoAnalytics` \u2014 via consulta \u00e0 external DB do Pipefy pela edge function `query-external-db` (mesma rota que o app usa) para garantir n\u00fameros id\u00eanticos aos aceler\u00f4metros.
-- Aplicar as regras que j\u00e1 est\u00e3o no c\u00f3digo/memory:
-  - Dedup mensal por card + fase.
-  - Venda deduplicada 1x por card+m\u00eas preferindo `Ganho` sobre `Contrato assinado`; Monetiza\u00e7\u00e3o s\u00f3 conta venda em `Conclu\u00eddo`.
-  - MQL por faixa de faturamento (Modelo \u2265 200k, O2 TAX \u2265 500k, Expans\u00e3o \u2265 15k), independente da fase atual.
-  - Exclus\u00e3o de test cards via `isTestCard`.
-  - Origem via `src/lib/leadSource.ts` (inclui reclassifica\u00e7\u00e3o de G4 como Eventos e Monetiza\u00e7\u00e3o como origem pr\u00f3pria).
-  - Normaliza\u00e7\u00e3o de strings (trim, lower, sem acento) para agrupar origens.
+### Estrutura de cada arquivo por estágio
 
-## Detalhes t\u00e9cnicos
+- **Aba `Resumo`**: matriz BU (linhas) × Origem (colunas) com contagem; total por linha/coluna; comparação com o número exibido no dashboard (coluna "Dashboard" preenchida manualmente ou puxada do snapshot).
+- **Aba `Detalhe`**: uma linha por card com — `card_id`, `título`, `BU`, `Origem detectada`, `Data do evento` (data de criação para MQL; data de movimento para RM/RR/Proposta; data de assinatura para Venda), `Fase atual`, `Closer`, `SDR`, `MRR`, `Setup`, `Pontual`, `Motivo qualificação MQL` (para MQL: threshold atingido / faturamento declarado), `URL Pipefy`.
+- **Aba `Metodologia`**: descreve a fonte (`pipefy_cards`, `pipefy_cards_movements`, `pipefy_cards_movements_expansao`, `pipefy_moviment_outbound`, `pipefy_moviment_contrato`), a regra de dedup (1× por card × fase × mês; venda prefere "Ganho"), os thresholds de MQL (Modelo ≥ R$ 200k, O2 TAX ≥ R$ 500k, Expansão ≥ R$ 15k), exclusão de test cards e a lógica de classificação de origem espelhada do `leadSource.ts`.
 
-- Rodar um script Node local que:
-  1. Chama a edge function `query-external-db` autenticado com service role para puxar os cards de cada pipe do m\u00eas fechado.
-  2. Aplica os mesmos aggregators (`temperaturaAggregator` n\u00e3o \u00e9 necess\u00e1rio; reutilizar as fun\u00e7\u00f5es puras de classifica\u00e7\u00e3o de `leadSource.ts` e as regras de dedup dos hooks portadas para um utilit\u00e1rio de export).
-  3. Escreve o XLSX com `exceljs` (formata\u00e7\u00e3o num\u00e9rica BR, cabe\u00e7alho em negrito, freeze na primeira linha, filtro autom\u00e1tico na aba de detalhe).
-- N\u00e3o alterar UI do app. Nenhum arquivo em `src/` mexido; script fica em `/tmp` e o arquivo final em `/mnt/documents/`.
-- Ao final, entregar o arquivo via `<presentation-artifact>` para download.
+## Como funciona
 
-## Fora de escopo
+- **Fonte**: mesma DB externa que os hooks já usam (`useModeloAtualAnalytics`, `useO2TaxAnalytics`, `useExpansaoAnalytics`, `useOutboundAnalytics`, `useMonetizacaoAnalytics`) — via edge function `query-external-db` para respeitar JWT/RLS.
+- **Classificação de origem**: reaproveita `src/lib/leadSource.ts` + `src/lib/eventSubcategory.ts` para garantir que a origem no relatório é idêntica à do dashboard (inclui a regra de qualquer sinal "g4" cair em Eventos).
+- **Estágios**:
+  - MQL: entrada em "MQLs" (Modelo Atual/Expansão) ou qualificação por faturamento (thresholds), data = criação do card.
+  - RM: entrada em "Reunião marcada".
+  - RR: entrada em "Reunião realizada".
+  - Proposta: entrada em "Proposta enviada".
+  - Venda: entrada em "Ganho" ou "Contrato assinado" (dedup preferindo Ganho); para Monetização apenas fase "Concluído".
+- **Dedup**: 1 contagem por card × fase × mês, alinhado com `funnel-deduplication-rules-v2`.
+- **Test cards**: excluídos via `isTestCard`.
 
-- N\u00e3o adiciona bot\u00e3o de export no dashboard (posso fazer depois se quiser recorrente).
-- N\u00e3o inclui per\u00edodos al\u00e9m do \u00faltimo m\u00eas fechado.
+## Interface de geração
+
+Duas opções — escolha na sua próxima mensagem:
+
+**A) Botão no app (aba Indicadores Comerciais)**
+- Novo botão "Exportar conferência" abre modal para escolher período (mês fechado, MTD, custom) e estágios desejados.
+- Chama edge function `export-acelerometros-report` que gera os `.xlsx` e retorna links de download (upload em Supabase Storage bucket `reports`).
+- Vantagem: qualquer usuário com permissão gera; período flexível; auditável.
+
+**B) Script offline sob demanda**
+- Você pede no chat ("gera pro mês X"), eu rodo o script Python (evolução do `/tmp/gen_report.py`) e entrego os arquivos em `/mnt/documents/`.
+- Vantagem: zero mudança no app; rápido de iterar.
+
+## Detalhes técnicos
+
+- Reuso do agregador: extrair a lógica de classificação/contagem em `src/lib/reportAggregator.ts` (compartilhado entre hooks React e edge function via módulo Deno equivalente).
+- Período: parametrizado `{start, end}` — default = último mês fechado.
+- Formatação Excel: openpyxl, cabeçalhos em negrito, moeda `R$ #,##0`, coluna "URL Pipefy" como hyperlink.
+- O2 TAX: nota na aba Metodologia sobre defasagem de dados da réplica (movements até mai/2026) — mesma limitação do relatório anterior; preciso confirmar se a fonte agora está atualizada.
+
+## Perguntas antes de implementar
+
+1. Opção **A (botão no app)** ou **B (sob demanda pelo chat)**?
+2. Período default: **mês fechado anterior** ou **MTD**?
+3. Incluir aba com **comparação lado-a-lado vs. valor do dashboard** (exige snapshot salvo) ou basta o detalhe bruto para você conferir manualmente?
