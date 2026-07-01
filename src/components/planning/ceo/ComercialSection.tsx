@@ -9,7 +9,7 @@ import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
 import { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
-import { useFunnelRealized } from "@/hooks/useFunnelRealized";
+
 import { useFunnelMetas } from "@/hooks/useFunnelMetas";
 import { useConsolidatedMetas } from "@/hooks/useConsolidatedMetas";
 import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
@@ -64,8 +64,8 @@ export function ComercialSection({ dateRange }: Props) {
   const outbound = useOutboundAnalytics(startDate, endDate);
   const monetizacao = useMonetizacaoAnalytics(startDate, endDate);
 
-  // Funil realizado + metas + meta de faturamento
-  const funnelRealized = useFunnelRealized(startDate, endDate);
+  // Metas + meta de faturamento
+
   const funnelMetas = useFunnelMetas();
   const consolidated = useConsolidatedMetas();
 
@@ -74,15 +74,35 @@ export function ComercialSection({ dateRange }: Props) {
   const { getValueForPeriod: getExpansaoValue } = useExpansaoMetas(startDate, endDate);
   const { getValueForPeriod: getOxyHackerValue } = useOxyHackerMetas(startDate, endDate);
 
-  // Overview histórico — funil realizado em janelas distintas
-  const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
-  const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
-  const last3Start = startOfMonth(subMonths(new Date(), 3));
-  const last3End = endOfMonth(subMonths(new Date(), 1));
-  const mtdStart = startOfMonth(new Date());
-  const fnLastMonth = useFunnelRealized(lastMonthStart, lastMonthEnd);
-  const fnLast3 = useFunnelRealized(last3Start, last3End);
-  const fnMtd = useFunnelRealized(mtdStart, new Date());
+  // Overview histórico — mesma fonte da aba Indicadores Comercial (analytics reais por BU)
+  const today = new Date();
+  const lastMonthStart = startOfMonth(subMonths(today, 1));
+  const lastMonthEnd = endOfMonth(subMonths(today, 1));
+  const last3Start = startOfMonth(subMonths(today, 3));
+  const last3End = endOfMonth(subMonths(today, 1));
+  const mtdStart = startOfMonth(today);
+
+  // Último mês fechado
+  const lmModelo = useModeloAtualAnalytics(lastMonthStart, lastMonthEnd);
+  const lmO2tax = useO2TaxAnalytics(lastMonthStart, lastMonthEnd);
+  const lmFranq = useExpansaoAnalytics(lastMonthStart, lastMonthEnd, "Franquia");
+  const lmOxy = useExpansaoAnalytics(lastMonthStart, lastMonthEnd, "Oxy Hacker");
+  const lmOut = useOutboundAnalytics(lastMonthStart, lastMonthEnd);
+
+  // Últimos 3 meses (fechados)
+  const l3Modelo = useModeloAtualAnalytics(last3Start, last3End);
+  const l3O2tax = useO2TaxAnalytics(last3Start, last3End);
+  const l3Franq = useExpansaoAnalytics(last3Start, last3End, "Franquia");
+  const l3Oxy = useExpansaoAnalytics(last3Start, last3End, "Oxy Hacker");
+  const l3Out = useOutboundAnalytics(last3Start, last3End);
+
+  // Mês atual (MTD)
+  const mtdModelo = useModeloAtualAnalytics(mtdStart, today);
+  const mtdO2tax = useO2TaxAnalytics(mtdStart, today);
+  const mtdFranq = useExpansaoAnalytics(mtdStart, today, "Franquia");
+  const mtdOxy = useExpansaoAnalytics(mtdStart, today, "Oxy Hacker");
+  const mtdOut = useOutboundAnalytics(mtdStart, today);
+
 
   // Só o bloco de pipe depende dos analytics pesados; o resto renderiza na hora.
   const pipeLoading = modeloAtual.isLoading || o2tax.isLoading || franquia.isLoading || oxyHacker.isLoading || outbound.isLoading;
@@ -213,25 +233,53 @@ export function ComercialSection({ dateRange }: Props) {
 
 
   // ─── Overview histórico ───
+  // Fonte unificada: mesmos analytics da aba Indicadores Comercial (regras de MQL por faturamento,
+  // dedup mensal de venda, exclusão de test cards, Data de assinatura etc.).
+  const OVERVIEW_STAGES: { real: "mql" | "rm" | "rr" | "proposta" | "venda"; label: string }[] = [
+    { real: "mql", label: "MQLs" },
+    { real: "rm", label: "Reuniões agendadas" },
+    { real: "rr", label: "Reuniões realizadas" },
+    { real: "proposta", label: "Propostas" },
+    { real: "venda", label: "Vendas" },
+  ];
+
   const overview = useMemo(() => {
-    const proj = (() => {
-      const totals = fnMtd.getAllTotals("all");
-      const dim = getDaysInMonth(new Date());
-      const elapsed = new Date().getDate();
-      const factor = elapsed > 0 ? dim / elapsed : 1;
+    const sumStage = (hooks: any[], stage: string) =>
+      hooks.reduce((sum, h) => sum + (h.getCardsForIndicator?.(stage)?.length || 0), 0);
+
+    const totalsFor = (hooks: any[]) => {
       const out: Record<string, number> = {};
-      for (const s of FUNNEL_STAGES) out[s.real] = Math.round((totals[s.real] || 0) * factor);
+      for (const s of OVERVIEW_STAGES) out[s.real] = sumStage(hooks, s.real);
       return out;
-    })();
+    };
+
+    const lmHooks = [lmModelo, lmO2tax, lmFranq, lmOxy, lmOut];
+    const l3Hooks = [l3Modelo, l3O2tax, l3Franq, l3Oxy, l3Out];
+    const mtdHooks = [mtdModelo, mtdO2tax, mtdFranq, mtdOxy, mtdOut];
+
+    const lmTotals = totalsFor(lmHooks);
+    const l3Totals = totalsFor(l3Hooks);
+    const mtdTotals = totalsFor(mtdHooks);
+
+    const dim = getDaysInMonth(today);
+    const elapsed = today.getDate();
+    const factor = elapsed > 0 ? dim / elapsed : 1;
+    const proj: Record<string, number> = {};
+    for (const s of OVERVIEW_STAGES) proj[s.real] = Math.round((mtdTotals[s.real] || 0) * factor);
+
+    const l3avg: Record<string, number> = {};
+    for (const s of OVERVIEW_STAGES) l3avg[s.real] = Math.round((l3Totals[s.real] || 0) / 3);
+
     return {
       cols: [
-        { key: "lastMonth", label: "Último mês", totals: fnLastMonth.getAllTotals("all") },
-        { key: "last3avg", label: "Média 3 meses", totals: Object.fromEntries(FUNNEL_STAGES.map((s) => [s.real, Math.round((fnLast3.getAllTotals("all")[s.real] || 0) / 3)])) as Record<string, number> },
-        { key: "mtd", label: "Mês atual (até hoje)", totals: fnMtd.getAllTotals("all") },
+        { key: "lastMonth", label: "Último mês", totals: lmTotals },
+        { key: "last3avg", label: "Média 3 meses", totals: l3avg },
+        { key: "mtd", label: "Mês atual (até hoje)", totals: mtdTotals },
         { key: "proj", label: "Projeção do mês", totals: proj },
       ],
     };
-  }, [fnLastMonth, fnLast3, fnMtd]);
+  }, [lmModelo, lmO2tax, lmFranq, lmOxy, lmOut, l3Modelo, l3O2tax, l3Franq, l3Oxy, l3Out, mtdModelo, mtdO2tax, mtdFranq, mtdOxy, mtdOut]);
+
 
   return (
     <div className="space-y-6">
@@ -239,7 +287,7 @@ export function ComercialSection({ dateRange }: Props) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted-foreground" />Overview histórico <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">janela fixa</span></CardTitle>
-          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — <strong>não responde ao filtro de período acima</strong>.</p>
+          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — mesma fonte da aba Indicadores Comercial, <strong>não responde ao filtro de período acima</strong>.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="overflow-x-auto">
@@ -251,7 +299,7 @@ export function ComercialSection({ dateRange }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {FUNNEL_STAGES.map((s) => (
+                {OVERVIEW_STAGES.map((s) => (
                   <TableRow key={s.real}>
                     <TableCell className="font-medium">{s.label}</TableCell>
                     {overview.cols.map((c) => <TableCell key={c.key} className="text-right tabular-nums">{fmtInt(c.totals[s.real] || 0)}</TableCell>)}
@@ -259,6 +307,7 @@ export function ComercialSection({ dateRange }: Props) {
                 ))}
               </TableBody>
             </Table>
+
           </div>
           <AiNote />
         </CardContent>
