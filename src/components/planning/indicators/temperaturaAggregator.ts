@@ -26,7 +26,23 @@ const normalize = (s: unknown): string =>
     .trim()
     .toLowerCase();
 
-const LOST_PHASES = new Set(["perdido", "perda", "lost", "descartado"]);
+const LOST_PHASES = new Set([
+  "perdido",
+  "perda",
+  "lost",
+  "descartado",
+  "desistencia",
+  "desistiu",
+  "desistencias",
+  "arquivado",
+  "arquivados",
+  "cancelado",
+  "cancelamento",
+  "desqualificado",
+  "nao qualificado",
+  "no show",
+  "sem interesse",
+]);
 const isLostPhase = (fase: unknown): boolean => LOST_PHASES.has(normalize(fase));
 
 const WON_PHASES = new Set(["ganho", "contrato assinado", "concluido"]);
