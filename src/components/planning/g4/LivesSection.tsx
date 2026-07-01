@@ -8,7 +8,8 @@ import { FunnelDeluxe, type DeluxeChip, type DeluxeCompareRow } from "./FunnelDe
 import { useG4FunnelStages } from "@/hooks/useG4FunnelStages";
 import type { ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
 import { G4_LIVES, isCardLive } from "@/lib/g4Events";
-import { cardsForLive, computeCounts, mergeStages } from "@/lib/g4Funnel";
+import { cardsForLive, computeCounts, mergeStages, type ComputedCounts } from "@/lib/g4Funnel";
+import { getLiveOverride } from "@/data/livesOfficial";
 
 export interface LiveRow {
   label: string;
@@ -33,6 +34,15 @@ export interface LivesSectionProps {
 
 function liveSlug(dateIso: string): string {
   return `live-${dateIso}`;
+}
+
+function sumCounts(a: ComputedCounts, b: ComputedCounts): ComputedCounts {
+  return {
+    inscritos: a.inscritos + b.inscritos,
+    entraram: a.entraram + b.entraram,
+    mao: a.mao + b.mao,
+    venda: a.venda + b.venda,
+  };
 }
 
 export function LivesSection({
@@ -60,13 +70,37 @@ export function LivesSection({
   // Estágios manuais do banco (fallback [])
   const { data: dbStages = [] } = useG4FunnelStages("lives", dbSlug);
 
-  // Filtra cards por live selecionada
-  const scopedCards = useMemo(() => {
-    if (!selectedLive) return liveCards;
-    return cardsForLive(liveCards, selectedLive.date, selectedLive.captureWindowDays);
-  }, [liveCards, selectedLive]);
+  // Contagens por live (override oficial > cálculo a partir dos cards)
+  const perLiveCounts = useMemo(() => {
+    const map = new Map<string, ComputedCounts>();
+    for (const l of G4_LIVES) {
+      const override = getLiveOverride(l.date);
+      map.set(
+        l.date,
+        override ??
+          computeCounts(cardsForLive(liveCards, l.date, l.captureWindowDays)),
+      );
+    }
+    return map;
+  }, [liveCards]);
 
-  const counts = useMemo(() => computeCounts(scopedCards), [scopedCards]);
+  // Contagens do escopo atual (agregado = soma; live específica = override ou cálculo)
+  const counts = useMemo<ComputedCounts>(() => {
+    if (selectedLive) {
+      return (
+        perLiveCounts.get(selectedLive.date) ?? {
+          inscritos: 0,
+          entraram: 0,
+          mao: 0,
+          venda: 0,
+        }
+      );
+    }
+    let agg: ComputedCounts = { inscritos: 0, entraram: 0, mao: 0, venda: 0 };
+    for (const c of perLiveCounts.values()) agg = sumCounts(agg, c);
+    return agg;
+  }, [perLiveCounts, selectedLive]);
+
   const stages = useMemo(
     () => mergeStages("lives", counts, dbStages),
     [counts, dbStages],
@@ -76,7 +110,12 @@ export function LivesSection({
   const compare = useMemo<DeluxeCompareRow[]>(
     () =>
       G4_LIVES.map((l) => {
-        const c = computeCounts(cardsForLive(liveCards, l.date, l.captureWindowDays));
+        const c = perLiveCounts.get(l.date) ?? {
+          inscritos: 0,
+          entraram: 0,
+          mao: 0,
+          venda: 0,
+        };
         return {
           id: liveSlug(l.date),
           label: l.label,
@@ -86,8 +125,9 @@ export function LivesSection({
           venda: c.venda,
         };
       }),
-    [liveCards],
+    [perLiveCounts],
   );
+
 
   const chips: DeluxeChip[] = [
     { id: "all", label: `Agregado · ${G4_LIVES.length} lives` },
