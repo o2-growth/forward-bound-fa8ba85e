@@ -287,7 +287,7 @@ export function ComercialSection({ dateRange }: Props) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base"><History className="h-4 w-4 text-muted-foreground" />Overview histórico <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-normal uppercase tracking-wide text-muted-foreground">janela fixa</span></CardTitle>
-          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — <strong>não responde ao filtro de período acima</strong>.</p>
+          <p className="text-xs text-muted-foreground">Volumes do funil por janela de referência (último mês, média 3 meses, MTD, projeção) — mesma fonte da aba Indicadores Comercial, <strong>não responde ao filtro de período acima</strong>.</p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="overflow-x-auto">
@@ -299,7 +299,7 @@ export function ComercialSection({ dateRange }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {FUNNEL_STAGES.map((s) => (
+                {OVERVIEW_STAGES.map((s) => (
                   <TableRow key={s.real}>
                     <TableCell className="font-medium">{s.label}</TableCell>
                     {overview.cols.map((c) => <TableCell key={c.key} className="text-right tabular-nums">{fmtInt(c.totals[s.real] || 0)}</TableCell>)}
@@ -307,6 +307,7 @@ export function ComercialSection({ dateRange }: Props) {
                 ))}
               </TableBody>
             </Table>
+
           </div>
           <AiNote />
         </CardContent>
