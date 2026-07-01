@@ -174,7 +174,6 @@ export function AiNote({ title = "Análise (IA)", text, onGenerate, loading }: {
 }
 
 // ─── AiNote com IA plugada (Gemini via Lovable AI Gateway) ──
-import { useCeoAiAnalysis } from "./useCeoAiAnalysis";
 export function AiNoteAuto({ section, title, buildContext }: {
   section: string;
   title?: string;
