@@ -10,8 +10,6 @@
  * NOTA: não importa nada do banco nem de outros hooks —
  *       só usa tipos que vêm do chamador.
  */
-import { classifyLeadSource } from "./leadSource";
-
 // ── Tipos de frente ──────────────────────────────────────────────────────
 export type G4Frente = "lives" | "eventos" | "seller";
 
@@ -221,24 +219,32 @@ export function matchEventoFromCard(
   return sorted[0];
 }
 
+const EVENT_TOKENS = [
+  "evento",
+  "summit",
+  "talkshow",
+  "talk show",
+  "imersao",
+  "presencial",
+  "webinar",
+  "palestra",
+  "workshop",
+  "speaker",
+  "4am",
+];
+
 /**
  * Verifica se o card pertence à frente G4 Eventos.
- * Espelha o filtro "Eventos" do Indicador Comercial: usa classifyLeadSource
- * — qualquer card com "g4" (ou tokens de evento) em tipo/origem/fonte/campanha.
+ * Exige "g4" E ao menos um token de evento em origem/campanha/tipo/fonte.
  */
 export function isCardEvento(
   card: CardAttrs,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _eventos: G4EventoConfig[] = G4_EVENTOS
 ): boolean {
-  return (
-    classifyLeadSource({
-      tipoOrigem: card.tipoOrigem,
-      origemLead: card.origemLead,
-      fonte: card.fonte,
-      campanha: card.campanha,
-    }) === "evento"
-  );
+  const haystack = buildHaystack(card);
+  if (!haystack.includes("g4")) return false;
+  return EVENT_TOKENS.some((t) => haystack.includes(t));
 }
 
 /**
