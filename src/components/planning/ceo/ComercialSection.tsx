@@ -167,15 +167,17 @@ export function ComercialSection({ dateRange }: Props) {
         metaTotals.vendas += r.vendas || 0;
       }
     }
-    const rows = FUNNEL_STAGES.map((s, i) => {
+    // Indexa por estágio para blindar contra qualquer duplicação em runtime
+    const byStage: Record<string, { real: number; meta: number; conv: number | null; atingimento: number | null }> = {};
+    FUNNEL_STAGES.forEach((s, i) => {
       const real = realTotals[s.real] || 0;
       const meta = metaTotals[s.meta] || 0;
       const prevReal = i > 0 ? realTotals[FUNNEL_STAGES[i - 1].real] || 0 : null;
       const conv = prevReal && prevReal > 0 ? (real / prevReal) * 100 : null;
       const atingimento = meta > 0 ? (real / meta) * 100 : null;
-      return { ...s, real, meta, conv, atingimento };
+      byStage[s.real] = { real, meta, conv, atingimento };
     });
-    return { rows };
+    return { byStage };
   }, [modeloAtual, o2tax, franquia, oxyHacker, outbound, funnelMetas, startDate, endDate]);
 
   // ─── Previsto x realizado + pace (faturamento) ───
