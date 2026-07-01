@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Banknote, TrendingDown } from "lucide-react";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useOxyExpenses } from "@/hooks/useOxyExpenses";
-import { fmt, fmtFull, MetricCard, AiNote, type MetricSource } from "./ceoShared";
+import { fmt, fmtFull, MetricCard, AiNote, MONTHS_PT, type MetricSource } from "./ceoShared";
 
 interface Props { dateRange: { from: Date; to: Date }; }
 
