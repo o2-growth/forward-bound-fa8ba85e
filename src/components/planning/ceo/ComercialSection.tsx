@@ -309,7 +309,7 @@ export function ComercialSection({ dateRange }: Props) {
             </Table>
 
           </div>
-          <AiNote />
+          <AiNoteAuto section="Comercial" title="Overview histórico" buildContext={() => ({ cols: overview.cols.map(c => ({ label: c.label, totals: c.totals })) })} />
         </CardContent>
       </Card>
 
@@ -340,7 +340,7 @@ export function ComercialSection({ dateRange }: Props) {
               </div>
             </>
           )}
-          <AiNote />
+          <AiNoteAuto section="Comercial" title="Pipe de vendas em negociação" buildContext={() => ({ total: pipe.total, quente: pipe.quente, morno: pipe.morno, frio: pipe.frio, topClosers: pipe.byCloser.slice(0,5), topCanais: pipe.byCanal.slice(0,5), topBu: pipe.byBu.slice(0,5), topProduto: pipe.byProduto.slice(0,5) })} />
         </CardContent>
       </Card>
 
@@ -385,7 +385,7 @@ export function ComercialSection({ dateRange }: Props) {
               </TableBody>
             </Table>
           </div>
-          <AiNote />
+          <AiNoteAuto section="Comercial" title="Funil realizado x meta" buildContext={() => ({ byStage: funil.byStage })} />
         </CardContent>
       </Card>
 
@@ -403,7 +403,7 @@ export function ComercialSection({ dateRange }: Props) {
             <MetricCard label="Atingimento da meta" value={fmtPct(pace.atingimentoMeta)} tone={pace.atingimentoMeta != null && pace.atingimentoMeta >= 100 ? "success" : "default"} source={SRC_PACE} />
             <MetricCard label="vs Pace (esperado hoje)" value={fmtPct(pace.atingimentoPace)} sublabel={`esperado ${fmt(pace.expected)}`} tone={pace.atingimentoPace != null && pace.atingimentoPace >= 100 ? "success" : "danger"} source={SRC_PACE} />
           </div>
-          <AiNote />
+          <AiNoteAuto section="Comercial" title="Previsto x Realizado + Pace" buildContext={() => ({ metaFat: pace.metaFat, realizadoFat: pace.realizadoFat, expected: pace.expected, atingimentoMeta: pace.atingimentoMeta, atingimentoPace: pace.atingimentoPace })} />
         </CardContent>
       </Card>
     </div>
