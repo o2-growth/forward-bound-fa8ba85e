@@ -215,7 +215,7 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
   }, [saasCategoriesData]);
 
   // Parse DRE into dreByBU + expansaoByMonth + caasByMonth + saasByMonth
-  const { parsedDreByBU, expansaoByMonth, caasByMonth, saasByMonth } = useMemo(() => {
+  const { parsedDreByBU, expansaoByMonth, caasByMonth, saasByMonth, dreLines } = useMemo(() => {
     const result = initDreByBU();
     const expansao: Record<string, number> = {};
     const caas: Record<string, number> = {};
