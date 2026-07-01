@@ -1,37 +1,54 @@
-Já validei o commit `725803e` no turno anterior — os 3 blocos estão **FAIL** no código. Como você pediu de novo pra "testar", entendo que quer que eu **aplique as correções agora** (não só re-rodar o teste que vai dar o mesmo resultado). Segue o plano de implementação. Se você quer apenas re-testar sem mexer, me avisa.
+## Diagnóstico — o que está (e o que não está) vindo do Oxy DRE hoje na Visão CEO
 
-## Correções a aplicar
+### ✅ Já puxa do Oxy Finance / DRE detalhado
+- **Aba Pessoal** → Receita por setor (CaaS, SaaS, TAX, Expansão) usa `useOxyFinance` (`caasByMonth`, `saasByMonth`, `dreByBU.o2_tax`, `expansaoByMonth`). Correto.
+- **Aba DRE** → Receita Bruta (RB) por BU mês a mês, via `dreByBU`. Correto, mas **só a linha de RB**.
+- **Aba Caixa** → Entradas / Saídas / Saldo / Acumulado via `cashflowChart`. Correto.
 
-### Fix 1 — Coluna "Fase Atual" no drill-down RR
-**Arquivo:** `src/components/planning/IndicatorsTab.tsx` (builder do drill-down "Reunião Realizada")
-- Adicionar coluna `phase` ao array de colunas do RR, na ordem: Produto | Empresa | Closer | Faixa Faturamento | **Fase Atual** | Tempo até Reunir | Data.
-- Popular `phase` a partir de `card.current_phase` / `phase_name` (mesmo campo já usado no drill-down de Proposta).
-- Ajustar o drill-down de **Proposta enviada** para também ler `current_phase` real em vez de rótulo fixo "Proposta enviada / Follow Up".
+### ⚠️ Não puxa do Oxy hoje, mas deveria (ou faz sentido puxar)
+1. **Financeiro (Inadimplência / Base de recebíveis)**
+   Hoje mostra só Ativos/Churn do Pipefy Central de Projetos. Não tem nada de contas a receber.
+   → O endpoint `cashflow_details` do Oxy (já implementado em `fetch-oxy-finance`) aceita `movimentType=R` + `isLate=true`, o que resolve inadimplência por prazo/categoria/cliente direto do Oxy.
 
-### Fix 2 — Marketing: fontes de dados alinhadas
-**Arquivos:**
-- `supabase/functions/read-marketing-sheet/index.ts` — incluir no JSON de retorno os campos `timeFerramentas`, `despesasTotais`, `investimentoEventos` (já lidos internamente, mas nunca expostos).
-- `src/hooks/useMarketingSheetData.ts` — já declara os 3 campos, apenas confirmar tipagem.
-- `src/hooks/useMarketingIndicators.ts` — zerar `mqls` de `meta_ads` e `google_ads` (já está 0, revalidar que não há regressão com proporção).
-- `src/components/planning/MarketingIndicatorsTab.tsx` (seção Enriched Channels / coluna Eventos) — trocar `25000` hardcoded por `sheetData.investimentoEventos ?? 25000`.
-- `src/components/planning/marketing-indicators/` (gauge CAC) — adicionar sublabel `"Somente mídia — OPEX não incluído"` no gauge; manter Hero CAC com OPEX+timeFerramentas.
+2. **DRE completo (P&L, não só RB)**
+   Hoje só expõe Receita Bruta. O bloco "Aguardando fonte" pede DRE completo — mas a Oxy já devolve os outros códigos (`DA`, `MC`, `DO`, `EBITDA`, `RL`) no mesmo endpoint `/v2/dre/dre-table`. O parser em `useOxyFinance` filtra `code !== 'RB'` e descarta tudo.
+   → Alterando o parser para preservar as demais linhas, dá pra montar: Deduções, Custo variável, **Margem de contribuição**, Despesas operacionais, **EBITDA**, **Resultado líquido**, com análise vertical (% sobre receita) — sem depender de nova fonte.
 
-### Fix 3 — Visão do CEO
-**Arquivos em `src/components/planning/ceo/`:**
-- `ceoShared.tsx` (`sumMonths` / iterador de meses) — reescrever loop para iterar corretamente quando `to.year > from.year` (ex.: usar `addMonths` até `<= endOfMonth(to)` em vez de `for m in 1..12` no mesmo ano).
-- `DreSection.tsx` — garantir que as linhas Oxy Hacker e Franquia leiam de `realizedDRE[bu]` (mesmas fontes de `FinancialTab`), não filtradas fora.
-- `FinanceiroSection.tsx` — renomear card "Retenção" → **"Churn Rate"**, exibir `churnRate` direto (não `100 - churnRate`), adicionar sublabel `"Histórico total — base ativa desde início"`.
+3. **Caixa — detalhamento de saídas e Previsto x Realizado**
+   Hoje só tem o gráfico agregado. O `cashflow_details` (movimentType=D) devolve saídas por categoria/subcategoria/fornecedor + `expected` vs `paid` → cobre "principais saídas" e "previsto x realizado" que estão como "Aguardando fonte".
 
-## Validação após aplicar
-1. `tsgo` — 0 erros de tipo.
-2. Playwright headless com sessão Supabase restaurada:
-   - Drill-down RR (com/sem filtro Closer) — confere 7 colunas + valores distintos em "Fase Atual".
-   - Drill-down Proposta — "Fase Atual" mostra Ganho/Perdido/Follow Up.
-   - Aba Marketing → Enriched Channels: MQL Meta/Google = 0, coluna Eventos usa valor da planilha; interceptar response de `read-marketing-sheet` e confirmar 3 campos novos; gauge CAC com sublabel.
-   - Visão CEO: DateRange 15/11/2025→15/01/2026 → Receita/pessoa e Receita do período > 0; DRE com Oxy Hacker e Franquia > 0; card "Churn Rate" com valor pequeno + sublabel.
-3. Console = 0 exceções.
-4. Reporte final PASS/FAIL por item com screenshots e go/no-go para push.
+4. **Comercial — Realizado do card "Previsto x Realizado + Pace"**
+   Hoje soma `sumVendaValue` do Pipefy (regime de assinatura de contrato). Isso é o certo para o comercial. Mas vale adicionar uma **linha comparativa "Receita contábil (Oxy DRE)"** ao lado, pra CEO ver a divergência entre "vendido" (Pipefy) e "reconhecido" (Oxy). Opcional.
 
-## Fora de escopo
-- Não altero regras de MQL, funil, ou lógica de atribuição.
-- Não mexo em outras abas nem em migrations.
+### ✅ Não faz sentido puxar do Oxy
+- **Aba Comercial (pipe em negociação, funil, temperatura, metas de etapa)** → é operação de CRM; Pipefy é a fonte correta. Manter como está.
+
+---
+
+## Plano de mudanças (só se você aprovar)
+
+### Fase 1 — DRE completo do Oxy (alto impacto, baixo esforço)
+- Ajustar `useOxyFinance` para expor `dreLinesByCode` (Map de `code → { label, byBU/byMonth }`) preservando `DA`, `MC`, `DO`, `EBITDA`, `RL` além de `RB`.
+- Reescrever `DreSection.tsx`: nova tabela com linhas Receita Bruta → Deduções → Receita Líquida → Custo variável → **Margem de contribuição (%)** → Despesas operacionais → **EBITDA (%)** → **Resultado líquido (%)**, com totais e análise vertical.
+- Remover o bloco "Aguardando fonte — DRE completo".
+
+### Fase 2 — Inadimplência real na aba Financeiro
+- Criar `useOxyReceivables` que chama `fetch-oxy-finance` com `action=cashflow_details, movimentType=R, isLate=true` no período.
+- Novo bloco em `FinanceiroSection`: total inadimplente, buckets por prazo (7/15/30/60/90/120/180/360/720/+720), quebra por BU, por produto, por CFO.
+- Manter Ativos/Churn como estão (Pipefy).
+
+### Fase 3 — Caixa detalhado
+- Bloco "Principais saídas" (top categorias/subcategorias/fornecedores) via `cashflow_details, movimentType=D`.
+- Bloco "Previsto × Realizado" do mês (usa `expected` vs `paid` do mesmo endpoint).
+- Projeções 30/60/90: usa `cashflow_details` com janela futura.
+
+### Fase 4 (opcional) — Comparativo Pipefy × Oxy na aba Comercial
+- No card "Previsto x Realizado + Pace", adicionar sublinha "Receita contábil (Oxy DRE) no período: R$ X" com badge de divergência vs Pipefy.
+
+---
+
+## O que preciso de você
+
+1. **Aprovar as Fases 1–3** (recomendo todas, são complementares).
+2. **Fase 4 é opcional** — quer o comparativo Pipefy vs Oxy no card comercial? (Pode gerar dúvida com o time comercial que só olha Pipefy.)
+3. Confirmar se a estrutura de códigos do DRE Oxy que a API devolve hoje inclui `MC` e `EBITDA` no mesmo endpoint `/v2/dre/dre-table` — se não, precisamos de uma chamada extra. Posso confirmar rodando um probe rápido antes de codar a Fase 1.
