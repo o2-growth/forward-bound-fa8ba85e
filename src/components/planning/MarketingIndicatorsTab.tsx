@@ -273,6 +273,23 @@ export function MarketingIndicatorsTab() {
   const { cards: oxyHackerCards, getCardsForIndicator: oxyGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Oxy Hacker');
   const { allCards: outboundAllCards, getCardsForIndicator: outboundGetCards } = useOutboundAnalytics(dateRange.from, dateRange.to);
 
+  // Previous period range (mesmo tamanho, imediatamente anterior) — usado só para
+  // o comparativo "Resultados Gerais" (KPIs com delta). Antes, o filtro rodava
+  // sobre salesInPeriod (já do período atual) e resultava sempre 0.
+  const prevRange = useMemo(() => {
+    const ms = dateRange.to.getTime() - dateRange.from.getTime();
+    return {
+      from: new Date(dateRange.from.getTime() - ms - 1),
+      to: new Date(dateRange.from.getTime() - 1),
+    };
+  }, [dateRange]);
+  const { getCardsForIndicator: maGetCardsPrev } = useModeloAtualAnalytics(prevRange.from, prevRange.to);
+  const { getCardsForIndicator: o2GetCardsPrev } = useO2TaxAnalytics(prevRange.from, prevRange.to);
+  const { getCardsForIndicator: franquiaGetCardsPrev } = useExpansaoAnalytics(prevRange.from, prevRange.to, 'Franquia');
+  const { getCardsForIndicator: oxyGetCardsPrev } = useExpansaoAnalytics(prevRange.from, prevRange.to, 'Oxy Hacker');
+  const { getCardsForIndicator: outboundGetCardsPrev } = useOutboundAnalytics(prevRange.from, prevRange.to);
+
+
   // Investment per month (Meta + Google) for the visible range — for cohorts
   const { byMonth: investmentByMonth, totalInvestment: investmentTotalForRange } = useInvestmentByMonth(dateRange.from, dateRange.to);
 
