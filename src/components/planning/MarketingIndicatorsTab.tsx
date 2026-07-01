@@ -302,6 +302,10 @@ export function MarketingIndicatorsTab() {
     endDate: dateRange.to,
   });
 
+  // Investimento real em Eventos (tabela event_investments, editável no Admin).
+  // Substitui o valor fixo de R$ 25.000 que estava hardcoded.
+  const { data: eventInvestmentRows } = useEventInvestments();
+
   // Build attribution cards from all BUs
   const allAttributionCards = useMemo((): AttributionCard[] => {
     const result: AttributionCard[] = [];
