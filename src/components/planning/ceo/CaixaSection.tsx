@@ -52,14 +52,15 @@ export function CaixaSection({ dateRange }: Props) {
     <div className="space-y-6">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base"><Banknote className="h-4 w-4 text-muted-foreground" />Fluxo de caixa acumulado do ano — mês a mês</CardTitle>
-          <p className="text-xs text-muted-foreground">Entradas, saídas, saldo do mês e acumulado do ano.</p>
+          <CardTitle className="flex items-center gap-2 text-base"><Banknote className="h-4 w-4 text-muted-foreground" />Fluxo de caixa — mês a mês (período selecionado)</CardTitle>
+          <p className="text-xs text-muted-foreground">Entradas, saídas, saldo do mês e acumulado dentro do intervalo escolhido.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
-            <MetricCard label="Entradas (ano)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} />
-            <MetricCard label="Saídas (ano)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} />
-            <MetricCard label="Saldo (ano)" value={fmt(data.saldo)} large source={SRC_CASH} />
+            <MetricCard label="Entradas (período)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} />
+            <MetricCard label="Saídas (período)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} />
+            <MetricCard label="Saldo (período)" value={fmt(data.saldo)} large source={SRC_CASH} />
+
           </div>
           <div className="overflow-x-auto">
             <Table>
