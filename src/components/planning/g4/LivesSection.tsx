@@ -74,9 +74,9 @@ export function LivesSection({
       />
 
       {/* Mini-cards por live */}
-      {livesRows.length > 0 && (
+      {rows.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {livesRows.map((live) => (
+          {rows.map((live) => (
             <div
               key={live.label}
               className="flex flex-col items-start gap-0.5 rounded-md border border-border bg-card px-3 py-2 text-sm min-w-[160px]"
@@ -109,7 +109,7 @@ export function LivesSection({
       </div>
 
       {/* Tabela detalhada por live */}
-      {livesRows.length > 0 && (
+      {rows.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Detalhamento por Live</CardTitle>
@@ -129,7 +129,7 @@ export function LivesSection({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {livesRows.map((row) => {
+                  {rows.map((row) => {
                     const cpl = row.leadsGerados > 0 ? row.totalCost / row.leadsGerados : 0;
                     return (
                       <TableRow key={row.label}>
@@ -164,7 +164,7 @@ export function LivesSection({
                 <TableFooter>
                   <TableRow>
                     <TableCell colSpan={4} className="font-bold">
-                      Total ({livesRows.length} lives)
+                      Total ({rows.length} lives)
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-bold">
                       {fmtFull(totalCustoLives)}
