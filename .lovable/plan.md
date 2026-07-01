@@ -1,28 +1,19 @@
-## Problema
+## Regra confirmada
 
-Após o último ajuste, a frente **G4 › Eventos** zerou porque `matchEventoFromCard` só aceita cards que batem em tokens específicos de eventos configurados (`G4 TOOLS CONNECT`, `G4 TALKS`). Só que no Indicador Comercial, quando o usuário filtra origem = **Eventos**, aparece **qualquer card com "g4"** em `tipoOrigem / origemLead / fonte / campanha` — regra definida em `src/lib/leadSource.ts` (`classifyLeadSource → 'evento'`).
+- **G4 Eventos**: haystack (`origemLead | campanha | tipoOrigem | fonte`, normalizado) precisa conter `"g4"` **E** pelo menos 1 token de evento: `evento`, `summit`, `talkshow`, `talk show`, `imersao`, `presencial`, `webinar`, `palestra`, `workshop`, `speaker`, `4am`.
+- **G4 Lives**: mantém regra atual (`"g4"` **E** `"live"` no haystack).
+- **G4 Seller**: intocado.
+- Prioridade continua: seller > lives > eventos.
 
-A frente G4 Eventos precisa **espelhar exatamente essa regra**.
+## Mudança
 
-## Solução
+**`src/lib/g4Events.ts`**
+- Remover o uso de `classifyLeadSource` em `isCardEvento`.
+- Reescrever `isCardEvento` para: normalizar os 4 campos, exigir presença de `"g4"` **E** de ao menos um token da lista de eventos acima. Sem depender de `matchEventoFromCard`.
+- `matchEventoFromCard` permanece só para a tabela de detalhamento por evento configurado (sem fallback ±7d).
+- Pode remover o `import { classifyLeadSource }` se não for mais usado no arquivo.
 
-Trocar o predicado da frente Eventos para reusar `classifyLeadSource` — mesma fonte de verdade do Indicador Comercial.
+## Nada mais muda
 
-### Mudanças
-
-**1. `src/lib/g4Events.ts`**
-- Importar `classifyLeadSource` de `./leadSource`.
-- Reescrever `isCardEvento(card)` para retornar `classifyLeadSource({ tipoOrigem, origemLead, fonte, campanha }) === 'evento'`.
-- Manter `matchEventoFromCard` só para atribuir o card a um evento específico da tabela de detalhamento (retorna `null` sem quebrar a classificação). Continua exigindo token G4 e sem o fallback ±7d.
-- `classifyG4Card` mantém a prioridade **seller > lives > eventos**, mas "eventos" agora usa o predicado amplo.
-
-**2. Nada mais muda**
-- `useG4Analytics` continua chamando `classifyG4Card` — herda a nova regra automaticamente.
-- `buildEventosRows` já usa `matchEventoFromCard`; cards que caem na frente mas não batem em nenhum evento configurado simplesmente não aparecem na tabela detalhada (KPIs agregados do funil/DRE continuam corretos).
-- Lives e Seller intocados.
-
-### Validação
-
-- Abrir Indicadores › G4 › Eventos com filtro de Jun/2026.
-- Comparar total de Leads Captados da frente Eventos com o total do Indicador Comercial filtrado por origem = Eventos → devem bater.
-- Vendas / Receita do P&L de Eventos = soma de `valor` dos cards classificados como evento que estão em Ganho/Contrato assinado (mesmo universo do indicador comercial).
+- `useG4Analytics`, `EventosSection`, `LivesSection`, `SellerSection` continuam consumindo `classifyG4Card` — herdam a regra nova.
+- Funil / DRE / Pipe da frente Eventos passam a refletir só cards com G4 + token de evento; devem ficar bem menores que o "filtro Eventos" do Indicador Comercial (que é mais amplo).

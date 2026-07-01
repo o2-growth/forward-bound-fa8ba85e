@@ -10,8 +10,6 @@
  * NOTA: não importa nada do banco nem de outros hooks —
  *       só usa tipos que vêm do chamador.
  */
-import { classifyLeadSource } from "./leadSource";
-
 // ── Tipos de frente ──────────────────────────────────────────────────────
 export type G4Frente = "lives" | "eventos" | "seller";
 
