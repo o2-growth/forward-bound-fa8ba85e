@@ -34,7 +34,6 @@ const TAB_CONFIG: { key: TabKey; label: string; icon: React.ComponentType<{ clas
   { key: 'financial', label: 'Financeiro', icon: DollarSign },
   { key: 'marketing', label: 'Marketing', icon: Lightbulb },
   { key: 'structure', label: 'Estrutura', icon: Users },
-  { key: 'g4', label: 'G4', icon: Trophy },
   { key: 'admin', label: 'Admin', icon: Settings },
 ];
 
