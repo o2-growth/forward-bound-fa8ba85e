@@ -190,42 +190,34 @@ export function matchEventoFromCard(
   eventos: G4EventoConfig[] = G4_EVENTOS
 ): G4EventoConfig | null {
   const haystack = buildHaystack(card);
+
+  // Guard: só considera "evento G4" se houver sinal explícito de G4
+  // em algum campo de atribuição (origem/campanha/tipoOrigem/fonte).
+  if (!haystack.includes("g4")) return null;
+
   const entradaMs = card.dataEntrada
     ? new Date(card.dataEntrada).getTime()
     : null;
 
-  // 1. Candidatos por token
+  // Candidatos por token
   const tokenMatches = eventos.filter((e) =>
     e.originTokens.some((t) => haystack.includes(norm(t)))
   );
 
-  if (tokenMatches.length > 0) {
-    // Um único candidato → retorna direto
-    if (entradaMs === null || tokenMatches.length === 1) return tokenMatches[0];
+  if (tokenMatches.length === 0) return null;
 
-    // Desempata: prefere o evento que ocorreu ANTES da entrada, o mais próximo
-    const sorted = [...tokenMatches].sort((a, b) => {
-      const diffA = entradaMs - new Date(a.date).getTime();
-      const diffB = entradaMs - new Date(b.date).getTime();
-      // diff >= 0 → evento ocorreu antes da entrada (correto)
-      if (diffA >= 0 && diffB < 0) return -1;
-      if (diffA < 0 && diffB >= 0) return 1;
-      return Math.abs(diffA) - Math.abs(diffB);
-    });
-    return sorted[0];
-  }
+  // Um único candidato → retorna direto
+  if (entradaMs === null || tokenMatches.length === 1) return tokenMatches[0];
 
-  // 2. Fallback: janela ±7 dias
-  if (entradaMs !== null) {
-    const WINDOW_7 = 7 * 86_400_000;
-    const byDistance = eventos
-      .map((e) => ({ e, dist: Math.abs(entradaMs - new Date(e.date).getTime()) }))
-      .filter(({ dist }) => dist <= WINDOW_7)
-      .sort((a, b) => a.dist - b.dist);
-    if (byDistance.length > 0) return byDistance[0].e;
-  }
-
-  return null;
+  // Desempata: prefere o evento que ocorreu ANTES da entrada, o mais próximo
+  const sorted = [...tokenMatches].sort((a, b) => {
+    const diffA = entradaMs - new Date(a.date).getTime();
+    const diffB = entradaMs - new Date(b.date).getTime();
+    if (diffA >= 0 && diffB < 0) return -1;
+    if (diffA < 0 && diffB >= 0) return 1;
+    return Math.abs(diffA) - Math.abs(diffB);
+  });
+  return sorted[0];
 }
 
 /** Verifica se o card pertence à frente G4 Eventos */
