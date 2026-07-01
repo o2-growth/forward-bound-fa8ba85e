@@ -195,7 +195,7 @@ export function ComercialSection({ dateRange }: Props) {
       getOxyHackerValue: getOxyHackerValue as any,
       getExpansaoValue: getExpansaoValue as any,
       monetizacaoVendaItems,
-      includeMonetizacao: true, // Consolidado, sem filtro de origem
+      includeMonetizacao: false, // Auditoria CEO — achado #4: metaFat não inclui Monetização, então realizado também exclui p/ pace fiel
     });
     const totalDays = Math.max(differenceInCalendarDays(endDate, startDate) + 1, 1);
     const elapsed = Math.min(Math.max(differenceInCalendarDays(new Date(), startDate) + 1, 0), totalDays);
