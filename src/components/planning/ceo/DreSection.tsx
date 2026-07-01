@@ -31,12 +31,19 @@ const PL_ORDER: { code: string; label?: string; kind: "subtotal" | "detail" | "d
 
 export function DreSection({ dateRange }: Props) {
   const oxy = useOxyFinance();
+  const OXY_YEAR = 2026; // useOxyFinance() usa esse ano por padrão
 
   const data = useMemo(() => {
-    // Respeita o filtro de período: usa apenas os meses entre from..to (mesmo ano).
-    const fromMonth = dateRange.from.getMonth();
-    const toMonth = dateRange.to.getMonth();
-    const monthsInRange = MONTHS_PT.slice(fromMonth, toMonth + 1);
+    // Achado #3 da auditoria CEO: iterar por Date para respeitar ano corretamente.
+    // Meses fora do ano carregado pelo Oxy são ignorados (evita somar Jan/2026 quando o usuário pediu Jan/2027).
+    const monthsInRange: string[] = [];
+    let outOfYear = 0;
+    const start = new Date(dateRange.from.getFullYear(), dateRange.from.getMonth(), 1);
+    const end = new Date(dateRange.to.getFullYear(), dateRange.to.getMonth(), 1);
+    for (let d = start; d <= end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+      if (d.getFullYear() === OXY_YEAR) monthsInRange.push(MONTHS_PT[d.getMonth()]);
+      else outOfYear++;
+    }
     // agrupa linhas do DRE por code (soma quando há múltiplas ex: vários "CV")
     const byCode = new Map<string, Record<string, number>>();
     for (const line of oxy.dreLines || []) {
@@ -54,7 +61,7 @@ export function DreSection({ dateRange }: Props) {
       const label = row.label ?? row.code;
       return { ...row, label, cells, total, av };
     });
-    return { monthsUpTo: monthsInRange, rows, rbTotal, byCode };
+    return { monthsUpTo: monthsInRange, rows, rbTotal, byCode, outOfYear };
   }, [oxy.dreLines, dateRange.from, dateRange.to]);
 
   // ─── Receita por BU (100% Oxy Finance) ──────────────────────────────────────
