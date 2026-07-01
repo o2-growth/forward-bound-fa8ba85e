@@ -9,7 +9,7 @@ import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
 import { useMonetizacaoAnalytics } from "@/hooks/useMonetizacaoAnalytics";
-import { useFunnelRealized } from "@/hooks/useFunnelRealized";
+
 import { useFunnelMetas } from "@/hooks/useFunnelMetas";
 import { useConsolidatedMetas } from "@/hooks/useConsolidatedMetas";
 import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
