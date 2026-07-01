@@ -74,15 +74,35 @@ export function ComercialSection({ dateRange }: Props) {
   const { getValueForPeriod: getExpansaoValue } = useExpansaoMetas(startDate, endDate);
   const { getValueForPeriod: getOxyHackerValue } = useOxyHackerMetas(startDate, endDate);
 
-  // Overview histórico — funil realizado em janelas distintas
-  const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
-  const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
-  const last3Start = startOfMonth(subMonths(new Date(), 3));
-  const last3End = endOfMonth(subMonths(new Date(), 1));
-  const mtdStart = startOfMonth(new Date());
-  const fnLastMonth = useFunnelRealized(lastMonthStart, lastMonthEnd);
-  const fnLast3 = useFunnelRealized(last3Start, last3End);
-  const fnMtd = useFunnelRealized(mtdStart, new Date());
+  // Overview histórico — mesma fonte da aba Indicadores Comercial (analytics reais por BU)
+  const today = new Date();
+  const lastMonthStart = startOfMonth(subMonths(today, 1));
+  const lastMonthEnd = endOfMonth(subMonths(today, 1));
+  const last3Start = startOfMonth(subMonths(today, 3));
+  const last3End = endOfMonth(subMonths(today, 1));
+  const mtdStart = startOfMonth(today);
+
+  // Último mês fechado
+  const lmModelo = useModeloAtualAnalytics(lastMonthStart, lastMonthEnd);
+  const lmO2tax = useO2TaxAnalytics(lastMonthStart, lastMonthEnd);
+  const lmFranq = useExpansaoAnalytics(lastMonthStart, lastMonthEnd, "Franquia");
+  const lmOxy = useExpansaoAnalytics(lastMonthStart, lastMonthEnd, "Oxy Hacker");
+  const lmOut = useOutboundAnalytics(lastMonthStart, lastMonthEnd);
+
+  // Últimos 3 meses (fechados)
+  const l3Modelo = useModeloAtualAnalytics(last3Start, last3End);
+  const l3O2tax = useO2TaxAnalytics(last3Start, last3End);
+  const l3Franq = useExpansaoAnalytics(last3Start, last3End, "Franquia");
+  const l3Oxy = useExpansaoAnalytics(last3Start, last3End, "Oxy Hacker");
+  const l3Out = useOutboundAnalytics(last3Start, last3End);
+
+  // Mês atual (MTD)
+  const mtdModelo = useModeloAtualAnalytics(mtdStart, today);
+  const mtdO2tax = useO2TaxAnalytics(mtdStart, today);
+  const mtdFranq = useExpansaoAnalytics(mtdStart, today, "Franquia");
+  const mtdOxy = useExpansaoAnalytics(mtdStart, today, "Oxy Hacker");
+  const mtdOut = useOutboundAnalytics(mtdStart, today);
+
 
   // Só o bloco de pipe depende dos analytics pesados; o resto renderiza na hora.
   const pipeLoading = modeloAtual.isLoading || o2tax.isLoading || franquia.isLoading || oxyHacker.isLoading || outbound.isLoading;
