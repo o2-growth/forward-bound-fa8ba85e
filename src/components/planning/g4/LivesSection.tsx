@@ -1,71 +1,116 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
+import { useMemo, useState } from "react";
 import { Video } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { fmtInt, fmtFull, fmt } from "@/components/planning/ceo/ceoShared";
+import { Badge } from "@/components/ui/badge";
+import { fmtInt } from "@/components/planning/ceo/ceoShared";
 import { FrenteMetricsRow } from "./FrenteMetricsRow";
-import { FrenteFunnelCard, type FunnelStep } from "./FrenteFunnelCard";
 import { FrenteDreCard, type G4Dre, type CustoDetalhe } from "./FrenteDreCard";
+import { FunnelDeluxe, type DeluxeChip, type DeluxeCompareRow } from "./FunnelDeluxe";
+import { useG4FunnelStages } from "@/hooks/useG4FunnelStages";
+import type { ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
+import { G4_LIVES, isCardLive } from "@/lib/g4Events";
+import { cardsForLive, computeCounts, mergeStages } from "@/lib/g4Funnel";
 
-// ── Tipos ──────────────────────────────────────────────────────────────
 export interface LiveRow {
-  label: string;         // ex: 'Live 20/05'
-  date: string;          // 'YYYY-MM-DD'
-  saveCost: number;      // custo Save Studios
-  pedroCost: number;     // honorários Pedro
-  totalCost: number;     // saveCost + pedroCost
+  label: string;
+  date: string;
+  saveCost: number;
+  pedroCost: number;
+  totalCost: number;
   leadsGerados: number;
 }
 
 export interface LivesSectionProps {
-  // Métricas agregadas da frente Lives
   leads: number;
   pipe: number;
   faturamento: number;
   leadTimeMedio?: number;
-  funnel: FunnelStep[];
   dre: G4Dre;
   custosDetalhe?: CustoDetalhe[];
-  // Detalhamento por live
   livesRows: LiveRow[];
+  /** Cards Modelo Atual (todos os movimentos) — para atribuição por live */
+  cards: ModeloAtualCard[];
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
-function fmtDate(dateStr: string): string {
-  try {
-    const [, m, d] = dateStr.split("-");
-    return `${d}/${m}`;
-  } catch {
-    return dateStr;
-  }
+function liveSlug(dateIso: string): string {
+  return `live-${dateIso}`;
 }
 
-// ── Componente ─────────────────────────────────────────────────────────
 export function LivesSection({
   leads,
   pipe,
   faturamento,
   leadTimeMedio,
-  funnel,
   dre,
   custosDetalhe,
   livesRows = [],
+  cards = [],
 }: LivesSectionProps) {
-  const rows = livesRows ?? [];
-  const totalLeadsLives = rows.reduce((s, r) => s + r.leadsGerados, 0);
-  const totalCustoLives = rows.reduce((s, r) => s + r.totalCost, 0);
+  const [selected, setSelected] = useState<string>("all");
+
+  // Cards classificados como Lives (todos os movimentos)
+  const liveCards = useMemo(
+    () => cards.filter((c) => isCardLive(c)),
+    [cards],
+  );
+
+  // Slug do item selecionado (ou null p/ agregado)
+  const selectedLive = G4_LIVES.find((l) => liveSlug(l.date) === selected);
+  const dbSlug = selectedLive ? liveSlug(selectedLive.date) : null;
+
+  // Estágios manuais do banco (fallback [])
+  const { data: dbStages = [] } = useG4FunnelStages("lives", dbSlug);
+
+  // Filtra cards por live selecionada
+  const scopedCards = useMemo(() => {
+    if (!selectedLive) return liveCards;
+    return cardsForLive(liveCards, selectedLive.date, selectedLive.captureWindowDays);
+  }, [liveCards, selectedLive]);
+
+  const counts = useMemo(() => computeCounts(scopedCards), [scopedCards]);
+  const stages = useMemo(
+    () => mergeStages("lives", counts, dbStages),
+    [counts, dbStages],
+  );
+
+  // Comparativo entre lives
+  const compare = useMemo<DeluxeCompareRow[]>(
+    () =>
+      G4_LIVES.map((l) => {
+        const c = computeCounts(cardsForLive(liveCards, l.date, l.captureWindowDays));
+        return {
+          id: liveSlug(l.date),
+          label: l.label,
+          inscritos: c.inscritos,
+          entraram: c.entraram,
+          mao: c.mao,
+          venda: c.venda,
+        };
+      }),
+    [liveCards],
+  );
+
+  const chips: DeluxeChip[] = [
+    { id: "all", label: `Agregado · ${G4_LIVES.length} lives` },
+    ...G4_LIVES.map((l) => ({ id: liveSlug(l.date), label: l.label })),
+  ];
+
+  const contextLabel = selectedLive ? selectedLive.label : "Agregado · todas as lives";
+  const contextSub = selectedLive
+    ? new Date(selectedLive.date).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      })
+    : "Consolidado";
 
   return (
     <div className="space-y-4">
-      {/* Header frente */}
       <div className="flex items-center gap-2">
         <Video className="h-5 w-5 text-muted-foreground" />
         <h3 className="font-semibold text-lg">G4 Lives</h3>
         <Badge variant="secondary">{fmtInt(leads)} leads</Badge>
       </div>
 
-      {/* Métricas agregadas */}
       <FrenteMetricsRow
         leads={leads}
         pipe={pipe}
@@ -73,117 +118,26 @@ export function LivesSection({
         leadTimeMedio={leadTimeMedio}
       />
 
-      {/* Mini-cards por live */}
-      {rows.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {rows.map((live) => (
-            <div
-              key={live.label}
-              className="flex flex-col items-start gap-0.5 rounded-md border border-border bg-card px-3 py-2 text-sm min-w-[160px]"
-            >
-              <span className="font-semibold text-foreground">{live.label}</span>
-              <span className="text-xs text-muted-foreground">
-                {fmtInt(live.leadsGerados)} leads · {fmt(live.totalCost)}
-              </span>
-              <div className="mt-0.5 flex gap-2 text-[11px] text-muted-foreground/70">
-                <span>Save: {fmtFull(live.saveCost)}</span>
-                <span>Pedro: {fmtFull(live.pedroCost)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <FunnelDeluxe
+        title="Funil de Conversão"
+        subtitle="Da inscrição ao fechamento — todas as etapas das lives consolidadas em um só lugar."
+        chips={chips}
+        selectedChip={selected}
+        onChipChange={setSelected}
+        kpis={{
+          inscritos: counts.inscritos,
+          entraram: counts.entraram,
+          mao: counts.mao,
+          venda: counts.venda,
+          inscritosSub: selectedLive ? "1 live" : `${G4_LIVES.length} lives`,
+        }}
+        stages={stages}
+        contextLabel={contextLabel}
+        contextSub={contextSub}
+        compare={compare}
+      />
 
-      {/* Grid: Funil + DRE */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FrenteFunnelCard
-          title="Funil — Lives"
-          funnel={funnel}
-          leadTimeMedioDias={leadTimeMedio}
-        />
-        <FrenteDreCard
-          title="P&L — Lives"
-          dre={dre}
-          custosDetalhe={custosDetalhe}
-        />
-      </div>
-
-      {/* Tabela detalhada por live */}
-      {rows.length > 0 && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Detalhamento por Live</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Live</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead className="text-right">Save (R$)</TableHead>
-                    <TableHead className="text-right">Pedro (R$)</TableHead>
-                    <TableHead className="text-right">Custo Total</TableHead>
-                    <TableHead className="text-right">Leads</TableHead>
-                    <TableHead className="text-right">CPL</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => {
-                    const cpl = row.leadsGerados > 0 ? row.totalCost / row.leadsGerados : 0;
-                    return (
-                      <TableRow key={row.label}>
-                        <TableCell className="font-medium text-sm">{row.label}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {fmtDate(row.date)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">
-                          {fmtFull(row.saveCost)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">
-                          {fmtFull(row.pedroCost)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm font-semibold">
-                          {fmtFull(row.totalCost)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums text-sm">
-                          {fmtInt(row.leadsGerados)}
-                        </TableCell>
-                        <TableCell
-                          className={cn(
-                            "text-right tabular-nums text-sm",
-                            cpl > 0 ? "text-foreground" : "text-muted-foreground"
-                          )}
-                        >
-                          {cpl > 0 ? fmtFull(cpl) : "—"}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-                <TableFooter>
-                  <TableRow>
-                    <TableCell colSpan={4} className="font-bold">
-                      Total ({rows.length} lives)
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-bold">
-                      {fmtFull(totalCustoLives)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-bold">
-                      {fmtInt(totalLeadsLives)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums font-bold">
-                      {totalLeadsLives > 0
-                        ? fmtFull(totalCustoLives / totalLeadsLives)
-                        : "—"}
-                    </TableCell>
-                  </TableRow>
-                </TableFooter>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <FrenteDreCard title="P&L — Lives" dre={dre} custosDetalhe={custosDetalhe} />
     </div>
   );
 }
