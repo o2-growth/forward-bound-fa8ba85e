@@ -69,6 +69,11 @@ export function ComercialSection({ dateRange }: Props) {
   const funnelMetas = useFunnelMetas();
   const consolidated = useConsolidatedMetas();
 
+  // Hooks de faturamento realizado (Oxy Finance) — mesma fonte da aba Indicadores Comercial
+  const { getValueForPeriod: getModeloAtualValue } = useModeloAtualMetas(startDate, endDate);
+  const { getValueForPeriod: getExpansaoValue } = useExpansaoMetas(startDate, endDate);
+  const { getValueForPeriod: getOxyHackerValue } = useOxyHackerMetas(startDate, endDate);
+
   // Overview histórico — funil realizado em janelas distintas
   const lastMonthStart = startOfMonth(subMonths(new Date(), 1));
   const lastMonthEnd = endOfMonth(subMonths(new Date(), 1));
