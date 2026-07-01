@@ -1,60 +1,42 @@
-## Problemas identificados
+## Objetivo
+Deixar o card **"Receita por BU — mês a mês"** da aba **DRE** da Visão CEO totalmente alinhado com a API Oxy Finance (mesma fonte do DRE completo abaixo), respeitando o filtro de período e cobrindo todas as BUs da empresa.
 
-### 1. Filtro de período não está sendo aplicado corretamente
-Ao mudar o `dateRange` no topo da Visão CEO, várias seções ignoram o `from` (só olham `to.month`) ou usam dados anuais fixos:
+## O que está hoje
+`src/components/planning/ceo/DreSection.tsx` já lê de `useOxyFinance().dreByBU`, mas:
+- Mostra apenas 4 linhas fixas (Modelo Atual, O2 Tax, Oxy Hacker, Franquia).
+- Não expõe a quebra **CaaS / SaaS** (que Modelo Atual contém dentro).
+- Não mostra o consolidado **Expansão** (Oxy Hacker + Franquia agregados como a Oxy trata).
+- Header ainda diz "acumulado do ano", mas na verdade já respeita o filtro `from..to`.
+- Não tem linha de **Total** por mês nem coluna AV%, dificultando bater com o DRE completo logo abaixo.
 
-- **`DreSection.tsx`** — usa `MONTHS_PT.slice(0, dateRange.to.getMonth() + 1)`, ignorando o mês de início. Se eu escolher Abril–Junho ele mostra Jan–Jun.
-- **`CaixaSection.tsx`** — chama `useOxyFinance()` sem período e usa `cashflowChart` inteiro do ano. "Entradas/Saídas/Saldo" são sempre YTD, não do período filtrado.
-- **`PessoalSection.tsx`** — chama `useOxyFinance()` sem período (o hook já cobre o ano; só `sumMonths` respeita `from/to`, então o número de "Receita do período" funciona, mas o `receitaPorPessoa` usa headcount atual e não do período — apenas documentar isso via tooltip).
-- **`ComercialSection.tsx`** — usa `dateRange` corretamente nos analytics de Pipefy, mas os cards "Overview histórico" (Último mês / Média 3 meses / MTD / Projeção) são fixos ao mês atual e ignoram o filtro — isso é intencional; deixar claro no subtítulo que essa tabela é fixa por design.
+## Mudanças
 
-### 2. CEO Comercial não bate com Indicadores Comercial
-Hoje `ComercialSection` calcula "Realizado (faturamento)" via `sumVendaValue(...analytics)`, que soma apenas `getCardsForIndicator('venda').valor` do Pipefy para as 5 BUs. Já `IndicatorsTab.tsx` (fonte de verdade da aba Indicadores) usa:
+### 1. Rebasear 100% na Oxy
+Trocar a montagem das linhas para usar exclusivamente os campos já expostos por `useOxyFinance`:
+- `caasByMonth` → linha **CaaS (Modelo Atual)**
+- `saasByMonth` → linha **SaaS (Modelo Atual)**
+- `dreByBU.o2_tax` → linha **O2 TAX**
+- `dreByBU.oxy_hacker` → linha **Oxy Hacker**
+- `dreByBU.franquia` → linha **Franquia**
+- `expansaoByMonth` → linha **Expansão (Oxy Hacker + Franquia)** como subtotal cinza
+- Linha **Total** somando CaaS + SaaS + O2 TAX + Expansão (evita dupla contagem)
 
-- Modelo Atual → `getModeloAtualValue('venda', ...)` (Oxy Finance realizada, com fallback Pipefy)
-- O2 TAX → `o2TaxAnalytics.getCardsForIndicator('venda')` somando `valor` (Pipefy)
-- Oxy Hacker → `getOxyHackerValue('venda', ...)` (Oxy Finance)
-- Franquia → `getExpansaoValue('venda', ...)` (Oxy Finance)
-- Monetização → `getFilteredMonetizacaoItems('venda')` somando `.total` (só no Consolidado / origem `monetizacao`)
-- Aplica filtros de Closer / SDR / Origem via `filteredVendasForBU`
+### 2. Respeitar o filtro de período
+- Continuar usando `MONTHS_PT.slice(fromMonth, toMonth+1)` (já implementado).
+- Trocar o subtítulo de "acumulado do ano" para **"período selecionado"**.
+- Trocar a descrição para: *"Receita bruta realizada por BU, direto da API Oxy Finance (mesma fonte do DRE completo abaixo)."*
 
-Resultado: os dois lugares mostram números diferentes porque o CEO nunca puxa Oxy Finance e nunca soma Monetização.
+### 3. Coluna AV% + Total
+- Adicionar coluna **AV%** por linha (linha / Total do período) para bater visualmente com o P&L logo abaixo.
+- Adicionar linha **Total período** em negrito ao final, batendo com a linha "RECEITA BRUTA" do DRE completo — se divergir, exibir um badge de aviso "conferir mapeamento Oxy".
 
-## Correções propostas
+### 4. Consistência com o DRE completo
+- Garantir que a soma das linhas por mês bata com `byCode.get("RECEITA BRUTA")[m]` do DRE completo (mesma fonte). Se houver diferença > 0,5%, mostrar um tooltip explicando (linhas Oxy sem classificação de BU ficam agrupadas em "Outros").
+- Se houver resíduo (RB Oxy − soma das BUs), incluir linha **"Outros / não classificado"** com o delta, evitando que o usuário ache que "sumiu" receita.
 
-### A. Unificar cálculo do faturamento (fonte única)
-1. Extrair a lógica de `switch(indicator.key) case 'faturamento'` de `IndicatorsTab.tsx` para um helper reutilizável em `src/lib/faturamentoAggregator.ts`:
-   ```ts
-   computeFaturamentoRealizado({
-     selectedBUs, startDate, endDate,
-     modeloAtualAnalytics, o2TaxAnalytics, oxyHackerAnalytics,
-     franquiaAnalytics, monetizacaoAnalytics,
-     getModeloAtualValue, getOxyHackerValue, getExpansaoValue,
-     filters?: { closers, sdrs, origens },
-   }): number
-   ```
-2. `IndicatorsTab.tsx` passa a chamar o helper (comportamento idêntico).
-3. `ComercialSection.tsx` (CEO) passa a chamar o mesmo helper com `selectedBUs = todas` e sem filtros de closer/sdr → o Realizado do CEO Comercial fica idêntico ao "Fat Incremento" do consolidado da aba Indicadores.
-4. Remover `sumVendaValue` local de `ComercialSection.tsx`.
+## Arquivo a alterar
+- `src/components/planning/ceo/DreSection.tsx` (somente este; a fonte de dados `useOxyFinance` já expõe tudo que precisamos).
 
-### B. Corrigir filtro de período nas seções CEO
-1. **`DreSection.tsx`** — trocar `monthsUpTo = MONTHS_PT.slice(0, to.getMonth()+1)` por `monthsInRange = MONTHS_PT.slice(from.getMonth(), to.getMonth()+1)` e usar essa lista em toda a agregação e nas colunas da tabela. Ajustar dependências do `useMemo` para `[oxy.dreLines, dateRange.from, dateRange.to]`.
-2. **`CaixaSection.tsx`** — filtrar `oxy.cashflowChart` pelos meses do período (usando `MONTHS_PT[from.getMonth()..to.getMonth()]`) antes de calcular `totalIn/totalOut/saldo/acumulado`. Ajustar tooltips ("Fluxo de caixa do período" no lugar de "do ano"). `useOxyExpenses` já recebe `dateRange`, mantém.
-3. **`ComercialSection.tsx`** — adicionar subtítulo explícito na tabela "Overview histórico" indicando que a janela é fixa (independente do filtro), para tirar a impressão de bug.
-4. **`PessoalSection.tsx`** — sem mudança de dado (já usa `sumMonths(..., from, to)`), apenas adicionar nota "Headcount = snapshot atual" onde já não estiver clara.
-
-### C. Alinhar também a Meta de faturamento (bônus de consistência)
-No card "Meta do período" do bloco Pace, hoje o CEO usa `consolidated.getMetaForPeriod([...ALL_BUS], startDate, endDate, 'faturamento')`. Confirmar que essa é exatamente a mesma chamada usada em `IndicatorsTab` (é). Caso positivo, sem mudança — apenas documentar no tooltip que soma inclui todas as 4 BUs.
-
-## Arquivos afetados
-- Novo: `src/lib/faturamentoAggregator.ts`
-- `src/components/planning/IndicatorsTab.tsx` (usa o novo helper no case `faturamento`)
-- `src/components/planning/ceo/ComercialSection.tsx` (usa o helper + subtítulo do overview)
-- `src/components/planning/ceo/DreSection.tsx` (respeitar `from`)
-- `src/components/planning/ceo/CaixaSection.tsx` (respeitar `from`+`to`)
-- `src/components/planning/ceo/PessoalSection.tsx` (apenas copy do tooltip)
-
-## Validação
-- Selecionar "01/06 → 30/06" na Visão CEO: DRE deve mostrar só coluna Jun; Caixa deve mostrar Entradas/Saídas só de Jun.
-- Comparar "Realizado" do bloco Pace (CEO Comercial) com "Fat Incremento" do consolidado em Indicadores Comercial para o mesmo período — números idênticos.
-- Rodar `tsgo` para garantir tipagem do helper.
+## Fora de escopo
+- Não mexer em `PessoalSection`, `ComercialSection` ou `CaixaSection`.
+- Não alterar `useOxyFinance` (já retorna todos os campos necessários).
