@@ -167,15 +167,17 @@ export function ComercialSection({ dateRange }: Props) {
         metaTotals.vendas += r.vendas || 0;
       }
     }
-    const rows = FUNNEL_STAGES.map((s, i) => {
+    // Indexa por estágio para blindar contra qualquer duplicação em runtime
+    const byStage: Record<string, { real: number; meta: number; conv: number | null; atingimento: number | null }> = {};
+    FUNNEL_STAGES.forEach((s, i) => {
       const real = realTotals[s.real] || 0;
       const meta = metaTotals[s.meta] || 0;
       const prevReal = i > 0 ? realTotals[FUNNEL_STAGES[i - 1].real] || 0 : null;
       const conv = prevReal && prevReal > 0 ? (real / prevReal) * 100 : null;
       const atingimento = meta > 0 ? (real / meta) * 100 : null;
-      return { ...s, real, meta, conv, atingimento };
+      byStage[s.real] = { real, meta, conv, atingimento };
     });
-    return { rows };
+    return { byStage };
   }, [modeloAtual, o2tax, franquia, oxyHacker, outbound, funnelMetas, startDate, endDate]);
 
   // ─── Previsto x realizado + pace (faturamento) ───
@@ -312,28 +314,32 @@ export function ComercialSection({ dateRange }: Props) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {funil.rows.map((r) => (
-                  <TableRow key={r.real}>
-                    <TableCell className="font-medium">{r.label}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtInt(r.real)}</TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">{r.meta > 0 ? fmtInt(r.meta) : "—"}</TableCell>
-                    <TableCell>
-                      {r.atingimento != null ? (
-                        <div className="flex items-center gap-2">
-                          <Progress value={Math.min(r.atingimento, 100)} className="h-2" />
-                          <span className="w-12 text-right text-xs tabular-nums">{fmtPct(r.atingimento)}</span>
-                        </div>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{r.conv != null ? fmtPct(r.conv) : "—"}</TableCell>
-                  </TableRow>
-                ))}
+                {FUNNEL_STAGES.map((s) => {
+                  const r = funil.byStage[s.real] ?? { real: 0, meta: 0, conv: null, atingimento: null };
+                  return (
+                    <TableRow key={s.real}>
+                      <TableCell className="font-medium">{s.label}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmtInt(r.real)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">{r.meta > 0 ? fmtInt(r.meta) : "—"}</TableCell>
+                      <TableCell>
+                        {r.atingimento != null ? (
+                          <div className="flex items-center gap-2">
+                            <Progress value={Math.min(r.atingimento, 100)} className="h-2" />
+                            <span className="w-12 text-right text-xs tabular-nums">{fmtPct(r.atingimento)}</span>
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{r.conv != null ? fmtPct(r.conv) : "—"}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
           <AiNote />
         </CardContent>
       </Card>
+
 
       {/* ── Previsto x realizado + pace ── */}
       <Card>
