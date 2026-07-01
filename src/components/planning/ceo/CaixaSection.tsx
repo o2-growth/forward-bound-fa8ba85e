@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Banknote, TrendingDown } from "lucide-react";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useOxyExpenses } from "@/hooks/useOxyExpenses";
-import { fmt, fmtFull, MetricCard, AiNote, MONTHS_PT, type MetricSource } from "./ceoShared";
+import { fmt, fmtFull, MetricCard, AiNote, AiNoteAuto, MONTHS_PT, type MetricSource } from "./ceoShared";
 
 interface Props { dateRange: { from: Date; to: Date }; }
 
@@ -150,7 +150,7 @@ export function CaixaSection({ dateRange }: Props) {
                   </TableBody>
                 </Table>
               </div>
-              <AiNote />
+              <AiNoteAuto section="Caixa" title="Fluxo de caixa e saídas" buildContext={() => ({ meses: data.rows, totalEntradas: data.totalIn, totalSaidas: data.totalOut, top10Saidas: topSaidas.slice(0,10).map((c: any) => ({ label: c.label, total: c.total })) })} />
             </>
           )}
         </CardContent>

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Info, Sparkles, DatabaseZap, Loader2 } from "lucide-react";
+import { useCeoAiAnalysis } from "./useCeoAiAnalysis";
 
 // ─── Formatadores ──────────────────────────────────────
 export function fmt(value: number | null | undefined, prefix = "R$ "): string {
@@ -170,6 +171,17 @@ export function AiNote({ title = "Análise (IA)", text, onGenerate, loading }: {
       </p>
     </div>
   );
+}
+
+// ─── AiNote com IA plugada (Gemini via Lovable AI Gateway) ──
+export function AiNoteAuto({ section, title, buildContext }: {
+  section: string;
+  title?: string;
+  buildContext: () => unknown;
+}) {
+  const label = title ?? section;
+  const { text, loading, generate } = useCeoAiAnalysis(section, label, buildContext);
+  return <AiNote title={`Análise IA — ${label}`} text={text} onGenerate={generate} loading={loading} />;
 }
 
 // ─── Placeholder "aguardando fonte de dados" ───────────

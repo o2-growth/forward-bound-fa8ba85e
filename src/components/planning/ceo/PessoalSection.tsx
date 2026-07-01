@@ -6,7 +6,7 @@ import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useHrData } from "@/hooks/useHrData";
 import { useOperationsData } from "@/hooks/useOperationsData";
 import { headcountByBu, type PessoaBu } from "@/components/planning/pessoas/helpers";
-import { fmt, fmtFull, fmtInt, sumMonths, MetricCard, AiNote, AguardandoFonte, type MetricSource } from "./ceoShared";
+import { fmt, fmtFull, fmtInt, sumMonths, MetricCard, AiNote, AiNoteAuto, AguardandoFonte, type MetricSource } from "./ceoShared";
 
 interface Props { dateRange: { from: Date; to: Date }; }
 
@@ -85,7 +85,7 @@ export function PessoalSection({ dateRange }: Props) {
               </TableBody>
             </Table>
           </div>
-          <AiNote />
+          <AiNoteAuto section="Pessoal" title="Receita por setor e por pessoa" buildContext={() => ({ setores: setores.rows.map((r: any) => ({ setor: r.setor, receita: r.receita, pessoas: r.pessoas, receitaPorPessoa: r.receitaPorPessoa })) })} />
         </CardContent>
       </Card>
 

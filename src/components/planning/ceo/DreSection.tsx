@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, FileSpreadsheet } from "lucide-react";
 import { useOxyFinance } from "@/hooks/useOxyFinance";
-import { fmt, fmtFull, fmtPct, MONTHS_PT, AiNote } from "./ceoShared";
+import { fmt, fmtFull, fmtPct, MONTHS_PT, AiNote, AiNoteAuto } from "./ceoShared";
 
 interface Props { dateRange: { from: Date; to: Date }; }
 
@@ -231,7 +231,7 @@ export function DreSection({ dateRange }: Props) {
               </Table>
             </div>
           )}
-          <AiNote />
+          <AiNoteAuto section="DRE" title="Demonstrativo de Resultados" buildContext={() => ({ rows: data.rows.map((r: any) => ({ label: r.label ?? r.code, total: r.total, av: r.av })), receitaBrutaTotal: data.rbTotal, meses: data.monthsUpTo?.map((m: any) => MONTHS_PT[m.month] ?? m) })} />
         </CardContent>
       </Card>
     </div>
