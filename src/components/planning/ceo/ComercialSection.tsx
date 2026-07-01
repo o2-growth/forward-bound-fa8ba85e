@@ -17,7 +17,7 @@ import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
 import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
 import { aggregateByTemperatura, type Temperatura } from "@/components/planning/indicators/temperaturaAggregator";
 import { computeFaturamentoRealizado, type BuType } from "@/lib/faturamentoAggregator";
-import { fmt, fmtFull, fmtPct, fmtInt, MetricCard, AiNote, type MetricSource } from "./ceoShared";
+import { fmt, fmtFull, fmtPct, fmtInt, MetricCard, AiNote, AiNoteAuto, type MetricSource } from "./ceoShared";
 
 const MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 const ALL_BUS = ["modelo_atual", "o2_tax", "oxy_hacker", "franquia"] as const;
