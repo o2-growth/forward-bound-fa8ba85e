@@ -39,6 +39,9 @@ import { BestAdsSection } from "./marketing-indicators/BestAdsSection";
 import { InvestmentForecast } from "./marketing-indicators/InvestmentForecast";
 import { CHANNEL_LABELS, ChannelId, CostPerStage, AttributionCard } from "./marketing-indicators/types";
 import { isSaleFase } from "@/lib/marketingFunnelAggregator";
+import { computeLTV, RETENTION_MONTHS } from "@/lib/marketingLtv";
+import { filterCardsByBU } from "@/lib/marketingBuFilter";
+import { useEventInvestments, sumEventInvestmentInRange } from "@/hooks/useEventInvestments";
 import { CacTotalCard } from "./marketing-indicators/CacTotalCard";
 import { InvestmentCacMqlHero } from "./marketing-indicators/InvestmentCacMqlHero";
 import { ConsolidatedIndicators26Section } from "./marketing-indicators/ConsolidatedIndicators26Section";
@@ -298,6 +301,10 @@ export function MarketingIndicatorsTab() {
     startDate: dateRange.from,
     endDate: dateRange.to,
   });
+
+  // Investimento real em Eventos (tabela event_investments, editável no Admin).
+  // Substitui o valor fixo de R$ 25.000 que estava hardcoded.
+  const { data: eventInvestmentRows } = useEventInvestments();
 
   // Build attribution cards from all BUs
   const allAttributionCards = useMemo((): AttributionCard[] => {
@@ -611,8 +618,12 @@ export function MarketingIndicatorsTab() {
     });
 
     // Add Eventos channel from Pipefy attribution
-    // investimentoEventos vem da planilha (célula configurável); fallback R$ 25.000 enquanto não existe a célula
-    const eventosInvestment = sheetData?.investimentoEventos || 25000;
+    // Investimento vem da tabela `event_investments` (soma dos meses no range).
+    // Fallback: valor da planilha, senão zero — nunca mais R$ 25k fictício.
+    const eventosInvestmentFromDb = sumEventInvestmentInRange(eventInvestmentRows, dateRange.from, dateRange.to);
+    const eventosInvestment = eventosInvestmentFromDb > 0
+      ? eventosInvestmentFromDb
+      : (sheetData?.investimentoEventos ?? 0);
     const eventosSummary = channelSummaries.find(s => s.channel === 'eventos');
     if (eventosSummary && (eventosSummary.leads > 0 || eventosSummary.mqls > 0 || eventosSummary.vendas > 0 || eventosSummary.receita > 0)) {
       channels.push({
@@ -663,7 +674,7 @@ export function MarketingIndicatorsTab() {
     }
 
     return channels;
-  }, [data.channels, channelSummaries, googleAdsApiTotals, metaAdsApiTotals, sheetData]);
+  }, [data.channels, channelSummaries, googleAdsApiTotals, metaAdsApiTotals, sheetData, eventInvestmentRows, dateRange]);
 
   // Count real volumes mirroring the Commercial accelerometer (no Closer/SDR filter
   // branch in IndicatorsTab.getRealizedForIndicator): Modelo Atual includes Outbound,
@@ -764,19 +775,18 @@ export function MarketingIndicatorsTab() {
     // CacTotalCard e CPV do CostPerStageGauges — evita 3 números de vendas divergentes.
     const vendas = salesInPeriod.length;
 
-    // avgMRR usa qualquer venda válida (Contrato assinado OU Ganho), não só string match.
-    const vendasCards = allAttributionCards.filter(c => isSaleFase(c.fase));
-    const totalMrrVendas = vendasCards.reduce((sum, c) => sum + (c.valorMRR || 0), 0);
-    const avgMrr = vendasCards.length > 0 ? totalMrrVendas / vendasCards.length : 0;
+    // LTV canônico (marketingLtv.ts): avgMRR × RETENTION_MONTHS. Fonte única
+    // para hero, gauges e qualquer drill-down futuro. Aceita venda em
+    // 'Contrato assinado' e 'Ganho' (via isSaleFase interno).
+    const { avgMrr, ltv } = computeLTV(allAttributionCards, RETENTION_MONTHS);
 
     const roas = investmentForGauges > 0 ? gmv / investmentForGauges : 0;
     // CAC gauge = investmentTotalForRange (Meta+Google API por mês) ÷ vendas — somente mídia, sem OPEX
     // O hero card inclui OPEX (timeFerramentas). As duas métricas são intencionalmente diferentes.
     const cac = vendas > 0 ? investmentTotalForRange / vendas : 0;
-    const ltv = avgMrr * 12;
     const roiLtv = investmentForGauges > 0 ? (ltv * vendas) / investmentForGauges : 0;
 
-    return { roas, cac, ltv, roiLtv };
+    return { roas, cac, ltv, roiLtv, avgMrr };
   }, [enrichedTotals.totalInvestment, investmentTotalForRange, realRevenue.gmv, salesInPeriod, allAttributionCards]);
 
   const handleDateRangeChange = (start: Date, end: Date) => {
@@ -806,6 +816,27 @@ export function MarketingIndicatorsTab() {
   const cacReal = vendasPeriodo > 0
     ? (cacMidia + cacOpex) / vendasPeriodo
     : (sheetData?.cac ?? 0);
+
+  // ===== Filtro de BU propagado (antes só afetava a tabela de campanhas) =====
+  // Todas as seções abaixo do header passam a receber cards filtrados pela BU
+  // selecionada. Investimento total continua global (não há segmentação de
+  // spend por BU garantida na API Meta/Google).
+  const buFilteredAttributionCards = useMemo(
+    () => filterCardsByBU(allAttributionCards, selectedBU),
+    [allAttributionCards, selectedBU],
+  );
+  const buFilteredSales = useMemo(
+    () => filterCardsByBU(salesInPeriod, selectedBU),
+    [salesInPeriod, selectedBU],
+  );
+  const buFilteredSalesPrev = useMemo(
+    () => filterCardsByBU(salesInPeriodPrev, selectedBU),
+    [salesInPeriodPrev, selectedBU],
+  );
+  const buFilteredLeads = useMemo(
+    () => filterCardsByBU(leadsAttributionCards, selectedBU),
+    [leadsAttributionCards, selectedBU],
+  );
 
   return (
     <div className="space-y-6">
@@ -881,25 +912,25 @@ export function MarketingIndicatorsTab() {
         ltvCac={sheetData?.ltvCac}
       />
 
-      {/* ===== Visão Total — Indicadores 26 ===== */}
-      <ConsolidatedIndicators26Section />
+      {/* ===== Visão Total — Indicadores 26 (respeita o filtro de data do topo) ===== */}
+      <ConsolidatedIndicators26Section dateRange={dateRange} />
 
       {/* ===== CPV (mídia ÷ vendas) — antigo "CAC Total", renomeado ===== */}
       <CacTotalCard
         investment={investmentTotalForRange}
-        sales={salesInPeriod.length}
+        sales={buFilteredSales.length}
       />
 
       {/* ===== NEW: Performance por Canal (Power BI-style) ===== */}
       <PerformanceByChannelSection
         dateRange={dateRange}
-        salesCards={salesInPeriod}
+        salesCards={buFilteredSales}
       />
 
       {/* ===== NEW: Performance de Campanhas — Criativos ===== */}
       <CreativeAdPerformanceSection
         dateRange={dateRange}
-        salesCards={salesInPeriod}
+        salesCards={buFilteredSales}
         campaignFunnels={campaignFunnels}
         allCampaigns={allCampaigns}
        />
@@ -908,35 +939,35 @@ export function MarketingIndicatorsTab() {
       <SourceFunnelSection
         dateRange={dateRange}
         allCampaigns={allCampaigns}
-        allAttributionCards={allAttributionCards}
-        salesCards={salesInPeriod}
-        pipefyTotals={pipefyVolumes}
+        allAttributionCards={buFilteredAttributionCards}
+        salesCards={buFilteredSales}
+        pipefyTotals={selectedBU === 'all' ? pipefyVolumes : undefined}
       />
 
       {/* ===== NEW: Resultados Gerais (V4-style dashboard) ===== */}
       <OverallResultsSection
         dateRange={dateRange}
-        allAttributionCards={allAttributionCards}
-        salesCards={salesInPeriod}
-        salesCardsPrev={salesInPeriodPrev}
+        allAttributionCards={buFilteredAttributionCards}
+        salesCards={buFilteredSales}
+        salesCardsPrev={buFilteredSalesPrev}
       />
 
 
 
 
-      {/* ===== NEW: Online vs Offline ===== */}
+      {/* ===== NEW: Online vs Offline (cohort do lead de origem) ===== */}
       <OnlineOfflineSection
-        leadsCards={leadsAttributionCards}
-        salesCards={salesInPeriod}
+        leadsCards={buFilteredLeads}
+        salesCards={buFilteredSales}
         totalInvestment={investmentTotalForRange}
       />
 
       {/* ===== NEW: Curva de Conversão ===== */}
-      <ConversionCurveSection salesCards={salesInPeriod} />
+      <ConversionCurveSection salesCards={buFilteredSales} />
 
       {/* ===== NEW: Cohort de Entrada ===== */}
       <CohortTable
-        cards={salesInPeriod}
+        cards={buFilteredSales}
         cohortType="entrada"
         investmentByMonth={investmentByMonth}
         title="Cohort de Entrada"
@@ -945,12 +976,13 @@ export function MarketingIndicatorsTab() {
 
       {/* ===== NEW: Cohort de Assinatura ===== */}
       <CohortTable
-        cards={salesInPeriod}
+        cards={buFilteredSales}
         cohortType="assinatura"
         investmentByMonth={investmentByMonth}
         title="Cohort de Assinatura"
         description="Vendas agrupadas pelo mês de assinatura do contrato. Investimento = soma dos meses de entrada dos leads dessa safra."
       />
+
 
 
 
