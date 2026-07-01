@@ -39,8 +39,8 @@ Deno.serve(async (req) => {
   const body = await req.json().catch(() => ({}));
   let cursor: string | null = body.cursor ?? null;
   const state = body.state ?? {
-    counts: { mql: 0, rm: 0, rr: 0, proposta: 0, venda: 0 },
-    seen: { rm: [], rr: [], proposta: [], venda: [], mql: [] },
+    counts: { mql_creation: 0, mql_phase: 0, rm: 0, rr: 0, proposta: 0, venda: 0 },
+    seen: { rm: [], rr: [], proposta: [], venda: [], mql_creation: [], mql_phase: [] },
     totalCards: 0, pages: 0,
   };
   const seenSets: any = {
@@ -48,7 +48,8 @@ Deno.serve(async (req) => {
     rr: new Set(state.seen.rr),
     proposta: new Set(state.seen.proposta),
     venda: new Set(state.seen.venda),
-    mql: new Set(state.seen.mql),
+    mql_creation: new Set(state.seen.mql_creation),
+    mql_phase: new Set(state.seen.mql_phase),
   };
   const startedAt = Date.now();
   const MAX_PAGES_PER_CALL = Number(body.maxPages || 25);
