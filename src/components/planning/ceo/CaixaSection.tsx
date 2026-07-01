@@ -15,9 +15,10 @@ const SRC_CASH: MetricSource = {
 };
 
 const SRC_EXP: MetricSource = {
-  origem: "Oxy Finance — Saídas detalhadas (cashflow_details, movimentType=D)",
-  periodo: "Filtra pelo período selecionado",
-  calculo: "Soma das saídas por categoria/fornecedor no período.",
+  origem: "Oxy Finance — DRE (linhas de custo/despesa: CV, DX, DF, DNO, AD, INV, PROV)",
+  periodo: "Filtra pelo período selecionado (meses do ano corrente)",
+  calculo:
+    "Soma por rubrica contábil do DRE Oxy no intervalo. Mesma fonte do P&L exibido na aba DRE — consistência automática.",
 };
 
 export function CaixaSection({ dateRange }: Props) {
