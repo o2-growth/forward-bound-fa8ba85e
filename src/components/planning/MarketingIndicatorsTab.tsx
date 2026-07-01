@@ -817,6 +817,27 @@ export function MarketingIndicatorsTab() {
     ? (cacMidia + cacOpex) / vendasPeriodo
     : (sheetData?.cac ?? 0);
 
+  // ===== Filtro de BU propagado (antes só afetava a tabela de campanhas) =====
+  // Todas as seções abaixo do header passam a receber cards filtrados pela BU
+  // selecionada. Investimento total continua global (não há segmentação de
+  // spend por BU garantida na API Meta/Google).
+  const buFilteredAttributionCards = useMemo(
+    () => filterCardsByBU(allAttributionCards, selectedBU),
+    [allAttributionCards, selectedBU],
+  );
+  const buFilteredSales = useMemo(
+    () => filterCardsByBU(salesInPeriod, selectedBU),
+    [salesInPeriod, selectedBU],
+  );
+  const buFilteredSalesPrev = useMemo(
+    () => filterCardsByBU(salesInPeriodPrev, selectedBU),
+    [salesInPeriodPrev, selectedBU],
+  );
+  const buFilteredLeads = useMemo(
+    () => filterCardsByBU(leadsAttributionCards, selectedBU),
+    [leadsAttributionCards, selectedBU],
+  );
+
   return (
     <div className="space-y-6">
       {/* Header with Filters */}
