@@ -618,8 +618,12 @@ export function MarketingIndicatorsTab() {
     });
 
     // Add Eventos channel from Pipefy attribution
-    // investimentoEventos vem da planilha (célula configurável); fallback R$ 25.000 enquanto não existe a célula
-    const eventosInvestment = sheetData?.investimentoEventos || 25000;
+    // Investimento vem da tabela `event_investments` (soma dos meses no range).
+    // Fallback: valor da planilha, senão zero — nunca mais R$ 25k fictício.
+    const eventosInvestmentFromDb = sumEventInvestmentInRange(eventInvestmentRows, dateRange.from, dateRange.to);
+    const eventosInvestment = eventosInvestmentFromDb > 0
+      ? eventosInvestmentFromDb
+      : (sheetData?.investimentoEventos ?? 0);
     const eventosSummary = channelSummaries.find(s => s.channel === 'eventos');
     if (eventosSummary && (eventosSummary.leads > 0 || eventosSummary.mqls > 0 || eventosSummary.vendas > 0 || eventosSummary.receita > 0)) {
       channels.push({
