@@ -60,6 +60,15 @@ function normalizeLabel(s: string): string {
   return (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+export interface DreLine {
+  /** Código do grupo no DRE Oxy (ex: RB, CV, DX, EBITDA, RESULTADO LÍQUIDO). */
+  code: string;
+  /** Label exibido pelo Oxy (ex: "CaaS", "EBITDA"). */
+  label: string;
+  /** Valor por mês do ano corrente. */
+  byMonth: Record<MonthType, number>;
+}
+
 export interface OxyFinanceResult {
   dreByBU: Record<BuType, Record<MonthType, number>>;
   /** Receita bruta do grupo "Expansão" (oxy_hacker + franquia combinados) por mês */
@@ -70,6 +79,8 @@ export interface OxyFinanceResult {
   caasByMonth: Record<MonthType, number>;
   /** Receita bruta do grupo "SaaS" por mês (separado do CaaS) */
   saasByMonth: Record<MonthType, number>;
+  /** Todas as linhas do DRE Oxy (RB, DC, CV, DX, subtotais como EBITDA/RESULTADO), por mês. */
+  dreLines: DreLine[];
   dreRaw: any;
   cashflowChart: CashflowChartPoint[];
   cashflowByMonth: Record<MonthType, number>;
