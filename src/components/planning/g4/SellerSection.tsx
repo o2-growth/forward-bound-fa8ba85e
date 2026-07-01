@@ -1,33 +1,33 @@
+import { useMemo } from "react";
+import { ShoppingBag, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ShoppingBag, Info } from "lucide-react";
 import { fmtInt } from "@/components/planning/ceo/ceoShared";
 import { FrenteMetricsRow } from "./FrenteMetricsRow";
-import { FrenteFunnelCard, type FunnelStep } from "./FrenteFunnelCard";
 import { FrenteDreCard, type G4Dre } from "./FrenteDreCard";
+import { FunnelDeluxe } from "./FunnelDeluxe";
+import { useG4FunnelStages } from "@/hooks/useG4FunnelStages";
+import type { ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
+import { isCardSeller } from "@/lib/g4Events";
+import { computeCounts, mergeStages } from "@/lib/g4Funnel";
 
-// ── Tipos ──────────────────────────────────────────────────────────────
 export interface SellerSectionProps {
-  // Métricas agregadas da frente G4 Seller
   leads: number;
   pipe: number;
   faturamento: number;
   leadTimeMedio?: number;
-  funnel: FunnelStep[];
-  // DRE sem custosDetalhe (canal Seller tipicamente sem custos operacionais diretos)
   dre: Omit<G4Dre, "custosOperacionais"> & { custosOperacionais?: number };
+  cards?: ModeloAtualCard[];
 }
 
-// ── Componente ─────────────────────────────────────────────────────────
 export function SellerSection({
   leads,
   pipe,
   faturamento,
   leadTimeMedio,
-  funnel,
   dre,
+  cards = [],
 }: SellerSectionProps) {
-  // Normaliza custosOperacionais para 0 quando não informado (canal Seller)
   const dreNorm: G4Dre = {
     receitaBruta: dre.receitaBruta,
     imposto: dre.imposto,
@@ -36,29 +36,39 @@ export function SellerSection({
     lucroLiquido: dre.lucroLiquido,
   };
 
+  const sellerCards = useMemo(
+    () => cards.filter((c) => isCardSeller(c)),
+    [cards],
+  );
+
+  const { data: dbStages = [] } = useG4FunnelStages("seller", null);
+  const counts = useMemo(() => computeCounts(sellerCards), [sellerCards]);
+  const stages = useMemo(
+    () => mergeStages("seller", counts, dbStages),
+    [counts, dbStages],
+  );
+
   return (
     <div className="space-y-4">
-      {/* Header frente */}
       <div className="flex items-center gap-2">
         <ShoppingBag className="h-5 w-5 text-muted-foreground" />
         <h3 className="font-semibold text-lg">G4 Seller</h3>
         <Badge variant="secondary">{fmtInt(leads)} leads</Badge>
       </div>
 
-      {/* Aviso sobre configuração de campo no Pipefy */}
       <Card className="border-dashed border-blue-300 bg-blue-50/50 dark:border-blue-700 dark:bg-blue-950/20">
         <CardContent className="flex items-start gap-2 py-3 px-4">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-500" />
           <p className="text-xs text-blue-700 dark:text-blue-400">
-            <strong>Configuração pendente:</strong> O campo <code>origemLead = &quot;G4 SELLER&quot;</code> ainda
-            precisa ser configurado no Pipefy. Enquanto isso, leads com{" "}
-            <code>paginaOrigem</code> contendo <code>tools.g4business.com</code> são
-            classificados como G4 Seller automaticamente (fallback).
+            <strong>Configuração pendente:</strong> O campo{" "}
+            <code>origemLead = &quot;G4 SELLER&quot;</code> ainda precisa ser
+            configurado no Pipefy. Enquanto isso, leads com{" "}
+            <code>paginaOrigem</code> contendo <code>tools.g4business.com</code>{" "}
+            são classificados como G4 Seller (fallback).
           </p>
         </CardContent>
       </Card>
 
-      {/* Métricas agregadas */}
       <FrenteMetricsRow
         leads={leads}
         pipe={pipe}
@@ -66,19 +76,24 @@ export function SellerSection({
         leadTimeMedio={leadTimeMedio}
       />
 
-      {/* Grid: Funil + DRE */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <FrenteFunnelCard
-          title="Funil — G4 Seller"
-          funnel={funnel}
-          leadTimeMedioDias={leadTimeMedio}
-        />
-        <FrenteDreCard
-          title="P&L — G4 Seller"
-          dre={dreNorm}
-          // Sem custosDetalhe — canal Seller não tem custos operacionais diretos
-        />
-      </div>
+      <FunnelDeluxe
+        title="Funil de Conversão · G4 Seller"
+        subtitle="Da entrada no funil ao fechamento — canal G4 Seller."
+        chips={[{ id: "all", label: "Agregado · canal Seller" }]}
+        selectedChip="all"
+        onChipChange={() => {}}
+        kpis={{
+          inscritos: counts.inscritos,
+          entraram: counts.entraram,
+          mao: counts.mao,
+          venda: counts.venda,
+        }}
+        stages={stages}
+        contextLabel="Canal G4 Seller"
+        contextSub="Consolidado"
+      />
+
+      <FrenteDreCard title="P&L — G4 Seller" dre={dreNorm} />
     </div>
   );
 }

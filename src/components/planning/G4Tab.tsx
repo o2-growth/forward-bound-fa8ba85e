@@ -262,10 +262,10 @@ export function G4Tab() {
               pipe={lives.pipe.aberto}
               faturamento={lives.dre.receitaBruta}
               leadTimeMedio={lives.leadTimeMediaDias}
-              funnel={lives.funnel}
               dre={lives.dre}
               custosDetalhe={lives.custosDetalhe}
               livesRows={lives.livesRows}
+              cards={lives.cards}
             />
           </Suspense>
         </TabsContent>
@@ -278,10 +278,10 @@ export function G4Tab() {
               pipe={eventos.pipe.aberto}
               faturamento={eventos.dre.receitaBruta}
               leadTimeMedio={eventos.leadTimeMediaDias}
-              funnel={eventos.funnel}
               dre={eventos.dre}
               custosDetalhe={eventos.custosDetalhe}
               eventosRows={eventos.eventosRows}
+              cards={eventos.cards}
             />
           </Suspense>
         </TabsContent>
@@ -294,8 +294,8 @@ export function G4Tab() {
               pipe={seller.pipe.aberto}
               faturamento={seller.dre.receitaBruta}
               leadTimeMedio={seller.leadTimeMediaDias}
-              funnel={seller.funnel}
               dre={seller.dre}
+              cards={seller.cards}
             />
           </Suspense>
         </TabsContent>
