@@ -163,7 +163,7 @@ export function ComercialSection({ dateRange }: Props) {
   // Usa a MESMA fonte da aba Indicadores Comercial (Oxy Finance para Modelo Atual/Franquia/Oxy Hacker, Pipefy para O2 TAX, + Monetização)
   const pace = useMemo(() => {
     const metaFat = consolidated.getMetaForPeriod([...ALL_BUS] as any, startDate, endDate, "faturamento" as any);
-    const monetizacaoVendaItems = monetizacao.getCardsForIndicator("venda") as any[];
+    const monetizacaoVendaItems = monetizacao.getDetailItemsForIndicator("venda") as any[];
     const realizadoFat = computeFaturamentoRealizado({
       selectedBUs: [...ALL_BUS] as BuType[],
       startDate,
