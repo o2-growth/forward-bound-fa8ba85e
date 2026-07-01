@@ -912,25 +912,25 @@ export function MarketingIndicatorsTab() {
         ltvCac={sheetData?.ltvCac}
       />
 
-      {/* ===== Visão Total — Indicadores 26 ===== */}
-      <ConsolidatedIndicators26Section />
+      {/* ===== Visão Total — Indicadores 26 (respeita o filtro de data do topo) ===== */}
+      <ConsolidatedIndicators26Section dateRange={dateRange} />
 
       {/* ===== CPV (mídia ÷ vendas) — antigo "CAC Total", renomeado ===== */}
       <CacTotalCard
         investment={investmentTotalForRange}
-        sales={salesInPeriod.length}
+        sales={buFilteredSales.length}
       />
 
       {/* ===== NEW: Performance por Canal (Power BI-style) ===== */}
       <PerformanceByChannelSection
         dateRange={dateRange}
-        salesCards={salesInPeriod}
+        salesCards={buFilteredSales}
       />
 
       {/* ===== NEW: Performance de Campanhas — Criativos ===== */}
       <CreativeAdPerformanceSection
         dateRange={dateRange}
-        salesCards={salesInPeriod}
+        salesCards={buFilteredSales}
         campaignFunnels={campaignFunnels}
         allCampaigns={allCampaigns}
        />
@@ -939,35 +939,35 @@ export function MarketingIndicatorsTab() {
       <SourceFunnelSection
         dateRange={dateRange}
         allCampaigns={allCampaigns}
-        allAttributionCards={allAttributionCards}
-        salesCards={salesInPeriod}
-        pipefyTotals={pipefyVolumes}
+        allAttributionCards={buFilteredAttributionCards}
+        salesCards={buFilteredSales}
+        pipefyTotals={selectedBU === 'all' ? pipefyVolumes : undefined}
       />
 
       {/* ===== NEW: Resultados Gerais (V4-style dashboard) ===== */}
       <OverallResultsSection
         dateRange={dateRange}
-        allAttributionCards={allAttributionCards}
-        salesCards={salesInPeriod}
-        salesCardsPrev={salesInPeriodPrev}
+        allAttributionCards={buFilteredAttributionCards}
+        salesCards={buFilteredSales}
+        salesCardsPrev={buFilteredSalesPrev}
       />
 
 
 
 
-      {/* ===== NEW: Online vs Offline ===== */}
+      {/* ===== NEW: Online vs Offline (cohort do lead de origem) ===== */}
       <OnlineOfflineSection
-        leadsCards={leadsAttributionCards}
-        salesCards={salesInPeriod}
+        leadsCards={buFilteredLeads}
+        salesCards={buFilteredSales}
         totalInvestment={investmentTotalForRange}
       />
 
       {/* ===== NEW: Curva de Conversão ===== */}
-      <ConversionCurveSection salesCards={salesInPeriod} />
+      <ConversionCurveSection salesCards={buFilteredSales} />
 
       {/* ===== NEW: Cohort de Entrada ===== */}
       <CohortTable
-        cards={salesInPeriod}
+        cards={buFilteredSales}
         cohortType="entrada"
         investmentByMonth={investmentByMonth}
         title="Cohort de Entrada"
@@ -976,12 +976,13 @@ export function MarketingIndicatorsTab() {
 
       {/* ===== NEW: Cohort de Assinatura ===== */}
       <CohortTable
-        cards={salesInPeriod}
+        cards={buFilteredSales}
         cohortType="assinatura"
         investmentByMonth={investmentByMonth}
         title="Cohort de Assinatura"
         description="Vendas agrupadas pelo mês de assinatura do contrato. Investimento = soma dos meses de entrada dos leads dessa safra."
       />
+
 
 
 
