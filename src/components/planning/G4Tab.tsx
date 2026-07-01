@@ -27,9 +27,9 @@ type LivesSectionProps    = { dateRange: { from: Date; to: Date } };
 type EventosSectionProps  = { dateRange: { from: Date; to: Date } };
 type SellerSectionProps   = { dateRange: { from: Date; to: Date } };
 
-const LivesSection   = lazy(() => import("./g4/LivesSection").then((m) => ({ default: m.LivesSection   as ComponentType<LivesSectionProps>   })));
-const EventosSection = lazy(() => import("./g4/EventosSection").then((m) => ({ default: m.EventosSection as ComponentType<EventosSectionProps> })));
-const SellerSection  = lazy(() => import("./g4/SellerSection").then((m) => ({ default: m.SellerSection  as ComponentType<SellerSectionProps>  })));
+const LivesSection   = lazy(() => import("./g4/LivesSection").then((m) => ({ default: m.LivesSection   as unknown as ComponentType<LivesSectionProps>   })));
+const EventosSection = lazy(() => import("./g4/EventosSection").then((m) => ({ default: m.EventosSection as unknown as ComponentType<EventosSectionProps> })));
+const SellerSection  = lazy(() => import("./g4/SellerSection").then((m) => ({ default: m.SellerSection  as unknown as ComponentType<SellerSectionProps>  })));
 
 // ── Fallback de loading ─────────────────────────────────────────────────
 function SectionFallback() {
