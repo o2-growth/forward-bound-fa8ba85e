@@ -227,33 +227,43 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
       expansaoByMonth: expansao as Record<MonthType, number>,
       caasByMonth: caas as Record<MonthType, number>,
       saasByMonth: saas as Record<MonthType, number>,
+      dreLines: [] as DreLine[],
     };
 
     if (!dreData) return emptyReturn;
 
     const normalize = (s: string) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
+    const lines: DreLine[] = [];
+
     try {
       // Primary: parse groups format { groups: [{ label, code, data: [{ period, value }] }] }
       if (dreData?.groups && Array.isArray(dreData.groups)) {
         for (const group of dreData.groups) {
-          if (group.code !== 'RB') continue;
-
+          const code = group.code || '';
           const label = group.label || '';
           const labelNorm = normalize(label);
           const entries = Array.isArray(group.data) ? group.data : [];
 
+          // ── Preserva TODAS as linhas do DRE (RB, DC, CV, DX, RF, DF, subtotais…)
+          //    para permitir montar o P&L completo (Margem, EBITDA, Resultado).
+          const byMonth: Record<string, number> = {};
+          for (const m of MONTHS) byMonth[m] = 0;
+          for (const entry of entries) {
+            const monthName = parseMonthFromDate(entry.period || entry.date || '');
+            if (monthName) byMonth[monthName] += Number(entry.value || 0);
+          }
+          lines.push({ code, label, byMonth: byMonth as Record<MonthType, number> });
+
+          // ── Compat: preenche estruturas legadas por BU (só linhas RB)
+          if (code !== 'RB') continue;
+
           if (isExpansaoGroup(label)) {
             for (const entry of entries) {
               const monthName = parseMonthFromDate(entry.period || entry.date || '');
-              if (monthName) {
-                expansao[monthName] += Number(entry.value || 0);
-              }
+              if (monthName) expansao[monthName] += Number(entry.value || 0);
             }
           } else {
-            // Oxy Hacker e Franquia podem aparecer como grupos independentes no DRE
-            // mas não têm entrada em DRE_GROUP_TO_BU, então matchBU retornaria null
-            // e eles seriam silenciosamente ignorados. Tratamos explicitamente aqui.
             const isOxyHacker = labelNorm.includes('oxy hacker') || labelNorm.includes('oxy-hacker') || labelNorm === 'oxyhacker';
             const isFranquia = labelNorm.includes('franquia');
             const bu: BuType | null = isOxyHacker ? 'oxy_hacker' : isFranquia ? 'franquia' : matchBU(label);
@@ -273,6 +283,7 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
           expansaoByMonth: expansao as Record<MonthType, number>,
           caasByMonth: caas as Record<MonthType, number>,
           saasByMonth: saas as Record<MonthType, number>,
+          dreLines: lines,
         };
       }
 
@@ -292,7 +303,6 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
             continue;
           }
 
-          // Oxy Hacker e Franquia: tratamento explícito (idem ao path de grupos acima)
           const isOxyHackerRow = labelNorm.includes('oxy hacker') || labelNorm.includes('oxy-hacker') || labelNorm === 'oxyhacker';
           const isFranquiaRow = labelNorm.includes('franquia');
           const bu: BuType | null = isOxyHackerRow ? 'oxy_hacker' : isFranquiaRow ? 'franquia' : matchBU(groupLabel);
@@ -316,6 +326,7 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
       expansaoByMonth: expansao as Record<MonthType, number>,
       caasByMonth: caas as Record<MonthType, number>,
       saasByMonth: saas as Record<MonthType, number>,
+      dreLines: lines,
     };
   }, [dreData]);
 
