@@ -672,18 +672,20 @@ export function MarketingIndicatorsTab() {
     const totalInvestment = data.totalInvestment + googleDeltaInvestment + metaDeltaInvestment;
     const totalLeads = pipefyVolumes.leads;
     
-    // Recalculate cost per stage using API investment / Pipefy volumes
+    // Recalculate cost per stage using API investment / Pipefy volumes.
+    // CPV usa salesInPeriod (dedup autoritativo) para bater com o hero CAC e o CacTotalCard.
+    const vendasAuth = salesInPeriod.length;
     const costPerStage: CostPerStage = {
       cpl: pipefyVolumes.leads > 0 ? totalInvestment / pipefyVolumes.leads : 0,
       cpmql: pipefyVolumes.mqls > 0 ? totalInvestment / pipefyVolumes.mqls : 0,
       cprm: pipefyVolumes.rms > 0 ? totalInvestment / pipefyVolumes.rms : 0,
       cprr: pipefyVolumes.rrs > 0 ? totalInvestment / pipefyVolumes.rrs : 0,
       cpp: pipefyVolumes.propostas > 0 ? totalInvestment / pipefyVolumes.propostas : 0,
-      cpv: pipefyVolumes.vendas > 0 ? totalInvestment / pipefyVolumes.vendas : 0,
+      cpv: vendasAuth > 0 ? totalInvestment / vendasAuth : 0,
     };
     
     return { totalInvestment, totalLeads, costPerStage };
-  }, [enrichedChannels, data, pipefyVolumes]);
+  }, [enrichedChannels, data, pipefyVolumes, salesInPeriod]);
 
   // Calculate real performance metrics from APIs + Pipefy (no spreadsheet dependency)
   // CAC do gauge usa investmentTotalForRange (mesma base do hero card) — somente mídia, sem OPEX.
