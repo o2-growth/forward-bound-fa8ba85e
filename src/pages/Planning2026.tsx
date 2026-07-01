@@ -185,9 +185,7 @@ export default function Planning2026() {
                 <StructureTab />
               </TabsContent>
 
-              <TabsContent value="g4" className="mt-0">
-                <G4Tab />
-              </TabsContent>
+
 
               {isAdmin && (
                 <TabsContent value="admin" className="mt-0">
