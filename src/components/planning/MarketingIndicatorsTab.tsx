@@ -693,10 +693,12 @@ export function MarketingIndicatorsTab() {
   const realPerformanceMetrics = useMemo(() => {
     const investmentForGauges = enrichedTotals.totalInvestment;
     const gmv = realRevenue.gmv;
-    const vendas = pipefyVolumes.vendas;
+    // Denominador único: salesInPeriod (dedup autoritativo). Mesma base do hero CAC,
+    // CacTotalCard e CPV do CostPerStageGauges — evita 3 números de vendas divergentes.
+    const vendas = salesInPeriod.length;
 
-    // Filter "Contrato assinado" cards to get average MRR
-    const vendasCards = allAttributionCards.filter(c => c.fase === 'Contrato assinado');
+    // avgMRR usa qualquer venda válida (Contrato assinado OU Ganho), não só string match.
+    const vendasCards = allAttributionCards.filter(c => isSaleFase(c.fase));
     const totalMrrVendas = vendasCards.reduce((sum, c) => sum + (c.valorMRR || 0), 0);
     const avgMrr = vendasCards.length > 0 ? totalMrrVendas / vendasCards.length : 0;
 
@@ -708,7 +710,7 @@ export function MarketingIndicatorsTab() {
     const roiLtv = investmentForGauges > 0 ? (ltv * vendas) / investmentForGauges : 0;
 
     return { roas, cac, ltv, roiLtv };
-  }, [enrichedTotals.totalInvestment, investmentTotalForRange, realRevenue.gmv, pipefyVolumes.vendas, allAttributionCards]);
+  }, [enrichedTotals.totalInvestment, investmentTotalForRange, realRevenue.gmv, salesInPeriod, allAttributionCards]);
 
   const handleDateRangeChange = (start: Date, end: Date) => {
     setDateRange({ from: start, to: end });
