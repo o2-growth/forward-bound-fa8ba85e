@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { AttributionCard, CampaignData, CampaignFunnel } from "../types";
+import { detectChannel } from "@/hooks/useMarketingAttribution";
 
 type Granularity = "day" | "week" | "month";
 type MetricKey = "vendas" | "investimento" | "ctr" | "cpv" | "cliques" | "impressoes";
@@ -61,6 +62,9 @@ export function CreativeAdPerformanceSection({
   const [metric, setMetric] = useState<MetricKey>("vendas");
 
   // ===== KPI totals (period) — from API campaigns
+  // CPV usa APENAS vendas de mídia paga (Meta/Google), não todas — senão o
+  // investimento pago é dividido por vendas orgânicas/eventos/outbound e o CPV
+  // vira artificialmente baixo. Vendas totais são exibidas como referência.
   const kpis = useMemo(() => {
     let invest = 0, impressions = 0, clicks = 0, reach = 0;
     for (const c of allCampaigns) {
@@ -70,9 +74,13 @@ export function CreativeAdPerformanceSection({
       reach += c.reach || 0;
     }
     const vendas = salesCards.length;
+    const paidVendas = salesCards.filter(c => {
+      const ch = detectChannel(c);
+      return ch === "meta_ads" || ch === "google_ads";
+    }).length;
     const ctr = impressions > 0 ? (clicks / impressions) * 100 : 0;
-    const cpv = vendas > 0 ? invest / vendas : 0;
-    return { invest, impressions, clicks, reach, vendas, ctr, cpv };
+    const cpv = paidVendas > 0 ? invest / paidVendas : 0;
+    return { invest, impressions, clicks, reach, vendas, paidVendas, ctr, cpv };
   }, [allCampaigns, salesCards]);
 
   // ===== Buckets =====

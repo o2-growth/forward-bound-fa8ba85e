@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { AttributionCard, CampaignData } from "../types";
 import { detectChannel } from "@/hooks/useMarketingAttribution";
+import { PHASE_FUNNEL_MAP, FUNNEL_ORDER } from "@/lib/marketingFunnelAggregator";
 
 type SourceKey = "all" | "meta_ads" | "google_ads" | "organico" | "eventos";
 
@@ -31,24 +32,8 @@ const SOURCE_OPTIONS: { value: SourceKey; label: string; color: string }[] = [
   { value: "eventos",    label: "Eventos",          color: "hsl(280 70% 60%)" },
 ];
 
-const PHASE_FUNNEL_MAP: Record<string, string> = {
-  "Novos Leads": "leads",
-  "Start form": "leads",
-  "MQLs": "mqls",
-  "MQL": "mqls",
-  "Tentativas de contato": "mqls",
-  "Material ISCA": "mqls",
-  "Reunião agendada / Qualificado": "rms",
-  "Reunião Realizada": "rrs",
-  "1° Reunião Realizada - Apresentação": "rrs",
-  "1° Reunião Realizada": "rrs",
-  "Proposta enviada / Follow Up": "propostas",
-  "Enviar para assinatura": "propostas",
-  "Contrato assinado": "vendas",
-  "Ganho": "vendas",
-};
-
-const STAGE_ORDER = ["leads", "mqls", "rms", "rrs", "propostas", "vendas"] as const;
+// PHASE_FUNNEL_MAP e STAGE_ORDER agora vêm de marketingFunnelAggregator (fonte única).
+const STAGE_ORDER = FUNNEL_ORDER;
 
 const formatBRL = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });

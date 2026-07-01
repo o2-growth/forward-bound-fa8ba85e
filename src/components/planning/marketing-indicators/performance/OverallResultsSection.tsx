@@ -35,6 +35,8 @@ interface Props {
   dateRange: { from: Date; to: Date };
   allAttributionCards: AttributionCard[];
   salesCards: AttributionCard[];
+  /** Vendas do período anterior (mesmo tamanho). Se ausente, comparativo fica zerado. */
+  salesCardsPrev?: AttributionCard[];
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -92,7 +94,7 @@ function inRange(d: Date | null | undefined, from: Date, to: Date) {
 }
 
 // ─── component ───────────────────────────────────────────────────────────────
-export function OverallResultsSection({ dateRange, allAttributionCards, salesCards }: Props) {
+export function OverallResultsSection({ dateRange, allAttributionCards, salesCards, salesCardsPrev = [] }: Props) {
   // Cross-filter state
   const [cf, setCf] = useState<{ origem?: string; produto?: string; bu?: string; sdr?: string; closer?: string }>({});
   const [granularity, setGranularity] = useState<Granularity>("month");
@@ -149,9 +151,11 @@ export function OverallResultsSection({ dateRange, allAttributionCards, salesCar
 
   // Universos
   const allSalesInPeriod = useMemo(() => salesCards.filter(passesCf), [salesCards, cf]);
+  // Vendas do período anterior vêm de hooks dedicados no parent (salesCardsPrev),
+  // já dedup'd. Aplicamos só o cross-filter aqui.
   const allSalesPrev = useMemo(
-    () => salesCards.filter(c => passesCf(c) && inRange(c.dataAssinatura, prevRange.from, prevRange.to)),
-    [salesCards, cf, prevRange]
+    () => salesCardsPrev.filter(passesCf),
+    [salesCardsPrev, cf]
   );
 
   const propostasInPeriod = useMemo(() => {

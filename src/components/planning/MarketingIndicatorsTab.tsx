@@ -38,6 +38,7 @@ import { DetailSheet, columnFormatters } from "./indicators/DetailSheet";
 import { BestAdsSection } from "./marketing-indicators/BestAdsSection";
 import { InvestmentForecast } from "./marketing-indicators/InvestmentForecast";
 import { CHANNEL_LABELS, ChannelId, CostPerStage, AttributionCard } from "./marketing-indicators/types";
+import { isSaleFase } from "@/lib/marketingFunnelAggregator";
 import { CacTotalCard } from "./marketing-indicators/CacTotalCard";
 import { InvestmentCacMqlHero } from "./marketing-indicators/InvestmentCacMqlHero";
 import { ConsolidatedIndicators26Section } from "./marketing-indicators/ConsolidatedIndicators26Section";
@@ -115,8 +116,10 @@ export function MarketingIndicatorsTab() {
     const mrr = getMetaForPeriod(allBUs, dateRange.from, dateRange.to, 'mrr');
     const setup = getMetaForPeriod(allBUs, dateRange.from, dateRange.to, 'setup');
     const pontual = getMetaForPeriod(allBUs, dateRange.from, dateRange.to, 'pontual');
-    const gmv = mrr + setup + pontual;
-    return { mrr, setup, pontual, educacao: 0, gmv };
+    // GMV inclui Educação (regra do projeto). Como não há meta específica p/ Educação,
+    // usamos o realizado como "meta" — assim GMV real vs meta compara like-for-like
+    // e não gera falsa impressão de over-performance por Educação sem baseline.
+    return { mrr, setup, pontual, educacao: 0, gmv: mrr + setup + pontual };
   }, [getMetaForPeriod, dateRange, allBUs]);
 
   const consolidatedFunnelGoals = useMemo(() => {
@@ -269,6 +272,23 @@ export function MarketingIndicatorsTab() {
   const { cards: franquiaCards, getCardsForIndicator: franquiaGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Franquia');
   const { cards: oxyHackerCards, getCardsForIndicator: oxyGetCards } = useExpansaoAnalytics(dateRange.from, dateRange.to, 'Oxy Hacker');
   const { allCards: outboundAllCards, getCardsForIndicator: outboundGetCards } = useOutboundAnalytics(dateRange.from, dateRange.to);
+
+  // Previous period range (mesmo tamanho, imediatamente anterior) — usado só para
+  // o comparativo "Resultados Gerais" (KPIs com delta). Antes, o filtro rodava
+  // sobre salesInPeriod (já do período atual) e resultava sempre 0.
+  const prevRange = useMemo(() => {
+    const ms = dateRange.to.getTime() - dateRange.from.getTime();
+    return {
+      from: new Date(dateRange.from.getTime() - ms - 1),
+      to: new Date(dateRange.from.getTime() - 1),
+    };
+  }, [dateRange]);
+  const { getCardsForIndicator: maGetCardsPrev } = useModeloAtualAnalytics(prevRange.from, prevRange.to);
+  const { getCardsForIndicator: o2GetCardsPrev } = useO2TaxAnalytics(prevRange.from, prevRange.to);
+  const { getCardsForIndicator: franquiaGetCardsPrev } = useExpansaoAnalytics(prevRange.from, prevRange.to, 'Franquia');
+  const { getCardsForIndicator: oxyGetCardsPrev } = useExpansaoAnalytics(prevRange.from, prevRange.to, 'Oxy Hacker');
+  const { getCardsForIndicator: outboundGetCardsPrev } = useOutboundAnalytics(prevRange.from, prevRange.to);
+
 
   // Investment per month (Meta + Google) for the visible range — for cohorts
   const { byMonth: investmentByMonth, totalInvestment: investmentTotalForRange } = useInvestmentByMonth(dateRange.from, dateRange.to);
@@ -465,6 +485,56 @@ export function MarketingIndicatorsTab() {
 
     return all;
   }, [maGetCards, o2GetCards, franquiaGetCards, oxyGetCards, outboundGetCards, allAttributionCards, dateRange]);
+
+  // Vendas do período anterior — usado pelo comparativo em "Resultados Gerais".
+  // Versão simplificada de salesInPeriod: só dedup por card+empresa, sem o
+  // fallback de allAttributionCards (que aqui não temos para prev period).
+  const salesInPeriodPrev = useMemo<AttributionCard[]>(() => {
+    const normalize = (s?: string | null) =>
+      (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const stripPrefix = (id: string) => String(id).replace(/^(outbound_|oxy_|o2tax_)/, '');
+    const isValidDate = (d: unknown): d is Date => d instanceof Date && !Number.isNaN(d.getTime());
+    const sources: Array<{ cards: any[]; bu: string; prefix: string; priority: number }> = [
+      { cards: maGetCardsPrev('venda'),       bu: 'Modelo Atual', prefix: '',          priority: 1 },
+      { cards: o2GetCardsPrev('venda'),       bu: 'O2 TAX',       prefix: 'o2tax_',    priority: 2 },
+      { cards: franquiaGetCardsPrev('venda'), bu: 'Franquia',     prefix: '',          priority: 3 },
+      { cards: oxyGetCardsPrev('venda'),      bu: 'Oxy Hacker',   prefix: 'oxy_',      priority: 4 },
+      { cards: outboundGetCardsPrev('venda'), bu: 'Outbound',     prefix: 'outbound_', priority: 5 },
+    ];
+    const byKey = new Map<string, { card: AttributionCard; priority: number }>();
+    for (const { cards, bu, prefix, priority } of sources) {
+      for (const c of cards) {
+        const baseId = stripPrefix(String(c.id));
+        if (isTestCard(baseId)) continue;
+        const empresaKey = normalize((c as any).empresa || c.titulo);
+        const key = `${baseId}|${empresaKey}`;
+        const existing = byKey.get(key);
+        if (existing && existing.priority <= priority) continue;
+        const phaseEntryDate = isValidDate(c.dataEntrada) ? c.dataEntrada : new Date();
+        const signedDate = isValidDate(c.dataAssinatura) ? c.dataAssinatura : phaseEntryDate;
+        byKey.set(key, {
+          priority,
+          card: {
+            id: prefix + c.id,
+            titulo: c.titulo,
+            empresa: (c as any).empresa,
+            fase: c.fase,
+            dataEntrada: phaseEntryDate,
+            dataCriacao: isValidDate(c.dataCriacao) ? c.dataCriacao : phaseEntryDate,
+            dataAssinatura: signedDate,
+            produto: c.produto,
+            valor: c.valor || 0,
+            valorMRR: c.valorMRR || 0,
+            valorSetup: c.valorSetup || 0,
+            valorPontual: c.valorPontual || 0,
+            valorEducacao: c.valorEducacao || 0,
+            bu,
+          },
+        });
+      }
+    }
+    return Array.from(byKey.values()).map(v => v.card);
+  }, [maGetCardsPrev, o2GetCardsPrev, franquiaGetCardsPrev, oxyGetCardsPrev, outboundGetCardsPrev]);
 
   // Resolve archived/deleted campaign names for attribution
   const { data: campaignNamesMap } = useMetaCampaignNames();
@@ -669,18 +739,20 @@ export function MarketingIndicatorsTab() {
     const totalInvestment = data.totalInvestment + googleDeltaInvestment + metaDeltaInvestment;
     const totalLeads = pipefyVolumes.leads;
     
-    // Recalculate cost per stage using API investment / Pipefy volumes
+    // Recalculate cost per stage using API investment / Pipefy volumes.
+    // CPV usa salesInPeriod (dedup autoritativo) para bater com o hero CAC e o CacTotalCard.
+    const vendasAuth = salesInPeriod.length;
     const costPerStage: CostPerStage = {
       cpl: pipefyVolumes.leads > 0 ? totalInvestment / pipefyVolumes.leads : 0,
       cpmql: pipefyVolumes.mqls > 0 ? totalInvestment / pipefyVolumes.mqls : 0,
       cprm: pipefyVolumes.rms > 0 ? totalInvestment / pipefyVolumes.rms : 0,
       cprr: pipefyVolumes.rrs > 0 ? totalInvestment / pipefyVolumes.rrs : 0,
       cpp: pipefyVolumes.propostas > 0 ? totalInvestment / pipefyVolumes.propostas : 0,
-      cpv: pipefyVolumes.vendas > 0 ? totalInvestment / pipefyVolumes.vendas : 0,
+      cpv: vendasAuth > 0 ? totalInvestment / vendasAuth : 0,
     };
     
     return { totalInvestment, totalLeads, costPerStage };
-  }, [enrichedChannels, data, pipefyVolumes]);
+  }, [enrichedChannels, data, pipefyVolumes, salesInPeriod]);
 
   // Calculate real performance metrics from APIs + Pipefy (no spreadsheet dependency)
   // CAC do gauge usa investmentTotalForRange (mesma base do hero card) — somente mídia, sem OPEX.
@@ -688,10 +760,12 @@ export function MarketingIndicatorsTab() {
   const realPerformanceMetrics = useMemo(() => {
     const investmentForGauges = enrichedTotals.totalInvestment;
     const gmv = realRevenue.gmv;
-    const vendas = pipefyVolumes.vendas;
+    // Denominador único: salesInPeriod (dedup autoritativo). Mesma base do hero CAC,
+    // CacTotalCard e CPV do CostPerStageGauges — evita 3 números de vendas divergentes.
+    const vendas = salesInPeriod.length;
 
-    // Filter "Contrato assinado" cards to get average MRR
-    const vendasCards = allAttributionCards.filter(c => c.fase === 'Contrato assinado');
+    // avgMRR usa qualquer venda válida (Contrato assinado OU Ganho), não só string match.
+    const vendasCards = allAttributionCards.filter(c => isSaleFase(c.fase));
     const totalMrrVendas = vendasCards.reduce((sum, c) => sum + (c.valorMRR || 0), 0);
     const avgMrr = vendasCards.length > 0 ? totalMrrVendas / vendasCards.length : 0;
 
@@ -703,7 +777,7 @@ export function MarketingIndicatorsTab() {
     const roiLtv = investmentForGauges > 0 ? (ltv * vendas) / investmentForGauges : 0;
 
     return { roas, cac, ltv, roiLtv };
-  }, [enrichedTotals.totalInvestment, investmentTotalForRange, realRevenue.gmv, pipefyVolumes.vendas, allAttributionCards]);
+  }, [enrichedTotals.totalInvestment, investmentTotalForRange, realRevenue.gmv, salesInPeriod, allAttributionCards]);
 
   const handleDateRangeChange = (start: Date, end: Date) => {
     setDateRange({ from: start, to: end });
@@ -844,6 +918,7 @@ export function MarketingIndicatorsTab() {
         dateRange={dateRange}
         allAttributionCards={allAttributionCards}
         salesCards={salesInPeriod}
+        salesCardsPrev={salesInPeriodPrev}
       />
 
 
@@ -914,7 +989,7 @@ export function MarketingIndicatorsTab() {
               }
               return resolved === channelDrillDown.channel;
             })
-            .filter(card => card.fase === 'Contrato assinado')
+            .filter(card => isSaleFase(card.fase))
             .map(card => ({
               id: card.id,
               name: card.titulo,
@@ -934,10 +1009,16 @@ export function MarketingIndicatorsTab() {
       )}
 
 
-      {/* Revenue Metrics Cards - Integrated with Modelo Atual data */}
+      {/* Revenue Metrics Cards - Integrated with Modelo Atual data.
+          Meta de Educação usa o realizado como baseline (não há meta própria), então
+          GMV real (mrr+setup+pontual+educ) vs GMV meta compara like-for-like. */}
       <RevenueMetricsCards
         revenue={realRevenue}
-        goals={finalRevenueGoals}
+        goals={{
+          ...finalRevenueGoals,
+          educacao: realRevenue.educacao || 0,
+          gmv: (finalRevenueGoals.mrr || 0) + (finalRevenueGoals.setup || 0) + (finalRevenueGoals.pontual || 0) + (realRevenue.educacao || 0),
+        }}
       />
 
       {/* Cost Per Stage Gauges */}
@@ -992,7 +1073,7 @@ export function MarketingIndicatorsTab() {
                   <p className="text-xs text-muted-foreground">vs Meta</p>
                   <p className={cn(
                     "text-xl font-bold",
-                    data.costPerStage[costDrillDown.costKey] <= finalCostGoals[costDrillDown.costKey] 
+                    enrichedTotals.costPerStage[costDrillDown.costKey] <= finalCostGoals[costDrillDown.costKey] 
                       ? "text-chart-2" 
                       : "text-destructive"
                   )}>
