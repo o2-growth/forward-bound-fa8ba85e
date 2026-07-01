@@ -1,40 +1,37 @@
-## Plano de validação — commit 725803e
+Já validei o commit `725803e` no turno anterior — os 3 blocos estão **FAIL** no código. Como você pediu de novo pra "testar", entendo que quer que eu **aplique as correções agora** (não só re-rodar o teste que vai dar o mesmo resultado). Segue o plano de implementação. Se você quer apenas re-testar sem mexer, me avisa.
 
-Executar 3 blocos de teste end-to-end no preview autenticado, mais checagens gerais. Reportar PASS/FAIL por item com screenshot + logs quando falhar.
+## Correções a aplicar
 
-### Preparação
-1. `tsgo` no repo para confirmar 0 erros de tipo antes de subir Playwright.
-2. Playwright headless em `http://localhost:8080` restaurando sessão Supabase gerenciada (LOVABLE_BROWSER_*). Viewport 1280x1800. Screenshots em `/tmp/browser/commit-725803e/screenshots/`.
-3. Captura `console` e `network` (foco em `read-marketing-sheet`) durante toda a navegação.
+### Fix 1 — Coluna "Fase Atual" no drill-down RR
+**Arquivo:** `src/components/planning/IndicatorsTab.tsx` (builder do drill-down "Reunião Realizada")
+- Adicionar coluna `phase` ao array de colunas do RR, na ordem: Produto | Empresa | Closer | Faixa Faturamento | **Fase Atual** | Tempo até Reunir | Data.
+- Popular `phase` a partir de `card.current_phase` / `phase_name` (mesmo campo já usado no drill-down de Proposta).
+- Ajustar o drill-down de **Proposta enviada** para também ler `current_phase` real em vez de rótulo fixo "Proposta enviada / Follow Up".
 
-### Teste 1 — Drill-down RR "Fase Atual"
-- Navegar: Planejamento → Indicadores → Comercial.
-- Aplicar filtro Closer = Daniel Trindade.
-- Clicar acelerômetro "Reunião Realizada".
-- Validar cabeçalho da tabela: `Produto | Empresa | Closer | Faixa Faturamento | Fase Atual | Tempo até Reunir | Data` (7 colunas, ordem exata).
-- Coletar valores distintos da coluna "Fase Atual" — falhar se todas forem "Reunião Realizada".
-- Repetir sem filtro de closer.
-- Repetir para acelerômetro "Proposta enviada" e validar que "Fase Atual" mostra Ganho/Perdido/Follow Up (não sempre "Proposta enviada / Follow Up").
+### Fix 2 — Marketing: fontes de dados alinhadas
+**Arquivos:**
+- `supabase/functions/read-marketing-sheet/index.ts` — incluir no JSON de retorno os campos `timeFerramentas`, `despesasTotais`, `investimentoEventos` (já lidos internamente, mas nunca expostos).
+- `src/hooks/useMarketingSheetData.ts` — já declara os 3 campos, apenas confirmar tipagem.
+- `src/hooks/useMarketingIndicators.ts` — zerar `mqls` de `meta_ads` e `google_ads` (já está 0, revalidar que não há regressão com proporção).
+- `src/components/planning/MarketingIndicatorsTab.tsx` (seção Enriched Channels / coluna Eventos) — trocar `25000` hardcoded por `sheetData.investimentoEventos ?? 25000`.
+- `src/components/planning/marketing-indicators/` (gauge CAC) — adicionar sublabel `"Somente mídia — OPEX não incluído"` no gauge; manter Hero CAC com OPEX+timeFerramentas.
 
-### Teste 2 — Marketing Indicadores
-- Navegar: Planejamento → Marketing → Indicadores.
-- 2.1 Ler tabela Enriched Channels: MQL de Meta Ads e Google Ads deve ser 0.
-- 2.2 Coluna Eventos: capturar valor de investimento; comparar com `investimentoEventos` do JSON de `read-marketing-sheet`. Falhar se hardcoded 25.000 quando a planilha tem valor.
-- 2.3 Conferir Hero CAC (topo) e Gauge CAC (grid). Confirmar sublabel "Somente mídia — OPEX não incluído" no gauge.
-- 2.4 Interceptar resposta de `functions/v1/read-marketing-sheet` via `page.on("response")`; validar presença de `timeFerramentas`, `despesasTotais`, `investimentoEventos`.
+### Fix 3 — Visão do CEO
+**Arquivos em `src/components/planning/ceo/`:**
+- `ceoShared.tsx` (`sumMonths` / iterador de meses) — reescrever loop para iterar corretamente quando `to.year > from.year` (ex.: usar `addMonths` até `<= endOfMonth(to)` em vez de `for m in 1..12` no mesmo ano).
+- `DreSection.tsx` — garantir que as linhas Oxy Hacker e Franquia leiam de `realizedDRE[bu]` (mesmas fontes de `FinancialTab`), não filtradas fora.
+- `FinanceiroSection.tsx` — renomear card "Retenção" → **"Churn Rate"**, exibir `churnRate` direto (não `100 - churnRate`), adicionar sublabel `"Histórico total — base ativa desde início"`.
 
-### Teste 3 — Visão do CEO
-- 3.1 Sub-abas Pessoal e Financeiro: setar DateRange 15/11/2025 → 15/01/2026 e conferir "Receita / pessoa" e "Receita do período" > 0.
-- 3.2 Sub-aba DRE: confirmar linhas Oxy Hacker e Franquia com valores não-zero; comparar totais vs. cards de faturamento em outras abas.
-- 3.3 Sub-aba Financeiro: confirmar card renomeado para "Churn Rate", valor pequeno (ex. 3.5%), sublabel "Histórico total — …" presente.
+## Validação após aplicar
+1. `tsgo` — 0 erros de tipo.
+2. Playwright headless com sessão Supabase restaurada:
+   - Drill-down RR (com/sem filtro Closer) — confere 7 colunas + valores distintos em "Fase Atual".
+   - Drill-down Proposta — "Fase Atual" mostra Ganho/Perdido/Follow Up.
+   - Aba Marketing → Enriched Channels: MQL Meta/Google = 0, coluna Eventos usa valor da planilha; interceptar response de `read-marketing-sheet` e confirmar 3 campos novos; gauge CAC com sublabel.
+   - Visão CEO: DateRange 15/11/2025→15/01/2026 → Receita/pessoa e Receita do período > 0; DRE com Oxy Hacker e Franquia > 0; card "Churn Rate" com valor pequeno + sublabel.
+3. Console = 0 exceções.
+4. Reporte final PASS/FAIL por item com screenshots e go/no-go para push.
 
-### Checagens gerais
-- `tsgo` = 0 erros.
-- Console = 0 exceções vermelhas durante a navegação (filtrar `Failed to fetch` do lovable.js overlay, que é ruído de dev).
-- Qualquer modal em branco / loading infinito → screenshot + trace de network + arquivo/componente suspeito.
-
-### Entrega
-Resposta consolidada com tabela PASS/FAIL/warning por item, prints anexados nos casos com divergência e recomendação final (go/no-go para push).
-
-### Nota
-Este plano é somente de teste — nenhum arquivo do projeto será modificado. Se algum item falhar, retorno com diagnóstico e proposta de correção separada antes de qualquer edit.
+## Fora de escopo
+- Não altero regras de MQL, funil, ou lógica de atribuição.
+- Não mexo em outras abas nem em migrations.
