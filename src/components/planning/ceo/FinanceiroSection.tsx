@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Wallet, AlertTriangle } from "lucide-react";
 import { useOperationsData } from "@/hooks/useOperationsData";
 import { useOxyReceivables } from "@/hooks/useOxyReceivables";
-import { fmt, fmtFull, fmtInt, MetricCard, AiNote, type MetricSource } from "./ceoShared";
+import { fmt, fmtFull, fmtInt, MetricCard, AiNote, AiNoteAuto, type MetricSource } from "./ceoShared";
 
 interface Props { dateRange: { from: Date; to: Date }; }
 
@@ -112,7 +112,7 @@ export function FinanceiroSection({ dateRange }: Props) {
                   </Table>
                 </div>
               )}
-              <AiNote />
+              <AiNoteAuto section="Financeiro" title="Base ativa e inadimplência" buildContext={() => ({ clientesAtivos: kpis?.totalAtivos, churn: kpis?.churn, churnRate: kpis?.churnRate, inadimplenciaTotal: receivables.total, clientesInadimplentes: clientesInad, top10Inadimplentes: topInad.slice(0,10).map((c: any) => ({ label: c.label, total: c.total })) })} />
             </>
           )}
         </CardContent>
