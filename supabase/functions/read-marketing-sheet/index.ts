@@ -76,6 +76,7 @@ const METRIC_MAPPINGS: Record<string, string[]> = {
   'ltvCac': ['LTV/CAC', 'LTV / CAC', 'Ltv/Cac', 'LTV:CAC', 'LTV CAC'],
   'timeFerramentas': ['Time e ferramentas', 'Time e Ferramentas', 'Time + Ferramentas', 'Time e ferramenta'],
   'despesasTotais': ['Despesas totais', 'Despesas Totais', 'Despesa total', 'Despesas total'],
+  'investimentoEventos': ['Investimento Eventos', 'Investimento em Eventos', 'Eventos - Investimento', 'Eventos Investimento', 'Invest. Eventos'],
 };
 
 // Metrics that are ratios/averages (not summable)
@@ -91,7 +92,7 @@ const SUMMABLE_METRICS = new Set([
   'midiaTotal', 'leadsTotais', 'mqlPorFaturamento', 'reuniaoMarcada',
   'reuniaoRealizada', 'propostaEnviada', 'vendas',
   'mrr', 'setup', 'pontual', 'educacao', 'gmv',
-  'timeFerramentas', 'despesasTotais'
+  'timeFerramentas', 'despesasTotais', 'investimentoEventos'
 ]);
 
 function normalizeText(text: string): string {
@@ -613,7 +614,12 @@ serve(async (req) => {
       roasLtv: metrics.roasLtv || 0,
       roiLtv: metrics.roiLtv || 0,
       ltvCac: metrics.ltvCac || 0,
-      
+
+      // OPEX / Eventos
+      timeFerramentas: metrics.timeFerramentas || 0,
+      despesasTotais: metrics.despesasTotais || 0,
+      investimentoEventos: metrics.investimentoEventos || 0,
+
       // Meta
       period: { startDate, endDate },
       monthsIncluded: totalMonthsIncluded,

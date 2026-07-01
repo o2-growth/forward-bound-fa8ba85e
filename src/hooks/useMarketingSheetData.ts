@@ -47,6 +47,9 @@ export interface MarketingSheetData {
   timeFerramentas: number;
   despesasTotais: number;
 
+  // Investimento em eventos (configurável na planilha; fallback 25000 no tab)
+  investimentoEventos: number;
+
   // Meta
   period: {
     startDate: string;

@@ -34,10 +34,23 @@ export function fmtInt(value: number | null | undefined): string {
 export const MONTHS_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 // Soma os valores de um Record<mês, número> (ano corrente) dentro do período.
+// Itera mês a mês para suportar períodos cross-year (ex: Nov→Jan) que quebravam
+// o loop anterior (from.getMonth() > to.getMonth() → loop nunca executava → retornava 0).
+// NOTE: rec é indexado apenas por nome do mês (sem ano). Períodos cross-year somam
+// os meses do período mas usam os mesmos nomes de mês para anos distintos — limitação
+// aceitável enquanto os dados forem de um único ano fiscal.
+// TODO: mudar rec para Record<year, Record<month, number>> para suporte multi-year real.
 export function sumMonths(rec: Record<string, number> | undefined | null, from: Date, to: Date): number {
   if (!rec) return 0;
   let t = 0;
-  for (let i = from.getMonth(); i <= to.getMonth(); i++) t += rec[MONTHS_PT[i]] || 0;
+  const d = new Date(from.getFullYear(), from.getMonth(), 1);
+  const end = new Date(to.getFullYear(), to.getMonth(), 1);
+  let iterations = 0;
+  while (d <= end && iterations < 13) {
+    t += rec[MONTHS_PT[d.getMonth()]] || 0;
+    d.setMonth(d.getMonth() + 1);
+    iterations++;
+  }
   return t;
 }
 

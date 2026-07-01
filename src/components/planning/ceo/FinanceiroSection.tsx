@@ -7,8 +7,8 @@ interface Props { dateRange: { from: Date; to: Date }; }
 
 const SRC: MetricSource = {
   origem: "useOperationsData — Pipefy Central de Projetos",
-  periodo: "Snapshot atual",
-  calculo: "Clientes em fases ativas vs encerradas.",
+  periodo: "Snapshot atual (histórico total — não filtra por data)",
+  calculo: "Churn Rate = clientes encerrados ÷ (ativos + encerrados). Retenção real (por período) requer contagem de início do período — não disponível ainda.",
 };
 
 export function FinanceiroSection(_props: Props) {
@@ -30,7 +30,15 @@ export function FinanceiroSection(_props: Props) {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <MetricCard label="Clientes ativos" value={fmtInt(kpis?.totalAtivos)} large source={SRC} />
             <MetricCard label="Clientes inativos (churn)" value={fmtInt(kpis?.churn)} tone="danger" source={SRC} />
-            <MetricCard label="Retenção" value={kpis?.retencaoRate != null ? `${kpis.retencaoRate.toFixed(1)}%` : "—"} source={SRC} />
+            {/* BUG F3: retencaoRate era complemento do churn histórico — não é taxa de retenção
+                do período. Exibimos churnRate com aviso até a fonte de dados por período estar disponível. */}
+            <MetricCard
+              label="Churn Rate"
+              value={kpis?.churnRate != null ? `${kpis.churnRate.toFixed(1)}%` : "—"}
+              sublabel="Histórico total — ignora filtro de data"
+              tone="danger"
+              source={SRC}
+            />
           </div>
           <AiNote />
         </CardContent>

@@ -273,6 +273,12 @@ export function MarketingIndicatorsTab() {
   // Investment per month (Meta + Google) for the visible range — for cohorts
   const { byMonth: investmentByMonth, totalInvestment: investmentTotalForRange } = useInvestmentByMonth(dateRange.from, dateRange.to);
 
+  // Sheet data — hoisted here so it's available for enrichedChannels (eventos investment) and hero block
+  const { data: sheetData } = useMarketingSheetData({
+    startDate: dateRange.from,
+    endDate: dateRange.to,
+  });
+
   // Build attribution cards from all BUs
   const allAttributionCards = useMemo((): AttributionCard[] => {
     const result: AttributionCard[] = [];
@@ -535,18 +541,20 @@ export function MarketingIndicatorsTab() {
     });
 
     // Add Eventos channel from Pipefy attribution
+    // investimentoEventos vem da planilha (célula configurável); fallback R$ 25.000 enquanto não existe a célula
+    const eventosInvestment = sheetData?.investimentoEventos || 25000;
     const eventosSummary = channelSummaries.find(s => s.channel === 'eventos');
     if (eventosSummary && (eventosSummary.leads > 0 || eventosSummary.mqls > 0 || eventosSummary.vendas > 0 || eventosSummary.receita > 0)) {
       channels.push({
         id: 'eventos',
         name: 'Eventos',
-        investment: 25000,
+        investment: eventosInvestment,
         leads: eventosSummary.leads,
         mqls: eventosSummary.mqls,
         rms: 0,
         rrs: 0,
-        cpl: eventosSummary.leads > 0 ? 25000 / eventosSummary.leads : 0,
-        cpmql: eventosSummary.mqls > 0 ? 25000 / eventosSummary.mqls : 0,
+        cpl: eventosSummary.leads > 0 ? eventosInvestment / eventosSummary.leads : 0,
+        cpmql: eventosSummary.mqls > 0 ? eventosInvestment / eventosSummary.mqls : 0,
         conversionRate: eventosSummary.leads > 0
           ? Math.round((eventosSummary.mqls / eventosSummary.leads) * 100)
           : 0,
@@ -585,7 +593,7 @@ export function MarketingIndicatorsTab() {
     }
 
     return channels;
-  }, [data.channels, channelSummaries, googleAdsApiTotals, metaAdsApiTotals]);
+  }, [data.channels, channelSummaries, googleAdsApiTotals, metaAdsApiTotals, sheetData]);
 
   // Count real volumes mirroring the Commercial accelerometer (no Closer/SDR filter
   // branch in IndicatorsTab.getRealizedForIndicator): Modelo Atual includes Outbound,
@@ -675,8 +683,10 @@ export function MarketingIndicatorsTab() {
   }, [enrichedChannels, data, pipefyVolumes]);
 
   // Calculate real performance metrics from APIs + Pipefy (no spreadsheet dependency)
+  // CAC do gauge usa investmentTotalForRange (mesma base do hero card) — somente mídia, sem OPEX.
+  // ROAS e ROI LTV usam enrichedTotals para incluir todos os canais (inclusive Eventos).
   const realPerformanceMetrics = useMemo(() => {
-    const investment = enrichedTotals.totalInvestment;
+    const investmentForGauges = enrichedTotals.totalInvestment;
     const gmv = realRevenue.gmv;
     const vendas = pipefyVolumes.vendas;
 
@@ -685,24 +695,22 @@ export function MarketingIndicatorsTab() {
     const totalMrrVendas = vendasCards.reduce((sum, c) => sum + (c.valorMRR || 0), 0);
     const avgMrr = vendasCards.length > 0 ? totalMrrVendas / vendasCards.length : 0;
 
-    const roas = investment > 0 ? gmv / investment : 0;
-    const cac = vendas > 0 ? investment / vendas : 0;
+    const roas = investmentForGauges > 0 ? gmv / investmentForGauges : 0;
+    // CAC gauge = investmentTotalForRange (Meta+Google API por mês) ÷ vendas — somente mídia, sem OPEX
+    // O hero card inclui OPEX (timeFerramentas). As duas métricas são intencionalmente diferentes.
+    const cac = vendas > 0 ? investmentTotalForRange / vendas : 0;
     const ltv = avgMrr * 12;
-    const roiLtv = investment > 0 ? (ltv * vendas) / investment : 0;
+    const roiLtv = investmentForGauges > 0 ? (ltv * vendas) / investmentForGauges : 0;
 
     return { roas, cac, ltv, roiLtv };
-  }, [enrichedTotals.totalInvestment, realRevenue.gmv, pipefyVolumes.vendas, allAttributionCards]);
+  }, [enrichedTotals.totalInvestment, investmentTotalForRange, realRevenue.gmv, pipefyVolumes.vendas, allAttributionCards]);
 
   const handleDateRangeChange = (start: Date, end: Date) => {
     setDateRange({ from: start, to: end });
   };
 
   // ===== Dados do bloco hero "Investimento • CPMQL • CAC" =====
-  // Espelho consolidado da planilha "Indicadores 26" (CAC autoritativo, LTV/CAC, Time e ferramentas).
-  const { data: sheetData } = useMarketingSheetData({
-    startDate: dateRange.from,
-    endDate: dateRange.to,
-  });
+  // sheetData já está hoistado acima (antes de enrichedChannels) — usado aqui também.
 
   // Time e Ferramentas — autoritativo via DRE Oxy detalhado (toda a Oxy, não só squad CFO).
   const tfDre = useTimeEFerramentasFromDre({

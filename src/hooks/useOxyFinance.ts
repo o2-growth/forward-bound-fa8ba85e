@@ -240,7 +240,12 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
               }
             }
           } else {
-            const bu = matchBU(label);
+            // Oxy Hacker e Franquia podem aparecer como grupos independentes no DRE
+            // mas não têm entrada em DRE_GROUP_TO_BU, então matchBU retornaria null
+            // e eles seriam silenciosamente ignorados. Tratamos explicitamente aqui.
+            const isOxyHacker = labelNorm.includes('oxy hacker') || labelNorm.includes('oxy-hacker') || labelNorm === 'oxyhacker';
+            const isFranquia = labelNorm.includes('franquia');
+            const bu: BuType | null = isOxyHacker ? 'oxy_hacker' : isFranquia ? 'franquia' : matchBU(label);
             if (!bu) continue;
             for (const entry of entries) {
               const monthName = parseMonthFromDate(entry.period || entry.date || '');
@@ -276,7 +281,10 @@ export function useOxyFinance(year: number = 2026): OxyFinanceResult {
             continue;
           }
 
-          const bu = matchBU(groupLabel);
+          // Oxy Hacker e Franquia: tratamento explícito (idem ao path de grupos acima)
+          const isOxyHackerRow = labelNorm.includes('oxy hacker') || labelNorm.includes('oxy-hacker') || labelNorm === 'oxyhacker';
+          const isFranquiaRow = labelNorm.includes('franquia');
+          const bu: BuType | null = isOxyHackerRow ? 'oxy_hacker' : isFranquiaRow ? 'franquia' : matchBU(groupLabel);
           if (!bu) continue;
           if (row.value && row.date) {
             const monthName = parseMonthFromDate(row.date);

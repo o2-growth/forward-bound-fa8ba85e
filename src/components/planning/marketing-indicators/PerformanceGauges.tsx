@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, DollarSign, Target, Users } from "lucide-reac
 
 interface GaugeCardProps {
   title: string;
+  subtitle?: string; // Optional note shown below the title (e.g. "Somente mídia")
   value: number;
   goal: number;
   format: 'currency' | 'multiplier' | 'percentage';
@@ -10,7 +11,7 @@ interface GaugeCardProps {
   invertColors?: boolean; // For metrics where lower is better (CAC)
 }
 
-function GaugeCard({ title, value, goal, format, icon, invertColors = false }: GaugeCardProps) {
+function GaugeCard({ title, subtitle, value, goal, format, icon, invertColors = false }: GaugeCardProps) {
   const percentage = goal > 0 ? (value / goal) * 100 : 0;
   const isOnTrack = invertColors ? value <= goal : value >= goal;
   
@@ -33,6 +34,9 @@ function GaugeCard({ title, value, goal, format, icon, invertColors = false }: G
           {icon}
           {title}
         </CardTitle>
+        {subtitle && (
+          <p className="text-xs text-muted-foreground/70 -mt-1">{subtitle}</p>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
@@ -113,6 +117,7 @@ export function PerformanceGauges({
       />
       <GaugeCard
         title="CAC"
+        subtitle="Somente mídia — OPEX não incluído"
         value={cac}
         goal={cacGoal}
         format="currency"

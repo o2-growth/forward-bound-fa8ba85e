@@ -99,14 +99,14 @@ export function useMarketingIndicators({
         name: 'Meta Ads',
         investment: sheetData.midiaMeta,
         leads: sheetData.leadsMeta,
-        mqls: Math.round(sheetData.mqlPorFaturamento * metaRatio),
+        // mqls por canal não existe como dado real — sem atribuição de MQL por plataforma
+        mqls: 0,
         rms: Math.round(sheetData.reuniaoMarcada * metaRatio),
         rrs: Math.round(sheetData.reuniaoRealizada * metaRatio),
         cpl: sheetData.cplMeta || (sheetData.leadsMeta > 0 ? sheetData.midiaMeta / sheetData.leadsMeta : 0),
         cpmql: sheetData.cpmqlPorFaturamento || 0,
-        conversionRate: sheetData.leadsMeta > 0 
-          ? Math.round((sheetData.mqlPorFaturamento * metaRatio / sheetData.leadsMeta) * 100) 
-          : 0,
+        // conversionRate de MQL por canal é desconhecido sem atribuição real
+        conversionRate: 0,
         propostas: Math.round(sheetData.propostaEnviada * metaRatio),
         vendas: Math.round(sheetData.vendas * metaRatio),
         cprm: sheetData.cprm || 0,
@@ -119,14 +119,14 @@ export function useMarketingIndicators({
         name: 'Google Ads',
         investment: sheetData.midiaGoogle,
         leads: sheetData.leadsGoogle,
-        mqls: Math.round(sheetData.mqlPorFaturamento * googleRatio),
+        // mqls por canal não existe como dado real — sem atribuição de MQL por plataforma
+        mqls: 0,
         rms: Math.round(sheetData.reuniaoMarcada * googleRatio),
         rrs: Math.round(sheetData.reuniaoRealizada * googleRatio),
         cpl: sheetData.cplGoogle || (sheetData.leadsGoogle > 0 ? sheetData.midiaGoogle / sheetData.leadsGoogle : 0),
         cpmql: sheetData.cpmqlPorFaturamento || 0,
-        conversionRate: sheetData.leadsGoogle > 0 
-          ? Math.round((sheetData.mqlPorFaturamento * googleRatio / sheetData.leadsGoogle) * 100) 
-          : 0,
+        // conversionRate de MQL por canal é desconhecido sem atribuição real
+        conversionRate: 0,
         propostas: Math.round(sheetData.propostaEnviada * googleRatio),
         vendas: Math.round(sheetData.vendas * googleRatio),
         cprm: sheetData.cprm || 0,

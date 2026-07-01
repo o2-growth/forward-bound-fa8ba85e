@@ -618,7 +618,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       id: card.id,
       name: card.titulo || card.empresa || 'Sem título',
       company: card.empresa || card.contato || undefined,
-      phase: card.faseDestino,
+      phase: card.faseAtual || card.faseDestino,
       date: (card.dataAssinatura && PHASE_TO_INDICATOR[card.fase] === 'venda'
         ? card.dataAssinatura
         : card.dataEntrada).toISOString(),

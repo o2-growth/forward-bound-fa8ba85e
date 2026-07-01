@@ -2017,6 +2017,7 @@ export function IndicatorsTab() {
           { key: 'company', label: 'Empresa' },
           { key: 'responsible', label: 'Closer' },
           { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
           { key: 'duration', label: 'Tempo até Reunir', format: columnFormatters.duration },
           { key: 'date', label: 'Data', format: columnFormatters.date },
         ]);
