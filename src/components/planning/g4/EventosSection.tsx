@@ -18,16 +18,24 @@ export interface EventoRow {
 
 export interface EventosSectionProps {
   // Métricas agregadas da frente Eventos
-  leads: number;
-  pipe: number;
-  faturamento: number;
+  leads?: number;
+  pipe?: number;
+  faturamento?: number;
   leadTimeMedio?: number;
-  funnel: FunnelStep[];
-  dre: G4Dre;
+  funnel?: FunnelStep[];
+  dre?: G4Dre;
   custosDetalhe?: CustoDetalhe[];
   // Detalhamento por evento
-  eventosRows: EventoRow[];
+  eventosRows?: EventoRow[];
 }
+
+const ZERO_DRE: G4Dre = {
+  receitaBruta: 0,
+  imposto: 0,
+  comissaoG4: 0,
+  custosOperacionais: 0,
+  lucroLiquido: 0,
+};
 
 // ── Helpers ────────────────────────────────────────────────────────────
 function fmtDate(dateStr: string): string {
@@ -41,18 +49,19 @@ function fmtDate(dateStr: string): string {
 
 // ── Componente ─────────────────────────────────────────────────────────
 export function EventosSection({
-  leads,
-  pipe,
-  faturamento,
+  leads = 0,
+  pipe = 0,
+  faturamento = 0,
   leadTimeMedio,
-  funnel,
-  dre,
+  funnel = [],
+  dre = ZERO_DRE,
   custosDetalhe,
-  eventosRows,
+  eventosRows = [],
 }: EventosSectionProps) {
-  const totalLeadsEventos = eventosRows.reduce((s, r) => s + r.leadsGerados, 0);
-  const totalCustoEventos = eventosRows.reduce((s, r) => s + r.custo, 0);
-  const hasCustosPendentes = eventosRows.some((r) => r.custo === 0);
+  const rows = eventosRows ?? [];
+  const totalLeadsEventos = rows.reduce((s, r) => s + r.leadsGerados, 0);
+  const totalCustoEventos = rows.reduce((s, r) => s + r.custo, 0);
+  const hasCustosPendentes = rows.some((r) => r.custo === 0);
 
   return (
     <div className="space-y-4">
@@ -101,7 +110,7 @@ export function EventosSection({
       </div>
 
       {/* Tabela detalhada por evento */}
-      {eventosRows.length > 0 && (
+      {rows.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -126,7 +135,7 @@ export function EventosSection({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {eventosRows.map((row) => {
+                  {rows.map((row) => {
                     const cpl =
                       row.custo > 0 && row.leadsGerados > 0
                         ? row.custo / row.leadsGerados
@@ -166,7 +175,7 @@ export function EventosSection({
                 <TableFooter>
                   <TableRow>
                     <TableCell colSpan={2} className="font-bold">
-                      Total ({eventosRows.length} eventos)
+                      Total ({rows.length} eventos)
                     </TableCell>
                     <TableCell className="text-right tabular-nums font-bold">
                       {totalCustoEventos > 0 ? fmtFull(totalCustoEventos) : "—"}
