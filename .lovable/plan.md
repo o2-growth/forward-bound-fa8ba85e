@@ -1,22 +1,34 @@
+# Flag de performance no card "Faturamento — período" (Pace Comercial)
+
 ## Objetivo
-Validar via Pipefy API **apenas Modelo Atual** (Jun/2026) contra o relatório, com o mínimo de chamadas.
+Mostrar no card **Faturamento — período** de `CommercialPaceDashboard.tsx` uma flag/bolinha colorida indicando o status do vendedor selecionado (ou do time, quando "Todos os closers") frente à meta do período filtrado.
 
-## Números do relatório a bater (Modelo Atual · Jun/2026)
-- MQL · RM · RR · Proposta · Venda (valores do `conferencia-acelerometros-jun-2026_v2.xlsx`, aba Pivot por estágio).
+## Regra de cor (conforme pedido)
+Compara `rev` (faturamento realizado no período filtrado) com `metaRef` (meta do período — a mesma variável que o dashboard já usa hoje para calcular `% atingido`, `Falta para a meta` e o `pace-badge`).
 
-## Estratégia (mínimo de chamadas)
-**1 única query GraphQL** ao Pipefy no pipe Modelo Atual, paginando `allCards` só nas fases-alvo com `first: 50` + cursor. Estimativa: ~10 páginas para cobrir todas as fases de Jun/2026.
+- 🔴 **Vermelha** — `rev === 0` (nada vendido no período com meta definida).
+- 🟡 **Amarela** — `0 < rev < metaRef` (vendeu parte da meta).
+- 🟢 **Verde** — `rev >= metaRef` (bateu ou superou a meta).
+- ⚪ **Sem flag** — quando `metaRef === 0` (ex.: closer sem meta individual e sem meta consolidada no período). Mantém o comportamento atual "sem meta individual".
 
-Query única por página traz: `id`, `created_at`, `current_phase.name`, `phases_history { phase.name firstTimeIn lastTimeOut }`, e campos de faturamento (para threshold ≥ R$ 200k no MQL).
+Isso respeita 100% a lógica existente de:
+- período/data selecionados (`dateRange`) — já refletido em `rev` e `metaRef`;
+- rateio por closer via `closer_metas` — já embutido em `metaRef` quando um closer é selecionado;
+- fallback para meta do time quando "Todos os closers" está ativo.
 
-## Execução
-1. Ler pipe ID + IDs das fases-alvo de Modelo Atual em `src/hooks/useModeloAtualAnalytics.ts` (ou `src/integrations/pipefy/*`).
-2. Script `/tmp/verify_modelo_atual.py` usando `PIPEFY_API_KEY`:
-   - Pagina `allCards` das fases: Novos Leads, MQLs, Reunião Marcada, Reunião Realizada, Proposta Enviada, Ganho, Contrato Assinado.
-   - Aplica: dedup mensal por card+fase, exclusão de test cards, threshold MQL ≥ R$ 200k, prioridade "Ganho" sobre "Contrato assinado" na venda, `Data de assinatura do contrato` para atribuir mês da venda (regras já memorizadas).
-3. Comparar com totais da aba Pivot do relatório → tabela **Pipefy vs Relatório vs Delta** por estágio.
-4. Se houver delta, listar IDs dos cards divergentes com link Pipefy.
+## Onde renderizar
+No topo do card "Faturamento — período" (linhas 581–599 do arquivo), ao lado do label **"Faturamento — período"**, antes do valor em R$. Assim a flag fica visível junto ao card de cada vendedor conforme o print.
 
-## Entregável
-- Tabela comparativa no chat.
-- Se houver divergências: `divergencias-modelo-atual-jun-2026.xlsx` com os cards em cada célula divergente.
+Formato: bolinha 10px + label curto ("Meta batida" / "Parcial" / "Sem vendas"), com `title`/tooltip explicando o cálculo (`rev` vs `metaRef` do período).
+
+## Detalhes técnicos
+- Arquivo único: `src/components/planning/indicators/CommercialPaceDashboard.tsx`.
+- Adicionar um helper local `getPaceFlag(rev, metaRef)` retornando `{ color, label, tone }` usando tokens semânticos existentes (`--cp-ok`, `--cp-warn`, `--cp-bad` — ou equivalentes já usados pelo `pace-badge`). Nada de cores hardcoded.
+- Renderizar o chip dentro do bloco `.rev-head > div` (linha 583), acima do `Faturamento — período`.
+- CSS: reutilizar as classes de badge já existentes no arquivo; adicionar 3 modificadores (`flag-ok`, `flag-warn`, `flag-bad`) apontando para os tokens semânticos.
+- Nenhuma alteração em hooks, agregadores, metas ou fontes de dados — puramente apresentação.
+
+## Fora de escopo
+- Não alterar cálculo de meta, pace, projeção ou rateio de closers.
+- Não mexer em outros cards (Oportunidades Quentes, Conversão do Funil, Ranking).
+- Não adicionar nova coluna no Ranking de Closers (posso fazer numa próxima iteração se quiser).

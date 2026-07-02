@@ -450,6 +450,14 @@ export function CommercialPaceDashboard({
         .pace-badge { display:inline-flex; align-items:center; gap:6px; border-radius:99px; padding:5px 12px; font-size:12px; font-weight:600; }
         .pace-badge.ahead { background:hsl(var(--success) / 0.12); color:var(--cp-ok); }
         .pace-badge.behind { background:hsl(var(--destructive) / 0.12); color:var(--cp-behind); }
+        .goal-flag { display:inline-flex; align-items:center; gap:6px; border-radius:99px; padding:4px 10px; font-size:11px; font-weight:600; margin-bottom:6px; letter-spacing:.02em; }
+        .goal-flag .dot { width:8px; height:8px; border-radius:99px; display:inline-block; }
+        .goal-flag.flag-ok { background:hsl(var(--success) / 0.12); color:var(--cp-ok); }
+        .goal-flag.flag-ok .dot { background:var(--cp-ok); }
+        .goal-flag.flag-warn { background:hsl(var(--warning) / 0.14); color:var(--cp-warn); }
+        .goal-flag.flag-warn .dot { background:var(--cp-warn); }
+        .goal-flag.flag-bad { background:hsl(var(--destructive) / 0.12); color:var(--cp-behind); }
+        .goal-flag.flag-bad .dot { background:var(--cp-behind); }
         .rev-track { position:relative; margin:26px 0 8px; }
         .rev-bar { height:10px; background:var(--cp-lane-3); border-radius:99px; position:relative; }
         .rev-fill { height:100%; border-radius:99px; background:linear-gradient(90deg, hsl(var(--primary) / 0.55), var(--cp-pace)); transition:width .5s ease-out; }
@@ -582,6 +590,21 @@ export function CommercialPaceDashboard({
           <div className="rev-head">
             <div>
               <div className="cp-card-label">Faturamento — período</div>
+              {(() => {
+                if (metaRef <= 0) return null;
+                const ratio = rev / metaRef;
+                let cls = "flag-bad";
+                let label = "Sem vendas no período";
+                if (rev >= metaRef) { cls = "flag-ok"; label = "Meta batida"; }
+                else if (rev > 0) { cls = "flag-warn"; label = "Parcial"; }
+                const title = `Realizado ${brl(rev)} de ${brl(metaRef)} (${pct(ratio)}) no período selecionado`;
+                return (
+                  <div className={`goal-flag ${cls}`} title={title}>
+                    <span className="dot" />
+                    {label} · {pct(ratio, 0)}
+                  </div>
+                );
+              })()}
               <div className="rev-value num">{brl(rev)}</div>
               <div className="rev-meta">
                 {selected
