@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, eachDayOfInterval, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Flag } from "lucide-react";
 import {
   CartesianGrid,
   Line,
