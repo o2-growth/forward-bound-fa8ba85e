@@ -590,6 +590,21 @@ export function CommercialPaceDashboard({
           <div className="rev-head">
             <div>
               <div className="cp-card-label">Faturamento — período</div>
+              {(() => {
+                if (metaRef <= 0) return null;
+                const ratio = rev / metaRef;
+                let cls = "flag-bad";
+                let label = "Sem vendas no período";
+                if (rev >= metaRef) { cls = "flag-ok"; label = "Meta batida"; }
+                else if (rev > 0) { cls = "flag-warn"; label = "Parcial"; }
+                const title = `Realizado ${brl(rev)} de ${brl(metaRef)} (${pct(ratio)}) no período selecionado`;
+                return (
+                  <div className={`goal-flag ${cls}`} title={title}>
+                    <span className="dot" />
+                    {label} · {pct(ratio, 0)}
+                  </div>
+                );
+              })()}
               <div className="rev-value num">{brl(rev)}</div>
               <div className="rev-meta">
                 {selected
