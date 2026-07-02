@@ -19,6 +19,7 @@ export const LIVES_OFICIAIS: Record<string, LiveOfficialCounts> = {
   "2026-05-21": { inscritos: 196, entraram: 48, mao: 3, venda: 1 },
   "2026-06-17": { inscritos: 329, entraram: 243, mao: 9, venda: 0 },
   "2026-06-18": { inscritos: 351, entraram: 168, mao: 5, venda: 0 },
+  "2026-07-02": { inscritos: 0, entraram: 8, mao: 8, venda: 0 },
 };
 
 export function getLiveOverride(dateIso: string): LiveOfficialCounts | null {

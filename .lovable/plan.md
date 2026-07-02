@@ -1,34 +1,28 @@
-# Flag de performance no card "Faturamento — período" (Pace Comercial)
+## Contexto
 
-## Objetivo
-Mostrar no card **Faturamento — período** de `CommercialPaceDashboard.tsx` uma flag/bolinha colorida indicando o status do vendedor selecionado (ou do time, quando "Todos os closers") frente à meta do período filtrado.
+A Live 02/07 hoje aparece com "8" porque cai no cálculo dinâmico (`computeCounts`) — sem override em `src/data/livesOfficial.ts`, o sistema conta cards Modelo Atual classificados como G4 Live cuja `dataEntrada` está na janela 02/07 → 05/07 (3 dias). Esses 8 cards estão sendo tratados como `inscritos`, o que não é semanticamente correto: são leads que entraram no funil vindos da live.
 
-## Regra de cor (conforme pedido)
-Compara `rev` (faturamento realizado no período filtrado) com `metaRef` (meta do período — a mesma variável que o dashboard já usa hoje para calcular `% atingido`, `Falta para a meta` e o `pace-badge`).
+## Ajuste
 
-- 🔴 **Vermelha** — `rev === 0` (nada vendido no período com meta definida).
-- 🟡 **Amarela** — `0 < rev < metaRef` (vendeu parte da meta).
-- 🟢 **Verde** — `rev >= metaRef` (bateu ou superou a meta).
-- ⚪ **Sem flag** — quando `metaRef === 0` (ex.: closer sem meta individual e sem meta consolidada no período). Mantém o comportamento atual "sem meta individual".
+Adicionar entrada oficial provisória para a Live 02/07 em `src/data/livesOfficial.ts`, com:
 
-Isso respeita 100% a lógica existente de:
-- período/data selecionados (`dateRange`) — já refletido em `rev` e `metaRef`;
-- rateio por closer via `closer_metas` — já embutido em `metaRef` quando um closer é selecionado;
-- fallback para meta do time quando "Todos os closers" está ativo.
+- `inscritos: 0` (placeholder — você vai atualizar em seguida)
+- `entraram: 8`
+- `mao: 8`
+- `venda: 0`
 
-## Onde renderizar
-No topo do card "Faturamento — período" (linhas 581–599 do arquivo), ao lado do label **"Faturamento — período"**, antes do valor em R$. Assim a flag fica visível junto ao card de cada vendedor conforme o print.
+Assim que essa entrada existir, o `LivesSection` para de calcular pelos cards e passa a usar o override oficial — os "8" ficam nas duas linhas corretas do funil (Entraram na live e Levantaram a mão) em vez de aparecer só como Inscritos.
 
-Formato: bolinha 10px + label curto ("Meta batida" / "Parcial" / "Sem vendas"), com `title`/tooltip explicando o cálculo (`rev` vs `metaRef` do período).
+## Alteração
 
-## Detalhes técnicos
-- Arquivo único: `src/components/planning/indicators/CommercialPaceDashboard.tsx`.
-- Adicionar um helper local `getPaceFlag(rev, metaRef)` retornando `{ color, label, tone }` usando tokens semânticos existentes (`--cp-ok`, `--cp-warn`, `--cp-bad` — ou equivalentes já usados pelo `pace-badge`). Nada de cores hardcoded.
-- Renderizar o chip dentro do bloco `.rev-head > div` (linha 583), acima do `Faturamento — período`.
-- CSS: reutilizar as classes de badge já existentes no arquivo; adicionar 3 modificadores (`flag-ok`, `flag-warn`, `flag-bad`) apontando para os tokens semânticos.
-- Nenhuma alteração em hooks, agregadores, metas ou fontes de dados — puramente apresentação.
+**`src/data/livesOfficial.ts`** — acrescentar uma linha ao objeto `LIVES_OFICIAIS`:
 
-## Fora de escopo
-- Não alterar cálculo de meta, pace, projeção ou rateio de closers.
-- Não mexer em outros cards (Oportunidades Quentes, Conversão do Funil, Ranking).
-- Não adicionar nova coluna no Ranking de Closers (posso fazer numa próxima iteração se quiser).
+```ts
+"2026-07-02": { inscritos: 0, entraram: 8, mao: 8, venda: 0 },
+```
+
+Nenhum outro arquivo muda. `LivesSection` já lê `getLiveOverride(l.date)` antes de calcular, então o efeito é imediato no chip "Live 02/07" e no agregado.
+
+## Próximo passo (fora deste plano)
+
+Quando você me passar o número real de inscritos da 02/07, atualizo o `inscritos: 0` para o valor correto no mesmo arquivo — edição de 1 linha.
