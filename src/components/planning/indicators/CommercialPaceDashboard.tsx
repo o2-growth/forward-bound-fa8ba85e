@@ -450,14 +450,13 @@ export function CommercialPaceDashboard({
         .pace-badge { display:inline-flex; align-items:center; gap:6px; border-radius:99px; padding:5px 12px; font-size:12px; font-weight:600; }
         .pace-badge.ahead { background:hsl(var(--success) / 0.12); color:var(--cp-ok); }
         .pace-badge.behind { background:hsl(var(--destructive) / 0.12); color:var(--cp-behind); }
-        .goal-flag { display:inline-flex; align-items:center; gap:6px; border-radius:99px; padding:4px 10px; font-size:11px; font-weight:600; margin-bottom:6px; letter-spacing:.02em; }
-        .goal-flag .dot { width:8px; height:8px; border-radius:99px; display:inline-block; }
-        .goal-flag.flag-ok { background:hsl(var(--success) / 0.12); color:var(--cp-ok); }
-        .goal-flag.flag-ok .dot { background:var(--cp-ok); }
-        .goal-flag.flag-warn { background:hsl(var(--warning) / 0.14); color:var(--cp-warn); }
-        .goal-flag.flag-warn .dot { background:var(--cp-warn); }
-        .goal-flag.flag-bad { background:hsl(var(--destructive) / 0.12); color:var(--cp-behind); }
-        .goal-flag.flag-bad .dot { background:var(--cp-behind); }
+        .goal-flag { display:inline-flex; align-items:center; gap:8px; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:700; margin-bottom:8px; letter-spacing:.01em; box-shadow:0 2px 4px rgba(0,0,0,0.08); }
+        .goal-flag .flag-icon { flex-shrink:0; }
+        .goal-flag .flag-text { text-transform:uppercase; }
+        .goal-flag .flag-pct { font-weight:600; opacity:0.85; }
+        .goal-flag.flag-ok { background:linear-gradient(135deg, hsl(var(--success) / 0.18), hsl(var(--success) / 0.08)); color:var(--cp-ok); border-left:4px solid var(--cp-ok); }
+        .goal-flag.flag-warn { background:linear-gradient(135deg, hsl(var(--warning) / 0.22), hsl(var(--warning) / 0.08)); color:var(--cp-warn); border-left:4px solid var(--cp-warn); }
+        .goal-flag.flag-bad { background:linear-gradient(135deg, hsl(var(--destructive) / 0.18), hsl(var(--destructive) / 0.08)); color:var(--cp-behind); border-left:4px solid var(--cp-behind); }
         .rev-track { position:relative; margin:26px 0 8px; }
         .rev-bar { height:10px; background:var(--cp-lane-3); border-radius:99px; position:relative; }
         .rev-fill { height:100%; border-radius:99px; background:linear-gradient(90deg, hsl(var(--primary) / 0.55), var(--cp-pace)); transition:width .5s ease-out; }
