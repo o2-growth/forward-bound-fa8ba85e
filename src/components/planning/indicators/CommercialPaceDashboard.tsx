@@ -450,13 +450,13 @@ export function CommercialPaceDashboard({
         .pace-badge { display:inline-flex; align-items:center; gap:6px; border-radius:99px; padding:5px 12px; font-size:12px; font-weight:600; }
         .pace-badge.ahead { background:hsl(var(--success) / 0.12); color:var(--cp-ok); }
         .pace-badge.behind { background:hsl(var(--destructive) / 0.12); color:var(--cp-behind); }
-        .goal-flag { display:inline-flex; align-items:center; gap:8px; border-radius:6px; padding:6px 12px; font-size:13px; font-weight:700; margin-bottom:8px; letter-spacing:.01em; box-shadow:0 2px 4px rgba(0,0,0,0.08); }
+        .goal-flag { display:inline-flex; align-items:center; gap:10px; border-radius:6px; padding:7px 14px; font-size:14px; font-weight:800; margin-bottom:10px; letter-spacing:.02em; box-shadow:0 2px 6px rgba(0,0,0,0.10); }
         .goal-flag .flag-icon { flex-shrink:0; }
         .goal-flag .flag-text { text-transform:uppercase; }
-        .goal-flag .flag-pct { font-weight:600; opacity:0.85; }
-        .goal-flag.flag-ok { background:linear-gradient(135deg, hsl(var(--success) / 0.18), hsl(var(--success) / 0.08)); color:var(--cp-ok); border-left:4px solid var(--cp-ok); }
-        .goal-flag.flag-warn { background:linear-gradient(135deg, hsl(var(--warning) / 0.22), hsl(var(--warning) / 0.08)); color:var(--cp-warn); border-left:4px solid var(--cp-warn); }
-        .goal-flag.flag-bad { background:linear-gradient(135deg, hsl(var(--destructive) / 0.18), hsl(var(--destructive) / 0.08)); color:var(--cp-behind); border-left:4px solid var(--cp-behind); }
+        .goal-flag .flag-pct { font-weight:700; opacity:0.9; font-size:13px; }
+        .goal-flag.flag-ok { background:linear-gradient(135deg, hsl(var(--success) / 0.22), hsl(var(--success) / 0.08)); color:var(--cp-ok); border-left:5px solid var(--cp-ok); }
+        .goal-flag.flag-warn { background:linear-gradient(135deg, hsl(var(--warning) / 0.26), hsl(var(--warning) / 0.10)); color:var(--cp-warn); border-left:5px solid var(--cp-warn); }
+        .goal-flag.flag-bad { background:linear-gradient(135deg, hsl(var(--destructive) / 0.22), hsl(var(--destructive) / 0.08)); color:var(--cp-behind); border-left:5px solid var(--cp-behind); }
         .rev-track { position:relative; margin:26px 0 8px; }
         .rev-bar { height:10px; background:var(--cp-lane-3); border-radius:99px; position:relative; }
         .rev-fill { height:100%; border-radius:99px; background:linear-gradient(90deg, hsl(var(--primary) / 0.55), var(--cp-pace)); transition:width .5s ease-out; }
