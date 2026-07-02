@@ -605,7 +605,7 @@ export function CommercialPaceDashboard({
                 const title = `Realizado ${brl(rev)} de ${brl(flagMeta)}${metaLabel} (${pct(ratio)}) no período selecionado`;
                 return (
                   <div className={`goal-flag ${cls}`} title={title}>
-                    <Flag className="flag-icon" size={18} color={flagColor} fill={flagColor} />
+                    <Flag className="flag-icon" size={20} color={flagColor} fill={flagColor} />
                     <span className="flag-text">{label}</span>
                     <span className="flag-pct">{pct(ratio, 0)}</span>
                   </div>
