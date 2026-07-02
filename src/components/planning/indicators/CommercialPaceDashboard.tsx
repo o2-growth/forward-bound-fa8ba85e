@@ -598,15 +598,17 @@ export function CommercialPaceDashboard({
                 if (flagMeta <= 0) return null;
                 const ratio = rev / flagMeta;
                 let cls = "flag-bad";
-                let label = "Sem vendas no período";
-                if (rev >= flagMeta) { cls = "flag-ok"; label = "Meta batida"; }
-                else if (rev > 0) { cls = "flag-warn"; label = "Parcial"; }
+                let label = "Red Flag";
+                let flagColor = "#ef4444";
+                if (rev >= flagMeta) { cls = "flag-ok"; label = "Green Flag"; flagColor = "#22c55e"; }
+                else if (rev > 0) { cls = "flag-warn"; label = "Yellow Flag"; flagColor = "#f59e0b"; }
                 const metaLabel = metaRef > 0 ? "" : " (rateio)";
                 const title = `Realizado ${brl(rev)} de ${brl(flagMeta)}${metaLabel} (${pct(ratio)}) no período selecionado`;
                 return (
                   <div className={`goal-flag ${cls}`} title={title}>
-                    <span className="dot" />
-                    {label} · {pct(ratio, 0)}
+                    <Flag className="flag-icon" size={18} color={flagColor} fill={flagColor} />
+                    <span className="flag-text">{label}</span>
+                    <span className="flag-pct">{pct(ratio, 0)}</span>
                   </div>
                 );
               })()}
