@@ -591,13 +591,18 @@ export function CommercialPaceDashboard({
             <div>
               <div className="cp-card-label">Faturamento — período</div>
               {(() => {
-                if (metaRef <= 0) return null;
-                const ratio = rev / metaRef;
+                // Fallback: se closer não tem meta individual, usa rateio igualitário da meta do time
+                const activeClosers = closers.filter(c => c.id !== "__none__" && (c.name || "").toLowerCase() !== "sem closer");
+                const fallbackMeta = selected && activeClosers.length > 0 ? revenueMeta / activeClosers.length : revenueMeta;
+                const flagMeta = metaRef > 0 ? metaRef : fallbackMeta;
+                if (flagMeta <= 0) return null;
+                const ratio = rev / flagMeta;
                 let cls = "flag-bad";
                 let label = "Sem vendas no período";
-                if (rev >= metaRef) { cls = "flag-ok"; label = "Meta batida"; }
+                if (rev >= flagMeta) { cls = "flag-ok"; label = "Meta batida"; }
                 else if (rev > 0) { cls = "flag-warn"; label = "Parcial"; }
-                const title = `Realizado ${brl(rev)} de ${brl(metaRef)} (${pct(ratio)}) no período selecionado`;
+                const metaLabel = metaRef > 0 ? "" : " (rateio)";
+                const title = `Realizado ${brl(rev)} de ${brl(flagMeta)}${metaLabel} (${pct(ratio)}) no período selecionado`;
                 return (
                   <div className={`goal-flag ${cls}`} title={title}>
                     <span className="dot" />
@@ -605,6 +610,7 @@ export function CommercialPaceDashboard({
                   </div>
                 );
               })()}
+
               <div className="rev-value num">{brl(rev)}</div>
               <div className="rev-meta">
                 {selected
