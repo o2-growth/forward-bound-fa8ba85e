@@ -146,12 +146,16 @@ export function useMonetizacaoAnalytics(
 
   const cards: MonetizacaoCard[] = Array.from(byId.values()).map((row) => {
     const valores: Record<string, number> = {};
-    let valorTotal = 0;
+    let somaValorFields = 0;
     for (const f of VALOR_FIELDS) {
       const v = toNumber(row[f]);
       valores[f] = v;
-      valorTotal += v;
+      somaValorFields += v;
     }
+    const moeda = toNumber(row['moeda']);
+    valores['moeda'] = moeda;
+    // Fallback: cards vindos só com o agregado `moeda` (sem discriminação em valor_*)
+    const valorTotal = somaValorFields > 0 ? somaValorFields : moeda;
     const tipoRaw = (row['tipo_de_movimenta_o'] || '').toString().trim();
     const faseAtual = (row['Fase Atual'] || row['Fase'] || '').toString().trim();
     const motivoPerda = (row['motivo_da_perda'] || '').toString().trim();
@@ -217,10 +221,14 @@ export function useMonetizacaoAnalytics(
       (card.valores['valor_bpo'] || 0) +
       (card.valores['valor_coordenador_financeiro'] || 0);
     const setup = card.valores['valor_setup'] || 0;
-    const pontual =
+    let pontual =
       (card.valores['valor_diagn_stico'] || 0) +
       (card.valores['valor_turnaround'] || 0) +
       (card.valores['valor_valuation'] || 0);
+    // Fallback: se nada foi discriminado, usa `moeda` como pontual
+    if (mrr === 0 && setup === 0 && pontual === 0 && (card.valores['moeda'] || 0) > 0) {
+      pontual = card.valores['moeda'];
+    }
     const value = mrr + setup + pontual;
     return {
       id: card.id,
