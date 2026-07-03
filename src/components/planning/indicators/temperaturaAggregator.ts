@@ -184,8 +184,10 @@ export function aggregateByTemperatura({
       const entradaTime = card.entrada
         ? new Date(card.entrada).getTime()
         : NaN;
-      if (!Number.isFinite(entradaTime)) continue;
-      if (entradaTime < startTime || entradaTime > endTime) continue;
+      if (!includeAllOpenIgnoringPeriod) {
+        if (!Number.isFinite(entradaTime)) continue;
+        if (entradaTime < startTime || entradaTime > endTime) continue;
+      }
       const id = String(card.id);
       if (existingQuenteIds.has(id)) continue;
       existingQuenteIds.add(id);
