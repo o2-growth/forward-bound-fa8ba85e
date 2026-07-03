@@ -971,6 +971,27 @@ Deno.serve(async (req) => {
       const res = await client.query(sql);
       result = { action: "pessoas_all", count: res.rows.length, rows: res.rows };
       console.log(`pessoas_all: ${res.rows.length} rows`);
+    } else if (action === "query_open_pipeline") {
+      // Estado atual dos cards abertos (não concluídos e sem motivo de perda)
+      // Retorna a linha mais recente por ID via DISTINCT ON.
+      const invalid = await validateTable(table);
+      if (invalid) return invalid;
+
+      const sql = `
+        SELECT DISTINCT ON ("ID") *
+        FROM ${table}
+        WHERE COALESCE(NULLIF(TRIM("Fase Atual"), ''), '') NOT IN ('Concluído', 'Concluido')
+          AND COALESCE(NULLIF(TRIM("motivo_da_perda"), ''), '') = ''
+        ORDER BY "ID", "Entrada" DESC
+      `;
+      const res = await client.query(sql);
+      result = {
+        action: "query_open_pipeline",
+        table,
+        totalRows: res.rows.length,
+        data: res.rows,
+      };
+      console.log(`query_open_pipeline for ${table}: ${res.rows.length} open cards`);
     } else {
       await client.end();
       return new Response(JSON.stringify({ error: "Invalid action" }), {
