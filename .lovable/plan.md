@@ -1,37 +1,30 @@
-## Objetivo
-Validar em runtime que o Cenário de Caixa está correto após a última alteração (ignorar período para cards em aberto) e confirmar que a lógica de hidratação de valores (_1 e texto) não deixa nenhum card com R$ 0 indevido.
+## Diagnóstico
 
-## Escopo da validação
-Somente leitura — nenhuma mudança de código. Se algum problema for encontrado, volto com um plano de correção separado.
+O Cenário de Caixa ainda está preso ao período em parte do fluxo. O `includeAllOpenIgnoringPeriod` só removeu o filtro dentro do agregador, mas os hooks de dados de Modelo Atual e Expansão/Franquia/Oxy Hacker ainda buscam cards usando `startDate/endDate`. Então cards abertos fora do período não chegam ao Cenário de Caixa.
 
-## O que já está estabelecido pela leitura do código
+Além disso, Outbound hoje entra com `mrr/setup/pontual = 0` no detalhe, mesmo quando existe valor do negócio. Isso explica cards aparecendo com caixa zerado e mantendo o valor igual ao cenário anterior.
 
-1. **Cenário de Caixa consome 4 BUs comerciais** (Modelo Atual, Outbound, Franquia, Oxy Hacker) via `computeCashFromCard` + regras `CASH_RULES`. Monetização entra na agregação por temperatura, mas sua regra é `{ mrr: 0, setup: 0, pontual: 0 }` → **não contribui para caixa por design**. Os campos `_1` e texto extraído da Monetização afetam o Funil de Monetização, não o Cenário de Caixa.
-2. **Modelo Atual / Outbound** usam `valorMRR`, `valorSetup`, `valorPontual` já parseados do movimento Pipefy (`Valor MRR`, `Valor Pontual`, `Valor Setup`). Não há fallback `_1` — nunca houve nesse hook.
-3. **Franquia / Oxy Hacker** (useExpansaoAnalytics) idem: leem `Valor MRR/Pontual/Setup` da linha do movimento.
-4. **Filtro de período** agora está desligado no Cenário de Caixa via `includeAllOpenIgnoringPeriod: true` (já aplicado em `temperaturaAggregator.ts`).
+## Plano de correção
 
-## Passos de validação em runtime
+1. **Modelo Atual**
+   - Buscar também o pipeline aberto global via `query_open_pipeline`, sem filtro de período.
+   - Hidratar histórico desses IDs para garantir valores completos.
+   - Expor uma lista separada `allOpenCards` para uso exclusivo no Cenário de Caixa.
 
-### 1. Playwright na preview
-- Abrir `/` logado, ir até a seção Cenário de Caixa.
-- Screenshot dos dois cards (Realista / Otimista) com os totais e barra por BU.
-- Trocar o filtro de período para outro mês → confirmar que os **totais/contagens não mudam** (prova de que o filtro foi ignorado).
-- Trocar de volta e abrir "Ver detalhes" do cenário Realista → screenshot da tabela; olhar coluna `Total Caixa` e conferir que não há linhas com R$ 0 exceto Monetização (rule 0/0/0).
+2. **Franquia e Oxy Hacker**
+   - Incluir `query_open_pipeline` na busca compartilhada de Expansão.
+   - Hidratar histórico dos cards abertos, não só dos cards do período.
+   - Expor `allOpenCards` filtrado por produto, preservando a lógica atual do funil normal.
 
-### 2. Cross-check nos logs do console
-- Rodar `code--read_console_logs` filtrando por `useModeloAtualAnalytics`, `useExpansaoAnalytics`, `Monetização`, para confirmar que as consultas retornaram cards e que `valor_* fields detectados` foi logado.
+3. **Outbound**
+   - Ajustar `toDetailItem` para não zerar caixa: usar `valor` como `pontual` quando não houver MRR/Setup/Pontual estruturado.
+   - Assim a regra do Cenário de Caixa aplicará 50% sobre esse valor, em vez de R$ 0.
 
-### 3. Query no DB externo (via edge function `query-external-db`)
-- Para 3 cards abertos por BU (amostra), inspecionar `Valor MRR/Setup/Pontual` no `pipefy_moviment_contrato`. Se algum vier zerado no DB, o R$ 0 no Cenário é fiel ao dado bruto (não é bug do hook) — reportarei nome+ID para eventual correção manual no Pipefy.
+4. **Cenário de Caixa**
+   - Fazer o agregador usar `allOpenCards` quando `includeAllOpenIgnoringPeriod` estiver ativo.
+   - Manter a Temperatura dos Leads usando o comportamento antigo, respeitando o período.
 
-### 4. Regressão da Seção Temperatura (acima do Cenário)
-- Confirmar que os contadores **variam** ao trocar o filtro de período (comportamento antigo preservado — o flag só é passado pelo Cenário de Caixa).
-
-## Entregável
-Um relatório curto no chat com:
-- Screenshots dos dois cenários antes/depois de trocar o período.
-- Lista de eventuais cards com R$ 0 no Cenário, separando "R$ 0 legítimo (rule=0 ou dado bruto zerado)" de "R$ 0 suspeito (dado no DB mas não hidratado)".
-- Confirmação de que Temperatura seguiu variando com o filtro.
-
-Se aparecer categoria "R$ 0 suspeito", volto com plano de correção para o hook responsável (Modelo/Outbound/Expansão).
+5. **Validação**
+   - Verificar no preview que mudar o período não muda os totais/cards do Cenário de Caixa.
+   - Abrir detalhes e confirmar que novos cards abertos não aparecem zerados quando há valor disponível.
+   - Confirmar que Monetização continua R$ 0 no Cenário de Caixa por regra atual de caixa.

@@ -110,7 +110,9 @@ export function aggregateByTemperatura({
     {
       buLabel: "Modelo Atual",
       enabled: includesModelo,
-      cards: modeloAtualAnalytics.allCards as any,
+      cards: (includeAllOpenIgnoringPeriod
+        ? ((modeloAtualAnalytics as any).allOpenCards || modeloAtualAnalytics.allCards)
+        : modeloAtualAnalytics.allCards) as any,
       toDetail: modeloAtualAnalytics.toDetailItem,
     },
     {
@@ -122,13 +124,17 @@ export function aggregateByTemperatura({
     {
       buLabel: "Franquia",
       enabled: selectedBUs.includes("franquia"),
-      cards: franquiaAnalytics.cards as any,
+      cards: (includeAllOpenIgnoringPeriod
+        ? ((franquiaAnalytics as any).allOpenCards || franquiaAnalytics.cards)
+        : franquiaAnalytics.cards) as any,
       toDetail: franquiaAnalytics.toDetailItem,
     },
     {
       buLabel: "Oxy Hacker",
       enabled: selectedBUs.includes("oxy_hacker"),
-      cards: oxyHackerAnalytics.cards as any,
+      cards: (includeAllOpenIgnoringPeriod
+        ? ((oxyHackerAnalytics as any).allOpenCards || oxyHackerAnalytics.cards)
+        : oxyHackerAnalytics.cards) as any,
       toDetail: oxyHackerAnalytics.toDetailItem,
     },
   ];

@@ -36,7 +36,13 @@ function parseDate(value: string | null | undefined): Date | null {
 function parseNumber(value: any): number {
   if (value == null) return 0;
   if (typeof value === "number") return value;
-  const n = parseFloat(String(value));
+  let cleaned = String(value).replace(/[R$\s]/g, "").trim();
+  if (!cleaned) return 0;
+  const hasComma = cleaned.includes(",");
+  const hasDot = cleaned.includes(".");
+  if (hasComma && hasDot) cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+  else if (hasComma) cleaned = cleaned.replace(",", ".");
+  const n = parseFloat(cleaned);
   return isNaN(n) ? 0 : n;
 }
 
@@ -169,6 +175,15 @@ export function useOutboundAnalytics(startDate: Date, endDate: Date) {
 
   const cards = data?.cards ?? [];
 
+  const valueByCardId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const card of cards) {
+      const current = map.get(card.id) || 0;
+      if ((card.valor || 0) > current) map.set(card.id, card.valor || 0);
+    }
+    return map;
+  }, [cards]);
+
   // Cards filtrados por período (dataEntrada dentro do range)
   const cardsInPeriod = useMemo(() => {
     return cards.filter((c) => {
@@ -204,21 +219,24 @@ export function useOutboundAnalytics(startDate: Date, endDate: Date) {
    * Converte cards para DetailItem (formato consumido por DetailSheet e
    * filtros downstream). Mesmo shape do `toDetailItem` do modelo atual.
    */
-  const toDetailItem = (card: ModeloAtualCard): DetailItem => ({
+  const toDetailItem = (card: ModeloAtualCard): DetailItem => {
+    const value = card.valor > 0 ? card.valor : valueByCardId.get(card.id) || 0;
+    return ({
     id: card.id,
     name: card.empresa || card.titulo || card.id,
     company: card.empresa,
     phase: card.faseAtual || card.faseDestino,
     date: card.dataEntrada.toISOString(),
-    value: card.valor,
+    value,
     reason: card.motivoPerda,
     revenueRange: card.faixa,
     responsible: card.responsavel,
     duration: card.duracao,
     product: card.produto,
-    mrr: 0,
-    setup: 0,
-    pontual: 0,
+    mrr: card.valorMRR || 0,
+    setup: card.valorSetup || 0,
+    pontual: card.valorPontual || value,
+    total: (card.valorMRR || 0) + (card.valorSetup || 0) + (card.valorPontual || value),
     closer: card.closer,
     sdr: card.sdr,
     dataAssinatura: card.dataAssinatura?.toISOString(),
@@ -228,6 +246,7 @@ export function useOutboundAnalytics(startDate: Date, endDate: Date) {
     fonte: card.fonte,
     campanha: card.campanha,
   });
+  };
 
   const getDetailItemsForIndicator = useMemo(() => {
     return (indicator: IndicatorType): DetailItem[] => {

@@ -283,6 +283,40 @@ function parseCards(rows: Record<string, any>[], skipPhaseFilter = false): Model
   return cards;
 }
 
+function hydrateOpenCardsWithHistory(openCards: ModeloAtualCard[], historyCards: ModeloAtualCard[]): ModeloAtualCard[] {
+  if (openCards.length === 0 || historyCards.length === 0) return openCards;
+
+  const historyById = new Map<string, ModeloAtualCard[]>();
+  for (const card of [...historyCards, ...openCards]) {
+    if (!historyById.has(card.id)) historyById.set(card.id, []);
+    historyById.get(card.id)!.push(card);
+  }
+
+  return openCards.map((card) => {
+    const history = historyById.get(card.id) || [card];
+    const valorMRR = Math.max(card.valorMRR || 0, ...history.map((h) => h.valorMRR || 0));
+    const valorPontual = Math.max(card.valorPontual || 0, ...history.map((h) => h.valorPontual || 0));
+    const valorSetup = Math.max(card.valorSetup || 0, ...history.map((h) => h.valorSetup || 0));
+    const valorEducacao = Math.max(card.valorEducacao || 0, ...history.map((h) => h.valorEducacao || 0));
+    const valor = valorMRR + valorPontual + valorSetup;
+
+    return {
+      ...card,
+      valorMRR,
+      valorPontual,
+      valorSetup,
+      valorEducacao,
+      valor: valor > 0 ? valor : card.valor,
+      valoresExtras: {
+        ...card.valoresExtras,
+        valorMRR,
+        valorSetup,
+        valorEducacao,
+      },
+    };
+  });
+}
+
 export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
   // Enriquecimento de produto via pipefy_db_clientes (campo "Produtos" não existe nos movimentos)
   const { produtosMap } = useClientesProdutos();
@@ -336,17 +370,25 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
         return allRows;
       };
 
-      // Fetch all three queries with pagination (signature is small, but use same pattern for safety)
-      const [periodRows, creationRows, signatureRows] = await Promise.all([
+      // Fetch all three period queries + global open pipeline for cash scenario.
+      const [periodRows, creationRows, signatureRows, openPipelineResponse] = await Promise.all([
         fetchAllPages('query_period'),
         fetchAllPages('query_period_by_creation'),
         fetchAllPages('query_period_by_signature'),
+        supabase.functions.invoke('query-external-db', {
+          body: {
+            table: 'pipefy_moviment_cfos',
+            action: 'query_open_pipeline',
+          },
+        }),
       ]);
 
       // Wrap in the format expected by the rest of the code
       const periodResponse = { data: { data: periodRows }, error: null };
       const creationResponse = { data: { data: creationRows }, error: null };
       const signatureResponse = { data: { data: signatureRows }, error: null };
+      if (openPipelineResponse.error) throw openPipelineResponse.error;
+      const openRows = openPipelineResponse.data?.data || [];
 
       if (periodResponse.error) {
         console.error('[useModeloAtualAnalytics] Error fetching period data:', periodResponse.error);
@@ -355,7 +397,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
 
       if (!periodResponse.data?.data) {
         console.warn('[useModeloAtualAnalytics] No data returned');
-        return { cards: [], fullHistory: [], mqlByCreation: [] };
+        return { cards: [], allCardsUnfiltered: [], fullHistory: [], mqlByCreation: [], allOpenCards: [] };
       }
 
       console.log(`[useModeloAtualAnalytics] Raw period data rows: ${periodResponse.data.data.length}`);
@@ -373,6 +415,9 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       } else if (creationResponse.error) {
         console.error('[useModeloAtualAnalytics] Error fetching creation data:', creationResponse.error);
       }
+
+      let allOpenCards = parseCards(openRows, true).filter((c) => !isTestCard(c.id));
+      console.log(`[useModeloAtualAnalytics] Open pipeline cards loaded: ${allOpenCards.length}`);
       
       // Parse signature-date cards (captures sales signed in period but moved later in Pipefy)
       // Perf: idem — uma única passagem de parse, deriva filtered via filter.
@@ -408,7 +453,11 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       console.log(`[useModeloAtualAnalytics] Unique phases:`, uniquePhases);
       
       // Step 2: Get unique card IDs from period (union of all queries)
-      const allCardIds = new Set([...cards.map(c => c.id), ...mqlByCreation.map(c => c.id)]);
+      const allCardIds = new Set([
+        ...cards.map(c => c.id),
+        ...mqlByCreation.map(c => c.id),
+        ...allOpenCards.map(c => c.id),
+      ]);
       const uniqueCardIds = [...allCardIds];
       console.log(`[useModeloAtualAnalytics] Unique card IDs (union): ${uniqueCardIds.length}`);
       
@@ -432,7 +481,9 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
         }
       }
 
-      return { cards, allCardsUnfiltered, fullHistory, mqlByCreation };
+      allOpenCards = hydrateOpenCardsWithHistory(allOpenCards, fullHistory);
+
+      return { cards, allCardsUnfiltered, fullHistory, mqlByCreation, allOpenCards };
     },
     staleTime: 30 * 60 * 1000,
     retry: 1,
@@ -440,6 +491,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
 
   const cards = data?.cards ?? [];
   const allCards = data?.allCardsUnfiltered ?? [];
+  const allOpenCards = data?.allOpenCards ?? [];
   const fullHistory = data?.fullHistory ?? [];
   const mqlByCreation = data?.mqlByCreation ?? [];
 
@@ -886,6 +938,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
     error,
     cards,
     allCards,
+    allOpenCards,
     getCardsForIndicator,
     getLeadsCards,
     toDetailItem,
