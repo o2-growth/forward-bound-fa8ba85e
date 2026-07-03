@@ -85,6 +85,7 @@ export function aggregateByTemperatura({
   selectedBUs,
   startDate,
   endDate,
+  includeAllOpenIgnoringPeriod = false,
 }: AggregateInput): AggregateResult {
   const startTime = startDate.getTime();
   const endTime = new Date(
