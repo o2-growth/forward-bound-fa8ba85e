@@ -265,7 +265,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
         limit: 10000,
       };
 
-      const [periodRes, signatureRes] = await Promise.all([
+      const [periodRes, signatureRes, openRes] = await Promise.all([
         supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period' } }),
         supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period_by_signature' } }),
         supabase.functions.invoke('query-external-db', {
@@ -280,14 +280,25 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
         console.error('Error fetching Expansao raw rows:', periodRes.error);
         throw periodRes.error;
       }
+      if (signatureRes.error) {
+        console.error('Error fetching Expansao signature rows:', signatureRes.error);
+        throw signatureRes.error;
+      }
+      if (openRes.error) {
+        console.error('Error fetching Expansao open pipeline:', openRes.error);
+        throw openRes.error;
+      }
 
       const allRows: Record<string, any>[] = [
         ...(periodRes.data?.data || []),
         ...(signatureRes.data?.data || []),
       ];
+      const openRows: Record<string, any>[] = openRes.data?.data || [];
 
       // Coleta IDs únicos (TODOS os produtos — filter por produto é feito no useMemo abaixo)
-      const uniqueCardIds = [...new Set(allRows.map(r => String(r['ID'] || '')).filter(Boolean))];
+      const uniqueCardIds = [
+        ...new Set([...allRows, ...openRows].map(r => String(r['ID'] || '')).filter(Boolean)),
+      ];
 
       let historyRows: Record<string, any>[] = [];
       if (uniqueCardIds.length > 0) {
@@ -303,8 +314,8 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
         }
       }
 
-      console.log(`[Expansao Raw] period=${(periodRes.data?.data || []).length} sig=${(signatureRes.data?.data || []).length} hist=${historyRows.length} ids=${uniqueCardIds.length}`);
-      return { allRows, historyRows };
+      console.log(`[Expansao Raw] period=${(periodRes.data?.data || []).length} sig=${(signatureRes.data?.data || []).length} open=${openRows.length} hist=${historyRows.length} ids=${uniqueCardIds.length}`);
+      return { allRows, openRows, historyRows };
     },
     staleTime: 30 * 60 * 1000,
     retry: 1,
@@ -340,6 +351,35 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     }
     return out;
   }, [data?.historyRows, produto, defaultTicket]);
+
+  const allOpenCards = useMemo<ExpansaoCard[]>(() => {
+    const rows = data?.openRows || [];
+    const historyById = new Map<string, ExpansaoCard[]>();
+    for (const historyCard of fullHistory) {
+      if (!historyById.has(historyCard.id)) historyById.set(historyCard.id, []);
+      historyById.get(historyCard.id)!.push(historyCard);
+    }
+
+    const seen = new Set<string>();
+    const out: ExpansaoCard[] = [];
+    for (const row of rows) {
+      if (isTestCard(String(row['ID'] || ''))) continue;
+      const parsed = parseRawCard(row, defaultTicket);
+      if (parsed.produto !== produto) continue;
+      if (seen.has(parsed.id)) continue;
+      seen.add(parsed.id);
+
+      const history = historyById.get(parsed.id) || [];
+      const taxaFranquia = Math.max(parsed.taxaFranquia || 0, ...history.map((h) => h.taxaFranquia || 0));
+      const valorMRR = Math.max(parsed.valorMRR || 0, ...history.map((h) => h.valorMRR || 0));
+      const valorPontual = Math.max(parsed.valorPontual || 0, ...history.map((h) => h.valorPontual || 0));
+      const valorSetup = Math.max(parsed.valorSetup || 0, ...history.map((h) => h.valorSetup || 0));
+      const valor = taxaFranquia > 0 ? taxaFranquia : Math.max(parsed.valor || 0, valorMRR + valorPontual + valorSetup);
+
+      out.push({ ...parsed, taxaFranquia, valorMRR, valorPontual, valorSetup, valor });
+    }
+    return out;
+  }, [data?.openRows, fullHistory, produto, defaultTicket]);
 
   // Build a map of FIRST entry per card+indicator+calendar_month (monthly dedup)
   // Key: `cardId__indicator__YYYY-MM` → earliest ExpansaoCard in that month
@@ -717,6 +757,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     isLoading,
     error,
     cards,
+    allOpenCards,
     getCardsForIndicator,
     toDetailItem,
     getDetailItemsForIndicator,
