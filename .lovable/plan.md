@@ -1,28 +1,40 @@
-## Contexto
+Diagnóstico encontrado:
 
-A Live 02/07 hoje aparece com "8" porque cai no cálculo dinâmico (`computeCounts`) — sem override em `src/data/livesOfficial.ts`, o sistema conta cards Modelo Atual classificados como G4 Live cuja `dataEntrada` está na janela 02/07 → 05/07 (3 dias). Esses 8 cards estão sendo tratados como `inscritos`, o que não é semanticamente correto: são leads que entraram no funil vindos da live.
+1. Existem 3 cards de Monetização com movimento em julho:
+   - 1383090406 — FromTherm — Concluído em 01/07 e 02/07 — valor real histórico: R$ 10.000,00
+   - 1391208172 — Samba Decor — Concluído em 02/07 — valor real histórico: R$ 7.000,00
+   - 1393377615 — Dom Duan Supermercado — entrou em Proposta enviada / Follow Up, Aprovado e Jurídico em 02/07 — valor não preenchido no banco
 
-## Ajuste
+2. Motivo de continuar zerado/não mostrando corretamente:
+   - A busca atual pega só movimentações cuja `Entrada` está dentro do mês.
+   - Para FromTherm e Samba Decor, os valores `moeda` estavam preenchidos nas movimentações antigas de junho, mas nas linhas de julho vieram nulos.
+   - O fallback para `moeda` foi aplicado só na linha selecionada de julho; como essa linha está nula, continua R$ 0.
+   - Para Proposta, a lógica usa `Fase Atual`; o Dom Duan está com `Fase Atual = Jurídico`, então deixa de contar como proposta mesmo tendo passado por `Proposta enviada / Follow Up` em julho.
 
-Adicionar entrada oficial provisória para a Live 02/07 em `src/data/livesOfficial.ts`, com:
+Solução definitiva:
 
-- `inscritos: 0` (placeholder — você vai atualizar em seguida)
-- `entraram: 8`
-- `mao: 8`
-- `venda: 0`
+1. Alterar `useMonetizacaoAnalytics` para buscar em duas etapas:
+   - Primeiro: movimentações do período, para saber quais cards tiveram evento no mês.
+   - Segundo: histórico completo desses IDs via action existente `query_card_history`, para recuperar valores preenchidos em qualquer movimentação anterior.
 
-Assim que essa entrada existir, o `LivesSection` para de calcular pelos cards e passa a usar o override oficial — os "8" ficam nas duas linhas corretas do funil (Entraram na live e Levantaram a mão) em vez de aparecer só como Inscritos.
+2. Criar uma hidratação de valor por card:
+   - Somar `valor_*` se existirem em algum ponto do histórico.
+   - Se não houver `valor_*`, usar o maior/último `moeda` não nulo do histórico.
+   - Aplicar esse valor hidratado nas linhas do mês atual.
+   - Resultado esperado: FromTherm = R$ 10.000, Samba Decor = R$ 7.000, Dom Duan = R$ 0 enquanto não tiver valor preenchido.
 
-## Alteração
+3. Corrigir a lógica de Proposta/Venda da Monetização:
+   - Para contar entrada no funil, usar a coluna `Fase` do movimento dentro do período, não apenas `Fase Atual`.
+   - `Proposta` conta quando `Fase` for `Proposta enviada / Follow Up` ou `Proposta em Elaboração` dentro do mês.
+   - `Venda` conta quando `Fase` for `Concluído` dentro do mês.
+   - Deduplicar por card + indicador + mês, para evitar contar FromTherm duas vezes por ter reentrada em Concluído.
 
-**`src/data/livesOfficial.ts`** — acrescentar uma linha ao objeto `LIVES_OFICIAIS`:
+4. Ajustar o drill-down e indicadores monetários:
+   - Os itens retornados por `getDetailItemsForIndicator('venda')` e `('proposta')` passam a usar os eventos do período com valor hidratado.
+   - `faturamento`, `pontual`, `ticket médio`, detalhes e origem Monetização passam a refletir o mesmo valor.
 
-```ts
-"2026-07-02": { inscritos: 0, entraram: 8, mao: 8, venda: 0 },
-```
-
-Nenhum outro arquivo muda. `LivesSection` já lê `getLiveOverride(l.date)` antes de calcular, então o efeito é imediato no chip "Live 02/07" e no agregado.
-
-## Próximo passo (fora deste plano)
-
-Quando você me passar o número real de inscritos da 02/07, atualizo o `inscritos: 0` para o valor correto no mesmo arquivo — edição de 1 linha.
+5. Validar após implementar:
+   - Julho / mês atual deve mostrar 3 cards em Monetização no conjunto do período.
+   - Venda deve incluir FromTherm e Samba Decor com R$ 17.000 total.
+   - Proposta deve incluir Dom Duan no drill-down, mesmo estando atualmente em Jurídico.
+   - Dom Duan permanece com valor R$ 0 até o valor ser preenchido na base.
