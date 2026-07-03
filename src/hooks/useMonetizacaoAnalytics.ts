@@ -112,29 +112,47 @@ export function useMonetizacaoAnalytics(
   const endIso = endDate.toISOString();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['monetizacao-analytics-v2', startIso, endIso],
+    queryKey: ['monetizacao-analytics-v3', startIso, endIso],
     queryFn: async () => {
-      // Etapa 1: descobrir os IDs que tiveram movimentação no período
-      const { data: periodResp, error: err1 } = await supabase.functions.invoke(
-        'query-external-db',
-        {
-          body: {
-            table: 'pipefy_moviment_contrato',
-            action: 'query_period',
-            startDate: startIso,
-            endDate: endIso,
-            limit: 5000,
-            offset: 0,
-          },
+      // Etapa 1a: movimentos no período (para detectar Concluído no período)
+      const periodPromise = supabase.functions.invoke('query-external-db', {
+        body: {
+          table: 'pipefy_moviment_contrato',
+          action: 'query_period',
+          startDate: startIso,
+          endDate: endIso,
+          limit: 5000,
+          offset: 0,
         },
-      );
-      if (err1) throw err1;
-      const periodRows = (periodResp?.data ?? []) as any[];
-      const ids = Array.from(new Set(periodRows.map((r) => String(r['ID'] ?? '')).filter(Boolean)));
-      if (ids.length === 0) return { periodRows, historyRows: [] as any[] };
+      });
 
-      // Etapa 2: buscar TODO o histórico desses IDs para hidratar valores
-      const { data: histResp, error: err2 } = await supabase.functions.invoke(
+      // Etapa 1b: pipeline aberto (fases != Concluído, sem motivo de perda) — sem filtro de período
+      const openPromise = supabase.functions.invoke('query-external-db', {
+        body: {
+          table: 'pipefy_moviment_contrato',
+          action: 'query_open_pipeline',
+        },
+      });
+
+      const [{ data: periodResp, error: err1 }, { data: openResp, error: err2 }] =
+        await Promise.all([periodPromise, openPromise]);
+      if (err1) throw err1;
+      if (err2) throw err2;
+
+      const periodRows = (periodResp?.data ?? []) as any[];
+      const openRows = (openResp?.data ?? []) as any[];
+
+      // Etapa 2: hidrata valores buscando TODO o histórico da união de IDs
+      const ids = Array.from(
+        new Set(
+          [...periodRows, ...openRows]
+            .map((r) => String(r['ID'] ?? ''))
+            .filter(Boolean),
+        ),
+      );
+      if (ids.length === 0) return { periodRows, openRows, historyRows: [] as any[] };
+
+      const { data: histResp, error: err3 } = await supabase.functions.invoke(
         'query-external-db',
         {
           body: {
@@ -144,19 +162,20 @@ export function useMonetizacaoAnalytics(
           },
         },
       );
-      if (err2) throw err2;
+      if (err3) throw err3;
       const historyRows = (histResp?.data ?? []) as any[];
-      return { periodRows, historyRows };
+      return { periodRows, openRows, historyRows };
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 
   const periodRows = data?.periodRows ?? [];
+  const openRows: any[] = data?.openRows ?? [];
   const historyRows = data?.historyRows ?? [];
 
   // Descobre dinamicamente quais colunas valor_* existem (com/sem underscore de acento)
-  const valorFields = collectValorFields([...historyRows, ...periodRows]);
+  const valorFields = collectValorFields([...historyRows, ...periodRows, ...openRows]);
   if (valorFields.length > 0) {
     console.info('[Monetização] valor_* fields detectados:', valorFields);
   }
@@ -170,7 +189,7 @@ export function useMonetizacaoAnalytics(
     historyById.get(id)!.push(row);
   }
 
-  // Agrupa movimentos do período por ID (para saber fases percorridas no mês e escolher linha "mais recente")
+  // Agrupa movimentos do período por ID (para saber fases percorridas no mês)
   const periodById = new Map<string, any[]>();
   for (const row of periodRows) {
     const id = String(row['ID'] ?? '');
@@ -179,24 +198,59 @@ export function useMonetizacaoAnalytics(
     periodById.get(id)!.push(row);
   }
 
-  const cards: MonetizacaoCard[] = Array.from(periodById.entries()).map(([id, periodRowsOfCard]) => {
-    // Linha mais recente do período para dados descritivos (fase atual, responsável, tipo, etc.)
-    const sorted = [...periodRowsOfCard].sort((a, b) => {
-      const ta = a['Entrada'] ? new Date(a['Entrada']).getTime() : 0;
-      const tb = b['Entrada'] ? new Date(b['Entrada']).getTime() : 0;
-      return tb - ta;
-    });
-    const latest = sorted[0];
+  // Pipeline aberto (estado atual) por ID — 1 linha por card (DISTINCT ON no edge)
+  const openById = new Map<string, any>();
+  for (const row of openRows) {
+    const id = String(row['ID'] ?? '');
+    if (!id) continue;
+    openById.set(id, row);
+  }
 
-    // Fases que passaram no período (para classificação Proposta/Venda por evento)
+  const normFase = (s: string) => (s || '').toString().trim();
+  const isConcluido = (s: string) => /^conclu[ií]do$/i.test(normFase(s));
+
+  // IDs que fecharam DENTRO do período (têm Fase = Concluído em alguma linha do período,
+  // ou cuja Fase Atual mais recente no período é Concluído)
+  const closedInPeriodIds = new Set<string>();
+  for (const [id, rows] of periodById.entries()) {
+    const anyClosed = rows.some(
+      (r) => isConcluido(r['Fase']) || isConcluido(r['Fase Atual']),
+    );
+    if (anyClosed) closedInPeriodIds.add(id);
+  }
+
+  // Universo final: pipeline aberto (todos) + cards fechados no período
+  const allIds = new Set<string>([...openById.keys(), ...closedInPeriodIds]);
+
+  const cards: MonetizacaoCard[] = Array.from(allIds).map((id) => {
+    const periodRowsOfCard = periodById.get(id) ?? [];
+    const openRow = openById.get(id);
+    const isClosedInPeriod = closedInPeriodIds.has(id);
+
+    // Linha descritiva "latest":
+    // - Se o card fechou no período → usa a linha mais recente do período (fase = Concluído)
+    // - Senão → usa a linha do pipeline aberto (estado atual)
+    let latest: any;
+    if (isClosedInPeriod) {
+      const sorted = [...periodRowsOfCard].sort((a, b) => {
+        const ta = a['Entrada'] ? new Date(a['Entrada']).getTime() : 0;
+        const tb = b['Entrada'] ? new Date(b['Entrada']).getTime() : 0;
+        return tb - ta;
+      });
+      latest = sorted[0] ?? openRow ?? {};
+    } else {
+      latest = openRow ?? periodRowsOfCard[0] ?? {};
+    }
+
+    // Fases percorridas no período (para classificação Proposta/Venda por evento)
     const fasesNoPeriodo = Array.from(
-      new Set(periodRowsOfCard.map((r) => (r['Fase'] || '').toString().trim()).filter(Boolean)),
+      new Set(periodRowsOfCard.map((r) => normFase(r['Fase'])).filter(Boolean)),
     );
 
-    // Hidrata valores: usa TODO o histórico do card + as próprias linhas do período
-    const hist = historyById.get(id) ?? periodRowsOfCard;
+    // Hidrata valores: histórico + período + linha aberta
+    const hist = historyById.get(id) ?? [...periodRowsOfCard, ...(openRow ? [openRow] : [])];
     const valores: Record<string, number> = {};
-    let somaValorFieldsExEduca = 0; // Educação fica fora da soma padrão
+    let somaValorFieldsExEduca = 0;
     for (const f of valorFields) {
       let best = 0;
       for (const r of hist) {
@@ -206,7 +260,6 @@ export function useMonetizacaoAnalytics(
       valores[f] = best;
       if (!isEducacaoField(f)) somaValorFieldsExEduca += best;
     }
-    // Idem para `moeda` (agregado)
     let moedaMax = 0;
     for (const r of hist) {
       const v = toNumber(r['moeda']);
@@ -214,27 +267,26 @@ export function useMonetizacaoAnalytics(
     }
     valores['moeda'] = moedaMax;
 
-    // Valor total hidratado: prefere soma dos discriminativos (sem Educação), fallback para moeda
     const valorTotal = somaValorFieldsExEduca > 0 ? somaValorFieldsExEduca : moedaMax;
 
-    // Classificação MRR / Setup / Pontual por matcher de substring
     let mrr = 0, setup = 0, pontual = 0;
     for (const f of valorFields) {
       const v = valores[f] || 0;
       if (v <= 0) continue;
-      if (isEducacaoField(f)) continue; // excluída dos totais padrão
+      if (isEducacaoField(f)) continue;
       if (isMrrField(f)) mrr += v;
       else if (isSetupField(f)) setup += v;
       else if (isPontualField(f)) pontual += v;
-      else pontual += v; // desconhecido → Pontual por segurança
+      else pontual += v;
     }
     if (mrr === 0 && setup === 0 && pontual === 0 && moedaMax > 0) {
       pontual = moedaMax;
     }
 
-
     const tipoRaw = (latest['tipo_de_movimenta_o'] || '').toString().trim();
-    const faseAtual = (latest['Fase Atual'] || latest['Fase'] || '').toString().trim();
+    const faseAtualRaw = (latest['Fase Atual'] || latest['Fase'] || '').toString().trim();
+    // Se fechou no período, força fase "Concluído" para agregar corretamente no mini-funil.
+    const faseAtual = isClosedInPeriod ? 'Concluído' : faseAtualRaw;
     const motivoPerda = (latest['motivo_da_perda'] || '').toString().trim();
     const statusProposta = (latest['status_da_proposta'] || '').toString().trim();
 
@@ -255,7 +307,7 @@ export function useMonetizacaoAnalytics(
       mrr,
       setup,
       pontual,
-      ganho: fasesNoPeriodo.some((f) => VENDA_PHASES.has(f)) || faseAtual === 'Concluído',
+      ganho: isClosedInPeriod,
       perdido: !!motivoPerda,
       fasesNoPeriodo,
     };
@@ -290,9 +342,12 @@ export function useMonetizacaoAnalytics(
     .map(([tipo, v]) => ({ tipo, count: v.count, valor: v.valor }))
     .sort((a, b) => b.valor - a.valor);
 
-  const valorPipeline = cards.reduce((s, c) => s + c.valorTotal, 0);
+  // valorPipeline = cards em fases abertas (não concluídos no período)
+  // valorGanho = cards concluídos no período
+  const openCards = cards.filter((c) => !c.ganho);
+  const valorPipeline = openCards.reduce((s, c) => s + c.valorTotal, 0);
   const valorGanho = cards.filter((c) => c.ganho).reduce((s, c) => s + c.valorTotal, 0);
-  const ticketMedio = cards.length > 0 ? valorPipeline / cards.length : 0;
+  const ticketMedio = cards.length > 0 ? (valorPipeline + valorGanho) / cards.length : 0;
 
   const toDetailItem = (card: MonetizacaoCard): DetailItem => {
     const value = card.mrr + card.setup + card.pontual;
