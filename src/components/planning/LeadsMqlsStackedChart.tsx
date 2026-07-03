@@ -118,80 +118,99 @@ export function LeadsMqlsStackedChart({ startDate, endDate, selectedBU, selected
   const daysInPeriod = differenceInDays(endDate, startDate) + 1;
   const grouping: ChartGrouping = daysInPeriod <= 31 ? 'daily' : daysInPeriod <= 90 ? 'weekly' : 'monthly';
 
-  // Get grouped data based on selected BU
-  const sheetData = useExpansaoData 
-    ? getExpansaoGroupedData('mql', startDate, endDate, grouping)
-    : useO2TaxData
-    ? getO2TaxGroupedData('mql', startDate, endDate, grouping)
-    : useOxyHackerData
-    ? getOxyHackerGroupedData('mql', startDate, endDate, grouping)
-    : getModeloAtualGroupedData('mql', startDate, endDate, grouping);
-  
   // Get total meta from funnelData (Plan Growth) based on selected BUs
   const periodMeta = 
     (includesModeloAtual ? calcularMetaDoPeriodo('modelo_atual', funnelData?.modeloAtual) : 0) +
     (includesO2Tax ? calcularMetaDoPeriodo('o2_tax', funnelData?.o2Tax) : 0) +
     (includesOxyHacker ? calcularMetaDoPeriodo('oxy_hacker', funnelData?.oxyHacker) : 0) +
     (includesFranquia ? calcularMetaDoPeriodo('franquia', funnelData?.franquia) : 0);
-    
-  // Calculate total realized based on selected BUs using first-entry logic
-  const getTotalRealized = (): number => {
-    let total = 0;
-    
-    // For Modelo Atual, apply closer filter if active
-    if (includesModeloAtual) {
-      const cards = modeloAtualAnalytics.getCardsForIndicator('mql');
-      if (selectedClosers?.length && selectedClosers.length > 0) {
-        const filteredCards = cards.filter(c => {
-          const closerValue = (c.closer || '').trim();
-          return closerValue && selectedClosers.includes(closerValue);
-        });
-        total += filteredCards.length;
-      } else {
-        total += cards.length;
-      }
-    }
-    
-    if (includesO2Tax) total += o2TaxAnalytics.getMqlsByRevenue.flatMap(r => r.cards).length;
-    if (includesOxyHacker) total += oxyHackerAnalytics.getDetailItemsForIndicator('mql').length;
-    if (includesFranquia) total += franquiaAnalytics.getDetailItemsForIndicator('mql').length;
-    
-    return total;
-  };
-  
-  const totalRealized = getTotalRealized();
 
-  // Build chart data with proper date labels
+  // ─── Unified source: aggregate MQL items from analytics hooks for selected BUs ───
+  // (mesma fonte do header Realizado — respeita regras de MQL por faturamento, dedup,
+  // exclusão de test cards, First Entry e filtro de closer)
+  const collectMqlItems = (): DetailItem[] => {
+    const items: DetailItem[] = [];
+    if (includesModeloAtual) {
+      let modeloItems = modeloAtualAnalytics.getDetailItemsForIndicator('mql');
+      if (selectedClosers?.length) {
+        modeloItems = modeloItems.filter((it: any) => {
+          const closer = (it.closer || '').trim();
+          return closer && selectedClosers.includes(closer);
+        });
+      }
+      items.push(...modeloItems);
+    }
+    if (includesO2Tax) {
+      const o2Items = o2TaxAnalytics.getMqlsByRevenue
+        .flatMap(r => r.cards)
+        .map(o2TaxAnalytics.toDetailItem);
+      items.push(...o2Items);
+    }
+    if (includesFranquia) items.push(...franquiaAnalytics.getDetailItemsForIndicator('mql'));
+    if (includesOxyHacker) items.push(...oxyHackerAnalytics.getDetailItemsForIndicator('mql'));
+    return items;
+  };
+
+  const allMqlItems = collectMqlItems();
+
+  // Total realized derived from the SAME source that feeds the bars — garante paridade
+  const totalRealized = allMqlItems.length;
+
+  // Build chart data with proper date labels, bucketing items by grouping
   const buildChartData = () => {
     if (grouping === 'daily') {
-      return eachDayOfInterval({ start: startDate, end: endDate }).map((day, index) => ({
+      const days = eachDayOfInterval({ start: startDate, end: endDate });
+      const buckets = days.map(() => 0);
+      for (const it of allMqlItems) {
+        if (!it.date) continue;
+        const d = new Date(it.date);
+        const idx = days.findIndex(day => isSameDay(day, d));
+        if (idx >= 0) buckets[idx] += 1;
+      }
+      return days.map((day, i) => ({
         label: format(day, "d 'de' MMM", { locale: ptBR }),
-        mqls: sheetData.qty[index] || 0,
-        meta: sheetData.meta[index] || 0,
+        mqls: buckets[i],
+        meta: 0,
       }));
     } else if (grouping === 'weekly') {
       const totalDays = differenceInDays(endDate, startDate) + 1;
       const numWeeks = Math.ceil(totalDays / 7);
+      const buckets = Array.from({ length: numWeeks }, () => 0);
+      for (const it of allMqlItems) {
+        if (!it.date) continue;
+        const d = new Date(it.date);
+        const diff = differenceInDays(d, startDate);
+        if (diff < 0) continue;
+        const idx = Math.floor(diff / 7);
+        if (idx >= 0 && idx < numWeeks) buckets[idx] += 1;
+      }
       return Array.from({ length: numWeeks }, (_, i) => {
         const weekStart = addDays(startDate, i * 7);
         return {
           label: format(weekStart, "d 'de' MMM", { locale: ptBR }),
-          mqls: sheetData.qty[i] || 0,
-          meta: sheetData.meta[i] || 0,
+          mqls: buckets[i],
+          meta: 0,
         };
       });
     } else {
-      // Monthly - use actual months from the interval
       const months = eachMonthOfInterval({ start: startDate, end: endDate });
-      return months.map((monthDate, index) => ({
+      const buckets = months.map(() => 0);
+      for (const it of allMqlItems) {
+        if (!it.date) continue;
+        const d = new Date(it.date);
+        const idx = months.findIndex(m => isSameMonth(m, d));
+        if (idx >= 0) buckets[idx] += 1;
+      }
+      return months.map((monthDate, i) => ({
         label: format(monthDate, "MMM", { locale: ptBR }),
-        mqls: sheetData.qty[index] || 0,
-        meta: sheetData.meta[index] || 0,
+        mqls: buckets[i],
+        meta: 0,
       }));
     }
   };
 
   const chartData = buildChartData();
+
 
   // Handle click on specific bar - filter by day/week/month
   const handleBarClick = (data: any, index: number) => {
