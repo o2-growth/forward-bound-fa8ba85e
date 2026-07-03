@@ -45,12 +45,37 @@ const isEducacaoField = (f: string) => /educa/i.test(f);
 
 const toNumber = (v: unknown): number => {
   if (v == null || v === '') return 0;
-  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+
+  let s = String(v).trim();
+  if (!s) return 0;
+
+  s = s.replace(/\s+/g, '').replace(/[^\d,.-]/g, '');
+  if (!s || s === '-' || s === ',' || s === '.') return 0;
+
+  const dotCount = (s.match(/\./g) ?? []).length;
+  const hasComma = s.includes(',');
+
+  if (hasComma) {
+    // Formato BR: 5.200,00 → 5200.00
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (dotCount > 1) {
+    // 1.234.567 → 1234567
+    s = s.replace(/\./g, '');
+  } else if (dotCount === 1) {
+    const [before, after] = s.split('.');
+    // 2.300 normalmente é milhar no Pipefy/textos brasileiros; 2300.00 permanece decimal.
+    if (before.length <= 3 && after?.length === 3) s = `${before}${after}`;
+  }
+
+  const n = Number(s);
   return Number.isFinite(n) ? n : 0;
 };
 
-// Detecta dinamicamente todas as colunas valor_* presentes nas linhas (evita hardcode
-// de sufixos com/sem underscore de acento — valor_diagnostico vs valor_diagn_stico etc.)
+const normalizeValorFieldKey = (field: string) => field.replace(/_\d+$/, '');
+
+// Detecta dinamicamente as colunas valor_* presentes e normaliza duplicatas do Pipefy
+// (ex.: valor_cfoaas e valor_cfoaas_1 representam o mesmo tipo de valor).
 const collectValorFields = (rows: any[]): string[] => {
   const set = new Set<string>();
   for (const r of rows) {
@@ -58,10 +83,50 @@ const collectValorFields = (rows: any[]): string[] => {
     for (const k of Object.keys(r)) {
       if (!k.startsWith('valor_')) continue;
       if (k === 'valor_mrr' || k === 'valor_total') continue; // agregados calculados
-      set.add(k);
+      set.add(normalizeValorFieldKey(k));
     }
   }
   return Array.from(set);
+};
+
+const TEXT_VALUE_FIELDS = [
+  'forma_de_pagamento',
+  'condi_es_de_pagamento',
+  'detalhes_sobre_a_proposta',
+  'escopo_aprovado_pelo_cliente',
+  'descri_o_da_oportunidade',
+  'observa_es_da_triagem',
+];
+
+const extractTextualValues = (rows: any[]) => {
+  let mrr = 0;
+  let setup = 0;
+  let pontual = 0;
+
+  for (const row of rows) {
+    for (const field of TEXT_VALUE_FIELDS) {
+      const text = String(row?.[field] ?? '');
+      if (!text) continue;
+
+      const amountRegex = /R\$\s*(\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d+(?:[,.]\d{2})?)/gi;
+      let match: RegExpExecArray | null;
+      while ((match = amountRegex.exec(text)) !== null) {
+        const amount = toNumber(match[1]);
+        if (amount <= 0) continue;
+
+        const context = text.slice(Math.max(0, match.index - 90), match.index).toLowerCase();
+        if (/setup|implanta[cç][aã]o|onboarding/.test(context)) {
+          setup = Math.max(setup, amount);
+        } else if (/mrr|fee\s*mensal|mensalidade|valor\s*mensal|recorrente|coordenador\s*financeiro|cfo|bpo|assessoria/.test(context)) {
+          mrr = Math.max(mrr, amount);
+        } else {
+          pontual = Math.max(pontual, amount);
+        }
+      }
+    }
+  }
+
+  return { mrr, setup, pontual, total: mrr + setup + pontual };
 };
 
 
@@ -112,7 +177,7 @@ export function useMonetizacaoAnalytics(
   const endIso = endDate.toISOString();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['monetizacao-analytics-v3', startIso, endIso],
+    queryKey: ['monetizacao-analytics-v4', startIso, endIso],
     queryFn: async () => {
       // Etapa 1a: movimentos no período (para detectar Concluído no período)
       const periodPromise = supabase.functions.invoke('query-external-db', {
@@ -254,8 +319,12 @@ export function useMonetizacaoAnalytics(
     for (const f of valorFields) {
       let best = 0;
       for (const r of hist) {
-        const v = toNumber(r[f]);
-        if (v > best) best = v;
+        for (const [key, rawValue] of Object.entries(r ?? {})) {
+          if (!key.startsWith('valor_')) continue;
+          if (normalizeValorFieldKey(key) !== f) continue;
+          const v = toNumber(rawValue);
+          if (v > best) best = v;
+        }
       }
       valores[f] = best;
       if (!isEducacaoField(f)) somaValorFieldsExEduca += best;
@@ -267,7 +336,7 @@ export function useMonetizacaoAnalytics(
     }
     valores['moeda'] = moedaMax;
 
-    const valorTotal = somaValorFieldsExEduca > 0 ? somaValorFieldsExEduca : moedaMax;
+    let valorTotal = somaValorFieldsExEduca > 0 ? somaValorFieldsExEduca : moedaMax;
 
     let mrr = 0, setup = 0, pontual = 0;
     for (const f of valorFields) {
@@ -281,6 +350,20 @@ export function useMonetizacaoAnalytics(
     }
     if (mrr === 0 && setup === 0 && pontual === 0 && moedaMax > 0) {
       pontual = moedaMax;
+    }
+
+    // Alguns cards abertos recém-incluídos ainda não têm valor_* preenchido, mas trazem
+    // o valor em texto de pagamento/proposta. Usa somente como fallback para não alterar
+    // cards com valor estruturado.
+    if (valorTotal === 0) {
+      const textual = extractTextualValues(hist);
+      if (textual.total > 0) {
+        mrr = textual.mrr;
+        setup = textual.setup;
+        pontual = textual.pontual;
+        valorTotal = textual.total;
+        valores.valor_texto_extraido = textual.total;
+      }
     }
 
     const tipoRaw = (latest['tipo_de_movimenta_o'] || '').toString().trim();
