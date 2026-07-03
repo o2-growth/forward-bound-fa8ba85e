@@ -140,6 +140,8 @@ export interface MonetizacaoCard {
   tipo: string;
   faseAtual: string;
   entrada: string; // ISO — última movimentação dentro do período
+  dataCriacao: string; // ISO — criação do card
+  dataAssinatura: string; // ISO — data de assinatura/faturamento (quando ganho)
   responsavel: string;
   motivoPerda: string;
   statusProposta: string;
@@ -383,6 +385,10 @@ export function useMonetizacaoAnalytics(
       tipo: TIPO_LABEL_MAP[tipoRaw] || tipoRaw || '—',
       faseAtual,
       entrada: latest['Entrada'] || '',
+      dataCriacao: (latest['Data Criação'] || '').toString(),
+      dataAssinatura: isClosedInPeriod
+        ? (latest['data_de_faturamento_1'] || latest['data_de_faturamento'] || latest['Entrada'] || '').toString()
+        : '',
       responsavel: (latest['respons_vel'] || '').toString(),
       motivoPerda,
       statusProposta,
@@ -438,8 +444,11 @@ export function useMonetizacaoAnalytics(
     return {
       id: card.id,
       name: card.titulo || card.id,
+      company: card.titulo || card.cliente || card.id,
       phase: card.faseAtual,
       date: card.entrada,
+      dataCriacao: card.dataCriacao || undefined,
+      dataAssinatura: card.dataAssinatura || undefined,
       value,
       total: value,
       mrr: card.mrr,
