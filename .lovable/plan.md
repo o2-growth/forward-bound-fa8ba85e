@@ -1,33 +1,40 @@
-# Card "Qtd MQLs" — barras diárias divergem do Realizado
+# Monetização: 3 dos 5 cards sem valor
 
 ## Causa raiz
 
-Em `src/components/planning/LeadsMqlsStackedChart.tsx` há **duas fontes diferentes** alimentando o mesmo card:
+O hook `useMonetizacaoAnalytics` hidrata valores lendo **nomes fixos** de coluna:
 
-1. **Header "Realizado"** (`getTotalRealized`, linhas 138-160) usa os hooks de analytics de cada BU (`modeloAtualAnalytics`, `o2TaxAnalytics`, `franquiaAnalytics`, `oxyHackerAnalytics`) — aplicam as regras oficiais de MQL (faturamento mínimo, dedup mensal, exclusão de test cards, First Entry, filtro de closer).
-2. **Barras diárias** (`sheetData`, linhas 122-128) usam os hooks `useModeloAtualMetas / useExpansaoMetas / useOxyHackerMetas / useO2TaxMetas` (`getGroupedData('mql', …)`), que contam entradas brutas por dia **sem** essas regras.
+```
+valor_diagn_stico, valor_educa_o, valor_cfoaas, valor_oxy, valor_setup, ...
+```
 
-Além disso, o `sheetData` só suporta **uma** BU: quando `hasSingleBU === false` (é o seu caso: Franquia + Oxy Hacker marcados), a cadeia de ternários **cai no fallback `getModeloAtualGroupedData`** — ou seja, as barras que você vê são de **Modelo Atual**, não de Franquia + Oxy Hacker. Por isso aparece 6+6+1=13 nas barras enquanto o Realizado (que soma correto Franquia+Oxy Hacker) marca 4.
+Mas o sync/atualização recente grava com nomes **sem os `_` extras** dos acentos. Em `supabase/functions/analyze-churn-tratativa/index.ts:280-283` a mesma tabela usa **`valor_diagnostico`** (sem underscore), o que confirma o descasamento. Provável análogo: `valor_educacao` em vez de `valor_educa_o`. Como os cards antigos (FromTherm, Samba, Dom Duan) foram atualizados nesses nomes "corretos", o hook lê `null` nas variantes com underscore e cai no fallback de `moeda` — que também está null para eles → `valorTotal = 0`.
+
+Os 2 cards novos aparecem com valor porque provavelmente têm `moeda` preenchida (fallback funciona) ou coincidem com nomes esperados.
 
 ## Correção
 
-Reescrever a montagem de `chartData` para:
+Substituir a lista fixa `VALOR_FIELDS` por **detecção dinâmica**: qualquer chave da linha começando por `valor_` (exceto `valor_mrr`, que é agregado calculado) participa da hidratação. Assim, tanto `valor_diagn_stico` quanto `valor_diagnostico` são captados sem precisar adivinhar snake_case.
 
-1. **Agregar por BU selecionada**: para cada BU em `selectedBUsArray`, obter o grouped data correspondente e somar os arrays `qty` posição a posição (mesmo `grouping`, mesmo tamanho — os hooks já respeitam `startDate/endDate/grouping`).
-2. **Usar a mesma fonte do header** (analytics), não os hooks de metas, para as barras — assim as regras (faturamento MQL, dedup, test cards, First Entry, filtro closer) refletem no diário. Implementação: usar `getDetailItemsForIndicator('mql')` de cada BU incluída (mais O2 TAX via `getMqlsByRevenue.flatMap(r=>r.cards).map(toDetailItem)`), aplicar filtro de closer (quando `selectedClosers` estiver ativo, hoje só se aplica em Modelo Atual — manter esse comportamento), e distribuir os itens pelos buckets:
-   - `daily`: um bucket por dia entre `startDate` e `endDate`.
-   - `weekly`: buckets de 7 dias.
-   - `monthly`: um por mês do intervalo.
-3. **Soma total = header**: garantir por asserção no dev que `sum(chartData.mqls) === totalRealized`. Se divergir, é sinal de item sem `date` — nesse caso jogar num bucket "sem data" só em log, nunca contar duplicado.
-4. **Drill-down** (`handleBarClick`) já usa `getDetailItemsForIndicator('mql')` agregando por BU selecionada — manter como está; ele passará a bater com a barra porque ambos vêm da mesma fonte.
-5. **Meta** permanece via `calcularMetaDoPeriodo` (não é o problema — 5 está correto e vem só das BUs incluídas).
+Passos em `src/hooks/useMonetizacaoAnalytics.ts`:
+
+1. **Descobrir os campos dinamicamente**: percorrer todas as linhas de `historyRows` + `periodRows` e coletar em um `Set` todo `key` que comece por `valor_` e cujo valor seja numérico (ou parseável). Guardar isso em `discoveredValorFields`.
+2. **Hidratar por card**: para cada `f ∈ discoveredValorFields`, `valores[f] = max(toNumber(r[f]))` sobre todo histórico (comportamento atual, só que sobre a lista descoberta).
+3. **Classificação MRR/Setup/Pontual robusta**: normalizar o nome do campo (remover underscores duplicados/pontuais que substituem acentos) e casar por **substring**, aceitando as duas variantes:
+   - MRR: contém `cfoaas`, `oxy`, `assessoria_mrr`, `bpo`, `coordenador_financeiro`
+   - Setup: contém `setup`
+   - Pontual: contém `diagn` (ó/o), `turnaround`, `valuation`
+   - Educação: contém `educa` (ç/c) — permanece **fora** da soma padrão (mantém regra memory: MRR/Setup/Pontual excluem Educação).
+4. **`valorTotal`**: `somaValorFields > 0 ? somaValorFields : moedaMax` (inalterado).
+5. **Log de diagnóstico (uma vez por render)**: `console.info('[Monetização] valor_* fields detectados:', […])` para facilitar auditorias futuras se surgirem novos nomes.
+6. Manter compat com o fallback `moeda` para cards antigos.
 
 ## Arquivos
 
-- `src/components/planning/LeadsMqlsStackedChart.tsx` — substituir `sheetData` + `buildChartData` por a nova agregação multi-BU baseada em analytics; remover imports não usados de `useModeloAtualMetas`/`useExpansaoMetas`/`useO2TaxMetas`/`useOxyHackerMetas` para `getGroupedData` (manter `getQtyForPeriod` só se ainda for necessário — no arquivo atual não é).
+- `src/hooks/useMonetizacaoAnalytics.ts` — troca de lista fixa por detecção dinâmica + matcher por substring nas classificações MRR/Setup/Pontual/Educação.
 
 ## Validação
 
-- Filtrar Franquia + Oxy Hacker no período atual: soma das barras deve ser exatamente 4 (igual ao "Realizado").
-- Testar também com uma BU só (Modelo Atual, O2 TAX, Franquia, Oxy Hacker) e com "all" para garantir que continua batendo com o header.
-- Clicar numa barra: a lista aberta deve trazer exatamente o mesmo N que o rótulo daquela barra.
+- Abrir aba Monetização em julho: os 5 cards devem exibir `valorTotal > 0` para todo card que tenha qualquer coluna `valor_*` preenchida no histórico (independente do sufixo com/sem underscore).
+- Verificar no console o log `valor_* fields detectados` — deve incluir `valor_diagnostico`/`valor_diagn_stico`/`valor_educacao` conforme presentes.
+- Somatórios do funil (MRR, Setup, Pontual) devem refletir os novos valores.
