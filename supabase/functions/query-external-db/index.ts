@@ -977,11 +977,16 @@ Deno.serve(async (req) => {
       const invalid = await validateTable(table);
       if (invalid) return invalid;
 
+      const lossColumn =
+        table === "pipefy_moviment_contrato" || table === "pipefy_moviment_outbound"
+          ? '"motivo_da_perda"'
+          : '"Motivo da perda"';
+
       const sql = `
         SELECT DISTINCT ON ("ID") *
         FROM ${table}
-        WHERE COALESCE(NULLIF(TRIM("Fase Atual"), ''), '') NOT IN ('Concluído', 'Concluido')
-          AND COALESCE(NULLIF(TRIM("motivo_da_perda"), ''), '') = ''
+        WHERE COALESCE(NULLIF(TRIM("Fase Atual"), ''), '') NOT IN ('Concluído', 'Concluido', 'Ganho', 'Contrato assinado', 'Perdido')
+          AND COALESCE(NULLIF(TRIM(${lossColumn}), ''), '') = ''
         ORDER BY "ID", "Entrada" DESC
       `;
       const res = await client.query(sql);
