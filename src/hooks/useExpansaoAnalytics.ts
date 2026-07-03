@@ -268,6 +268,12 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       const [periodRes, signatureRes] = await Promise.all([
         supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period' } }),
         supabase.functions.invoke('query-external-db', { body: { ...baseBody, action: 'query_period_by_signature' } }),
+        supabase.functions.invoke('query-external-db', {
+          body: {
+            table: 'pipefy_cards_movements_expansao',
+            action: 'query_open_pipeline',
+          },
+        }),
       ]);
 
       if (periodRes.error) {
