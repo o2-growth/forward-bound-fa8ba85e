@@ -62,6 +62,11 @@ export interface AggregateInput {
   selectedBUs: BUType[];
   startDate: Date;
   endDate: Date;
+  /**
+   * Quando true, ignora o filtro de período para cards em aberto.
+   * Usado no Cenário de Caixa para mostrar todo o pipeline vivo.
+   */
+  includeAllOpenIgnoringPeriod?: boolean;
 }
 
 export interface AggregateResult {
