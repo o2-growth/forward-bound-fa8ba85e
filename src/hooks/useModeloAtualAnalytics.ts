@@ -272,11 +272,9 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
       valorEducacao,
       valorCFOaaS: parseNumericValue(row['Valor CFOaaS'] || 0),
       valorOXY: parseNumericValue(row['Valor OXY'] || row['Valor Oxy'] || 0),
-      valorTurnaround: parseNumericValue(row['Valor Turnaround'] || 0),
-      valorValuation: parseNumericValue(row['Valor Valuation'] || 0),
-      valorDiagnostico: parseNumericValue(
-        row['Valor Diagnóstico Estratégico'] || row['Valor Diagnostico'] || 0
-      ),
+      valorTurnaround,
+      valorValuation,
+      valorDiagnostico,
     },
     temperatura: FORCED_QUENTE_TITLES.has(normalizeTitleForQuente(tituloRaw))
       ? 'Quente'
