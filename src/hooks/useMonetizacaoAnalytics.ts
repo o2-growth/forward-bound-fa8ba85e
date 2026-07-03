@@ -115,6 +115,7 @@ const extractTextualValues = (rows: any[]) => {
         if (amount <= 0) continue;
 
         const context = text.slice(Math.max(0, match.index - 90), match.index).toLowerCase();
+        if (/\d+\s*x\s*de\s*$|parcela[s]?\s+de\s*$/.test(context)) continue;
         if (/setup|implanta[cç][aã]o|onboarding/.test(context)) {
           setup = Math.max(setup, amount);
         } else if (/mrr|fee\s*mensal|mensalidade|valor\s*mensal|recorrente|coordenador\s*financeiro|cfo|bpo|assessoria/.test(context)) {
