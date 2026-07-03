@@ -342,9 +342,12 @@ export function useMonetizacaoAnalytics(
     .map(([tipo, v]) => ({ tipo, count: v.count, valor: v.valor }))
     .sort((a, b) => b.valor - a.valor);
 
-  const valorPipeline = cards.reduce((s, c) => s + c.valorTotal, 0);
+  // valorPipeline = cards em fases abertas (não concluídos no período)
+  // valorGanho = cards concluídos no período
+  const openCards = cards.filter((c) => !c.ganho);
+  const valorPipeline = openCards.reduce((s, c) => s + c.valorTotal, 0);
   const valorGanho = cards.filter((c) => c.ganho).reduce((s, c) => s + c.valorTotal, 0);
-  const ticketMedio = cards.length > 0 ? valorPipeline / cards.length : 0;
+  const ticketMedio = cards.length > 0 ? (valorPipeline + valorGanho) / cards.length : 0;
 
   const toDetailItem = (card: MonetizacaoCard): DetailItem => {
     const value = card.mrr + card.setup + card.pontual;
