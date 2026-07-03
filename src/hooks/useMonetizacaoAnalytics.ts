@@ -385,6 +385,10 @@ export function useMonetizacaoAnalytics(
       tipo: TIPO_LABEL_MAP[tipoRaw] || tipoRaw || '—',
       faseAtual,
       entrada: latest['Entrada'] || '',
+      dataCriacao: (latest['Data Criação'] || '').toString(),
+      dataAssinatura: isClosedInPeriod
+        ? (latest['data_de_faturamento_1'] || latest['data_de_faturamento'] || latest['Entrada'] || '').toString()
+        : '',
       responsavel: (latest['respons_vel'] || '').toString(),
       motivoPerda,
       statusProposta,
