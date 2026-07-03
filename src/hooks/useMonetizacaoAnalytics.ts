@@ -5,25 +5,16 @@ import { MONETIZACAO_ORIGEM_SENTINEL } from '@/lib/leadSource';
 
 export type MonetizacaoIndicatorType = 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 
-// Fases do pipe Monetização que contam como "Proposta enviada" no acelerômetro comercial
+// Fases que contam como "Proposta enviada" no acelerômetro comercial (a partir do evento do mês, não Fase Atual)
 const PROPOSTA_PHASES = new Set([
   'Proposta em Elaboração',
   'Proposta enviada / Follow Up',
 ]);
 
-// Fases do pipe Monetização que contam como "Venda" no acelerômetro comercial
-// Regra: ganho/venda APENAS quando o card chega em Concluído.
+// Fases que contam como "Venda" (evento do mês)
 const VENDA_PHASES = new Set([
   'Concluído',
 ]);
-
-function mapFaseToIndicator(fase: string): MonetizacaoIndicatorType | null {
-  if (VENDA_PHASES.has(fase)) return 'venda';
-  if (PROPOSTA_PHASES.has(fase)) return 'proposta';
-  return null;
-}
-
-
 
 export const MONETIZACAO_FASES_ORDER = [
   'Start form',
@@ -38,8 +29,6 @@ export const MONETIZACAO_FASES_ORDER = [
 
 export type MonetizacaoFase = typeof MONETIZACAO_FASES_ORDER[number];
 
-// Mapeia o campo bruto "tipo_de_movimenta_o" para os labels exibidos no dash.
-// Mantemos o original também para o caso de chegar um valor novo.
 const TIPO_LABEL_MAP: Record<string, string> = {
   'Upsell': 'Upsell',
   'Novo produto': 'Cross-sell',
@@ -60,6 +49,16 @@ const VALOR_FIELDS = [
   'valor_educa_o',
 ] as const;
 
+const MRR_FIELDS = [
+  'valor_cfoaas',
+  'valor_oxy',
+  'valor_assessoria_mrr',
+  'valor_bpo',
+  'valor_coordenador_financeiro',
+] as const;
+const SETUP_FIELDS = ['valor_setup'] as const;
+const PONTUAL_FIELDS = ['valor_diagn_stico', 'valor_turnaround', 'valor_valuation'] as const;
+
 const toNumber = (v: unknown): number => {
   if (v == null || v === '') return 0;
   const n = typeof v === 'number' ? v : parseFloat(String(v));
@@ -72,16 +71,21 @@ export interface MonetizacaoCard {
   cliente: string;
   produto: string;
   tipoRaw: string;
-  tipo: string; // label normalizado para exibição
+  tipo: string;
   faseAtual: string;
-  entrada: string; // ISO
+  entrada: string; // ISO — última movimentação dentro do período
   responsavel: string;
   motivoPerda: string;
   statusProposta: string;
   valorTotal: number;
-  valores: Record<string, number>;
+  valores: Record<string, number>; // valores hidratados (max não nulo em todo histórico)
+  mrr: number;
+  setup: number;
+  pontual: number;
   ganho: boolean;
   perdido: boolean;
+  /** Fases que o card passou dentro do período */
+  fasesNoPeriodo: string[];
 }
 
 interface MonetizacaoAnalytics {
@@ -96,7 +100,6 @@ interface MonetizacaoAnalytics {
   };
   toDetailItem: (card: MonetizacaoCard) => DetailItem;
   getDetailItemsForIndicator: (indicator: MonetizacaoIndicatorType) => DetailItem[];
-
   isLoading: boolean;
   error: unknown;
 }
@@ -109,9 +112,10 @@ export function useMonetizacaoAnalytics(
   const endIso = endDate.toISOString();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['monetizacao-analytics', startIso, endIso],
+    queryKey: ['monetizacao-analytics-v2', startIso, endIso],
     queryFn: async () => {
-      const { data: resp, error: err } = await supabase.functions.invoke(
+      // Etapa 1: descobrir os IDs que tiveram movimentação no período
+      const { data: periodResp, error: err1 } = await supabase.functions.invoke(
         'query-external-db',
         {
           body: {
@@ -124,62 +128,127 @@ export function useMonetizacaoAnalytics(
           },
         },
       );
-      if (err) throw err;
-      return (resp?.data ?? []) as any[];
+      if (err1) throw err1;
+      const periodRows = (periodResp?.data ?? []) as any[];
+      const ids = Array.from(new Set(periodRows.map((r) => String(r['ID'] ?? '')).filter(Boolean)));
+      if (ids.length === 0) return { periodRows, historyRows: [] as any[] };
+
+      // Etapa 2: buscar TODO o histórico desses IDs para hidratar valores
+      const { data: histResp, error: err2 } = await supabase.functions.invoke(
+        'query-external-db',
+        {
+          body: {
+            table: 'pipefy_moviment_contrato',
+            action: 'query_card_history',
+            cardIds: ids,
+          },
+        },
+      );
+      if (err2) throw err2;
+      const historyRows = (histResp?.data ?? []) as any[];
+      return { periodRows, historyRows };
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 
-  const rows = data ?? [];
+  const periodRows = data?.periodRows ?? [];
+  const historyRows = data?.historyRows ?? [];
 
-  // Dedup por ID — mantém o movimento mais recente por Entrada
-  const byId = new Map<string, any>();
-  for (const row of rows) {
+  // Agrupa histórico por ID para hidratar valores (pega o maior valor não-nulo em qualquer linha)
+  const historyById = new Map<string, any[]>();
+  for (const row of historyRows) {
     const id = String(row['ID'] ?? '');
     if (!id) continue;
-    const prev = byId.get(id);
-    const entradaCurr = row['Entrada'] ? new Date(row['Entrada']).getTime() : 0;
-    const entradaPrev = prev?.['Entrada'] ? new Date(prev['Entrada']).getTime() : -1;
-    if (!prev || entradaCurr > entradaPrev) byId.set(id, row);
+    if (!historyById.has(id)) historyById.set(id, []);
+    historyById.get(id)!.push(row);
   }
 
-  const cards: MonetizacaoCard[] = Array.from(byId.values()).map((row) => {
+  // Agrupa movimentos do período por ID (para saber fases percorridas no mês e escolher linha "mais recente")
+  const periodById = new Map<string, any[]>();
+  for (const row of periodRows) {
+    const id = String(row['ID'] ?? '');
+    if (!id) continue;
+    if (!periodById.has(id)) periodById.set(id, []);
+    periodById.get(id)!.push(row);
+  }
+
+  const cards: MonetizacaoCard[] = Array.from(periodById.entries()).map(([id, periodRowsOfCard]) => {
+    // Linha mais recente do período para dados descritivos (fase atual, responsável, tipo, etc.)
+    const sorted = [...periodRowsOfCard].sort((a, b) => {
+      const ta = a['Entrada'] ? new Date(a['Entrada']).getTime() : 0;
+      const tb = b['Entrada'] ? new Date(b['Entrada']).getTime() : 0;
+      return tb - ta;
+    });
+    const latest = sorted[0];
+
+    // Fases que passaram no período (para classificação Proposta/Venda por evento)
+    const fasesNoPeriodo = Array.from(
+      new Set(periodRowsOfCard.map((r) => (r['Fase'] || '').toString().trim()).filter(Boolean)),
+    );
+
+    // Hidrata valores: usa TODO o histórico do card + as próprias linhas do período
+    const hist = historyById.get(id) ?? periodRowsOfCard;
     const valores: Record<string, number> = {};
     let somaValorFields = 0;
     for (const f of VALOR_FIELDS) {
-      const v = toNumber(row[f]);
-      valores[f] = v;
-      somaValorFields += v;
+      // Pega o maior valor não-nulo observado no histórico
+      let best = 0;
+      for (const r of hist) {
+        const v = toNumber(r[f]);
+        if (v > best) best = v;
+      }
+      valores[f] = best;
+      somaValorFields += best;
     }
-    const moeda = toNumber(row['moeda']);
-    valores['moeda'] = moeda;
-    // Fallback: cards vindos só com o agregado `moeda` (sem discriminação em valor_*)
-    const valorTotal = somaValorFields > 0 ? somaValorFields : moeda;
-    const tipoRaw = (row['tipo_de_movimenta_o'] || '').toString().trim();
-    const faseAtual = (row['Fase Atual'] || row['Fase'] || '').toString().trim();
-    const motivoPerda = (row['motivo_da_perda'] || '').toString().trim();
-    const statusProposta = (row['status_da_proposta'] || '').toString().trim();
+    // Idem para `moeda` (agregado)
+    let moedaMax = 0;
+    for (const r of hist) {
+      const v = toNumber(r['moeda']);
+      if (v > moedaMax) moedaMax = v;
+    }
+    valores['moeda'] = moedaMax;
+
+    // Valor total hidratado: prefere soma dos discriminativos, fallback para moeda
+    const valorTotal = somaValorFields > 0 ? somaValorFields : moedaMax;
+
+    // Classificação MRR / Setup / Pontual
+    const mrr = MRR_FIELDS.reduce((s, f) => s + (valores[f] || 0), 0);
+    const setup = SETUP_FIELDS.reduce((s, f) => s + (valores[f] || 0), 0);
+    let pontual = PONTUAL_FIELDS.reduce((s, f) => s + (valores[f] || 0), 0);
+    if (mrr === 0 && setup === 0 && pontual === 0 && moedaMax > 0) {
+      pontual = moedaMax;
+    }
+
+    const tipoRaw = (latest['tipo_de_movimenta_o'] || '').toString().trim();
+    const faseAtual = (latest['Fase Atual'] || latest['Fase'] || '').toString().trim();
+    const motivoPerda = (latest['motivo_da_perda'] || '').toString().trim();
+    const statusProposta = (latest['status_da_proposta'] || '').toString().trim();
+
     return {
-      id: String(row['ID'] ?? ''),
-      titulo: (row['Título'] || '').toString(),
-      cliente: (row['cliente'] || '').toString(),
-      produto: (row['produto'] || '').toString(),
+      id,
+      titulo: (latest['Título'] || '').toString(),
+      cliente: (latest['cliente'] || '').toString(),
+      produto: (latest['produto'] || '').toString(),
       tipoRaw,
       tipo: TIPO_LABEL_MAP[tipoRaw] || tipoRaw || '—',
       faseAtual,
-      entrada: row['Entrada'] || '',
-      responsavel: (row['respons_vel'] || '').toString(),
+      entrada: latest['Entrada'] || '',
+      responsavel: (latest['respons_vel'] || '').toString(),
       motivoPerda,
       statusProposta,
       valorTotal,
       valores,
-      ganho: faseAtual === 'Concluído',
+      mrr,
+      setup,
+      pontual,
+      ganho: fasesNoPeriodo.some((f) => VENDA_PHASES.has(f)) || faseAtual === 'Concluído',
       perdido: !!motivoPerda,
+      fasesNoPeriodo,
     };
   });
 
-  // Agregação por fase (ordem canônica)
+  // Agregação por fase (ordem canônica) — usa faseAtual
   const faseAgg = new Map<string, { count: number; valor: number }>();
   for (const f of MONETIZACAO_FASES_ORDER) faseAgg.set(f, { count: 0, valor: 0 });
   for (const c of cards) {
@@ -197,7 +266,6 @@ export function useMonetizacaoAnalytics(
     valor: v.valor,
   }));
 
-  // Agregação por tipo
   const tipoAgg = new Map<string, { count: number; valor: number }>();
   for (const c of cards) {
     if (!tipoAgg.has(c.tipo)) tipoAgg.set(c.tipo, { count: 0, valor: 0 });
@@ -214,22 +282,7 @@ export function useMonetizacaoAnalytics(
   const ticketMedio = cards.length > 0 ? valorPipeline / cards.length : 0;
 
   const toDetailItem = (card: MonetizacaoCard): DetailItem => {
-    const mrr =
-      (card.valores['valor_cfoaas'] || 0) +
-      (card.valores['valor_oxy'] || 0) +
-      (card.valores['valor_assessoria_mrr'] || 0) +
-      (card.valores['valor_bpo'] || 0) +
-      (card.valores['valor_coordenador_financeiro'] || 0);
-    const setup = card.valores['valor_setup'] || 0;
-    let pontual =
-      (card.valores['valor_diagn_stico'] || 0) +
-      (card.valores['valor_turnaround'] || 0) +
-      (card.valores['valor_valuation'] || 0);
-    // Fallback: se nada foi discriminado, usa `moeda` como pontual
-    if (mrr === 0 && setup === 0 && pontual === 0 && (card.valores['moeda'] || 0) > 0) {
-      pontual = card.valores['moeda'];
-    }
-    const value = mrr + setup + pontual;
+    const value = card.mrr + card.setup + card.pontual;
     return {
       id: card.id,
       name: card.titulo || card.id,
@@ -237,9 +290,9 @@ export function useMonetizacaoAnalytics(
       date: card.entrada,
       value,
       total: value,
-      mrr,
-      setup,
-      pontual,
+      mrr: card.mrr,
+      setup: card.setup,
+      pontual: card.pontual,
       responsible: card.responsavel,
       reason: card.motivoPerda || undefined,
       product: card.tipo,
@@ -248,14 +301,14 @@ export function useMonetizacaoAnalytics(
     };
   };
 
-  // Mapeia cards para itens de drill-down do acelerômetro comercial
-  // (Proposta / Venda). MQL / RM / RR não existem nesse pipe.
+  // Classificação Proposta/Venda por evento do mês (fasesNoPeriodo), não pela Fase Atual.
   const getDetailItemsForIndicator = (
     indicator: MonetizacaoIndicatorType,
   ): DetailItem[] => {
     if (indicator !== 'proposta' && indicator !== 'venda') return [];
+    const target = indicator === 'venda' ? VENDA_PHASES : PROPOSTA_PHASES;
     return cards
-      .filter((c) => mapFaseToIndicator(c.faseAtual) === indicator)
+      .filter((c) => c.fasesNoPeriodo.some((f) => target.has(f)))
       .map(toDetailItem);
   };
 
@@ -274,5 +327,4 @@ export function useMonetizacaoAnalytics(
     isLoading,
     error,
   };
-
 }
