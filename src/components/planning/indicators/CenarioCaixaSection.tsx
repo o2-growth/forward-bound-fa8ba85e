@@ -54,7 +54,12 @@ function buildCenario(sourceItems: DetailItem[]): CenarioData {
   const byBu: CenarioData["byBu"] = {};
   let total = 0;
   let grossTotal = 0;
-  const items: DetailItem[] = sourceItems.map((it) => {
+  const cashEligibleItems = sourceItems.filter((it) => {
+    const bu = (it.bu as string) || "—";
+    if (bu === "Monetização") return true;
+    return ((it.mrr || 0) + (it.setup || 0) + (it.pontual || 0)) > 0;
+  });
+  const items: DetailItem[] = cashEligibleItems.map((it) => {
     const cash = computeCashFromCard(it);
     const grossItem = (it.mrr || 0) + (it.setup || 0) + (it.pontual || 0);
     total += cash.total;
@@ -84,7 +89,7 @@ function buildCenario(sourceItems: DetailItem[]): CenarioData {
       regra: BU_RULE_SHORT[bu] || "—",
     } as DetailItem;
   });
-  return { items, total, grossTotal, byBu, count: sourceItems.length };
+  return { items, total, grossTotal, byBu, count: cashEligibleItems.length };
 }
 
 const BU_BAR_COLOR: Record<string, string> = {
