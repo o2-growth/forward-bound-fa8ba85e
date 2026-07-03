@@ -112,29 +112,47 @@ export function useMonetizacaoAnalytics(
   const endIso = endDate.toISOString();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['monetizacao-analytics-v2', startIso, endIso],
+    queryKey: ['monetizacao-analytics-v3', startIso, endIso],
     queryFn: async () => {
-      // Etapa 1: descobrir os IDs que tiveram movimentação no período
-      const { data: periodResp, error: err1 } = await supabase.functions.invoke(
-        'query-external-db',
-        {
-          body: {
-            table: 'pipefy_moviment_contrato',
-            action: 'query_period',
-            startDate: startIso,
-            endDate: endIso,
-            limit: 5000,
-            offset: 0,
-          },
+      // Etapa 1a: movimentos no período (para detectar Concluído no período)
+      const periodPromise = supabase.functions.invoke('query-external-db', {
+        body: {
+          table: 'pipefy_moviment_contrato',
+          action: 'query_period',
+          startDate: startIso,
+          endDate: endIso,
+          limit: 5000,
+          offset: 0,
         },
-      );
-      if (err1) throw err1;
-      const periodRows = (periodResp?.data ?? []) as any[];
-      const ids = Array.from(new Set(periodRows.map((r) => String(r['ID'] ?? '')).filter(Boolean)));
-      if (ids.length === 0) return { periodRows, historyRows: [] as any[] };
+      });
 
-      // Etapa 2: buscar TODO o histórico desses IDs para hidratar valores
-      const { data: histResp, error: err2 } = await supabase.functions.invoke(
+      // Etapa 1b: pipeline aberto (fases != Concluído, sem motivo de perda) — sem filtro de período
+      const openPromise = supabase.functions.invoke('query-external-db', {
+        body: {
+          table: 'pipefy_moviment_contrato',
+          action: 'query_open_pipeline',
+        },
+      });
+
+      const [{ data: periodResp, error: err1 }, { data: openResp, error: err2 }] =
+        await Promise.all([periodPromise, openPromise]);
+      if (err1) throw err1;
+      if (err2) throw err2;
+
+      const periodRows = (periodResp?.data ?? []) as any[];
+      const openRows = (openResp?.data ?? []) as any[];
+
+      // Etapa 2: hidrata valores buscando TODO o histórico da união de IDs
+      const ids = Array.from(
+        new Set(
+          [...periodRows, ...openRows]
+            .map((r) => String(r['ID'] ?? ''))
+            .filter(Boolean),
+        ),
+      );
+      if (ids.length === 0) return { periodRows, openRows, historyRows: [] as any[] };
+
+      const { data: histResp, error: err3 } = await supabase.functions.invoke(
         'query-external-db',
         {
           body: {
@@ -144,15 +162,16 @@ export function useMonetizacaoAnalytics(
           },
         },
       );
-      if (err2) throw err2;
+      if (err3) throw err3;
       const historyRows = (histResp?.data ?? []) as any[];
-      return { periodRows, historyRows };
+      return { periodRows, openRows, historyRows };
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 
   const periodRows = data?.periodRows ?? [];
+  const openRows: any[] = data?.openRows ?? [];
   const historyRows = data?.historyRows ?? [];
 
   // Descobre dinamicamente quais colunas valor_* existem (com/sem underscore de acento)
