@@ -444,8 +444,11 @@ export function useMonetizacaoAnalytics(
     return {
       id: card.id,
       name: card.titulo || card.id,
+      company: card.titulo || card.cliente || card.id,
       phase: card.faseAtual,
       date: card.entrada,
+      dataCriacao: card.dataCriacao || undefined,
+      dataAssinatura: card.dataAssinatura || undefined,
       value,
       total: value,
       mrr: card.mrr,
