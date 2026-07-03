@@ -1,32 +1,52 @@
-# Ajuste na Temperatura dos Leads
+# Correção do drill-down "Vendas – Análise de Valor (TCV)"
 
-## Objetivo
-Fazer os chips 🔥 Quente / 🌤 Morno / ❄ Frio refletirem **todo o pipeline vivo** com tag de temperatura, independente do período selecionado — mesmo comportamento já usado no Cenário de Caixa.
+## Diagnóstico
 
-Hoje o `TemperaturaSection` chama `aggregateByTemperatura` sem a flag `includeAllOpenIgnoringPeriod`, então cards que não tiveram movimentação no período somem dos chips mesmo estando abertos e marcados como Quente/Morno/Frio.
+Dois bugs distintos no modal do acelerômetro de Vendas do mês atual:
 
-## Mudanças
+### 1) Coluna "Empresa" vazia nas linhas de Monetização
+`useMonetizacaoAnalytics.toDetailItem` popula apenas `name`, não `company`. O `DetailSheet` usa a coluna `company` (linha 2322 do `IndicatorsTab.tsx`), então Cross-sell, Troca de produto e Upsell aparecem com "-".
 
-### 1. `src/components/planning/indicators/TemperaturaSection.tsx`
-- Passar `includeAllOpenIgnoringPeriod: true` no `aggregateByTemperatura`.
-- Atualizar o texto do `CardHeader` para deixar claro que o escopo é o pipeline aberto atual (não o período), evitando confusão com os outros indicadores comerciais que ainda respeitam o filtro.
-  - Ex.: "Cards abertos no pipeline (independente do período selecionado) com tag de prioridade..."
-- Manter o `useMemo` dependendo de `startDate/endDate` só por consistência das fontes de dados (os hooks continuam refazendo fetch quando o período muda).
+Também não popula `dataAssinatura` nem `dataCriacao`, o que zera "Data Assinatura" e "Ciclo" para todos os cards de Monetização.
 
-### 2. Reaproveitamento do que já existe
-- Nenhuma mudança em `temperaturaAggregator.ts`: a flag `includeAllOpenIgnoringPeriod` e o uso de `allOpenCards` de Modelo Atual / Franquia / Oxy Hacker já estão implementados.
-- Outbound e Monetização já entram corretamente sob a flag (Outbound usa `allCards`, Monetização respeita a flag para não exigir `entrada` no período).
-- Exclusão de fases Perdido / Ganho continua ativa — cards fechados não poluem os chips.
+### 2) Turnaround (e Valuation/Diagnóstico) sempre com R$ 0
+No `useModeloAtualAnalytics.parseCardRow`:
 
-## Detalhes técnicos
-- Comportamento após a mudança:
-  - Chip **Quente/Morno/Frio** = todos os cards abertos hoje com aquela tag, nas BUs selecionadas.
-  - Total "taggeado" e "sem tag" também deixam de variar com o período (passam a refletir o pipeline vivo).
-  - Monetização (Upsell / Cross-sell / Troca de produto) continua entrando como 🔥 Quente por regra.
-- Filtro de BUs (`selectedBUs`) continua sendo respeitado normalmente.
+```ts
+const valor = valorMRR + valorPontual + valorSetup;
+```
+
+A soma **ignora** `Valor Turnaround`, `Valor Valuation` e `Valor Diagnóstico Estratégico`. Cards da Oxy cujo valor está apenas nessas colunas (ex.: GARD COMÉRCIO – Turnaround, R$ na coluna "Valor Turnaround") entram com `valorPontual = 0`, TCV = 0 e ainda aparecem no drill-down "porque o classificador de produto os marcou como Turnaround".
+
+O mesmo vale para o Outbound (mesma estrutura de leitura).
+
+## Plano de correção
+
+### `src/hooks/useModeloAtualAnalytics.ts`
+1. Em `parseCardRow`, ao ler os valores:
+   - Manter `valorMRR` / `valorSetup` como estão.
+   - Somar em `valorPontual` os valores de produtos one-off da Oxy quando `Valor Pontual` estiver vazio: `Valor Turnaround`, `Valor Valuation`, `Valor Diagnóstico Estratégico`, `Valor OXY` (se ainda não contabilizados). Preservar o valor de `Valor Pontual` original quando existir (usar `Math.max` ou soma controlada para não duplicar em cards que já preenchem os dois campos).
+   - Recalcular `valor = valorMRR + valorPontual + valorSetup`.
+2. Em `hydrateOpenCardsWithHistory`, hidratar também `valoresExtras.valorTurnaround/valuation/diagnostico` com o `Math.max` histórico e reaplicar a mesma regra de agregar em `valorPontual` no card hidratado (para o pipeline aberto no Cenário de Caixa continuar consistente).
+
+### `src/hooks/useOutboundAnalytics.ts`
+Aplicar a mesma inclusão de `Valor Turnaround / Valuation / Diagnóstico` no cálculo de `pontual` (Outbound consome o mesmo tipo de row).
+
+### `src/hooks/useMonetizacaoAnalytics.ts`
+No `toDetailItem` (linha ~436):
+- Adicionar `company: card.titulo || card.cliente || card.id`.
+- Adicionar `dataCriacao: latest['Data Criação'] || undefined` (precisa expor `dataCriacao` no `MonetizacaoCard`).
+- Adicionar `dataAssinatura` quando `card.ganho`, usando `card.entrada` (ou `latest['data_de_faturamento_1']` / `data_de_faturamento` quando disponível).
+- Expor esses campos no tipo `MonetizacaoCard` e populá-los no `map(...)` que constrói cada card (linha ~377), lendo `Data Criação` da linha `latest`.
+
+### Nada muda em `IndicatorsTab.tsx`
+As colunas já estão corretas — só precisamos preencher os campos.
 
 ## Validação
-- Trocar o período no dashboard e confirmar que a contagem dos chips **não muda**.
-- Abrir cada chip e verificar que aparecem cards com movimentação anterior ao período (ex.: cards do mês passado ainda abertos).
-- Conferir que cards em fases Perdido/Ganho/Contrato assinado continuam fora.
-- Conferir que ao desmarcar uma BU os cards dela somem dos chips.
+
+1. Reabrir "Vendas – Análise de Valor (TCV)" e confirmar:
+   - Cada linha de Cross-sell / Troca de produto / Upsell agora mostra o nome da empresa.
+   - Cards de Monetização ganhos mostram data de assinatura e ciclo > 0d quando aplicável.
+   - Turnaround (GARD COMÉRCIO e demais) passa a mostrar o valor real em Pontual e TCV.
+2. Conferir no Cenário de Caixa que cards Turnaround/Valuation/Diagnóstico (Modelo Atual/Outbound) agora entram com valor (regra pontual × 50%).
+3. Conferir que cards que já tinham `Valor Pontual` preenchido não tiveram duplicação de valor.
