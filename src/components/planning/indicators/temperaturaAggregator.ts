@@ -148,8 +148,10 @@ export function aggregateByTemperatura({
     const byId = new Map<string, any>();
     for (const c of src.cards) {
       if (!c?.dataEntrada) continue;
-      const t = c.dataEntrada.getTime();
-      if (t < startTime || t > endTime) continue;
+      if (!includeAllOpenIgnoringPeriod) {
+        const t = c.dataEntrada.getTime();
+        if (t < startTime || t > endTime) continue;
+      }
       const ex = byId.get(c.id);
       if (!ex || c.dataEntrada > ex.dataEntrada) byId.set(c.id, c);
     }
