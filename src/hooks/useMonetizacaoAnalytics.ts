@@ -36,34 +36,34 @@ const TIPO_LABEL_MAP: Record<string, string> = {
   'Downsell': 'Downsell',
 };
 
-const VALOR_FIELDS = [
-  'valor_cfoaas',
-  'valor_setup',
-  'valor_oxy',
-  'valor_diagn_stico',
-  'valor_turnaround',
-  'valor_valuation',
-  'valor_assessoria_mrr',
-  'valor_bpo',
-  'valor_coordenador_financeiro',
-  'valor_educa_o',
-] as const;
-
-const MRR_FIELDS = [
-  'valor_cfoaas',
-  'valor_oxy',
-  'valor_assessoria_mrr',
-  'valor_bpo',
-  'valor_coordenador_financeiro',
-] as const;
-const SETUP_FIELDS = ['valor_setup'] as const;
-const PONTUAL_FIELDS = ['valor_diagn_stico', 'valor_turnaround', 'valor_valuation'] as const;
+// Classificação por substring — aceita variantes com/sem underscore (acentos removidos)
+const isMrrField = (f: string) =>
+  /cfoaas|_oxy|assessoria_?mrr|_bpo|coordenador_?financeiro/i.test(f);
+const isSetupField = (f: string) => /setup/i.test(f);
+const isPontualField = (f: string) => /diagn|turnaround|valuation/i.test(f);
+const isEducacaoField = (f: string) => /educa/i.test(f);
 
 const toNumber = (v: unknown): number => {
   if (v == null || v === '') return 0;
   const n = typeof v === 'number' ? v : parseFloat(String(v));
   return Number.isFinite(n) ? n : 0;
 };
+
+// Detecta dinamicamente todas as colunas valor_* presentes nas linhas (evita hardcode
+// de sufixos com/sem underscore de acento — valor_diagnostico vs valor_diagn_stico etc.)
+const collectValorFields = (rows: any[]): string[] => {
+  const set = new Set<string>();
+  for (const r of rows) {
+    if (!r || typeof r !== 'object') continue;
+    for (const k of Object.keys(r)) {
+      if (!k.startsWith('valor_')) continue;
+      if (k === 'valor_mrr' || k === 'valor_total') continue; // agregados calculados
+      set.add(k);
+    }
+  }
+  return Array.from(set);
+};
+
 
 export interface MonetizacaoCard {
   id: string;
