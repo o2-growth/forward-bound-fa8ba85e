@@ -99,15 +99,14 @@ export function CenarioCaixaSection(props: AggregateInput) {
   const [openCenario, setOpenCenario] = useState<Cenario | null>(null);
 
   const { buckets, activeLabels } = useMemo(
-    () => aggregateByTemperatura(props),
+    () => aggregateByTemperatura({ ...props, includeAllOpenIgnoringPeriod: true }),
     [
       props.modeloAtualAnalytics,
       props.franquiaAnalytics,
       props.oxyHackerAnalytics,
       props.outboundAnalytics,
+      props.monetizacaoAnalytics,
       props.selectedBUs,
-      props.startDate,
-      props.endDate,
     ],
   );
 
