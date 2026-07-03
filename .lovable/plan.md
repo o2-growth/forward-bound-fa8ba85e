@@ -1,34 +1,33 @@
-Situação no banco agora (última sync 02/07 20:34 UTC):
+# Card "Qtd MQLs" — barras diárias divergem do Realizado
 
-- **FromTherm (1383090406)** — `moeda = R$ 10.000` apenas em linhas de junho; linhas de julho estão nulas. Todos `valor_*` nulos.
-- **Samba Decor (1391208172)** — `moeda = R$ 7.000` apenas em linhas de junho; linha de 02/07 nula. Todos `valor_*` nulos.
-- **Dom Duan Supermercado (1393377615)** — `moeda` nulo em todo histórico. Todos `valor_*` nulos.
+## Causa raiz
 
-Os valores novos que você preencheu no Pipefy ainda não vieram na sincronização do banco. A correção precisa funcionar tanto agora (aproveitando o histórico) quanto quando o sync trouxer os novos valores.
+Em `src/components/planning/LeadsMqlsStackedChart.tsx` há **duas fontes diferentes** alimentando o mesmo card:
 
-Solução definitiva no `useMonetizacaoAnalytics`:
+1. **Header "Realizado"** (`getTotalRealized`, linhas 138-160) usa os hooks de analytics de cada BU (`modeloAtualAnalytics`, `o2TaxAnalytics`, `franquiaAnalytics`, `oxyHackerAnalytics`) — aplicam as regras oficiais de MQL (faturamento mínimo, dedup mensal, exclusão de test cards, First Entry, filtro de closer).
+2. **Barras diárias** (`sheetData`, linhas 122-128) usam os hooks `useModeloAtualMetas / useExpansaoMetas / useOxyHackerMetas / useO2TaxMetas` (`getGroupedData('mql', …)`), que contam entradas brutas por dia **sem** essas regras.
 
-1. **Busca em 2 etapas**
-   - Etapa 1: `query_period` no mês atual para descobrir quais IDs tiveram movimento.
-   - Etapa 2: `query_card_history` com esses IDs para trazer TODAS as linhas históricas.
+Além disso, o `sheetData` só suporta **uma** BU: quando `hasSingleBU === false` (é o seu caso: Franquia + Oxy Hacker marcados), a cadeia de ternários **cai no fallback `getModeloAtualGroupedData`** — ou seja, as barras que você vê são de **Modelo Atual**, não de Franquia + Oxy Hacker. Por isso aparece 6+6+1=13 nas barras enquanto o Realizado (que soma correto Franquia+Oxy Hacker) marca 4.
 
-2. **Hidratação de valor por card** (usando o histórico inteiro)
-   - Somar cada `valor_*` pegando o maior valor observado em qualquer linha (não nulo).
-   - Se `soma(valor_*) > 0` → usa a soma como `valorTotal` e classifica em MRR / Setup / Pontual conforme o campo.
-   - Senão → usa o maior `moeda` observado como `valorTotal` (classificado como Pontual).
-   - Resultado esperado hoje: FromTherm R$ 10.000, Samba Decor R$ 7.000, Dom Duan R$ 0.
-   - Quando o Pipefy sincronizar os novos `valor_*` preenchidos, eles substituem automaticamente.
+## Correção
 
-3. **Contagem Proposta / Venda pelo evento do mês** (não pela `Fase Atual`)
-   - `venda`: card teve alguma movimentação com `Fase = "Concluído"` dentro do período.
-   - `proposta`: card teve alguma movimentação com `Fase ∈ {"Proposta enviada / Follow Up", "Proposta em Elaboração"}` dentro do período.
-   - Deduplicar por `card + indicador + mês` para evitar dupla contagem (FromTherm reentrou em Concluído 2x).
-   - Resultado esperado julho: Venda = FromTherm + Samba (2 cards, R$ 17.000). Proposta = Dom Duan (1 card, R$ 0).
+Reescrever a montagem de `chartData` para:
 
-4. **Propagação nos consumidores**
-   - `getDetailItemsForIndicator('venda' | 'proposta')` retorna os cards do período com valor hidratado.
-   - `IndicatorsTab` (`faturamento`, `mrr`, `setup`, `pontual`, ticket médio, origem Monetização) e o agregador de faturamento passam a refletir o mesmo valor sem mudanças adicionais.
+1. **Agregar por BU selecionada**: para cada BU em `selectedBUsArray`, obter o grouped data correspondente e somar os arrays `qty` posição a posição (mesmo `grouping`, mesmo tamanho — os hooks já respeitam `startDate/endDate/grouping`).
+2. **Usar a mesma fonte do header** (analytics), não os hooks de metas, para as barras — assim as regras (faturamento MQL, dedup, test cards, First Entry, filtro closer) refletem no diário. Implementação: usar `getDetailItemsForIndicator('mql')` de cada BU incluída (mais O2 TAX via `getMqlsByRevenue.flatMap(r=>r.cards).map(toDetailItem)`), aplicar filtro de closer (quando `selectedClosers` estiver ativo, hoje só se aplica em Modelo Atual — manter esse comportamento), e distribuir os itens pelos buckets:
+   - `daily`: um bucket por dia entre `startDate` e `endDate`.
+   - `weekly`: buckets de 7 dias.
+   - `monthly`: um por mês do intervalo.
+3. **Soma total = header**: garantir por asserção no dev que `sum(chartData.mqls) === totalRealized`. Se divergir, é sinal de item sem `date` — nesse caso jogar num bucket "sem data" só em log, nunca contar duplicado.
+4. **Drill-down** (`handleBarClick`) já usa `getDetailItemsForIndicator('mql')` agregando por BU selecionada — manter como está; ele passará a bater com a barra porque ambos vêm da mesma fonte.
+5. **Meta** permanece via `calcularMetaDoPeriodo` (não é o problema — 5 está correto e vem só das BUs incluídas).
 
-5. **Validação após implementar**
-   - Aba Indicadores → filtro julho: card Monetização mostra 3 cards no mês, Venda R$ 17.000 (FromTherm + Samba), Proposta com Dom Duan aparecendo no drill-down.
-   - Assim que o Pipefy sincronizar os novos valores nos campos discriminativos, o dashboard reflete sem novo deploy.
+## Arquivos
+
+- `src/components/planning/LeadsMqlsStackedChart.tsx` — substituir `sheetData` + `buildChartData` por a nova agregação multi-BU baseada em analytics; remover imports não usados de `useModeloAtualMetas`/`useExpansaoMetas`/`useO2TaxMetas`/`useOxyHackerMetas` para `getGroupedData` (manter `getQtyForPeriod` só se ainda for necessário — no arquivo atual não é).
+
+## Validação
+
+- Filtrar Franquia + Oxy Hacker no período atual: soma das barras deve ser exatamente 4 (igual ao "Realizado").
+- Testar também com uma BU só (Modelo Atual, O2 TAX, Franquia, Oxy Hacker) e com "all" para garantir que continua batendo com o header.
+- Clicar numa barra: a lista aberta deve trazer exatamente o mesmo N que o rótulo daquela barra.
