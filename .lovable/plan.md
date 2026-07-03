@@ -1,40 +1,41 @@
-# Monetização: 3 dos 5 cards sem valor
+# Funil Monetização: Concluído filtra período, demais fases sempre visíveis
 
-## Causa raiz
+## Regra desejada
 
-O hook `useMonetizacaoAnalytics` hidrata valores lendo **nomes fixos** de coluna:
+- **Concluído**: apenas cards que foram concluídos **dentro do período** filtrado (comportamento atual).
+- **Todas as outras fases** (`Start form`, `Oportunidade Levantada`, `Proposta em Elaboração`, `Proposta enviada / Follow Up`, `Aprovado pelo Cliente`, `Jurídico`, `Faturamento`): mostram **todos os cards atualmente parados nelas**, independente do período — para dar visibilidade do que está "na mesa" agora.
 
-```
-valor_diagn_stico, valor_educa_o, valor_cfoaas, valor_oxy, valor_setup, ...
-```
+Escopo estritamente restrito ao Funil de Monetização — nada muda no acelerômetro Comercial, MQL, etc.
 
-Mas o sync/atualização recente grava com nomes **sem os `_` extras** dos acentos. Em `supabase/functions/analyze-churn-tratativa/index.ts:280-283` a mesma tabela usa **`valor_diagnostico`** (sem underscore), o que confirma o descasamento. Provável análogo: `valor_educacao` em vez de `valor_educa_o`. Como os cards antigos (FromTherm, Samba, Dom Duan) foram atualizados nesses nomes "corretos", o hook lê `null` nas variantes com underscore e cai no fallback de `moeda` — que também está null para eles → `valorTotal = 0`.
+## Mudanças
 
-Os 2 cards novos aparecem com valor porque provavelmente têm `moeda` preenchida (fallback funciona) ou coincidem com nomes esperados.
+### 1. `supabase/functions/query-external-db/index.ts` — nova action `query_open_pipeline`
 
-## Correção
+- Retorna o **estado atual** de cada card do pipe Monetização cuja `Fase Atual` seja diferente de `Concluído` (e sem `motivo_da_perda`, para não trazer perdidos antigos).
+- Estratégia: consulta `pipefy_moviment_contrato` pegando o **movimento mais recente por ID** (`DISTINCT ON (ID) ... ORDER BY ID, Entrada DESC`) filtrando `Fase Atual NOT IN ('Concluído')`.
+- Retorna as mesmas colunas usadas por `query_period` para reuso direto no hook.
 
-Substituir a lista fixa `VALOR_FIELDS` por **detecção dinâmica**: qualquer chave da linha começando por `valor_` (exceto `valor_mrr`, que é agregado calculado) participa da hidratação. Assim, tanto `valor_diagn_stico` quanto `valor_diagnostico` são captados sem precisar adivinhar snake_case.
+### 2. `src/hooks/useMonetizacaoAnalytics.ts` — combinar duas fontes
 
-Passos em `src/hooks/useMonetizacaoAnalytics.ts`:
-
-1. **Descobrir os campos dinamicamente**: percorrer todas as linhas de `historyRows` + `periodRows` e coletar em um `Set` todo `key` que comece por `valor_` e cujo valor seja numérico (ou parseável). Guardar isso em `discoveredValorFields`.
-2. **Hidratar por card**: para cada `f ∈ discoveredValorFields`, `valores[f] = max(toNumber(r[f]))` sobre todo histórico (comportamento atual, só que sobre a lista descoberta).
-3. **Classificação MRR/Setup/Pontual robusta**: normalizar o nome do campo (remover underscores duplicados/pontuais que substituem acentos) e casar por **substring**, aceitando as duas variantes:
-   - MRR: contém `cfoaas`, `oxy`, `assessoria_mrr`, `bpo`, `coordenador_financeiro`
-   - Setup: contém `setup`
-   - Pontual: contém `diagn` (ó/o), `turnaround`, `valuation`
-   - Educação: contém `educa` (ç/c) — permanece **fora** da soma padrão (mantém regra memory: MRR/Setup/Pontual excluem Educação).
-4. **`valorTotal`**: `somaValorFields > 0 ? somaValorFields : moedaMax` (inalterado).
-5. **Log de diagnóstico (uma vez por render)**: `console.info('[Monetização] valor_* fields detectados:', […])` para facilitar auditorias futuras se surgirem novos nomes.
-6. Manter compat com o fallback `moeda` para cards antigos.
+- Manter `query_period` (já existente) — cards com movimentação **no período**. Deles, aproveitamos os que caíram em `Concluído` no período (para o card "Valor concluído" e para a fase Concluído no mini-funil).
+- Adicionar chamada em paralelo à nova action `query_open_pipeline` — cards em fases abertas, sem filtro de tempo.
+- **Merge por ID**: se um ID vier em ambos, dedup priorizando a linha do período quando a fase for `Concluído`, caso contrário a linha do pipeline aberto.
+- Continuar hidratando valores via `query_card_history` sobre a união de IDs (concluídos no período + abertos atuais).
+- Regras derivadas:
+  - `byFase`: agregação natural — Concluído recebe só os do período; demais recebem os do pipeline aberto.
+  - `totals.valorPipeline` = soma dos cards em fases abertas.
+  - `totals.valorGanho` = soma dos concluídos no período (inalterado).
+  - `totals.count` = total combinado (abertos + concluídos no período).
+  - `byTipo`: baseado na união (mostra tudo que está na mesa + o que fechou no período).
+- `getDetailItemsForIndicator('venda')`: continua filtrando por `fasesNoPeriodo ⊇ Concluído` — só do período.
 
 ## Arquivos
 
-- `src/hooks/useMonetizacaoAnalytics.ts` — troca de lista fixa por detecção dinâmica + matcher por substring nas classificações MRR/Setup/Pontual/Educação.
+- `supabase/functions/query-external-db/index.ts` — adiciona action `query_open_pipeline`.
+- `src/hooks/useMonetizacaoAnalytics.ts` — segunda query + merge de cards abertos vs. concluídos no período.
 
 ## Validação
 
-- Abrir aba Monetização em julho: os 5 cards devem exibir `valorTotal > 0` para todo card que tenha qualquer coluna `valor_*` preenchida no histórico (independente do sufixo com/sem underscore).
-- Verificar no console o log `valor_* fields detectados` — deve incluir `valor_diagnostico`/`valor_diagn_stico`/`valor_educacao` conforme presentes.
-- Somatórios do funil (MRR, Setup, Pontual) devem refletir os novos valores.
+- Aba Monetização com filtro apertado (ex.: um único dia): a fase **Concluído** mostra somente o que fechou naquele dia; as demais fases continuam exibindo todos os cards abertos hoje.
+- Trocar o período não altera contagens de fases abertas — só muda a fase Concluído e o "Valor concluído".
+- Drill-down de "Todos os cards" traz abertos + concluídos-no-período; drill-down por fase Concluído traz só os do período.
