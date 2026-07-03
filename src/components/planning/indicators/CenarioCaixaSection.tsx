@@ -99,15 +99,14 @@ export function CenarioCaixaSection(props: AggregateInput) {
   const [openCenario, setOpenCenario] = useState<Cenario | null>(null);
 
   const { buckets, activeLabels } = useMemo(
-    () => aggregateByTemperatura(props),
+    () => aggregateByTemperatura({ ...props, includeAllOpenIgnoringPeriod: true }),
     [
       props.modeloAtualAnalytics,
       props.franquiaAnalytics,
       props.oxyHackerAnalytics,
       props.outboundAnalytics,
+      props.monetizacaoAnalytics,
       props.selectedBUs,
-      props.startDate,
-      props.endDate,
     ],
   );
 
@@ -293,13 +292,18 @@ export function CenarioCaixaSection(props: AggregateInput) {
                   MRR considerado como valor mensal (1×). A % é aplicada sobre o
                   valor de cada card individualmente.
                 </p>
+                <p className="mt-2 font-semibold">
+                  ⚠️ O filtro de período não se aplica aqui: mostramos todo o
+                  pipeline vivo (cards em aberto), independente de quando
+                  entraram. Cards Ganho/Concluído e Perdidos são sempre
+                  excluídos.
+                </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Projeção de entrada de caixa a partir dos cards taggeados na
-          Temperatura. Escopo atual:{" "}
+          Projeção de entrada de caixa considerando <span className="font-medium">todos os cards em aberto</span> taggeados na Temperatura, independente do período selecionado. Escopo atual:{" "}
           <span className="font-medium">{scopeLabel}</span>.
         </p>
       </CardHeader>

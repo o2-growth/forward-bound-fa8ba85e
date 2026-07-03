@@ -62,6 +62,11 @@ export interface AggregateInput {
   selectedBUs: BUType[];
   startDate: Date;
   endDate: Date;
+  /**
+   * Quando true, ignora o filtro de período para cards em aberto.
+   * Usado no Cenário de Caixa para mostrar todo o pipeline vivo.
+   */
+  includeAllOpenIgnoringPeriod?: boolean;
 }
 
 export interface AggregateResult {
@@ -80,6 +85,7 @@ export function aggregateByTemperatura({
   selectedBUs,
   startDate,
   endDate,
+  includeAllOpenIgnoringPeriod = false,
 }: AggregateInput): AggregateResult {
   const startTime = startDate.getTime();
   const endTime = new Date(
@@ -142,8 +148,10 @@ export function aggregateByTemperatura({
     const byId = new Map<string, any>();
     for (const c of src.cards) {
       if (!c?.dataEntrada) continue;
-      const t = c.dataEntrada.getTime();
-      if (t < startTime || t > endTime) continue;
+      if (!includeAllOpenIgnoringPeriod) {
+        const t = c.dataEntrada.getTime();
+        if (t < startTime || t > endTime) continue;
+      }
       const ex = byId.get(c.id);
       if (!ex || c.dataEntrada > ex.dataEntrada) byId.set(c.id, c);
     }
@@ -176,8 +184,10 @@ export function aggregateByTemperatura({
       const entradaTime = card.entrada
         ? new Date(card.entrada).getTime()
         : NaN;
-      if (!Number.isFinite(entradaTime)) continue;
-      if (entradaTime < startTime || entradaTime > endTime) continue;
+      if (!includeAllOpenIgnoringPeriod) {
+        if (!Number.isFinite(entradaTime)) continue;
+        if (entradaTime < startTime || entradaTime > endTime) continue;
+      }
       const id = String(card.id);
       if (existingQuenteIds.has(id)) continue;
       existingQuenteIds.add(id);
