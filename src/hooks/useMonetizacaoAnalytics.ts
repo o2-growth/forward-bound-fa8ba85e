@@ -140,6 +140,8 @@ export interface MonetizacaoCard {
   tipo: string;
   faseAtual: string;
   entrada: string; // ISO — última movimentação dentro do período
+  dataCriacao: string; // ISO — criação do card
+  dataAssinatura: string; // ISO — data de assinatura/faturamento (quando ganho)
   responsavel: string;
   motivoPerda: string;
   statusProposta: string;
