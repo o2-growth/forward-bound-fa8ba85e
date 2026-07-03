@@ -30,12 +30,13 @@ export function TemperaturaSection(props: AggregateInput) {
   const [openTemp, setOpenTemp] = useState<Temperatura | null>(null);
 
   const { buckets, totalTagged, totalSemTag, activeLabels } = useMemo(
-    () => aggregateByTemperatura(props),
+    () => aggregateByTemperatura({ ...props, includeAllOpenIgnoringPeriod: true }),
     [
       props.modeloAtualAnalytics,
       props.franquiaAnalytics,
       props.oxyHackerAnalytics,
       props.outboundAnalytics,
+      props.monetizacaoAnalytics,
       props.selectedBUs,
       props.startDate,
       props.endDate,
@@ -54,9 +55,9 @@ export function TemperaturaSection(props: AggregateInput) {
           🌡 Temperatura dos Leads
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Cards com tag de prioridade (Labels do Pipefy) no período selecionado.
-          Inclui Upsell, Cross-sell e Troca de produto do funil de Monetização
-          (sempre considerados 🔥 Quente). Escopo atual:{" "}
+          Todos os cards abertos no pipeline com tag de prioridade (Labels do Pipefy),
+          independente do período selecionado. Inclui Upsell, Cross-sell e Troca de
+          produto do funil de Monetização (sempre 🔥 Quente). Escopo atual:{" "}
           <span className="font-medium">{scopeLabel}</span>. Clique em cada chip
           para abrir a lista.
         </p>

@@ -1,30 +1,32 @@
-## Diagnóstico
+# Ajuste na Temperatura dos Leads
 
-O Cenário de Caixa ainda está preso ao período em parte do fluxo. O `includeAllOpenIgnoringPeriod` só removeu o filtro dentro do agregador, mas os hooks de dados de Modelo Atual e Expansão/Franquia/Oxy Hacker ainda buscam cards usando `startDate/endDate`. Então cards abertos fora do período não chegam ao Cenário de Caixa.
+## Objetivo
+Fazer os chips 🔥 Quente / 🌤 Morno / ❄ Frio refletirem **todo o pipeline vivo** com tag de temperatura, independente do período selecionado — mesmo comportamento já usado no Cenário de Caixa.
 
-Além disso, Outbound hoje entra com `mrr/setup/pontual = 0` no detalhe, mesmo quando existe valor do negócio. Isso explica cards aparecendo com caixa zerado e mantendo o valor igual ao cenário anterior.
+Hoje o `TemperaturaSection` chama `aggregateByTemperatura` sem a flag `includeAllOpenIgnoringPeriod`, então cards que não tiveram movimentação no período somem dos chips mesmo estando abertos e marcados como Quente/Morno/Frio.
 
-## Plano de correção
+## Mudanças
 
-1. **Modelo Atual**
-   - Buscar também o pipeline aberto global via `query_open_pipeline`, sem filtro de período.
-   - Hidratar histórico desses IDs para garantir valores completos.
-   - Expor uma lista separada `allOpenCards` para uso exclusivo no Cenário de Caixa.
+### 1. `src/components/planning/indicators/TemperaturaSection.tsx`
+- Passar `includeAllOpenIgnoringPeriod: true` no `aggregateByTemperatura`.
+- Atualizar o texto do `CardHeader` para deixar claro que o escopo é o pipeline aberto atual (não o período), evitando confusão com os outros indicadores comerciais que ainda respeitam o filtro.
+  - Ex.: "Cards abertos no pipeline (independente do período selecionado) com tag de prioridade..."
+- Manter o `useMemo` dependendo de `startDate/endDate` só por consistência das fontes de dados (os hooks continuam refazendo fetch quando o período muda).
 
-2. **Franquia e Oxy Hacker**
-   - Incluir `query_open_pipeline` na busca compartilhada de Expansão.
-   - Hidratar histórico dos cards abertos, não só dos cards do período.
-   - Expor `allOpenCards` filtrado por produto, preservando a lógica atual do funil normal.
+### 2. Reaproveitamento do que já existe
+- Nenhuma mudança em `temperaturaAggregator.ts`: a flag `includeAllOpenIgnoringPeriod` e o uso de `allOpenCards` de Modelo Atual / Franquia / Oxy Hacker já estão implementados.
+- Outbound e Monetização já entram corretamente sob a flag (Outbound usa `allCards`, Monetização respeita a flag para não exigir `entrada` no período).
+- Exclusão de fases Perdido / Ganho continua ativa — cards fechados não poluem os chips.
 
-3. **Outbound**
-   - Ajustar `toDetailItem` para não zerar caixa: usar `valor` como `pontual` quando não houver MRR/Setup/Pontual estruturado.
-   - Assim a regra do Cenário de Caixa aplicará 50% sobre esse valor, em vez de R$ 0.
+## Detalhes técnicos
+- Comportamento após a mudança:
+  - Chip **Quente/Morno/Frio** = todos os cards abertos hoje com aquela tag, nas BUs selecionadas.
+  - Total "taggeado" e "sem tag" também deixam de variar com o período (passam a refletir o pipeline vivo).
+  - Monetização (Upsell / Cross-sell / Troca de produto) continua entrando como 🔥 Quente por regra.
+- Filtro de BUs (`selectedBUs`) continua sendo respeitado normalmente.
 
-4. **Cenário de Caixa**
-   - Fazer o agregador usar `allOpenCards` quando `includeAllOpenIgnoringPeriod` estiver ativo.
-   - Manter a Temperatura dos Leads usando o comportamento antigo, respeitando o período.
-
-5. **Validação**
-   - Verificar no preview que mudar o período não muda os totais/cards do Cenário de Caixa.
-   - Abrir detalhes e confirmar que novos cards abertos não aparecem zerados quando há valor disponível.
-   - Confirmar que Monetização continua R$ 0 no Cenário de Caixa por regra atual de caixa.
+## Validação
+- Trocar o período no dashboard e confirmar que a contagem dos chips **não muda**.
+- Abrir cada chip e verificar que aparecem cards com movimentação anterior ao período (ex.: cards do mês passado ainda abertos).
+- Conferir que cards em fases Perdido/Ganho/Contrato assinado continuam fora.
+- Conferir que ao desmarcar uma BU os cards dela somem dos chips.
