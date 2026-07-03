@@ -155,6 +155,12 @@ export function useMonetizacaoAnalytics(
   const periodRows = data?.periodRows ?? [];
   const historyRows = data?.historyRows ?? [];
 
+  // Descobre dinamicamente quais colunas valor_* existem (com/sem underscore de acento)
+  const valorFields = collectValorFields([...historyRows, ...periodRows]);
+  if (valorFields.length > 0) {
+    console.info('[Monetização] valor_* fields detectados:', valorFields);
+  }
+
   // Agrupa histórico por ID para hidratar valores (pega o maior valor não-nulo em qualquer linha)
   const historyById = new Map<string, any[]>();
   for (const row of historyRows) {
@@ -190,16 +196,15 @@ export function useMonetizacaoAnalytics(
     // Hidrata valores: usa TODO o histórico do card + as próprias linhas do período
     const hist = historyById.get(id) ?? periodRowsOfCard;
     const valores: Record<string, number> = {};
-    let somaValorFields = 0;
-    for (const f of VALOR_FIELDS) {
-      // Pega o maior valor não-nulo observado no histórico
+    let somaValorFieldsExEduca = 0; // Educação fica fora da soma padrão
+    for (const f of valorFields) {
       let best = 0;
       for (const r of hist) {
         const v = toNumber(r[f]);
         if (v > best) best = v;
       }
       valores[f] = best;
-      somaValorFields += best;
+      if (!isEducacaoField(f)) somaValorFieldsExEduca += best;
     }
     // Idem para `moeda` (agregado)
     let moedaMax = 0;
@@ -209,16 +214,24 @@ export function useMonetizacaoAnalytics(
     }
     valores['moeda'] = moedaMax;
 
-    // Valor total hidratado: prefere soma dos discriminativos, fallback para moeda
-    const valorTotal = somaValorFields > 0 ? somaValorFields : moedaMax;
+    // Valor total hidratado: prefere soma dos discriminativos (sem Educação), fallback para moeda
+    const valorTotal = somaValorFieldsExEduca > 0 ? somaValorFieldsExEduca : moedaMax;
 
-    // Classificação MRR / Setup / Pontual
-    const mrr = MRR_FIELDS.reduce((s, f) => s + (valores[f] || 0), 0);
-    const setup = SETUP_FIELDS.reduce((s, f) => s + (valores[f] || 0), 0);
-    let pontual = PONTUAL_FIELDS.reduce((s, f) => s + (valores[f] || 0), 0);
+    // Classificação MRR / Setup / Pontual por matcher de substring
+    let mrr = 0, setup = 0, pontual = 0;
+    for (const f of valorFields) {
+      const v = valores[f] || 0;
+      if (v <= 0) continue;
+      if (isEducacaoField(f)) continue; // excluída dos totais padrão
+      if (isMrrField(f)) mrr += v;
+      else if (isSetupField(f)) setup += v;
+      else if (isPontualField(f)) pontual += v;
+      else pontual += v; // desconhecido → Pontual por segurança
+    }
     if (mrr === 0 && setup === 0 && pontual === 0 && moedaMax > 0) {
       pontual = moedaMax;
     }
+
 
     const tipoRaw = (latest['tipo_de_movimenta_o'] || '').toString().trim();
     const faseAtual = (latest['Fase Atual'] || latest['Fase'] || '').toString().trim();
