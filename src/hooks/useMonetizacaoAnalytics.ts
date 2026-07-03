@@ -221,10 +221,14 @@ export function useMonetizacaoAnalytics(
       (card.valores['valor_bpo'] || 0) +
       (card.valores['valor_coordenador_financeiro'] || 0);
     const setup = card.valores['valor_setup'] || 0;
-    const pontual =
+    let pontual =
       (card.valores['valor_diagn_stico'] || 0) +
       (card.valores['valor_turnaround'] || 0) +
       (card.valores['valor_valuation'] || 0);
+    // Fallback: se nada foi discriminado, usa `moeda` como pontual
+    if (mrr === 0 && setup === 0 && pontual === 0 && (card.valores['moeda'] || 0) > 0) {
+      pontual = card.valores['moeda'];
+    }
     const value = mrr + setup + pontual;
     return {
       id: card.id,
