@@ -30,12 +30,13 @@ export function TemperaturaSection(props: AggregateInput) {
   const [openTemp, setOpenTemp] = useState<Temperatura | null>(null);
 
   const { buckets, totalTagged, totalSemTag, activeLabels } = useMemo(
-    () => aggregateByTemperatura(props),
+    () => aggregateByTemperatura({ ...props, includeAllOpenIgnoringPeriod: true }),
     [
       props.modeloAtualAnalytics,
       props.franquiaAnalytics,
       props.oxyHackerAnalytics,
       props.outboundAnalytics,
+      props.monetizacaoAnalytics,
       props.selectedBUs,
       props.startDate,
       props.endDate,
