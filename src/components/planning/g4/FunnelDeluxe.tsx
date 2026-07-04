@@ -123,6 +123,7 @@ export function FunnelDeluxe({
   contextLabel,
   contextSub,
   compare,
+  onStageClick,
 }: FunnelDeluxeProps) {
   const topValue = stages[0]?.value ?? 0;
   const maxValue = Math.max(...stages.map((s) => s.value), 1);
