@@ -48,6 +48,8 @@ export interface FunnelDeluxeProps {
   contextSub?: string;
   /** Linhas do comparativo (rodapé) */
   compare?: DeluxeCompareRow[];
+  /** Clique numa barra do funil (stage) — passa a key da etapa */
+  onStageClick?: (stageKey: string) => void;
 }
 
 // ── Estilos por stage_key ─────────────────────────────────────────────
