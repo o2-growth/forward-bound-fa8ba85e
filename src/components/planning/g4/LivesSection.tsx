@@ -5,11 +5,13 @@ import { fmtInt } from "@/components/planning/ceo/ceoShared";
 import { FrenteMetricsRow } from "./FrenteMetricsRow";
 import { FrenteDreCard, type G4Dre, type CustoDetalhe } from "./FrenteDreCard";
 import { FunnelDeluxe, type DeluxeChip, type DeluxeCompareRow } from "./FunnelDeluxe";
+import { LiveLeadsDialog } from "./LiveLeadsDialog";
 import { useG4FunnelStages } from "@/hooks/useG4FunnelStages";
 import type { ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
 import { G4_LIVES, isCardLive } from "@/lib/g4Events";
 import { cardsForLive, computeCounts, mergeStages, type ComputedCounts } from "@/lib/g4Funnel";
 import { getLiveOverride } from "@/data/livesOfficial";
+
 
 export interface LiveRow {
   label: string;
