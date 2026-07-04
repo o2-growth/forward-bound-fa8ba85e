@@ -5,11 +5,13 @@ import { fmtInt } from "@/components/planning/ceo/ceoShared";
 import { FrenteMetricsRow } from "./FrenteMetricsRow";
 import { FrenteDreCard, type G4Dre, type CustoDetalhe } from "./FrenteDreCard";
 import { FunnelDeluxe, type DeluxeChip, type DeluxeCompareRow } from "./FunnelDeluxe";
+import { LiveLeadsDialog } from "./LiveLeadsDialog";
 import { useG4FunnelStages } from "@/hooks/useG4FunnelStages";
 import type { ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
 import { G4_LIVES, isCardLive } from "@/lib/g4Events";
 import { cardsForLive, computeCounts, mergeStages, type ComputedCounts } from "@/lib/g4Funnel";
 import { getLiveOverride } from "@/data/livesOfficial";
+
 
 export interface LiveRow {
   label: string;
@@ -56,6 +58,19 @@ export function LivesSection({
   cards = [],
 }: LivesSectionProps) {
   const [selected, setSelected] = useState<string>("all");
+  const [dialogStage, setDialogStage] = useState<string | null>(null);
+
+  // Fases usadas para listar cards por etapa (espelham g4Funnel.ts)
+  const MAO_PHASES = new Set([
+    "Reunião agendada / Qualificado",
+    "Reunião Realizada",
+    "1° Reunião Realizada - Apresentação",
+    "Proposta enviada / Follow Up",
+    "Ganho",
+    "Contrato assinado",
+  ]);
+  const VENDA_PHASES = new Set(["Ganho", "Contrato assinado"]);
+
 
   // Cards classificados como Lives (todos os movimentos)
   const liveCards = useMemo(
@@ -175,9 +190,59 @@ export function LivesSection({
         contextLabel={contextLabel}
         contextSub={contextSub}
         compare={compare}
+        onStageClick={setDialogStage}
       />
 
       <FrenteDreCard title="P&L — Lives" dre={dre} custosDetalhe={custosDetalhe} />
+
+      <LiveLeadsDialog
+        open={dialogStage !== null}
+        onOpenChange={(o) => !o && setDialogStage(null)}
+        stageKey={dialogStage ?? ""}
+        stageLabel={
+          dialogStage === "mao"
+            ? "Levantaram a mão"
+            : dialogStage === "venda"
+              ? "Vendas fechadas"
+              : dialogStage === "entraram"
+                ? "Entraram na live"
+                : dialogStage === "inscritos"
+                  ? "Inscritos"
+                  : (stages.find((s) => s.key === dialogStage)?.label ?? "")
+        }
+        contextLabel={contextLabel}
+        totalOfficial={
+          dialogStage === "mao"
+            ? counts.mao
+            : dialogStage === "venda"
+              ? counts.venda
+              : dialogStage === "entraram"
+                ? counts.entraram
+                : dialogStage === "inscritos"
+                  ? counts.inscritos
+                  : 0
+        }
+        cards={(() => {
+          if (dialogStage !== "mao" && dialogStage !== "venda") return [];
+          // Cards no escopo (live selecionada ou todas)
+          const scope = selectedLive
+            ? cardsForLive(liveCards, selectedLive.date, selectedLive.captureWindowDays)
+            : G4_LIVES.flatMap((l) =>
+                cardsForLive(liveCards, l.date, l.captureWindowDays),
+              );
+          // Dedupe: último dataEntrada por id
+          const uniq = new Map<string, ModeloAtualCard>();
+          for (const c of scope) {
+            const cur = uniq.get(c.id);
+            if (!cur || c.dataEntrada > cur.dataEntrada) uniq.set(c.id, c);
+          }
+          const phases = dialogStage === "venda" ? VENDA_PHASES : MAO_PHASES;
+          return Array.from(uniq.values()).filter((c) =>
+            phases.has(c.faseAtual || c.fase),
+          );
+        })()}
+      />
     </div>
   );
 }
+

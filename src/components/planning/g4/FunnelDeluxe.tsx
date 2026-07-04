@@ -48,6 +48,8 @@ export interface FunnelDeluxeProps {
   contextSub?: string;
   /** Linhas do comparativo (rodapé) */
   compare?: DeluxeCompareRow[];
+  /** Clique numa barra do funil (stage) — passa a key da etapa */
+  onStageClick?: (stageKey: string) => void;
 }
 
 // ── Estilos por stage_key ─────────────────────────────────────────────
@@ -121,6 +123,7 @@ export function FunnelDeluxe({
   contextLabel,
   contextSub,
   compare,
+  onStageClick,
 }: FunnelDeluxeProps) {
   const topValue = stages[0]?.value ?? 0;
   const maxValue = Math.max(...stages.map((s) => s.value), 1);
@@ -281,7 +284,18 @@ export function FunnelDeluxe({
                     </div>
 
                     {/* Trilho */}
-                    <div className="relative flex h-14 flex-1 items-center overflow-hidden rounded-lg border border-border/50 bg-muted/40 px-4">
+                    <button
+                      type="button"
+                      onClick={
+                        onStageClick ? () => onStageClick(step.key) : undefined
+                      }
+                      disabled={!onStageClick}
+                      className={cn(
+                        "relative flex h-14 flex-1 items-center overflow-hidden rounded-lg border border-border/50 bg-muted/40 px-4 text-left transition-all",
+                        onStageClick &&
+                          "cursor-pointer hover:border-emerald-400/60 hover:shadow-[0_0_20px_-6px_rgba(74,222,128,0.5)]",
+                      )}
+                    >
                       <div
                         className={cn(
                           "absolute inset-y-0 left-0 bg-gradient-to-r opacity-80",
@@ -303,8 +317,9 @@ export function FunnelDeluxe({
                           </span>
                         )}
                       </div>
-                    </div>
+                    </button>
                   </div>
+
 
                   {step.hint && (
                     <div className="ml-[144px] mt-1 text-[11px] italic text-muted-foreground">
