@@ -58,6 +58,19 @@ export function LivesSection({
   cards = [],
 }: LivesSectionProps) {
   const [selected, setSelected] = useState<string>("all");
+  const [dialogStage, setDialogStage] = useState<string | null>(null);
+
+  // Fases usadas para listar cards por etapa (espelham g4Funnel.ts)
+  const MAO_PHASES = new Set([
+    "Reunião agendada / Qualificado",
+    "Reunião Realizada",
+    "1° Reunião Realizada - Apresentação",
+    "Proposta enviada / Follow Up",
+    "Ganho",
+    "Contrato assinado",
+  ]);
+  const VENDA_PHASES = new Set(["Ganho", "Contrato assinado"]);
+
 
   // Cards classificados como Lives (todos os movimentos)
   const liveCards = useMemo(
