@@ -190,9 +190,59 @@ export function LivesSection({
         contextLabel={contextLabel}
         contextSub={contextSub}
         compare={compare}
+        onStageClick={setDialogStage}
       />
 
       <FrenteDreCard title="P&L — Lives" dre={dre} custosDetalhe={custosDetalhe} />
+
+      <LiveLeadsDialog
+        open={dialogStage !== null}
+        onOpenChange={(o) => !o && setDialogStage(null)}
+        stageKey={dialogStage ?? ""}
+        stageLabel={
+          dialogStage === "mao"
+            ? "Levantaram a mão"
+            : dialogStage === "venda"
+              ? "Vendas fechadas"
+              : dialogStage === "entraram"
+                ? "Entraram na live"
+                : dialogStage === "inscritos"
+                  ? "Inscritos"
+                  : (stages.find((s) => s.key === dialogStage)?.label ?? "")
+        }
+        contextLabel={contextLabel}
+        totalOfficial={
+          dialogStage === "mao"
+            ? counts.mao
+            : dialogStage === "venda"
+              ? counts.venda
+              : dialogStage === "entraram"
+                ? counts.entraram
+                : dialogStage === "inscritos"
+                  ? counts.inscritos
+                  : 0
+        }
+        cards={(() => {
+          if (dialogStage !== "mao" && dialogStage !== "venda") return [];
+          // Cards no escopo (live selecionada ou todas)
+          const scope = selectedLive
+            ? cardsForLive(liveCards, selectedLive.date, selectedLive.captureWindowDays)
+            : G4_LIVES.flatMap((l) =>
+                cardsForLive(liveCards, l.date, l.captureWindowDays),
+              );
+          // Dedupe: último dataEntrada por id
+          const uniq = new Map<string, ModeloAtualCard>();
+          for (const c of scope) {
+            const cur = uniq.get(c.id);
+            if (!cur || c.dataEntrada > cur.dataEntrada) uniq.set(c.id, c);
+          }
+          const phases = dialogStage === "venda" ? VENDA_PHASES : MAO_PHASES;
+          return Array.from(uniq.values()).filter((c) =>
+            phases.has(c.faseAtual || c.fase),
+          );
+        })()}
+      />
     </div>
   );
 }
+
