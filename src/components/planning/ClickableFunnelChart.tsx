@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
 import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
@@ -6,6 +6,7 @@ import { useO2TaxMetas } from "@/hooks/useO2TaxMetas";
 import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
 // useLeadsMetas removed - now using useModeloAtualMetas for leads
 import { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
+import { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { BUType, IndicatorType } from "@/hooks/useFunnelRealized";
@@ -119,7 +120,22 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
   
   
   // Analytics hooks for drill-down
-  const modeloAtualAnalytics = useModeloAtualAnalytics(startDate, endDate);
+  const modeloAtualAnalyticsRaw = useModeloAtualAnalytics(startDate, endDate);
+  const outboundAnalytics = useOutboundAnalytics(startDate, endDate);
+  // Combina Modelo Atual + Outbound (mesma lógica de IndicatorsTab.tsx: Outbound
+  // é extensão do Modelo Atual). Sem isso, o Funil do Período mostrava valores
+  // menores que os aceleradores porque ignorava os cards de Prospecção Ativa.
+  const modeloAtualAnalytics = useMemo(() => ({
+    ...modeloAtualAnalyticsRaw,
+    getCardsForIndicator: (ind: IndicatorType) => [
+      ...modeloAtualAnalyticsRaw.getCardsForIndicator(ind),
+      ...outboundAnalytics.getCardsForIndicator(ind),
+    ],
+    getDetailItemsForIndicator: (ind: IndicatorType) => [
+      ...modeloAtualAnalyticsRaw.getDetailItemsForIndicator(ind),
+      ...outboundAnalytics.getDetailItemsForIndicator(ind),
+    ],
+  }), [modeloAtualAnalyticsRaw, outboundAnalytics]);
   const o2TaxAnalytics = useO2TaxAnalytics(startDate, endDate);
   const franquiaAnalytics = useExpansaoAnalytics(startDate, endDate, 'Franquia');
   const oxyHackerAnalytics = useExpansaoAnalytics(startDate, endDate, 'Oxy Hacker');
@@ -226,6 +242,9 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
            (includesFranquia ? getFranquiaAnalyticsQty('venda') : 0) +
            monetVendaQty,
   };
+
+
+
 
 
   // Calculate conversions

@@ -1330,8 +1330,6 @@ export function IndicatorsTab() {
       const n = getFilteredMonetizacaoItems(indicator.key as 'proposta' | 'venda').length;
       dbg.monet = n; total += n;
     }
-
-
     return total;
   };
 
