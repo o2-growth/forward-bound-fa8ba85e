@@ -120,7 +120,22 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
   
   
   // Analytics hooks for drill-down
-  const modeloAtualAnalytics = useModeloAtualAnalytics(startDate, endDate);
+  const modeloAtualAnalyticsRaw = useModeloAtualAnalytics(startDate, endDate);
+  const outboundAnalytics = useOutboundAnalytics(startDate, endDate);
+  // Combina Modelo Atual + Outbound (mesma lógica de IndicatorsTab.tsx: Outbound
+  // é extensão do Modelo Atual). Sem isso, o Funil do Período mostrava valores
+  // menores que os aceleradores porque ignorava os cards de Prospecção Ativa.
+  const modeloAtualAnalytics = useMemo(() => ({
+    ...modeloAtualAnalyticsRaw,
+    getCardsForIndicator: (ind: IndicatorType) => [
+      ...modeloAtualAnalyticsRaw.getCardsForIndicator(ind),
+      ...outboundAnalytics.getCardsForIndicator(ind),
+    ],
+    getDetailItemsForIndicator: (ind: IndicatorType) => [
+      ...modeloAtualAnalyticsRaw.getDetailItemsForIndicator(ind),
+      ...outboundAnalytics.getDetailItemsForIndicator(ind),
+    ],
+  }), [modeloAtualAnalyticsRaw, outboundAnalytics]);
   const o2TaxAnalytics = useO2TaxAnalytics(startDate, endDate);
   const franquiaAnalytics = useExpansaoAnalytics(startDate, endDate, 'Franquia');
   const oxyHackerAnalytics = useExpansaoAnalytics(startDate, endDate, 'Oxy Hacker');
