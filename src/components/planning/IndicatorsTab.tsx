@@ -1084,6 +1084,8 @@ export function IndicatorsTab() {
   // Applies closer AND SDR filters when the selected closer/SDR operates in that BU
   const getRealizedForIndicator = (indicator: IndicatorConfig) => {
     let total = 0;
+    const dbg: any = { key: indicator.key, ma: 0, o2: 0, oxy: 0, franq: 0, monet: 0 };
+    
     
     if (includesModeloAtual) {
       // Check if any selected closer/SDR operates in Modelo Atual
@@ -1108,10 +1110,10 @@ export function IndicatorsTab() {
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.responsavel || card.sdr);
             return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
-          total += filteredCards.length;
+          dbg.ma = filteredCards.length; total += filteredCards.length;
         } else {
-          // No filters - use analytics hook with first-entry logic for consistency
-          total += modeloAtualAnalytics.getCardsForIndicator(indicator.key).length;
+          const n = modeloAtualAnalytics.getCardsForIndicator(indicator.key).length;
+          dbg.ma = n; total += n;
         }
       }
     }
@@ -1136,10 +1138,10 @@ export function IndicatorsTab() {
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
             return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
-          total += filteredCards.length;
+          dbg.o2 = filteredCards.length; total += filteredCards.length;
         } else {
-          // No filters - use analytics hook with first-entry logic for consistency
-          total += o2TaxAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          const n = o2TaxAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          dbg.o2 = n; total += n;
         }
       }
     }
@@ -1164,12 +1166,10 @@ export function IndicatorsTab() {
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
             return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
-          total += filteredCards.length;
+          dbg.oxy = filteredCards.length; total += filteredCards.length;
         } else {
-          // Fonte única: analytics do Pipefy (mesma do funil). Antes usava a
-          // planilha 'Indicadores 26' via getOxyHackerQty, o que causava
-          // divergência entre funil e acelerômetro.
-          total += oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          const n = oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          dbg.oxy = n; total += n;
         }
       }
     }
@@ -1194,12 +1194,10 @@ export function IndicatorsTab() {
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
             return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
-          total += filteredCards.length;
+          dbg.franq = filteredCards.length; total += filteredCards.length;
         } else {
-          // Fonte única: analytics do Pipefy (mesma do funil). Antes usava a
-          // planilha 'Indicadores 26' via getExpansaoQty, o que causava
-          // divergência entre funil e acelerômetro.
-          total += franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          const n = franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          dbg.franq = n; total += n;
         }
       }
     }
@@ -1211,9 +1209,13 @@ export function IndicatorsTab() {
       isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
-      total += getFilteredMonetizacaoItems(indicator.key as 'proposta' | 'venda').length;
+      const n = getFilteredMonetizacaoItems(indicator.key as 'proposta' | 'venda').length;
+      dbg.monet = n; total += n;
     }
 
+    if (typeof window !== 'undefined' && (window as any).__DEBUG_ACEL !== false) {
+      console.log(`[ACEL ${dbg.key}] MA=${dbg.ma} O2=${dbg.o2} Oxy=${dbg.oxy} Franq=${dbg.franq} Monet=${dbg.monet} => ${total}`);
+    }
 
     return total;
   };
