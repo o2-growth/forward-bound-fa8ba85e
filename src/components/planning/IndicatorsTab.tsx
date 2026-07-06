@@ -1196,8 +1196,10 @@ export function IndicatorsTab() {
           });
           total += filteredCards.length;
         } else {
-          // No filters - use metas hook (full dataset) for consistency with monetary gauges
-          total += getExpansaoQty(indicator.key as ExpansaoIndicator, startDate, endDate);
+          // Fonte única: analytics do Pipefy (mesma do funil). Antes usava a
+          // planilha 'Indicadores 26' via getExpansaoQty, o que causava
+          // divergência entre funil e acelerômetro.
+          total += franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length;
         }
       }
     }
