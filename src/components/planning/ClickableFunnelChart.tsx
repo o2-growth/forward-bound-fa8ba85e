@@ -243,16 +243,8 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
            monetVendaQty,
   };
 
-  // TEMP DEBUG — comparar com [GAUGE-DEBUG]
-  (['mql','rm','rr','proposta','venda'] as const).forEach(k => {
-    const ma = includesModeloAtual ? getFilteredModeloAtualQty(k as IndicatorType) : 0;
-    const o2 = includesO2Tax ? getO2TaxAnalyticsQty(k as IndicatorType) : 0;
-    const oxy = includesOxyHacker ? getOxyHackerAnalyticsQty(k as IndicatorType) : 0;
-    const franq = includesFranquia ? getFranquiaAnalyticsQty(k as IndicatorType) : 0;
-    const monet = (k === 'proposta') ? monetPropostaQty : (k === 'venda' ? monetVendaQty : 0);
-    // eslint-disable-next-line no-console
-    console.log('[FUNNEL-DEBUG]', JSON.stringify({ key: k, ma, o2, oxy, franq, monet, total: ma+o2+oxy+franq+monet }));
-  });
+
+
 
 
   // Calculate conversions
