@@ -1330,11 +1330,6 @@ export function IndicatorsTab() {
       const n = getFilteredMonetizacaoItems(indicator.key as 'proposta' | 'venda').length;
       dbg.monet = n; total += n;
     }
-    if (indicator.key === 'mql' || indicator.key === 'rm' || indicator.key === 'rr' || indicator.key === 'proposta' || indicator.key === 'venda') {
-      // eslint-disable-next-line no-console
-      console.log('[GAUGE-DEBUG]', JSON.stringify({ ...dbg, total }));
-    }
-
     return total;
   };
 
