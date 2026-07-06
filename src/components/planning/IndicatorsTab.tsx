@@ -2774,6 +2774,14 @@ export function IndicatorsTab() {
   const getMetaMonetaryForIndicator = (indicator: MonetaryIndicatorConfig): number => {
     const closerFilter = effectiveSelectedClosers.length > 0 ? effectiveSelectedClosers : undefined;
 
+    // Override: Fat Incremento (faturamento) — se algum closer selecionado é gerenciado
+    // via closer_absolute_metas, usa faturamento_meta rateado por dias no período.
+    if (indicator.key === 'faturamento' && closerFilter && effectiveSelectedSDRs.length === 0) {
+      const abs = getCloserAbsoluteMetaForPeriod('faturamento', startDate, endDate, closerFilter);
+      if (abs.hasData) return Math.round(abs.value);
+    }
+
+
     // Build SDR ratio callback when SDR filter is active
     let sdrRatio: ((bu: BuType, month: string) => number) | undefined;
     if (effectiveSelectedSDRs.length > 0) {
