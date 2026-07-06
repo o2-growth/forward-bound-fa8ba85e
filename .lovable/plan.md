@@ -1,36 +1,47 @@
-## Problema
+## Diagnóstico
 
-Ao filtrar Modelo Atual + Closer Thiago, os realizados são do Thiago (21 MQL, 34 RM, 23 RR, 19 Prop, 7 Venda), mas as **metas continuam sendo as da BU inteira** (487/195/156/125/31). Impossível ver o % individual dele.
+DB `closer_absolute_metas` para Thiago 2026:
+- **Mai**: rm=44, rr=37, prop=33, venda=5, faturamento=50.000
+- **Jun**: rm=0, rr=0, prop=0, venda=0, **faturamento=100.000** ← só faturamento
+- **Jul**: rm=0, rr=0, prop=0, venda=0, faturamento=200.000
 
-Você confirmou que a meta do Thiago está cadastrada na aba **Metas Closer (Indicadores)** → tabela `closer_absolute_metas` (colunas `rm_meta`, `rr_meta`, `prop_meta`, `venda_meta`, `faturamento_meta` por closer/mês/ano). Hoje o acelerômetro ignora essa tabela e usa só `closer_metas` (%), que provavelmente está com 100% legado ou zerado para Thiago.
+Duas correções necessárias:
 
-## Plano
+## Correção 1 — Semântica do override de closer
 
-### 1. Passar a usar `closer_absolute_metas` no acelerômetro
-Em `src/components/planning/IndicatorsTab.tsx`:
+Hoje meu código só aciona o override quando `valor > 0`. Isso mostra a meta cheia da BU quando o campo está zerado, dando a falsa impressão de que Thiago tem meta de 487 MQL/195 RM.
 
-- Importar `useCloserAbsoluteMetas(currentYear)` no topo do componente.
-- Criar helper `getCloserAbsoluteMetaForPeriod(indicatorKey, start, end, closers)` que:
-  - Só age quando `indicatorKey ∈ {rm, rr, proposta, venda}` (não há `mql_meta` na tabela).
-  - Para cada mês do período, soma as metas absolutas dos closers selecionados (match por `firstNameKey`), rateando por overlap de dias no mês (mesma fórmula já usada em `calcularMetaDoPeriodo`).
-  - Retorna `{ value, hasData }`. `hasData=true` se algum closer selecionado tem meta > 0 em algum mês do período.
+**Nova regra**: se o closer tem QUALQUER meta cadastrada no ano (`hasAnyMetaInYear=true`), essa tabela vira fonte da verdade. Meses/campos zerados retornam 0 (o admin não cadastrou aquele indicador para o mês). Se o closer não aparece em nenhum mês do ano, cai no fluxo antigo.
 
-- Em `calcularMetaDoPeriodo` (linhas 885-947), **antes** do loop atual: se `closerFilter?.length > 0` e o indicador é `rm|rr|proposta|venda`, tentar `getCloserAbsoluteMetaForPeriod`. Se `hasData` → retornar esse valor e pular todo o fluxo antigo. Senão, cair no fluxo atual (`closer_metas` %).
+Efeito: com Thiago selecionado em Jun, MQL/RM/RR/Prop/Venda mostram meta = 0 (admin não preencheu). Isso deixa visualmente óbvio que falta cadastrar.
 
-- Mesma lógica em `getMonthlyMetasFromFunnel` (linhas 949-995), mês a mês, para manter gráficos alinhados.
+## Correção 2 — Faturamento por closer
 
-### 2. MQL
-`closer_absolute_metas` não tem `mql_meta`. Como MQL vem de SDR e não de closer, manter o comportamento atual (fluxo `closer_metas` %) — o usuário verá a meta rateada por % se houver, ou 0 se não houver.
+Aplicar `faturamento_meta` no gauge **Fat Incremento** quando um closer é filtrado:
+- Se o closer tem `faturamento_meta > 0` em algum mês do período → soma rateada por dias vira a meta do gauge Fat Incremento.
+- MRR/Setup/Pontual: por enquanto mantém rateio antigo (`closer_metas` %). São gauges com decomposição própria que exigiria split adicional — fora deste escopo.
 
-### 3. Escopo mínimo
-- **Nenhuma mudança em schema.**
-- **Não mexer** em faturamento/monetários por ora (a queixa é dos 5 gauges de quantidade).
-- **Não mexer** no fluxo sem closer selecionado.
+## Onde mexer
 
-### Detalhes técnicos
-- Arquivo único: `src/components/planning/IndicatorsTab.tsx`.
-- Helper novo isolado + 2 pontos de integração (`calcularMetaDoPeriodo`, `getMonthlyMetasFromFunnel`).
-- Remover os `console.log` de debug `[FUNIL …]` / `[ACEL …]` adicionados no turno anterior, já que a divergência do funil ficou clara (proposta bateu, o resto é ruído numérico pequeno de dedup — se você quiser, tratamos depois em outra etapa).
+**`src/components/planning/IndicatorsTab.tsx`**
 
-### Validação
-Após aplicar: selecionar Modelo Atual + Thiago no mês de Jun/2026 deve trazer meta RM/RR/Prop/Venda batendo com o que está cadastrado na aba Metas Closer para Thiago naquele mês (rateada se o período for parcial).
+1. Novo helper `hasCloserAnyAbsMeta(closer, year)` → `true` se existe alguma linha do closer com algum campo > 0 no ano.
+2. `getCloserAbsoluteMetaForPeriod` passa a retornar `hasData=true` quando `hasCloserAnyAbsMeta(closer, year)` for true para pelo menos um dos closers selecionados (mesmo que o field somado no período seja 0).
+3. Idem para `getCloserAbsoluteMetaForMonth`.
+4. Novo helper análogo para `faturamento_meta`: `getCloserAbsFaturamentoForPeriod(closers, start, end)`.
+5. No cálculo da meta de **Fat Incremento** (localizar por `getMetaMonetaryForPeriod` / `getConsolidatedMeta`), se closer selecionado e `hasCloserAnyAbsMeta` para algum → usar `getCloserAbsFaturamentoForPeriod` no lugar do rateio %.
+
+## Validação (que vou executar após aplicar)
+
+1. TypeScript check.
+2. Rodar Playwright no preview: filtrar Modelo Atual + Thiago no mês Jun/2026, tirar screenshot, e confirmar:
+   - Fat Incremento **Meta ≈ R$ 100k** (rateado ao número de dias selecionados).
+   - MQL/RM/RR/Prop/Venda **Meta = 0** (admin não cadastrou para Jun).
+   - Trocar para Mai/2026 e confirmar RM=44, RR=37, Prop=33, Venda=5.
+
+Só finalizo o turno depois de confirmar visualmente os números.
+
+## Fora do escopo
+
+- Split de MRR/Setup/Pontual por closer (fica no rateio antigo).
+- MQL (`closer_absolute_metas` não tem `mql_meta`).
