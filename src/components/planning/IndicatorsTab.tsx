@@ -1166,8 +1166,10 @@ export function IndicatorsTab() {
           });
           total += filteredCards.length;
         } else {
-          // No filters - use metas hook (full dataset) for consistency with monetary gauges
-          total += getOxyHackerQty(indicator.key as OxyHackerIndicator, startDate, endDate);
+          // Fonte única: analytics do Pipefy (mesma do funil). Antes usava a
+          // planilha 'Indicadores 26' via getOxyHackerQty, o que causava
+          // divergência entre funil e acelerômetro.
+          total += oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key).length;
         }
       }
     }
@@ -1194,8 +1196,10 @@ export function IndicatorsTab() {
           });
           total += filteredCards.length;
         } else {
-          // No filters - use metas hook (full dataset) for consistency with monetary gauges
-          total += getExpansaoQty(indicator.key as ExpansaoIndicator, startDate, endDate);
+          // Fonte única: analytics do Pipefy (mesma do funil). Antes usava a
+          // planilha 'Indicadores 26' via getExpansaoQty, o que causava
+          // divergência entre funil e acelerômetro.
+          total += franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length;
         }
       }
     }
@@ -3558,7 +3562,7 @@ export function IndicatorsTab() {
           <LeadsMqlsStackedChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
           <MeetingsScheduledChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
         </div>
-        <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={effectiveSelectedClosers} selectedSDRs={effectiveSelectedSDRs} selectedOrigens={selectedOrigens} />
+        <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={effectiveSelectedClosers} selectedSDRs={effectiveSelectedSDRs} selectedOrigens={selectedOrigens} monetizacaoPropostaItems={isConsolidado ? getFilteredMonetizacaoItems('proposta') : undefined} monetizacaoVendaItems={isConsolidado ? getFilteredMonetizacaoItems('venda') : undefined} />
       </div>
 
       {/* Charts Section with View Mode Toggle */}

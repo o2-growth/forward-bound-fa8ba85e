@@ -41,6 +41,11 @@ interface ClickableFunnelChartProps {
   selectedClosers?: string[];
   selectedSDRs?: string[];
   selectedOrigens?: LeadSource[];
+  /** Itens de Monetização (Cross-sell/Upsell/Troca) já filtrados por Closer/SDR
+   *  pelo IndicatorsTab. Só faz sentido no consolidado; conta em Proposta/Venda
+   *  para alinhar com o acelerômetro. */
+  monetizacaoPropostaItems?: any[];
+  monetizacaoVendaItems?: any[];
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -54,7 +59,7 @@ interface FunnelStage {
   conversionPercent: number;
 }
 
-export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedBUs, selectedClosers, selectedSDRs, selectedOrigens }: ClickableFunnelChartProps) {
+export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedBUs, selectedClosers, selectedSDRs, selectedOrigens, monetizacaoPropostaItems, monetizacaoVendaItems }: ClickableFunnelChartProps) {
   const matchCardOrigem = (card: any): boolean => {
     if (!selectedOrigens?.length) return true;
     if (!card) return false;
@@ -184,6 +189,15 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     return filterAnalyticsItems(franquiaAnalytics.getDetailItemsForIndicator(indicator), 'franquia').length;
   };
   
+  // Monetização (transversal — só entra no consolidado e apenas se a origem
+  // selecionada inclui 'monetizacao' ou não há filtro de origem). Alinha o
+  // funil com o acelerômetro (getRealizedForIndicator no IndicatorsTab).
+  const includeMonetizacao =
+    useConsolidado &&
+    (!selectedOrigens?.length || selectedOrigens.includes('monetizacao'));
+  const monetPropostaQty = includeMonetizacao ? (monetizacaoPropostaItems?.length ?? 0) : 0;
+  const monetVendaQty = includeMonetizacao ? (monetizacaoVendaItems?.length ?? 0) : 0;
+
   const totals = {
     leads: (includesModeloAtual ? getFilteredModeloAtualQty('leads') : 0) + 
            (includesO2Tax ? getO2TaxAnalyticsQty('leads') : 0) + 
@@ -204,11 +218,13 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     proposta: (includesModeloAtual ? getFilteredModeloAtualQty('proposta') : 0) + 
               (includesO2Tax ? getO2TaxAnalyticsQty('proposta') : 0) + 
               (includesOxyHacker ? getOxyHackerAnalyticsQty('proposta') : 0) + 
-              (includesFranquia ? getFranquiaAnalyticsQty('proposta') : 0),
+              (includesFranquia ? getFranquiaAnalyticsQty('proposta') : 0) +
+              monetPropostaQty,
     venda: (includesModeloAtual ? getFilteredModeloAtualQty('venda') : 0) + 
            (includesO2Tax ? getO2TaxAnalyticsQty('venda') : 0) + 
            (includesOxyHacker ? getOxyHackerAnalyticsQty('venda') : 0) + 
-           (includesFranquia ? getFranquiaAnalyticsQty('venda') : 0),
+           (includesFranquia ? getFranquiaAnalyticsQty('venda') : 0) +
+           monetVendaQty,
   };
 
   // Calculate conversions
@@ -223,17 +239,22 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
 
   // Calculate monetary values based on selected BUs array
   // Para outras BUs (O2 Tax/Oxy/Franquia), zera quando o closer/SDR selecionado não opera lá
+  const sumItemsValue = (items?: any[]) =>
+    (items ?? []).reduce((s, it) => s + (Number(it?.value) || 0), 0);
+
   const propostaValue =
     (includesModeloAtual ? getFilteredModeloAtualValue('proposta') : 0) +
     (includesO2Tax && buHasMatch('o2_tax') ? getO2TaxValue('proposta', startDate, endDate) : 0) +
     (includesOxyHacker && buHasMatch('oxy_hacker') ? getOxyHackerValue('proposta', startDate, endDate) : 0) +
-    (includesFranquia && buHasMatch('franquia') ? getExpansaoValue('proposta', startDate, endDate) : 0);
+    (includesFranquia && buHasMatch('franquia') ? getExpansaoValue('proposta', startDate, endDate) : 0) +
+    (includeMonetizacao ? sumItemsValue(monetizacaoPropostaItems) : 0);
 
   const vendaValue =
     (includesModeloAtual ? getFilteredModeloAtualValue('venda') : 0) +
     (includesO2Tax && buHasMatch('o2_tax') ? getO2TaxValue('venda', startDate, endDate) : 0) +
     (includesOxyHacker && buHasMatch('oxy_hacker') ? getOxyHackerValue('venda', startDate, endDate) : 0) +
-    (includesFranquia && buHasMatch('franquia') ? getExpansaoValue('venda', startDate, endDate) : 0);
+    (includesFranquia && buHasMatch('franquia') ? getExpansaoValue('venda', startDate, endDate) : 0) +
+    (includeMonetizacao ? sumItemsValue(monetizacaoVendaItems) : 0);
 
   // Width percentages for funnel visualization (6 stages now)
   const widthPercentages = [100, 85, 70, 55, 45, 35];
@@ -343,8 +364,15 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
         
         // Oxy Hacker items
         const oxyHackerItems = oxyHackerAnalytics.getDetailItemsForIndicator(indicator);
-        
-        return origemPostFilter([...items, ...o2TaxItems, ...franquiaItems, ...oxyHackerItems]);
+
+        // Monetização (só Proposta/Venda, respeitando filtro de origem já
+        // aplicado pelo IndicatorsTab que passa as props filtradas)
+        const monetItems =
+          includeMonetizacao && (indicator === 'proposta' || indicator === 'venda')
+            ? ((indicator === 'proposta' ? monetizacaoPropostaItems : monetizacaoVendaItems) ?? [])
+            : [];
+
+        return origemPostFilter([...items, ...o2TaxItems, ...franquiaItems, ...oxyHackerItems, ...monetItems]);
       }
 
       return origemPostFilter(items);
