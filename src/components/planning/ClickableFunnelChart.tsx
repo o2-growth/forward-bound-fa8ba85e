@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useModeloAtualMetas } from "@/hooks/useModeloAtualMetas";
 import { useExpansaoMetas } from "@/hooks/useExpansaoMetas";
@@ -6,6 +6,7 @@ import { useO2TaxMetas } from "@/hooks/useO2TaxMetas";
 import { useOxyHackerMetas } from "@/hooks/useOxyHackerMetas";
 // useLeadsMetas removed - now using useModeloAtualMetas for leads
 import { useModeloAtualAnalytics } from "@/hooks/useModeloAtualAnalytics";
+import { useOutboundAnalytics } from "@/hooks/useOutboundAnalytics";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { BUType, IndicatorType } from "@/hooks/useFunnelRealized";
