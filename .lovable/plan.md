@@ -1,22 +1,16 @@
-# Cadastrar metas completas dos closers em Jun/2026
+# Investigar por que RM/RR/Prop/Venda do Thiago aparecem zerados
 
-Atualizar `closer_absolute_metas` para Jun/2026 com os valores da planilha enviada. Os registros já existem no banco (com `faturamento_meta` correto); vou apenas preencher `rm_meta`, `rr_meta`, `prop_meta`, `venda_meta` que hoje estão zerados.
+Os valores foram gravados no banco com sucesso (confirmado por SELECT): Thiago Jun/2026 → RM=70, RR=59, Prop=53, Venda=8. Mesmo assim, no dashboard só a meta monetária aparece.
 
-## Valores a gravar
+## Hipótese principal
 
-| Closer (nome no DB) | RM | RR | Proposta | Venda | Faturamento |
-|---|---|---|---|---|---|
-| Daniel Trindade | 131 | 111 | 100 | 15 | R$ 330.000 (já ok) |
-| Amanda Serafim | 70 | 59 | 53 | 8 | R$ 100.000 (já ok) |
-| Thiago | 70 | 59 | 53 | 8 | R$ 100.000 (já ok) |
+O hook `useCloserAbsoluteMetas` usa `staleTime: 30 * 60 * 1000` (30 min). O React Query provavelmente está servindo a versão antiga em cache, onde só `faturamento_meta` tinha valor. O gauge de Fat Incremento também usa o mesmo cache, mas como esse campo já estava preenchido antes, aparenta funcionar.
 
-Interpretação da imagem: Amanda e Thiago têm cabeçalho sem "R.M" na planilha, mas o primeiro valor numérico (70) corresponde a RM (o mesmo padrão da linha do Daniel e batendo com a meta de conversão de 15%: 8/53 ≈ 15%).
+## Passos
 
-## Ação técnica
+1. Abrir o dashboard via Playwright autenticado, filtrar Modelo Atual + Jun/2026 + closer Thiago, e verificar screenshot dos gauges RM/RR/Proposta/Venda.
+2. Se aparecerem 70/59/53/8 → o problema era só cache; instruir usuário a dar refresh (Ctrl+Shift+R) e não mudar código.
+3. Se ainda aparecerem 0 → depurar: verificar que `closerAbsMetas` contém o registro (log/console), conferir `firstNameKey('Thiago')` vs `firstNameKey(m.closer)`, e checar se `anySelectedCloserManaged` retorna true para Thiago em 2026.
+4. Fix conforme diagnóstico. Provável ajuste: reduzir `staleTime` do hook ou invalidar a query no mount da aba, caso o cache seja o culpado.
 
-UPDATE em `closer_absolute_metas` filtrando por `year=2026`, `month='Jun'` e cada `closer` (3 statements). Nenhuma outra tabela é tocada, nenhum código muda.
-
-## Validação
-
-- `SELECT` após o UPDATE confirmando os 4 campos por closer.
-- No dashboard, ao filtrar Jun/2026 + closer Thiago (Modelo Atual), os medidores RM/RR/Proposta/Venda passam a mostrar meta > 0 (usando a lógica já implementada de `closer_absolute_metas`).
+Sem mudanças de código antes da validação.
