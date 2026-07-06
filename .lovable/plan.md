@@ -1,47 +1,22 @@
-## Diagnóstico
+# Cadastrar metas completas dos closers em Jun/2026
 
-DB `closer_absolute_metas` para Thiago 2026:
-- **Mai**: rm=44, rr=37, prop=33, venda=5, faturamento=50.000
-- **Jun**: rm=0, rr=0, prop=0, venda=0, **faturamento=100.000** ← só faturamento
-- **Jul**: rm=0, rr=0, prop=0, venda=0, faturamento=200.000
+Atualizar `closer_absolute_metas` para Jun/2026 com os valores da planilha enviada. Os registros já existem no banco (com `faturamento_meta` correto); vou apenas preencher `rm_meta`, `rr_meta`, `prop_meta`, `venda_meta` que hoje estão zerados.
 
-Duas correções necessárias:
+## Valores a gravar
 
-## Correção 1 — Semântica do override de closer
+| Closer (nome no DB) | RM | RR | Proposta | Venda | Faturamento |
+|---|---|---|---|---|---|
+| Daniel Trindade | 131 | 111 | 100 | 15 | R$ 330.000 (já ok) |
+| Amanda Serafim | 70 | 59 | 53 | 8 | R$ 100.000 (já ok) |
+| Thiago | 70 | 59 | 53 | 8 | R$ 100.000 (já ok) |
 
-Hoje meu código só aciona o override quando `valor > 0`. Isso mostra a meta cheia da BU quando o campo está zerado, dando a falsa impressão de que Thiago tem meta de 487 MQL/195 RM.
+Interpretação da imagem: Amanda e Thiago têm cabeçalho sem "R.M" na planilha, mas o primeiro valor numérico (70) corresponde a RM (o mesmo padrão da linha do Daniel e batendo com a meta de conversão de 15%: 8/53 ≈ 15%).
 
-**Nova regra**: se o closer tem QUALQUER meta cadastrada no ano (`hasAnyMetaInYear=true`), essa tabela vira fonte da verdade. Meses/campos zerados retornam 0 (o admin não cadastrou aquele indicador para o mês). Se o closer não aparece em nenhum mês do ano, cai no fluxo antigo.
+## Ação técnica
 
-Efeito: com Thiago selecionado em Jun, MQL/RM/RR/Prop/Venda mostram meta = 0 (admin não preencheu). Isso deixa visualmente óbvio que falta cadastrar.
+UPDATE em `closer_absolute_metas` filtrando por `year=2026`, `month='Jun'` e cada `closer` (3 statements). Nenhuma outra tabela é tocada, nenhum código muda.
 
-## Correção 2 — Faturamento por closer
+## Validação
 
-Aplicar `faturamento_meta` no gauge **Fat Incremento** quando um closer é filtrado:
-- Se o closer tem `faturamento_meta > 0` em algum mês do período → soma rateada por dias vira a meta do gauge Fat Incremento.
-- MRR/Setup/Pontual: por enquanto mantém rateio antigo (`closer_metas` %). São gauges com decomposição própria que exigiria split adicional — fora deste escopo.
-
-## Onde mexer
-
-**`src/components/planning/IndicatorsTab.tsx`**
-
-1. Novo helper `hasCloserAnyAbsMeta(closer, year)` → `true` se existe alguma linha do closer com algum campo > 0 no ano.
-2. `getCloserAbsoluteMetaForPeriod` passa a retornar `hasData=true` quando `hasCloserAnyAbsMeta(closer, year)` for true para pelo menos um dos closers selecionados (mesmo que o field somado no período seja 0).
-3. Idem para `getCloserAbsoluteMetaForMonth`.
-4. Novo helper análogo para `faturamento_meta`: `getCloserAbsFaturamentoForPeriod(closers, start, end)`.
-5. No cálculo da meta de **Fat Incremento** (localizar por `getMetaMonetaryForPeriod` / `getConsolidatedMeta`), se closer selecionado e `hasCloserAnyAbsMeta` para algum → usar `getCloserAbsFaturamentoForPeriod` no lugar do rateio %.
-
-## Validação (que vou executar após aplicar)
-
-1. TypeScript check.
-2. Rodar Playwright no preview: filtrar Modelo Atual + Thiago no mês Jun/2026, tirar screenshot, e confirmar:
-   - Fat Incremento **Meta ≈ R$ 100k** (rateado ao número de dias selecionados).
-   - MQL/RM/RR/Prop/Venda **Meta = 0** (admin não cadastrou para Jun).
-   - Trocar para Mai/2026 e confirmar RM=44, RR=37, Prop=33, Venda=5.
-
-Só finalizo o turno depois de confirmar visualmente os números.
-
-## Fora do escopo
-
-- Split de MRR/Setup/Pontual por closer (fica no rateio antigo).
-- MQL (`closer_absolute_metas` não tem `mql_meta`).
+- `SELECT` após o UPDATE confirmando os 4 campos por closer.
+- No dashboard, ao filtrar Jun/2026 + closer Thiago (Modelo Atual), os medidores RM/RR/Proposta/Venda passam a mostrar meta > 0 (usando a lógica já implementada de `closer_absolute_metas`).
