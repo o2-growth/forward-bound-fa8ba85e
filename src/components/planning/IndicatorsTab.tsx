@@ -2625,11 +2625,8 @@ export function IndicatorsTab() {
 
         if (includesModeloAtual) {
           const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
-          if (filtered === null) {
-            total += getModeloAtualValue('venda', startDate, endDate);
-          } else {
-            total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
-          }
+          const cards = filtered ?? modeloAtualAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valor || 0), 0);
         }
 
         if (includesO2Tax) {
