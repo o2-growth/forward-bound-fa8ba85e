@@ -1110,10 +1110,10 @@ export function IndicatorsTab() {
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.responsavel || card.sdr);
             return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
-          total += filteredCards.length;
+          dbg.ma = filteredCards.length; total += filteredCards.length;
         } else {
-          // No filters - use analytics hook with first-entry logic for consistency
-          total += modeloAtualAnalytics.getCardsForIndicator(indicator.key).length;
+          const n = modeloAtualAnalytics.getCardsForIndicator(indicator.key).length;
+          dbg.ma = n; total += n;
         }
       }
     }
