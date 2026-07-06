@@ -230,7 +230,7 @@ export function useOutboundAnalytics(startDate: Date, endDate: Date) {
     value,
     reason: card.motivoPerda,
     revenueRange: card.faixa,
-    responsible: card.responsavel,
+    responsible: card.closer || card.responsavel,
     duration: card.duracao,
     product: card.produto,
     mrr: card.valorMRR || 0,
