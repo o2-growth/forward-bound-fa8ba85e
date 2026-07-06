@@ -1046,6 +1046,12 @@ export function IndicatorsTab() {
     return monthsInPeriod.map(monthDate => {
       const monthName = monthNames[getMonth(monthDate)];
 
+      // Override por closer via closer_absolute_metas (RM/RR/Prop/Venda)
+      if (closerFilter && closerFilter.length > 0) {
+        const abs = getCloserAbsoluteMetaForMonth(indicatorKey, monthName, monthDate.getFullYear(), closerFilter);
+        if (abs.hasData) return Math.round(abs.value);
+      }
+
       if (useSdrOverride) {
         const { value, hasData } = getSdrMetaForMonth(indicatorKey as 'rm' | 'rr', bu!, monthName, sdrFilter);
         if (hasData) return Math.round(value);
