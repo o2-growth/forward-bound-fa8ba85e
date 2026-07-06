@@ -41,6 +41,11 @@ interface ClickableFunnelChartProps {
   selectedClosers?: string[];
   selectedSDRs?: string[];
   selectedOrigens?: LeadSource[];
+  /** Itens de Monetização (Cross-sell/Upsell/Troca) já filtrados por Closer/SDR
+   *  pelo IndicatorsTab. Só faz sentido no consolidado; conta em Proposta/Venda
+   *  para alinhar com o acelerômetro. */
+  monetizacaoPropostaItems?: any[];
+  monetizacaoVendaItems?: any[];
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat("pt-BR").format(Math.round(value));
@@ -54,7 +59,7 @@ interface FunnelStage {
   conversionPercent: number;
 }
 
-export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedBUs, selectedClosers, selectedSDRs, selectedOrigens }: ClickableFunnelChartProps) {
+export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedBUs, selectedClosers, selectedSDRs, selectedOrigens, monetizacaoPropostaItems, monetizacaoVendaItems }: ClickableFunnelChartProps) {
   const matchCardOrigem = (card: any): boolean => {
     if (!selectedOrigens?.length) return true;
     if (!card) return false;
