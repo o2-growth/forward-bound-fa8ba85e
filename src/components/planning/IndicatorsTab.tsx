@@ -19,6 +19,7 @@ import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useCloserMetas, BU_CLOSERS, BuType, CloserType } from "@/hooks/useCloserMetas";
+import { useCloserAbsoluteMetas, firstNameKey } from "@/hooks/useCloserAbsoluteMetas";
 import { useSdrMetas } from "@/hooks/useSdrMetas";
 import { useFunnelMetas } from "@/hooks/useFunnelMetas";
 // Componentes pesados (abaixo do fold) → lazy load com retry on stale chunk
