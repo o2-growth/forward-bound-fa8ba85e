@@ -616,6 +616,7 @@ export function IndicatorsTab() {
   
   // Get closer metas for filtering goals by closer percentage
   const { getFilteredMeta } = useCloserMetas(currentYear);
+  const { metas: closerAbsMetas } = useCloserAbsoluteMetas(currentYear);
   const { metas: sdrMetasList } = useSdrMetas(currentYear);
   const { funnelMetas: dbFunnelMetas } = useFunnelMetas(currentYear);
 
