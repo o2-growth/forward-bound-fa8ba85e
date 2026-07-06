@@ -104,6 +104,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/debug/g4-lives-check"
+              element={
+                <ProtectedRoute>
+                  <DebugG4LivesCheck />
+                </ProtectedRoute>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
