@@ -1316,9 +1316,6 @@ export function IndicatorsTab() {
       dbg.monet = n; total += n;
     }
 
-    if (typeof window !== 'undefined' && (window as any).__DEBUG_ACEL !== false) {
-      console.log(`[ACEL ${dbg.key}] MA=${dbg.ma} O2=${dbg.o2} Oxy=${dbg.oxy} Franq=${dbg.franq} Monet=${dbg.monet} => ${total}`);
-    }
 
     return total;
   };
