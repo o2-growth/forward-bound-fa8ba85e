@@ -454,6 +454,48 @@ export type Database = {
         }
         Relationships: []
       }
+      closer_absolute_metas_backup_20260706_jul: {
+        Row: {
+          closer: string | null
+          created_at: string | null
+          faturamento_meta: number | null
+          id: string | null
+          month: string | null
+          prop_meta: number | null
+          rm_meta: number | null
+          rr_meta: number | null
+          updated_at: string | null
+          venda_meta: number | null
+          year: number | null
+        }
+        Insert: {
+          closer?: string | null
+          created_at?: string | null
+          faturamento_meta?: number | null
+          id?: string | null
+          month?: string | null
+          prop_meta?: number | null
+          rm_meta?: number | null
+          rr_meta?: number | null
+          updated_at?: string | null
+          venda_meta?: number | null
+          year?: number | null
+        }
+        Update: {
+          closer?: string | null
+          created_at?: string | null
+          faturamento_meta?: number | null
+          id?: string | null
+          month?: string | null
+          prop_meta?: number | null
+          rm_meta?: number | null
+          rr_meta?: number | null
+          updated_at?: string | null
+          venda_meta?: number | null
+          year?: number | null
+        }
+        Relationships: []
+      }
       closer_metas: {
         Row: {
           bu: string
@@ -1443,6 +1485,42 @@ export type Database = {
           sdr?: string
           updated_at?: string
           year?: number
+        }
+        Relationships: []
+      }
+      sdr_metas_backup_20260706_jul_modelo_atual: {
+        Row: {
+          bu: string | null
+          created_at: string | null
+          id: string | null
+          month: string | null
+          rm_meta: number | null
+          rr_meta: number | null
+          sdr: string | null
+          updated_at: string | null
+          year: number | null
+        }
+        Insert: {
+          bu?: string | null
+          created_at?: string | null
+          id?: string | null
+          month?: string | null
+          rm_meta?: number | null
+          rr_meta?: number | null
+          sdr?: string | null
+          updated_at?: string | null
+          year?: number | null
+        }
+        Update: {
+          bu?: string | null
+          created_at?: string | null
+          id?: string | null
+          month?: string | null
+          rm_meta?: number | null
+          rr_meta?: number | null
+          sdr?: string | null
+          updated_at?: string | null
+          year?: number | null
         }
         Relationships: []
       }
