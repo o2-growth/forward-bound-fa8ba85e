@@ -967,13 +967,9 @@ export function IndicatorsTab() {
     closerFilter?: string[],
     sdrFilter?: string[]
   ): number => {
-    // Override por closer via closer_absolute_metas (fonte oficial de metas por closer).
-    // Só age em RM/RR/Proposta/Venda (tabela não tem MQL). Se algum closer tem meta > 0
-    // no período, esse valor prevalece sobre o rateio antigo por %.
-    if (closerFilter && closerFilter.length > 0) {
-      const abs = getCloserAbsoluteMetaForPeriod(indicatorKey, start, end, closerFilter);
-      if (abs.hasData) return Math.round(abs.value);
-    }
+    // Nota: override por closer via closer_absolute_metas é aplicado UMA VEZ no
+    // nível superior (getMetaForIndicator), fora do loop por BU, para não
+    // multiplicar a meta por N BUs. Aqui mantemos apenas o rateio antigo por %.
     // Override RM/RR by sdr_metas when an SDR filter is active and we have data for this BU
     if (bu && (indicatorKey === 'rm' || indicatorKey === 'rr') && sdrFilter && sdrFilter.length > 0) {
       const { value, hasData } = getSdrMetaForPeriod(indicatorKey, bu, start, end, sdrFilter);
