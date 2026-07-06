@@ -1,28 +1,49 @@
 
 ## Objetivo
-Validar se as metas de Modelo Atual para Julho/2026 (Closers, SDRs e Faturamento) configuradas no dashboard batem com os valores da planilha enviada.
+Atualizar metas por Closer e por SDR de Jul/2026 (Modelo Atual) com os valores da planilha, garantindo backup para rollback rápido e sem afetar outros números.
 
-## Valores esperados (planilha, mês inteiro)
+## Segurança / Rollback
 
-**Closers (R.M / R.R / Proposta / Venda / Meta R$ / Ticket):**
-- Daniel: 87 / 74 / 67 / 10 / R$ 220.000 / R$ 22.000
-- Amanda: 70 / 59 / 53 / 8 / R$ 100.000 / R$ 12.500
-- Thiago (Zanoni): 87 / 74 / 67 / 10 / R$ 200.000 / R$ 20.000
+Antes de qualquer UPDATE, criar snapshot em tabelas de backup dedicadas (não migração de schema — insert simples via CREATE TABLE AS, feito no mesmo lote):
 
-**SDR (mês):**
-- Carlos: R.M 179 / R.R 140
+- `closer_absolute_metas_backup_20260706_jul` — cópia das 6 linhas de Jul/2026 antes do update
+- `sdr_metas_backup_20260706_jul_modelo_atual` — cópia das 5 linhas de Jul/2026 modelo_atual antes do update
 
-**Faturamento (Incremento):**
-- Total R$ 520.000 · MRR (25%) R$ 130.000 · Setup R$ 390.000
+Rollback = 1 comando UPDATE lendo do backup. Deixo o SQL de rollback pronto no chat após aplicar.
+
+## Escopo (o que MUDA)
+
+### `closer_absolute_metas` (apenas linhas Jul/2026 destes 3 closers)
+
+| Closer | rm_meta | rr_meta | prop_meta | venda_meta | faturamento_meta |
+|---|---:|---:|---:|---:|---:|
+| Daniel Trindade | 87 | 74 | 67 | 10 | **220000** (era 200000) |
+| Amanda Serafim | 70 | 59 | 53 | 8 | 100000 (mantém) |
+| Thiago | 87 | 74 | 67 | 10 | 200000 (mantém) |
+
+Bruna, Lucas Ilha, Pedro Albite → **não toco** (permanecem zerados como estão hoje).
+
+### `sdr_metas` (apenas Carlos, Jul/2026, modelo_atual)
+
+| SDR | rm_meta | rr_meta |
+|---|---:|---:|
+| Carlos | 179 | 140 |
+
+Ana, Amanda, Erica, Matheus → **não toco**.
+
+## O que NÃO MUDA (para não "foder outros números")
+
+- `funnel_metas` (RM/RR/Proposta/Venda consolidados da BU) — intocado
+- `monetary_metas` (faturamento/pontual da BU) — intocado
+- `closer_metas` (tabela de rateio %) — intocada
+- Metas de outros meses, outras BUs, outros closers/SDRs — intocados
+- Nenhuma alteração de schema, código, hooks ou lógica
 
 ## Passos
-1. Rodar script Playwright com sessão Supabase injetada; acessar `/planning-2026` (aba Indicadores / Comercial - Modelo Atual).
-2. Ajustar filtro para mês inteiro Jul/2026 e BU = Modelo Atual.
-3. Capturar screenshots dos cards:
-   - Metas por Closer (Daniel, Amanda, Thiago) → R.M, R.R, Proposta, Venda, Meta R$, Ticket
-   - Meta SDR (Carlos) → R.M, R.R
-   - Meta Faturamento Incremento → Total, MRR, Setup
-4. Comparar valores exibidos × planilha; listar divergências (esperado × atual × delta).
+1. Criar as 2 tabelas de backup com `CREATE TABLE ... AS SELECT ...` filtrado.
+2. Rodar os UPDATEs listados acima (7 linhas no total: 3 closers + 1 SDR + snapshots).
+3. Confirmar via SELECT que os novos valores bateram com a planilha.
+4. Postar no chat o SQL de rollback exato, para o usuário guardar.
 
-## Entrega
-Relatório curto no chat com tabela de conferência + screenshots anexadas. Nenhuma alteração de código nesta etapa — se houver divergência, proponho ajuste em seguida.
+## Não incluído nesta etapa
+- Meta de faturamento incremento (Total 520k / MRR 130k / Setup 390k) — envolve `funnel_metas` e/ou `monetary_metas` que são globais da BU e afetam gauges/dashboards. Trato numa segunda etapa separada com o mesmo padrão de backup, depois de você confirmar.
