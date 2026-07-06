@@ -167,19 +167,7 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
   const getFilteredModeloAtualQty = (indicator: IndicatorType): number => {
     if (!buHasMatch('modelo_atual')) return 0;
     const cards = modeloAtualAnalytics.getCardsForIndicator(indicator);
-    const before = cards.length;
-    let droppedCloser = 0, droppedSdr = 0, droppedOrigem = 0;
-    const filtered = cards.filter((c: any) => {
-      const okC = matchCardCloser(c.closer); if (!okC) { droppedCloser++; return false; }
-      const okS = matchCardSdr(c.responsavel || c.sdr); if (!okS) { droppedSdr++; return false; }
-      const okO = matchCardOrigem(c); if (!okO) { droppedOrigem++; return false; }
-      return true;
-    });
-    if (indicator === 'mql' || indicator === 'rm' || indicator === 'rr' || indicator === 'venda') {
-      // eslint-disable-next-line no-console
-      console.log('[FUNNEL-FILTER-MA]', indicator, 'before=', before, 'after=', filtered.length, 'droppedCloser=', droppedCloser, 'droppedSdr=', droppedSdr, 'droppedOrigem=', droppedOrigem, 'sel=', { c: selectedClosers?.length, s: selectedSDRs?.length, o: selectedOrigens?.length });
-    }
-    return filtered.length;
+    return cards.filter((c: any) => matchCardCloser(c.closer) && matchCardSdr(c.responsavel || c.sdr) && matchCardOrigem(c)).length;
   };
 
   // Helper to get filtered value for Modelo Atual when closers/SDRs/origem filter is active
