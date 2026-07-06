@@ -1,14 +1,16 @@
-# Confirmar Closer do GSC como Thiago Santana na aba Vendas
+## Correção do Closer do card 1341215587
 
-## Diagnóstico
-- Banco (mirror externo, `pipefy_moviment_outbound`, card 1341215587): `vendedor_respons_vel = "Thiago Santana"` em todas as 7 linhas — a atualização anterior persistiu.
-- Print do usuário ainda mostra "Matheus Staruck dos Reis" no Closer — provavelmente cache do React Query (a query de outbound é cacheada por `queryKey: ["outbound-analytics", startDate, endDate]`).
-- `useOutboundAnalytics.parseOutboundRow` já usa `vendedor_respons_vel` como `closer`, então após invalidar a cache o campo passa a exibir Thiago.
+Trocar o valor do campo `vendedor_respons_vel` de **"Thiago Santana"** para **"Thiago Zanoni"** no banco espelho (`pipefy_moviment_outbound`) para o card `1341215587`.
 
-## Passos
-1. Rodar Playwright abrindo o dashboard autenticado, ir na aba Indicadores período 01–06/07, abrir o drill de "Venda" e capturar a linha do GSC. Se ainda vier "Matheus", forçar reload (Ctrl+Shift+R equivalente: `page.reload({ waitUntil: "networkidle" })` + limpar `localStorage['REACT_QUERY_OFFLINE_CACHE']` se existir).
-2. Confirmar visualmente que Closer do GSC = "Thiago Santana" e SDR permanece "Matheus Staruck dos Reis".
-3. Se, mesmo após reload, aparecer Matheus (isso indicaria fallback `closer || responsible` em algum formatter), localizar o formatter da coluna Closer no DetailSheet e ajustar para não sobrescrever quando `closer` estiver preenchido — investigar apenas se o reload não resolver.
+### Passos
 
-## Nada a mudar no backend
-O update já está feito e verificado no mirror. Sem migrações, sem novos deploys.
+1. Chamar a edge function `query-external-db` com a ação `update_field`:
+   - `table`: `pipefy_moviment_outbound`
+   - `card_id`: `1341215587`
+   - `field`: `vendedor_respons_vel`
+   - `value`: `Thiago Zanoni`
+2. Validar via `curl_edge_functions` que todas as linhas do card agora retornam `vendedor_respons_vel = "Thiago Zanoni"`.
+3. SDR (Matheus Staruck) permanece inalterado.
+
+### Observação
+Alteração feita apenas no banco espelho consumido pelo dashboard. Após atualizar, será necessário refresh da página para invalidar o cache do React Query e ver "Thiago Zanoni" como Closer no GSC.
