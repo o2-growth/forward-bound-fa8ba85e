@@ -1138,10 +1138,10 @@ export function IndicatorsTab() {
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
             return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
-          total += filteredCards.length;
+          dbg.o2 = filteredCards.length; total += filteredCards.length;
         } else {
-          // No filters - use analytics hook with first-entry logic for consistency
-          total += o2TaxAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          const n = o2TaxAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          dbg.o2 = n; total += n;
         }
       }
     }
