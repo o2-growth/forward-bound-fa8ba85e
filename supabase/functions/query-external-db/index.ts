@@ -767,11 +767,15 @@ Deno.serve(async (req) => {
     } else if (action === "update_field") {
       const { cardId, field, value } = body;
 
-      // Only allow specific safe fields
-      const allowedFields = ["SDR responsável", "Closer responsável"];
+      // Whitelist per table — outbound uses different column names.
+      const allowedFieldsByTable: Record<string, string[]> = {
+        pipefy_moviment_outbound: ["vendedor_respons_vel"],
+      };
+      const defaultAllowedFields = ["SDR responsável", "Closer responsável"];
+      const allowedFields = allowedFieldsByTable[table] ?? defaultAllowedFields;
       if (!allowedFields.includes(field)) {
         await client.end();
-        return new Response(JSON.stringify({ error: `Field not allowed. Allowed: ${allowedFields.join(", ")}` }), {
+        return new Response(JSON.stringify({ error: `Field not allowed for table ${table}. Allowed: ${allowedFields.join(", ")}` }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
