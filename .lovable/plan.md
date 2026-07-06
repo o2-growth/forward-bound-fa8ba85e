@@ -1,16 +1,31 @@
-# Investigar por que RM/RR/Prop/Venda do Thiago aparecem zerados
+# Restaurar Jun/2026 Modelo Atual em `funnel_metas`
 
-Os valores foram gravados no banco com sucesso (confirmado por SELECT): Thiago Jun/2026 → RM=70, RR=59, Prop=53, Venda=8. Mesmo assim, no dashboard só a meta monetária aparece.
+## O que aconteceu (auditoria)
 
-## Hipótese principal
+Verifiquei no `audit_log` da tabela `funnel_metas` — eu **não** toquei nela em nenhum momento. Minhas alterações foram apenas em `closer_absolute_metas` (metas por closer). O que inflou os medidores foram 8 UPDATEs feitos hoje (2026-07-06, entre 00:20 e 00:26) pelo usuário `pedro.albite@o2inc.com.br` na linha Jun/2026 Modelo Atual, pela UI (Plan Growth / redistribuição). A progressão registrada foi:
 
-O hook `useCloserAbsoluteMetas` usa `staleTime: 30 * 60 * 1000` (30 min). O React Query provavelmente está servindo a versão antiga em cache, onde só `faturamento_meta` tinha valor. O gauge de Fat Incremento também usa o mesmo cache, mas como esse campo já estava preenchido antes, aparenta funcionar.
+`mqls: 510 → 857 → 1204 → 1551 → 1898 → 2245 → 2592`
+`rms: 204 → 343 → 482 → 621 → 760 → 898 → 1037`
 
-## Passos
+As demais BUs (O2 TAX, Oxy Hacker, Franquia) permaneceram nos valores originais e não precisam de correção.
 
-1. Abrir o dashboard via Playwright autenticado, filtrar Modelo Atual + Jun/2026 + closer Thiago, e verificar screenshot dos gauges RM/RR/Proposta/Venda.
-2. Se aparecerem 70/59/53/8 → o problema era só cache; instruir usuário a dar refresh (Ctrl+Shift+R) e não mudar código.
-3. Se ainda aparecerem 0 → depurar: verificar que `closerAbsMetas` contém o registro (log/console), conferir `firstNameKey('Thiago')` vs `firstNameKey(m.closer)`, e checar se `anySelectedCloserManaged` retorna true para Thiago em 2026.
-4. Fix conforme diagnóstico. Provável ajuste: reduzir `staleTime` do hook ou invalidar a query no mount da aba, caso o cache seja o culpado.
+## Restauração
 
-Sem mudanças de código antes da validação.
+UPDATE em `funnel_metas` para `bu='modelo_atual' AND month='Jun' AND year=2026`, voltando aos valores anteriores à sessão de hoje:
+
+| campo | valor |
+|---|---|
+| mqls | 510 |
+| rms | 204 |
+| rrs | 164 |
+| propostas | 131 |
+| vendas | 33 |
+
+`faturamento_meta`, `is_locked` e demais campos ficam como estão.
+
+## Validação
+
+- SELECT confirmando os valores.
+- No dashboard, sem filtro de closer, com período 01/06 a 30/06: Meta MQL deve cair para ~966 (510+57+149+250), RM ~338, Venda ~44, alinhado com Mai/Jul.
+
+Nenhuma mudança de código.
