@@ -1084,6 +1084,8 @@ export function IndicatorsTab() {
   // Applies closer AND SDR filters when the selected closer/SDR operates in that BU
   const getRealizedForIndicator = (indicator: IndicatorConfig) => {
     let total = 0;
+    const dbg: any = { key: indicator.key, ma: 0, o2: 0, oxy: 0, franq: 0, monet: 0 };
+    
     
     if (includesModeloAtual) {
       // Check if any selected closer/SDR operates in Modelo Atual
