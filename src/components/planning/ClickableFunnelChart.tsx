@@ -227,6 +227,18 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
            monetVendaQty,
   };
 
+  // DEBUG temporário: rastrear divergência funil vs acelerômetro
+  if (typeof window !== 'undefined' && (window as any).__DEBUG_FUNIL !== false) {
+    (['mql','rm','rr','proposta','venda'] as IndicatorType[]).forEach((ind) => {
+      const ma = includesModeloAtual ? getFilteredModeloAtualQty(ind) : 0;
+      const o2 = includesO2Tax ? getO2TaxAnalyticsQty(ind) : 0;
+      const oxy = includesOxyHacker ? getOxyHackerAnalyticsQty(ind) : 0;
+      const fra = includesFranquia ? getFranquiaAnalyticsQty(ind) : 0;
+      const mon = ind === 'proposta' ? monetPropostaQty : ind === 'venda' ? monetVendaQty : 0;
+      console.log(`[FUNIL ${ind}] MA=${ma} O2=${o2} Oxy=${oxy} Franq=${fra} Monet=${mon} => ${ma+o2+oxy+fra+mon}`);
+    });
+  }
+
   // Calculate conversions
   const stages: FunnelStage[] = [
     { number: 1, name: 'Leads', indicator: 'leads' as IndicatorType, value: totals.leads, conversionPercent: 100 },
