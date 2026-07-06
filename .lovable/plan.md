@@ -1,39 +1,26 @@
-# Alinhar Fat Incremento (acelerômetro) com o Pace de Faturamento
+# Setar Closer = "Thiago Santana" no card Pipefy 1341215587
 
-## Diagnóstico
+## Contexto
+- Card: https://app.pipefy.com/open-cards/1341215587
+- Ação: alterar apenas o campo "Closer responsável" para **Thiago Santana**. SDR permanece inalterado.
 
-Print (Consolidado, 01–06/07/2026):
-- Pace "Faturamento" (Pipefy Vendas, acumulado): **R$ 53k** realizado
-- Acelerômetro "Fat Incremento": **R$ 41k** realizado
-- Meta idêntica (R$ 216k) → problema é só no **realizado**.
+## Como será feito
+O dashboard usa a edge function `query-external-db` com `action=update_field`, que só permite os campos `SDR responsável` e `Closer responsável` e roda a query:
+```
+UPDATE <tabela> SET "Closer responsável" = $1 WHERE "ID" = $2
+```
+Ela grava no mirror externo (o mesmo que alimenta os aceleradores/funil). Não altera o Pipefy diretamente — a próxima sincronização do Pipefy pode sobrescrever se o campo for editado lá também; para persistir do lado do Pipefy o usuário precisa editar o card na plataforma.
 
-Fontes:
-- **Pace** (`IndicatorsTab.tsx` linhas 3525, 3562–3573): `getItemsForIndicator('venda')` — usa `modeloAtualAnalytics.getDetailItemsForIndicator('venda')`, que já está mesclado com Outbound.
-- **Acelerômetro Fat Incremento** (`getRealizedMonetaryForIndicator`, linhas 2623–2664): para Modelo Atual **sem filtro**, cai em `getModeloAtualValue('venda', startDate, endDate)` — hook `useModeloAtualMetas`, **que não inclui Outbound**. Idem para os outros gauges monetários (MRR, Setup, Pontual) nas linhas 2688–2762.
+## Passos
+1. Descobrir em qual tabela o card 1341215587 vive, tentando na ordem:
+   - `pipefy_cards` (Modelo Atual — mais provável)
+   - `pipefy_cards_expansao`
+   - `pipefy_moviment_outbound`
+   Usar `action: "history"` (leitura) para achar a tabela sem alterar nada.
+2. Confirmar o SDR atual e o Closer atual do card via `action: "history"` (log para o usuário).
+3. Chamar `update_field` com `field = "Closer responsável"`, `value = "Thiago Santana"`, `cardId = 1341215587` na tabela encontrada.
+4. Reler o card para confirmar que o Closer virou "Thiago Santana" e o SDR não mudou.
+5. Reportar ao usuário: SDR mantido, Closer antes → depois.
 
-Δ ≈ R$ 12k = exatamente o valor de cards Outbound de venda no período que estão sendo ignorados pelo gauge.
-
-Já corrigimos o mesmo tipo de bug no Funil do Período trocando a fonte de MA para a versão mesclada com Outbound. Agora falta corrigir os gauges monetários.
-
-## Plano
-
-Em `src/components/planning/IndicatorsTab.tsx`, em `getRealizedMonetaryForIndicator`:
-
-1. **`faturamento` (linhas 2626–2633)**: no branch sem filtro (Modelo Atual), trocar
-   `total += getModeloAtualValue('venda', startDate, endDate)`
-   por
-   `total += modeloAtualAnalytics.getCardsForIndicator('venda').reduce((s, c) => s + (c.valor || 0), 0)`
-   (mesma soma feita quando filtro está ativo, já inclui Outbound).
-
-2. **`mrr` (linhas 2690–2696)**: trocar `getMrrForPeriod(...)` por
-   `modeloAtualAnalytics.getCardsForIndicator('venda').reduce((s, c) => s + (c.valorMRR || 0), 0)`.
-
-3. **`setup` (linhas 2710–2716)**: trocar `getSetupForPeriod(...)` por
-   `modeloAtualAnalytics.getCardsForIndicator('venda').reduce((s, c) => s + (c.valorSetup || 0), 0)`.
-
-4. **`pontual` (mesma seção, ~linhas 2730-2760)**: trocar `getPontualForPeriod(...)` por
-   `modeloAtualAnalytics.getCardsForIndicator('venda').reduce((s, c) => s + (c.valorPontual || 0), 0)`.
-
-5. **Validação (Playwright)**: filtro Consolidado + 01–06/07/2026, comparar acelerômetros (Fat Incremento, MRR, Setup, Pontual) com o topo do Pace de Faturamento. Confirmar que todos batem, e que continua consistente com filtro por Closer/BU ativo.
-
-Sem mudança de dados nem de metas. Só alinhar a fonte de "realizado" de Modelo Atual dos gauges monetários com a mesma fonte já usada pelo Pace e pelo Funil do Período (analytics mesclada com Outbound).
+## Observação
+Caso o card não exista em nenhuma das tabelas espelhadas, avisar o usuário e sugerir editar diretamente no Pipefy.
