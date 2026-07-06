@@ -1,36 +1,28 @@
-## Aba de diagnóstico "G4 Lives — Conferência" (oculta, sem afetar nada)
 
-Criar uma **nova aba isolada** para comparar os valores oficiais das Lives × dados do Pipefy, sem tocar em nada da UI atual.
+## Objetivo
+Validar se as metas de Modelo Atual para Julho/2026 (Closers, SDRs e Faturamento) configuradas no dashboard batem com os valores da planilha enviada.
 
-### Onde
-- Nova rota: `/debug/g4-lives-check` (não linkada em nenhum menu — só acessível digitando a URL).
-- Novo componente: `src/pages/DebugG4LivesCheck.tsx`.
-- Registro apenas em `src/App.tsx` (rota nova, protegida por role admin — se não for admin, redireciona pra `/`).
-- **Zero mudança** em `LivesSection.tsx`, `livesOfficial.ts`, `g4Events.ts`, `g4Funnel.ts` ou qualquer hook.
+## Valores esperados (planilha, mês inteiro)
 
-### O que a página mostra
-Reaproveita `useModeloAtualAnalytics` (mesmos cards já usados hoje) + as constantes `G4_LIVES` e `LIVES_OFICIAIS`.
+**Closers (R.M / R.R / Proposta / Venda / Meta R$ / Ticket):**
+- Daniel: 87 / 74 / 67 / 10 / R$ 220.000 / R$ 22.000
+- Amanda: 70 / 59 / 53 / 8 / R$ 100.000 / R$ 12.500
+- Thiago (Zanoni): 87 / 74 / 67 / 10 / R$ 200.000 / R$ 20.000
 
-Para cada live em `G4_LIVES`:
+**SDR (mês):**
+- Carlos: R.M 179 / R.R 140
 
-1. **Cabeçalho**: label + data + janela de captura.
-2. **Tabela Oficial × Pipefy**:
+**Faturamento (Incremento):**
+- Total R$ 520.000 · MRR (25%) R$ 130.000 · Setup R$ 390.000
 
-   ```text
-   Métrica         | Oficial | Pipefy | Δ
-   Inscritos       |   339   |   ?    |  ?
-   Entraram        |    52   |   ?    |  ?
-   Levantaram mão  |     3   |   ?    |  ?
-   Venda           |     1   |   ?    |  ?
-   ```
+## Passos
+1. Rodar script Playwright com sessão Supabase injetada; acessar `/planning-2026` (aba Indicadores / Comercial - Modelo Atual).
+2. Ajustar filtro para mês inteiro Jul/2026 e BU = Modelo Atual.
+3. Capturar screenshots dos cards:
+   - Metas por Closer (Daniel, Amanda, Thiago) → R.M, R.R, Proposta, Venda, Meta R$, Ticket
+   - Meta SDR (Carlos) → R.M, R.R
+   - Meta Faturamento Incremento → Total, MRR, Setup
+4. Comparar valores exibidos × planilha; listar divergências (esperado × atual × delta).
 
-   - `Oficial` = `LIVES_OFICIAIS[live.date]`
-   - `Pipefy` = `computeCounts(cardsForLive(liveCards, live.date, live.captureWindowDays))`
-   - `Δ` colorido (verde=0, vermelho≠0)
-
-3. **Lista de cards atribuídos** (colapsável): id, título, `Origem do lead`, `Campanha`, `Fonte`, `Data Criação`, fase atual — os cards que a lógica `isCardLive` + janela de captura atribuiu àquela live. É aqui que dá pra ver *"o Pipefy tem esse lead ou não?"*.
-
-### Fora do escopo
-- Não altero nenhuma lógica de negócio nem números exibidos em outras telas.
-- Não crio link/menu visível — página existe só via URL direta.
-- Não altero `livesOfficial.ts`; qualquer correção nos números oficiais vem depois, com base no que a conferência mostrar.
+## Entrega
+Relatório curto no chat com tabela de conferência + screenshots anexadas. Nenhuma alteração de código nesta etapa — se houver divergência, proponho ajuste em seguida.
