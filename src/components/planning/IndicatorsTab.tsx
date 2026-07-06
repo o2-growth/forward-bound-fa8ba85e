@@ -2703,11 +2703,8 @@ export function IndicatorsTab() {
         let total = 0;
         if (includesModeloAtual) {
           const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
-          if (filtered === null) {
-            total += getSetupForPeriod(startDate, endDate);
-          } else {
-            total += filtered.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
-          }
+          const cards = filtered ?? modeloAtualAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
         }
         if (includesO2Tax) {
           const filtered = filteredVendasForBU('o2_tax', o2TaxAnalytics.getCardsForIndicator('venda'));
