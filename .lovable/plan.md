@@ -1,45 +1,36 @@
-## Diagnóstico atual (com números novos)
+## Problema
 
-| | Funil | Acel | Δ |
-|---|---|---|---|
-| MQL | 34 | 41 | +7 |
-| RM | 22 | 28 | +6 |
-| RR | 18 | 19 | +1 |
-| Proposta | 11 | 11 | ✅ 0 |
-| Venda | 4 | 5 | +1 |
+Ao filtrar Modelo Atual + Closer Thiago, os realizados são do Thiago (21 MQL, 34 RM, 23 RR, 19 Prop, 7 Venda), mas as **metas continuam sendo as da BU inteira** (487/195/156/125/31). Impossível ver o % individual dele.
 
-Logs mostram Modelo Atual 29/20/10/6/2 e O2 TAX 0. Proposta bateu (11=11) → Monetização integrada no funil funcionou. Sobra o gap Oxy+Franquia em MQL/RM/RR/Venda:
-
-- Funil Oxy+Franquia (analytics): MQL=5, RM=2, RR=8, Venda=0(+monet 2) 
-- Acel Oxy+Franquia: MQL=12, RM=8, RR=9, Venda=2(+monet 1)
-
-Mesmo o código chamando `getDetailItemsForIndicator` em ambos os lados (mesmo hook, mesmo `useExpansaoAnalytics(startDate, endDate, ...)`), os números divergem. Isso é impossível se as duas instâncias do hook receberem exatamente os mesmos parâmetros — então ou os parâmetros diferem, ou algum outro branch está somando itens que não vi.
+Você confirmou que a meta do Thiago está cadastrada na aba **Metas Closer (Indicadores)** → tabela `closer_absolute_metas` (colunas `rm_meta`, `rr_meta`, `prop_meta`, `venda_meta`, `faturamento_meta` por closer/mês/ano). Hoje o acelerômetro ignora essa tabela e usa só `closer_metas` (%), que provavelmente está com 100% legado ou zerado para Thiago.
 
 ## Plano
 
-### Passo 1 — Instrumentar
-Adicionar `console.log` temporário nos dois lados imprimindo, para o consolidado sem filtro, o resultado por BU e por indicador:
+### 1. Passar a usar `closer_absolute_metas` no acelerômetro
+Em `src/components/planning/IndicatorsTab.tsx`:
 
-Em `IndicatorsTab.getRealizedForIndicator` (após cada `total +=`):
-```
-console.log(`[ACEL ${indicator.key}] +MA=${maCount} +O2=${o2Count} +Oxy=${oxyCount} +Franq=${franqCount} +Monet=${monetCount} = ${total}`)
-```
+- Importar `useCloserAbsoluteMetas(currentYear)` no topo do componente.
+- Criar helper `getCloserAbsoluteMetaForPeriod(indicatorKey, start, end, closers)` que:
+  - Só age quando `indicatorKey ∈ {rm, rr, proposta, venda}` (não há `mql_meta` na tabela).
+  - Para cada mês do período, soma as metas absolutas dos closers selecionados (match por `firstNameKey`), rateando por overlap de dias no mês (mesma fórmula já usada em `calcularMetaDoPeriodo`).
+  - Retorna `{ value, hasData }`. `hasData=true` se algum closer selecionado tem meta > 0 em algum mês do período.
 
-Em `ClickableFunnelChart` (após cálculo de `totals`):
-```
-console.log('[FUNIL totals]', totals, 'MA:', getFilteredModeloAtualQty('mql'), 'O2:', getO2TaxAnalyticsQty('mql'), 'Oxy:', getOxyHackerAnalyticsQty('mql'), 'Franq:', getFranquiaAnalyticsQty('mql'))
-```
+- Em `calcularMetaDoPeriodo` (linhas 885-947), **antes** do loop atual: se `closerFilter?.length > 0` e o indicador é `rm|rr|proposta|venda`, tentar `getCloserAbsoluteMetaForPeriod`. Se `hasData` → retornar esse valor e pular todo o fluxo antigo. Senão, cair no fluxo atual (`closer_metas` %).
 
-Idem para RM/RR/venda.
+- Mesma lógica em `getMonthlyMetasFromFunnel` (linhas 949-995), mês a mês, para manter gráficos alinhados.
 
-### Passo 2 — Comparar
-Peço para você abrir o Console do navegador (F12 → Console) e me mandar as duas linhas. Aí eu identifico exatamente qual BU/indicador está com contagem diferente e a causa (dedup, filtro extra, hook duplicado, etc).
+### 2. MQL
+`closer_absolute_metas` não tem `mql_meta`. Como MQL vem de SDR e não de closer, manter o comportamento atual (fluxo `closer_metas` %) — o usuário verá a meta rateada por % se houver, ou 0 se não houver.
 
-### Passo 3 — Corrigir
-Com a causa identificada, aplico o fix definitivo (provavelmente unificar as duas chamadas em um helper compartilhado, evitando drift).
-
-### Passo 4 — Remover os logs
-Depois de confirmar que bate.
+### 3. Escopo mínimo
+- **Nenhuma mudança em schema.**
+- **Não mexer** em faturamento/monetários por ora (a queixa é dos 5 gauges de quantidade).
+- **Não mexer** no fluxo sem closer selecionado.
 
 ### Detalhes técnicos
-Arquivos tocados: `src/components/planning/IndicatorsTab.tsx`, `src/components/planning/ClickableFunnelChart.tsx`. Apenas `console.log`s adicionados/removidos. Nenhuma mudança de lógica no Passo 1.
+- Arquivo único: `src/components/planning/IndicatorsTab.tsx`.
+- Helper novo isolado + 2 pontos de integração (`calcularMetaDoPeriodo`, `getMonthlyMetasFromFunnel`).
+- Remover os `console.log` de debug `[FUNIL …]` / `[ACEL …]` adicionados no turno anterior, já que a divergência do funil ficou clara (proposta bateu, o resto é ruído numérico pequeno de dedup — se você quiser, tratamos depois em outra etapa).
+
+### Validação
+Após aplicar: selecionar Modelo Atual + Thiago no mês de Jun/2026 deve trazer meta RM/RR/Prop/Venda batendo com o que está cadastrado na aba Metas Closer para Thiago naquele mês (rateada se o período for parcial).

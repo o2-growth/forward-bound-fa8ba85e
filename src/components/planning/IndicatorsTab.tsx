@@ -19,6 +19,7 @@ import { useOxyFinance } from "@/hooks/useOxyFinance";
 import { useO2TaxAnalytics } from "@/hooks/useO2TaxAnalytics";
 import { useExpansaoAnalytics } from "@/hooks/useExpansaoAnalytics";
 import { useCloserMetas, BU_CLOSERS, BuType, CloserType } from "@/hooks/useCloserMetas";
+import { useCloserAbsoluteMetas, firstNameKey } from "@/hooks/useCloserAbsoluteMetas";
 import { useSdrMetas } from "@/hooks/useSdrMetas";
 import { useFunnelMetas } from "@/hooks/useFunnelMetas";
 // Componentes pesados (abaixo do fold) → lazy load com retry on stale chunk
@@ -615,6 +616,7 @@ export function IndicatorsTab() {
   
   // Get closer metas for filtering goals by closer percentage
   const { getFilteredMeta } = useCloserMetas(currentYear);
+  const { metas: closerAbsMetas } = useCloserAbsoluteMetas(currentYear);
   const { metas: sdrMetasList } = useSdrMetas(currentYear);
   const { funnelMetas: dbFunnelMetas } = useFunnelMetas(currentYear);
 
@@ -882,6 +884,80 @@ export function IndicatorsTab() {
   
   // Helper function to calculate meta from funnelData for a given period (pro-rated for partial months)
   // Optionally applies closer percentage filter per month for a specific BU
+  // Helper: soma metas absolutas por closer (closer_absolute_metas) rateadas por
+  // dias de overlap no período. Retorna hasData=true se algum closer selecionado
+  // tem meta > 0 em algum mês do período.
+  const getCloserAbsoluteMetaForPeriod = (
+    indicatorKey: IndicatorType,
+    start: Date,
+    end: Date,
+    closers: string[]
+  ): { value: number; hasData: boolean } => {
+    if (!closers?.length || !closerAbsMetas?.length) return { value: 0, hasData: false };
+    if (indicatorKey !== 'rm' && indicatorKey !== 'rr' && indicatorKey !== 'proposta' && indicatorKey !== 'venda') {
+      return { value: 0, hasData: false };
+    }
+    const field = indicatorKey === 'rm' ? 'rm_meta'
+      : indicatorKey === 'rr' ? 'rr_meta'
+      : indicatorKey === 'proposta' ? 'prop_meta'
+      : 'venda_meta';
+    const closerKeys = new Set(closers.map(c => firstNameKey(c)));
+    const yr = start.getFullYear();
+    let total = 0;
+    let hasData = false;
+    for (const monthDate of eachMonthOfInterval({ start, end })) {
+      const monthName = monthNames[getMonth(monthDate)];
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const overlapStart = start > monthStart ? start : monthStart;
+      const overlapEnd = end < monthEnd ? end : monthEnd;
+      if (overlapStart > overlapEnd) continue;
+      const overlapDays = differenceInDays(overlapEnd, overlapStart) + 1;
+      const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
+      const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
+      let monthBase = 0;
+      for (const m of closerAbsMetas) {
+        if (m.year !== yr) continue;
+        if (m.month !== monthName) continue;
+        if (!closerKeys.has(firstNameKey(m.closer))) continue;
+        const v = Number((m as any)[field]) || 0;
+        if (v > 0) hasData = true;
+        monthBase += v;
+      }
+      total += monthBase * fraction;
+    }
+    return { value: total, hasData };
+  };
+
+  // Per-month version (não pró-rata; usado nos gráficos que já operam por mês)
+  const getCloserAbsoluteMetaForMonth = (
+    indicatorKey: IndicatorType,
+    monthName: string,
+    year: number,
+    closers: string[]
+  ): { value: number; hasData: boolean } => {
+    if (!closers?.length || !closerAbsMetas?.length) return { value: 0, hasData: false };
+    if (indicatorKey !== 'rm' && indicatorKey !== 'rr' && indicatorKey !== 'proposta' && indicatorKey !== 'venda') {
+      return { value: 0, hasData: false };
+    }
+    const field = indicatorKey === 'rm' ? 'rm_meta'
+      : indicatorKey === 'rr' ? 'rr_meta'
+      : indicatorKey === 'proposta' ? 'prop_meta'
+      : 'venda_meta';
+    const closerKeys = new Set(closers.map(c => firstNameKey(c)));
+    let total = 0;
+    let hasData = false;
+    for (const m of closerAbsMetas) {
+      if (m.year !== year) continue;
+      if (m.month !== monthName) continue;
+      if (!closerKeys.has(firstNameKey(m.closer))) continue;
+      const v = Number((m as any)[field]) || 0;
+      if (v > 0) hasData = true;
+      total += v;
+    }
+    return { value: total, hasData };
+  };
+
   const calcularMetaDoPeriodo = (
     funnelItems: FunnelDataItem[] | undefined,
     indicatorKey: IndicatorType,
@@ -891,6 +967,9 @@ export function IndicatorsTab() {
     closerFilter?: string[],
     sdrFilter?: string[]
   ): number => {
+    // Nota: override por closer via closer_absolute_metas é aplicado UMA VEZ no
+    // nível superior (getMetaForIndicator), fora do loop por BU, para não
+    // multiplicar a meta por N BUs. Aqui mantemos apenas o rateio antigo por %.
     // Override RM/RR by sdr_metas when an SDR filter is active and we have data for this BU
     if (bu && (indicatorKey === 'rm' || indicatorKey === 'rr') && sdrFilter && sdrFilter.length > 0) {
       const { value, hasData } = getSdrMetaForPeriod(indicatorKey, bu, start, end, sdrFilter);
@@ -962,6 +1041,12 @@ export function IndicatorsTab() {
 
     return monthsInPeriod.map(monthDate => {
       const monthName = monthNames[getMonth(monthDate)];
+
+      // Override por closer via closer_absolute_metas (RM/RR/Prop/Venda)
+      if (closerFilter && closerFilter.length > 0) {
+        const abs = getCloserAbsoluteMetaForMonth(indicatorKey, monthName, monthDate.getFullYear(), closerFilter);
+        if (abs.hasData) return Math.round(abs.value);
+      }
 
       if (useSdrOverride) {
         const { value, hasData } = getSdrMetaForMonth(indicatorKey as 'rm' | 'rr', bu!, monthName, sdrFilter);
@@ -1042,6 +1127,24 @@ export function IndicatorsTab() {
   // Get meta for indicator - sums metas from selected BUs using funnelData
   // Applies closer percentage filter for Modelo Atual when closers are selected
   const getMetaForIndicator = (indicator: IndicatorConfig) => {
+    // Override: se há closer selecionado e o indicador é RM/RR/Proposta/Venda,
+    // usar closer_absolute_metas UMA VEZ (não por BU) — a tabela já é o total
+    // do closer no mês. Só aplica quando NÃO há filtro de SDR (SDR sobrepõe closer).
+    if (
+      effectiveSelectedClosers.length > 0 &&
+      effectiveSelectedSDRs.length === 0 &&
+      (indicator.key === 'rm' || indicator.key === 'rr' || indicator.key === 'proposta' || indicator.key === 'venda')
+    ) {
+      // Filtrar closers que operam em ALGUMA das BUs selecionadas
+      const closersInSelectedBUs = effectiveSelectedClosers.filter(c =>
+        selectedBUs.some(bu => BU_CLOSERS[bu]?.includes(c as CloserType))
+      );
+      if (closersInSelectedBUs.length > 0) {
+        const abs = getCloserAbsoluteMetaForPeriod(indicator.key, startDate, endDate, closersInSelectedBUs);
+        if (abs.hasData) return Math.round(abs.value);
+      }
+    }
+
     let total = 0;
 
     const buBlocks: { bu: BuType; items?: FunnelDataItem[] }[] = [
@@ -1213,9 +1316,6 @@ export function IndicatorsTab() {
       dbg.monet = n; total += n;
     }
 
-    if (typeof window !== 'undefined' && (window as any).__DEBUG_ACEL !== false) {
-      console.log(`[ACEL ${dbg.key}] MA=${dbg.ma} O2=${dbg.o2} Oxy=${dbg.oxy} Franq=${dbg.franq} Monet=${dbg.monet} => ${total}`);
-    }
 
     return total;
   };
