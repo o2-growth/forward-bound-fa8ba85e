@@ -1194,12 +1194,10 @@ export function IndicatorsTab() {
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
             return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
-          total += filteredCards.length;
+          dbg.franq = filteredCards.length; total += filteredCards.length;
         } else {
-          // Fonte única: analytics do Pipefy (mesma do funil). Antes usava a
-          // planilha 'Indicadores 26' via getExpansaoQty, o que causava
-          // divergência entre funil e acelerômetro.
-          total += franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          const n = franquiaAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          dbg.franq = n; total += n;
         }
       }
     }
@@ -1211,9 +1209,13 @@ export function IndicatorsTab() {
       isConsolidado &&
       (selectedOrigens.length === 0 || selectedOrigens.includes('monetizacao'))
     ) {
-      total += getFilteredMonetizacaoItems(indicator.key as 'proposta' | 'venda').length;
+      const n = getFilteredMonetizacaoItems(indicator.key as 'proposta' | 'venda').length;
+      dbg.monet = n; total += n;
     }
 
+    if (typeof window !== 'undefined' && (window as any).__DEBUG_ACEL !== false) {
+      console.log(`[ACEL ${dbg.key}] MA=${dbg.ma} O2=${dbg.o2} Oxy=${dbg.oxy} Franq=${dbg.franq} Monet=${dbg.monet} => ${total}`);
+    }
 
     return total;
   };
