@@ -1131,6 +1131,24 @@ export function IndicatorsTab() {
   // Get meta for indicator - sums metas from selected BUs using funnelData
   // Applies closer percentage filter for Modelo Atual when closers are selected
   const getMetaForIndicator = (indicator: IndicatorConfig) => {
+    // Override: se há closer selecionado e o indicador é RM/RR/Proposta/Venda,
+    // usar closer_absolute_metas UMA VEZ (não por BU) — a tabela já é o total
+    // do closer no mês. Só aplica quando NÃO há filtro de SDR (SDR sobrepõe closer).
+    if (
+      effectiveSelectedClosers.length > 0 &&
+      effectiveSelectedSDRs.length === 0 &&
+      (indicator.key === 'rm' || indicator.key === 'rr' || indicator.key === 'proposta' || indicator.key === 'venda')
+    ) {
+      // Filtrar closers que operam em ALGUMA das BUs selecionadas
+      const closersInSelectedBUs = effectiveSelectedClosers.filter(c =>
+        selectedBUs.some(bu => BU_CLOSERS[bu]?.includes(c as CloserType))
+      );
+      if (closersInSelectedBUs.length > 0) {
+        const abs = getCloserAbsoluteMetaForPeriod(indicator.key, startDate, endDate, closersInSelectedBUs);
+        if (abs.hasData) return Math.round(abs.value);
+      }
+    }
+
     let total = 0;
 
     const buBlocks: { bu: BuType; items?: FunnelDataItem[] }[] = [
