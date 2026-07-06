@@ -884,27 +884,45 @@ export function IndicatorsTab() {
   
   // Helper function to calculate meta from funnelData for a given period (pro-rated for partial months)
   // Optionally applies closer percentage filter per month for a specific BU
-  // Helper: soma metas absolutas por closer (closer_absolute_metas) rateadas por
-  // dias de overlap no período. Retorna hasData=true se algum closer selecionado
-  // tem meta > 0 em algum mês do período.
+  // Helper: closer é "gerenciado" via aba Metas Closer se tem QUALQUER meta > 0
+  // (rm/rr/prop/venda/faturamento) em qualquer mês do ano. Uma vez gerenciado,
+  // meses/campos zerados são intencionais (não fallback para meta cheia da BU).
+  const hasCloserAnyAbsMeta = (closer: string, year: number): boolean => {
+    if (!closerAbsMetas?.length) return false;
+    const key = firstNameKey(closer);
+    return closerAbsMetas.some(m =>
+      m.year === year &&
+      firstNameKey(m.closer) === key &&
+      ((m.rm_meta || 0) > 0 || (m.rr_meta || 0) > 0 || (m.prop_meta || 0) > 0 ||
+       (m.venda_meta || 0) > 0 || (m.faturamento_meta || 0) > 0)
+    );
+  };
+
+  const anySelectedCloserManaged = (closers: string[], year: number): boolean =>
+    !!closers?.length && closers.some(c => hasCloserAnyAbsMeta(c, year));
+
+  // Soma metas absolutas por closer (closer_absolute_metas) rateadas por dias
+  // de overlap no período. hasData=true se algum closer selecionado é
+  // "gerenciado" nesta tabela no ano (mesmo que o valor específico seja 0).
   const getCloserAbsoluteMetaForPeriod = (
-    indicatorKey: IndicatorType,
+    indicatorKey: IndicatorType | 'faturamento',
     start: Date,
     end: Date,
     closers: string[]
   ): { value: number; hasData: boolean } => {
     if (!closers?.length || !closerAbsMetas?.length) return { value: 0, hasData: false };
-    if (indicatorKey !== 'rm' && indicatorKey !== 'rr' && indicatorKey !== 'proposta' && indicatorKey !== 'venda') {
+    if (indicatorKey !== 'rm' && indicatorKey !== 'rr' && indicatorKey !== 'proposta' && indicatorKey !== 'venda' && indicatorKey !== 'faturamento') {
       return { value: 0, hasData: false };
     }
     const field = indicatorKey === 'rm' ? 'rm_meta'
       : indicatorKey === 'rr' ? 'rr_meta'
       : indicatorKey === 'proposta' ? 'prop_meta'
-      : 'venda_meta';
+      : indicatorKey === 'venda' ? 'venda_meta'
+      : 'faturamento_meta';
     const closerKeys = new Set(closers.map(c => firstNameKey(c)));
     const yr = start.getFullYear();
+    const hasData = anySelectedCloserManaged(closers, yr);
     let total = 0;
-    let hasData = false;
     for (const monthDate of eachMonthOfInterval({ start, end })) {
       const monthName = monthNames[getMonth(monthDate)];
       const monthStart = startOfMonth(monthDate);
@@ -920,9 +938,7 @@ export function IndicatorsTab() {
         if (m.year !== yr) continue;
         if (m.month !== monthName) continue;
         if (!closerKeys.has(firstNameKey(m.closer))) continue;
-        const v = Number((m as any)[field]) || 0;
-        if (v > 0) hasData = true;
-        monthBase += v;
+        monthBase += Number((m as any)[field]) || 0;
       }
       total += monthBase * fraction;
     }
@@ -945,18 +961,17 @@ export function IndicatorsTab() {
       : indicatorKey === 'proposta' ? 'prop_meta'
       : 'venda_meta';
     const closerKeys = new Set(closers.map(c => firstNameKey(c)));
+    const hasData = anySelectedCloserManaged(closers, year);
     let total = 0;
-    let hasData = false;
     for (const m of closerAbsMetas) {
       if (m.year !== year) continue;
       if (m.month !== monthName) continue;
       if (!closerKeys.has(firstNameKey(m.closer))) continue;
-      const v = Number((m as any)[field]) || 0;
-      if (v > 0) hasData = true;
-      total += v;
+      total += Number((m as any)[field]) || 0;
     }
     return { value: total, hasData };
   };
+
 
   const calcularMetaDoPeriodo = (
     funnelItems: FunnelDataItem[] | undefined,
