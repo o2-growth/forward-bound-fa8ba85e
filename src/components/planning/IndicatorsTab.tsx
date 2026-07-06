@@ -884,6 +884,80 @@ export function IndicatorsTab() {
   
   // Helper function to calculate meta from funnelData for a given period (pro-rated for partial months)
   // Optionally applies closer percentage filter per month for a specific BU
+  // Helper: soma metas absolutas por closer (closer_absolute_metas) rateadas por
+  // dias de overlap no período. Retorna hasData=true se algum closer selecionado
+  // tem meta > 0 em algum mês do período.
+  const getCloserAbsoluteMetaForPeriod = (
+    indicatorKey: IndicatorType,
+    start: Date,
+    end: Date,
+    closers: string[]
+  ): { value: number; hasData: boolean } => {
+    if (!closers?.length || !closerAbsMetas?.length) return { value: 0, hasData: false };
+    if (indicatorKey !== 'rm' && indicatorKey !== 'rr' && indicatorKey !== 'proposta' && indicatorKey !== 'venda') {
+      return { value: 0, hasData: false };
+    }
+    const field = indicatorKey === 'rm' ? 'rm_meta'
+      : indicatorKey === 'rr' ? 'rr_meta'
+      : indicatorKey === 'proposta' ? 'prop_meta'
+      : 'venda_meta';
+    const closerKeys = new Set(closers.map(c => firstNameKey(c)));
+    const yr = start.getFullYear();
+    let total = 0;
+    let hasData = false;
+    for (const monthDate of eachMonthOfInterval({ start, end })) {
+      const monthName = monthNames[getMonth(monthDate)];
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const overlapStart = start > monthStart ? start : monthStart;
+      const overlapEnd = end < monthEnd ? end : monthEnd;
+      if (overlapStart > overlapEnd) continue;
+      const overlapDays = differenceInDays(overlapEnd, overlapStart) + 1;
+      const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
+      const fraction = daysInMonth > 0 ? overlapDays / daysInMonth : 0;
+      let monthBase = 0;
+      for (const m of closerAbsMetas) {
+        if (m.year !== yr) continue;
+        if (m.month !== monthName) continue;
+        if (!closerKeys.has(firstNameKey(m.closer))) continue;
+        const v = Number((m as any)[field]) || 0;
+        if (v > 0) hasData = true;
+        monthBase += v;
+      }
+      total += monthBase * fraction;
+    }
+    return { value: total, hasData };
+  };
+
+  // Per-month version (não pró-rata; usado nos gráficos que já operam por mês)
+  const getCloserAbsoluteMetaForMonth = (
+    indicatorKey: IndicatorType,
+    monthName: string,
+    year: number,
+    closers: string[]
+  ): { value: number; hasData: boolean } => {
+    if (!closers?.length || !closerAbsMetas?.length) return { value: 0, hasData: false };
+    if (indicatorKey !== 'rm' && indicatorKey !== 'rr' && indicatorKey !== 'proposta' && indicatorKey !== 'venda') {
+      return { value: 0, hasData: false };
+    }
+    const field = indicatorKey === 'rm' ? 'rm_meta'
+      : indicatorKey === 'rr' ? 'rr_meta'
+      : indicatorKey === 'proposta' ? 'prop_meta'
+      : 'venda_meta';
+    const closerKeys = new Set(closers.map(c => firstNameKey(c)));
+    let total = 0;
+    let hasData = false;
+    for (const m of closerAbsMetas) {
+      if (m.year !== year) continue;
+      if (m.month !== monthName) continue;
+      if (!closerKeys.has(firstNameKey(m.closer))) continue;
+      const v = Number((m as any)[field]) || 0;
+      if (v > 0) hasData = true;
+      total += v;
+    }
+    return { value: total, hasData };
+  };
+
   const calcularMetaDoPeriodo = (
     funnelItems: FunnelDataItem[] | undefined,
     indicatorKey: IndicatorType,
@@ -893,6 +967,13 @@ export function IndicatorsTab() {
     closerFilter?: string[],
     sdrFilter?: string[]
   ): number => {
+    // Override por closer via closer_absolute_metas (fonte oficial de metas por closer).
+    // Só age em RM/RR/Proposta/Venda (tabela não tem MQL). Se algum closer tem meta > 0
+    // no período, esse valor prevalece sobre o rateio antigo por %.
+    if (closerFilter && closerFilter.length > 0) {
+      const abs = getCloserAbsoluteMetaForPeriod(indicatorKey, start, end, closerFilter);
+      if (abs.hasData) return Math.round(abs.value);
+    }
     // Override RM/RR by sdr_metas when an SDR filter is active and we have data for this BU
     if (bu && (indicatorKey === 'rm' || indicatorKey === 'rr') && sdrFilter && sdrFilter.length > 0) {
       const { value, hasData } = getSdrMetaForPeriod(indicatorKey, bu, start, end, sdrFilter);
