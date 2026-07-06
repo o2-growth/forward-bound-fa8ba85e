@@ -1166,12 +1166,10 @@ export function IndicatorsTab() {
             const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsible);
             return matchCloser && matchSdr && matchesOrigemFilter(card);
           });
-          total += filteredCards.length;
+          dbg.oxy = filteredCards.length; total += filteredCards.length;
         } else {
-          // Fonte única: analytics do Pipefy (mesma do funil). Antes usava a
-          // planilha 'Indicadores 26' via getOxyHackerQty, o que causava
-          // divergência entre funil e acelerômetro.
-          total += oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          const n = oxyHackerAnalytics.getDetailItemsForIndicator(indicator.key).length;
+          dbg.oxy = n; total += n;
         }
       }
     }
