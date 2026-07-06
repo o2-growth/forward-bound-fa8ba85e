@@ -3562,7 +3562,7 @@ export function IndicatorsTab() {
           <LeadsMqlsStackedChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
           <MeetingsScheduledChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
         </div>
-        <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={effectiveSelectedClosers} selectedSDRs={effectiveSelectedSDRs} selectedOrigens={selectedOrigens} />
+        <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={effectiveSelectedClosers} selectedSDRs={effectiveSelectedSDRs} selectedOrigens={selectedOrigens} monetizacaoPropostaItems={isConsolidado ? getFilteredMonetizacaoItems('proposta') : undefined} monetizacaoVendaItems={isConsolidado ? getFilteredMonetizacaoItems('venda') : undefined} />
       </div>
 
       {/* Charts Section with View Mode Toggle */}
