@@ -189,6 +189,15 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     return filterAnalyticsItems(franquiaAnalytics.getDetailItemsForIndicator(indicator), 'franquia').length;
   };
   
+  // Monetização (transversal — só entra no consolidado e apenas se a origem
+  // selecionada inclui 'monetizacao' ou não há filtro de origem). Alinha o
+  // funil com o acelerômetro (getRealizedForIndicator no IndicatorsTab).
+  const includeMonetizacao =
+    useConsolidado &&
+    (!selectedOrigens?.length || selectedOrigens.includes('monetizacao'));
+  const monetPropostaQty = includeMonetizacao ? (monetizacaoPropostaItems?.length ?? 0) : 0;
+  const monetVendaQty = includeMonetizacao ? (monetizacaoVendaItems?.length ?? 0) : 0;
+
   const totals = {
     leads: (includesModeloAtual ? getFilteredModeloAtualQty('leads') : 0) + 
            (includesO2Tax ? getO2TaxAnalyticsQty('leads') : 0) + 
@@ -209,11 +218,13 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     proposta: (includesModeloAtual ? getFilteredModeloAtualQty('proposta') : 0) + 
               (includesO2Tax ? getO2TaxAnalyticsQty('proposta') : 0) + 
               (includesOxyHacker ? getOxyHackerAnalyticsQty('proposta') : 0) + 
-              (includesFranquia ? getFranquiaAnalyticsQty('proposta') : 0),
+              (includesFranquia ? getFranquiaAnalyticsQty('proposta') : 0) +
+              monetPropostaQty,
     venda: (includesModeloAtual ? getFilteredModeloAtualQty('venda') : 0) + 
            (includesO2Tax ? getO2TaxAnalyticsQty('venda') : 0) + 
            (includesOxyHacker ? getOxyHackerAnalyticsQty('venda') : 0) + 
-           (includesFranquia ? getFranquiaAnalyticsQty('venda') : 0),
+           (includesFranquia ? getFranquiaAnalyticsQty('venda') : 0) +
+           monetVendaQty,
   };
 
   // Calculate conversions
