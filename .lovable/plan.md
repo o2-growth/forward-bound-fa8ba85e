@@ -1,35 +1,39 @@
-# Fix da divergência Funil do Período × Aceleradores
+# Alinhar Fat Incremento (acelerômetro) com o Pace de Faturamento
 
-## Diagnóstico atual
+## Diagnóstico
 
-Comparando o print atual (Consolidado, 01–06/07/2026, sem filtros):
+Print (Consolidado, 01–06/07/2026):
+- Pace "Faturamento" (Pipefy Vendas, acumulado): **R$ 53k** realizado
+- Acelerômetro "Fat Incremento": **R$ 41k** realizado
+- Meta idêntica (R$ 216k) → problema é só no **realizado**.
 
-| Indicador | Aceleradores | Funil do Período | Δ |
-|---|---:|---:|---:|
-| MQL | 41 | 34 | +7 |
-| RM (Reun. Ag.) | 28 | 22 | +6 |
-| RR (Reun. Real.) | 19 | 18 | +1 |
-| Proposta | 11 | 11 | 0 |
-| Venda | 5 | 4 | +1 |
+Fontes:
+- **Pace** (`IndicatorsTab.tsx` linhas 3525, 3562–3573): `getItemsForIndicator('venda')` — usa `modeloAtualAnalytics.getDetailItemsForIndicator('venda')`, que já está mesclado com Outbound.
+- **Acelerômetro Fat Incremento** (`getRealizedMonetaryForIndicator`, linhas 2623–2664): para Modelo Atual **sem filtro**, cai em `getModeloAtualValue('venda', startDate, endDate)` — hook `useModeloAtualMetas`, **que não inclui Outbound**. Idem para os outros gauges monetários (MRR, Setup, Pontual) nas linhas 2688–2762.
 
-Comparando os dois caminhos no código:
+Δ ≈ R$ 12k = exatamente o valor de cards Outbound de venda no período que estão sendo ignorados pelo gauge.
 
-- **Aceleradores** (`getRealizedForIndicator` em `IndicatorsTab.tsx` linhas 1203–1336): sem filtro ativo, usa `getCardsForIndicator(k).length` para Modelo Atual e `getDetailItemsForIndicator(k).length` para O2 TAX / Oxy / Franquia. Para Proposta/Venda no Consolidado, soma Monetização.
-- **Funil do Período** (`ClickableFunnelChart.tsx` linhas 151–228): sem filtro ativo, faz o mesmo — porém com duas exceções: (1) para O2 TAX MQL usa `o2TaxAnalytics.getMqlsByRevenue.flatMap(cards)` em vez de `getDetailItemsForIndicator('mql')`; (2) roda um `filter(matchCardCloser && matchCardSdr && matchCardOrigem)` mesmo quando não há filtro selecionado.
-
-Sem filtros ativos, os helpers de match retornam `true` por curto-circuito, então em tese as duas fontes deveriam bater. As logs do console (`getCardsForIndicator mql (by creation): 334 cards`, `rm: 123 → 118`) mostram que as funções são invocadas várias vezes (uma vez por instância de hook: gauge, gráficos, weekly, funil), o que dificulta ver qual chamada alimenta cada área.
+Já corrigimos o mesmo tipo de bug no Funil do Período trocando a fonte de MA para a versão mesclada com Outbound. Agora falta corrigir os gauges monetários.
 
 ## Plano
 
-1. **Instrumentar** temporariamente com logs marcados:
-   - Em `getRealizedForIndicator` (IndicatorsTab): logar `{key, ma, o2, oxy, franq, monet, total}` como `[GAUGE-DEBUG]`.
-   - Em `ClickableFunnelChart` (após `totals`): logar `{key, ma, o2, oxy, franq, monet, total}` como `[FUNNEL-DEBUG]`.
-2. **Reproduzir** via Playwright autenticado: abrir Indicadores no período 01–06/07/2026, sem filtros, capturar console filtrando por `[GAUGE-DEBUG]` e `[FUNNEL-DEBUG]` para MQL/RM/RR/Prop/Venda. Comparar por BU para localizar exatamente onde diverge (Modelo Atual? O2 TAX? Oxy? Franquia? Monet?).
-3. **Corrigir** a causa raiz — provavelmente uma das seguintes, já mapeadas:
-   - **O2 TAX MQL**: alinhar Funil e Gauge para usarem a mesma fonte (`getDetailItemsForIndicator('mql')` ou ambos `getMqlsByRevenue`). Escolha depende de qual é a definição correta hoje.
-   - **Filtros silenciosos no Funil**: se algum `matchCardOrigem` está retornando `false` para cards sem `origemLead` mesmo com "Todas Origens" (bug de defaults), ajustar o helper para não excluir cards sem origem quando não há filtro.
-   - **Deduplicação diferente entre `getCardsForIndicator` e `getDetailItemsForIndicator`**: unificar a fonte usada pelo Funil e pelo Gauge para o mesmo indicador na mesma BU.
-4. **Validar**: rodar Playwright de novo, confirmar que Gauge e Funil batem MQL, RM, RR, Proposta e Venda no mesmo período; testar também com filtros de closer/BU para garantir que não quebrei o caminho filtrado.
-5. **Remover** os logs `[GAUGE-DEBUG]` / `[FUNNEL-DEBUG]`.
+Em `src/components/planning/IndicatorsTab.tsx`, em `getRealizedMonetaryForIndicator`:
 
-Sem mudança de dados — só código.
+1. **`faturamento` (linhas 2626–2633)**: no branch sem filtro (Modelo Atual), trocar
+   `total += getModeloAtualValue('venda', startDate, endDate)`
+   por
+   `total += modeloAtualAnalytics.getCardsForIndicator('venda').reduce((s, c) => s + (c.valor || 0), 0)`
+   (mesma soma feita quando filtro está ativo, já inclui Outbound).
+
+2. **`mrr` (linhas 2690–2696)**: trocar `getMrrForPeriod(...)` por
+   `modeloAtualAnalytics.getCardsForIndicator('venda').reduce((s, c) => s + (c.valorMRR || 0), 0)`.
+
+3. **`setup` (linhas 2710–2716)**: trocar `getSetupForPeriod(...)` por
+   `modeloAtualAnalytics.getCardsForIndicator('venda').reduce((s, c) => s + (c.valorSetup || 0), 0)`.
+
+4. **`pontual` (mesma seção, ~linhas 2730-2760)**: trocar `getPontualForPeriod(...)` por
+   `modeloAtualAnalytics.getCardsForIndicator('venda').reduce((s, c) => s + (c.valorPontual || 0), 0)`.
+
+5. **Validação (Playwright)**: filtro Consolidado + 01–06/07/2026, comparar acelerômetros (Fat Incremento, MRR, Setup, Pontual) com o topo do Pace de Faturamento. Confirmar que todos batem, e que continua consistente com filtro por Closer/BU ativo.
+
+Sem mudança de dados nem de metas. Só alinhar a fonte de "realizado" de Modelo Atual dos gauges monetários com a mesma fonte já usada pelo Pace e pelo Funil do Período (analytics mesclada com Outbound).

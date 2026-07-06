@@ -2625,11 +2625,8 @@ export function IndicatorsTab() {
 
         if (includesModeloAtual) {
           const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
-          if (filtered === null) {
-            total += getModeloAtualValue('venda', startDate, endDate);
-          } else {
-            total += filtered.reduce((acc, card) => acc + (card.valor || 0), 0);
-          }
+          const cards = filtered ?? modeloAtualAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valor || 0), 0);
         }
 
         if (includesO2Tax) {
@@ -2689,11 +2686,8 @@ export function IndicatorsTab() {
         let total = 0;
         if (includesModeloAtual) {
           const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
-          if (filtered === null) {
-            total += getMrrForPeriod(startDate, endDate);
-          } else {
-            total += filtered.reduce((acc, card) => acc + (card.valorMRR || 0), 0);
-          }
+          const cards = filtered ?? modeloAtualAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valorMRR || 0), 0);
         }
         if (includesO2Tax) {
           const filtered = filteredVendasForBU('o2_tax', o2TaxAnalytics.getCardsForIndicator('venda'));
@@ -2709,11 +2703,8 @@ export function IndicatorsTab() {
         let total = 0;
         if (includesModeloAtual) {
           const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
-          if (filtered === null) {
-            total += getSetupForPeriod(startDate, endDate);
-          } else {
-            total += filtered.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
-          }
+          const cards = filtered ?? modeloAtualAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valorSetup || 0), 0);
         }
         if (includesO2Tax) {
           const filtered = filteredVendasForBU('o2_tax', o2TaxAnalytics.getCardsForIndicator('venda'));
@@ -2729,11 +2720,8 @@ export function IndicatorsTab() {
         let total = 0;
         if (includesModeloAtual) {
           const filtered = filteredVendasForBU('modelo_atual', modeloAtualAnalytics.getCardsForIndicator('venda'));
-          if (filtered === null) {
-            total += getPontualForPeriod(startDate, endDate);
-          } else {
-            total += filtered.reduce((acc, card) => acc + (card.valorPontual || 0), 0);
-          }
+          const cards = filtered ?? modeloAtualAnalytics.getCardsForIndicator('venda');
+          total += cards.reduce((acc, card) => acc + (card.valorPontual || 0), 0);
         }
         if (includesO2Tax) {
           const filtered = filteredVendasForBU('o2_tax', o2TaxAnalytics.getCardsForIndicator('venda'));
