@@ -364,8 +364,15 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
         
         // Oxy Hacker items
         const oxyHackerItems = oxyHackerAnalytics.getDetailItemsForIndicator(indicator);
-        
-        return origemPostFilter([...items, ...o2TaxItems, ...franquiaItems, ...oxyHackerItems]);
+
+        // Monetização (só Proposta/Venda, respeitando filtro de origem já
+        // aplicado pelo IndicatorsTab que passa as props filtradas)
+        const monetItems =
+          includeMonetizacao && (indicator === 'proposta' || indicator === 'venda')
+            ? ((indicator === 'proposta' ? monetizacaoPropostaItems : monetizacaoVendaItems) ?? [])
+            : [];
+
+        return origemPostFilter([...items, ...o2TaxItems, ...franquiaItems, ...oxyHackerItems, ...monetItems]);
       }
 
       return origemPostFilter(items);
