@@ -2063,7 +2063,17 @@ export function MediaInvestmentTab() {
       // differs from what's stored.
       {
         const modeloTicket = indicadoresPorBU.modeloAtual.ticketMedio;
+        // Only cascade to CURRENT month onwards. Past months are frozen — they
+        // must never be rewritten as a side-effect of editing a future month.
+        const currentMonthIdx = new Date().getMonth();
         for (const m of months) {
+          const mIdx = months.indexOf(m);
+          if (mIdx < currentMonthIdx) continue; // skip past months
+          // Skip locked months (funnel_metas is_locked=true acts as canonical freeze signal)
+          const isLocked = allFunnelMetas.some(
+            x => x.bu === 'modelo_atual' && x.month === m && x.year === 2026 && x.is_locked === true
+          );
+          if (isLocked) continue;
           // Skip months already pushed in the main loop above
           const alreadyPushed = updates.some(u => u.bu === 'modelo_atual' && u.month === m);
           if (alreadyPushed) continue;
@@ -2093,6 +2103,27 @@ export function MediaInvestmentTab() {
           });
         }
       }
+
+      // Safety guard: never allow updates to a past month via the cascade above.
+      // Explicit user edits via pendingChanges are still honored in the main loop.
+      {
+        const currentMonthIdx = new Date().getMonth();
+        const editedKeys = new Set<string>();
+        for (const [bu, changes] of Object.entries(pendingChanges)) {
+          for (const m of Object.keys(changes)) editedKeys.add(`${bu}__${m}`);
+        }
+        const violated = updates.filter(u => {
+          const mIdx = months.indexOf(u.month);
+          return mIdx < currentMonthIdx && !editedKeys.has(`${u.bu}__${u.month}`);
+        });
+        if (violated.length > 0) {
+          console.warn('[PlanGrowth] Blocked cascade updates to past months:', violated);
+          for (const v of violated) {
+            const idx = updates.indexOf(v);
+            if (idx >= 0) updates.splice(idx, 1);
+          }
+        }
+      }
       // ------------------------------------------------------------------------------------
 
       
@@ -2107,13 +2138,17 @@ export function MediaInvestmentTab() {
       try {
         const lockedKey = (bu: string, m: string) =>
           allFunnelMetas.some(x => x.bu === bu && x.month === m && x.year === 2026 && x.is_locked === true);
+        // Never sync past months — they represent closed history and must not be
+        // overwritten by Plan Growth recomputations as a side-effect of editing a future month.
+        const currentMonthIdx = new Date().getMonth();
+        const isPastMonth = (m: string) => months.indexOf(m) < currentMonthIdx;
 
         const buildItems = (
           bu: string,
           funnel: Array<{ month: string; leads?: number; mqls?: number; rms?: number; rrs?: number; propostas?: number; vendas?: number }>
         ) =>
           funnel
-            .filter(d => !lockedKey(bu, d.month))
+            .filter(d => !lockedKey(bu, d.month) && !isPastMonth(d.month))
             .map(d => ({
               bu,
               month: d.month,
