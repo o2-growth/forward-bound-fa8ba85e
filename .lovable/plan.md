@@ -1,11 +1,13 @@
-## Verificação proposta
+## Continuar verificação — aba Indicadores › Comercial
 
-Rodar Playwright headless contra `http://localhost:8080`, restaurar sessão, filtrar apenas Franquia + Julho/2026, abrir drill-down de MQL e conferir:
+Já cheguei na aba correta. Próximos passos do Playwright:
 
-1. Coluna "Faixa Faturamento" mostra valores reais (ex: "Menos de 5 mil reais") em vez de "-"
-2. Gráfico "Por Faixa de Faturamento" tem múltiplas barras (não só "Não informado")
-3. Repetir para Oxy Hacker
+1. No filtro "Consolidado" (dropdown de BUs) desmarcar Modelo Atual, O2 TAX, Oxy Hacker — deixar só **Franquia**.
+2. Aguardar recarregar, clicar no card radial **MQLs**.
+3. Screenshot do drill-down "MQL - De Onde Vêm Nossos Melhores Leads?" — checar:
+   - Coluna "Faixa Faturamento" com valores reais (não "-")
+   - Gráfico "Por Faixa de Faturamento" com múltiplas barras (não só "Não informado")
+4. Repetir para **Oxy Hacker**.
+5. Relatar resultado. Sem edits nesta rodada.
 
-Se aparecer o valor, o fix funcionou. Se ainda vier "-", investigo se `columnFormatters.revenueRange` ou o gráfico precisam de normalização adicional.
-
-Sem edits de código nesta rodada — só screenshots + relato.
+Se algum passo falhar por seletor, ajusto com `sed -i` no script e re-rodo.
