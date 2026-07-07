@@ -454,6 +454,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
         responsible: '',
         closer: '',
         sdr: '',
+        revenueRange: cardInvestimento.get(movement.id) || undefined,
         dataAssinatura: (movement.dataAssinatura || movement.dataEntrada).toISOString(),
       });
     }
