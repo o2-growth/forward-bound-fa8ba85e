@@ -2138,13 +2138,17 @@ export function MediaInvestmentTab() {
       try {
         const lockedKey = (bu: string, m: string) =>
           allFunnelMetas.some(x => x.bu === bu && x.month === m && x.year === 2026 && x.is_locked === true);
+        // Never sync past months — they represent closed history and must not be
+        // overwritten by Plan Growth recomputations as a side-effect of editing a future month.
+        const currentMonthIdx = new Date().getMonth();
+        const isPastMonth = (m: string) => months.indexOf(m) < currentMonthIdx;
 
         const buildItems = (
           bu: string,
           funnel: Array<{ month: string; leads?: number; mqls?: number; rms?: number; rrs?: number; propostas?: number; vendas?: number }>
         ) =>
           funnel
-            .filter(d => !lockedKey(bu, d.month))
+            .filter(d => !lockedKey(bu, d.month) && !isPastMonth(d.month))
             .map(d => ({
               bu,
               month: d.month,
