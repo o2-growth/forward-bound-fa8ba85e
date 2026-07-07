@@ -1,40 +1,33 @@
-## Causa raiz
+## Diagnóstico
 
-Nos acelerômetros de **Franquia** e **Oxy Hacker** (Expansão), o gráfico/coluna "Faixa de Faturamento" aparece sempre como **Não informado / null**. Não é falta de dado no Pipefy — os cards têm a coluna preenchida.
+O drill-down "MQL - De Onde Vêm Nossos Melhores Leads?" mostra "Faixa Faturamento: -" e barra única "Não informado" para MQLs de Franquia e Oxy Hacker.
 
-O que acontece:
+**Causa raiz (diferente da última correção):**
+- Quando NÃO há filtro de Closer/SDR/Origem (caso padrão do dashboard), o `getItemsForIndicator` em `IndicatorsTab.tsx` (linhas 1722-1725 para Franquia e 1752-1753 para Oxy Hacker) usa `useExpansaoMetas.getDetailItemsForIndicator` / `useOxyHackerMetas.getDetailItemsForIndicator` — NÃO o `useExpansaoAnalytics` (que já popula `revenueRange`).
+- Esses dois hooks de "metas" montam o item sem o campo `revenueRange`, então chega `undefined` no drill-down → coluna mostra "-" e o gráfico agrupa tudo em "Não informado".
+- Confirmado via query direta: card "Maria Missileide" tem `"Investimento disponível": "Menos de 5 mil reais"` no Pipefy — o dado existe, só não é propagado.
+- Os hooks já têm o `cardInvestimento` Map disponível (usam ele na qualificação do MQL — linhas 426 / 424). Só falta anexar ao item de saída.
 
-1. `useExpansaoAnalytics.ts` (linha 559) já popula corretamente `revenueRange` a partir da coluna Pipefy **`Investimento disponível`** (ex.: `"Menos de 5 mil reais"`, `"Entre 5 e 15 mil"`, etc.) — taxonomia própria de Expansão.
-2. Os drill-downs em `IndicatorsTab.tsx` e `DrillDownBarChart.tsx` normalizam esse campo via `normalizeTier()` de `src/lib/revenueTiers.ts`.
-3. `TIER_NORMALIZATION` só conhece as faixas de **Faturamento mensal** de Modelo Atual/O2 TAX (`"Menos de R$ 100 mil"`, `"Entre R$ 100 mil e R$ 200 mil"`, …). Nenhum valor de Investimento casa → tudo cai em `'Não informado'`.
+## Correção proposta
 
-Resultado: dado existe, chega no componente com o valor certo, e é jogado fora na normalização.
+Duas linhas, escopo mínimo, reversível:
 
-## Fix
+**1. `src/hooks/useExpansaoMetas.ts`** (dentro do objeto retornado em `byCard.set(...)`, ~linha 459)
+- Adicionar `revenueRange: cardInvestimento.get(movement.id) || undefined,`
 
-Editar apenas `src/lib/revenueTiers.ts` (mudança de apresentação, sem tocar em business logic):
+**2. `src/hooks/useOxyHackerMetas.ts`** (mesma coisa, ~linha 457)
+- Adicionar `revenueRange: cardInvestimento.get(movement.id) || undefined,`
 
-1. Adicionar constantes paralelas para a taxonomia de Investimento (Expansão):
-   - `INVESTMENT_TIER_NORMALIZATION` — mapa `raw → label curto` (ex.: `"Menos de 5 mil reais" → "< R$ 5k"`, `"Entre 5 e 15 mil reais" → "R$ 5k – 15k"`, `"Entre 15 e 30 mil reais" → "R$ 15k – 30k"`, `"Entre 30 e 50 mil reais" → "R$ 30k – 50k"`, `"Entre 50 e 100 mil reais" → "R$ 50k – 100k"`, `"Mais de 100 mil reais" → "> R$ 100k"`).
-   - `INVESTMENT_TIER_ORDER` — ordenação crescente.
-   - `INVESTMENT_TIER_COLORS` — cores por faixa (usando tokens `hsl(var(--chart-*))`, sem hardcode).
-2. `normalizeTier()`: tentar primeiro `TIER_NORMALIZATION` (faturamento); se não casar, tentar `INVESTMENT_TIER_NORMALIZATION`; só então cair em `'Não informado'`. Comparação case-insensitive/trim já existente é preservada.
-3. Antes de escrever o mapa final, rodar uma query rápida no Pipefy externo listando os valores distintos reais de `"Investimento disponível"` em `pipefy_cards_movements_expansao` (últimos 12 meses) — para garantir que as strings do enum estão exatas (acentos, "reais" vs "mil", etc.). O mapa acima é o esperado, mas será ajustado ao que o DB retornar.
+## Impacto / segurança
 
-## Escopo do que **não** muda
+- **Nenhuma métrica muda**: MQL count, valores monetários, dedup, meta — todos calculados por `getQtyForPeriod` / `getValueForPeriod`, intocados.
+- **Só enriquece um campo** consumido apenas pelo drill-down (coluna "Faixa Faturamento" e gráfico "Por Faixa de Faturamento").
+- Modelo Atual e O2 TAX continuam funcionando pelo caminho atual (analytics hook próprio).
+- Fácil reverter: remover as 2 linhas.
 
-- `useExpansaoAnalytics.ts`: intocado (já entrega o dado correto).
-- `IndicatorsTab.tsx` e `DrillDownBarChart.tsx`: intocados; continuam consumindo `normalizeTier` e `TIER_ORDER`. Como a normalização passa a devolver rótulos válidos, os agrupamentos deixam de colapsar em "Não informado".
-- Modelo Atual e O2 TAX: comportamento inalterado (o primeiro try continua sendo o mapa de faturamento).
-- Nenhum campo/coluna do Pipefy, meta ou métrica é alterado.
+## O que NÃO vou mexer
 
-## Reversibilidade
-
-Reverter é apagar as 3 constantes novas e o segundo try dentro de `normalizeTier`. Zero migração, zero mudança de dado.
-
-## Validação
-
-Após aplicar:
-1. Abrir Dashboard → Comercial → filtrar Franquia (mês inteiro Jul/2026) → clicar em um acelerômetro (Leads/MQL/RM/RR) → o drill-down "Por Faixa de Faturamento" deve mostrar as barras com rótulos de investimento (`< R$ 5k`, `R$ 5k – 15k`, …) e não mais tudo em "Não informado".
-2. Repetir para Oxy Hacker.
-3. Repetir para Modelo Atual e confirmar que continua exibindo as faixas de faturamento originais (regressão).
+- `useExpansaoAnalytics.ts`, `useOxyHackerAnalytics.ts`, `useModeloAtualAnalytics.ts`, `useO2TaxAnalytics.ts`
+- `src/lib/revenueTiers.ts` (já corrigido antes)
+- `IndicatorsTab.tsx`, `DrillDownBarChart.tsx`
+- Nenhuma migração, nenhum edge function, nenhum dado

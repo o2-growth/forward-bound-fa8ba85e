@@ -456,6 +456,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         responsible: '',
         closer: '',
         sdr: '',
+        revenueRange: cardInvestimento.get(movement.id) || undefined,
         dataAssinatura: movement.dataEntrada.toISOString(),
       });
     }
