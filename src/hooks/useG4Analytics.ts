@@ -523,6 +523,8 @@ export function useG4Analytics(dateRange: { from: Date; to: Date }): {
       lives: livesMetrics,
       eventos: eventosMetrics,
       seller: sellerMetrics,
+      unclassifiedCount: unclassifiedCards.length,
+      unclassifiedCards,
     };
   }, [allCards, isLoading, error, dateRange.from, dateRange.to]); // eslint-disable-line react-hooks/exhaustive-deps
 
