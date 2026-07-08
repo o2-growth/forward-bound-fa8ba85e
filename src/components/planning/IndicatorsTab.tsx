@@ -1929,8 +1929,31 @@ export function IndicatorsTab() {
           .sort((a, b) => b.value - a.value);
         
         const TIER_ORDER = ['Ainda não fatura', '< R$ 100k', 'R$ 100k - 200k', 'R$ 200k - 350k', 'R$ 350k - 500k', 'R$ 500k - 1M', 'R$ 1M - 5M', '> R$ 5M'];
-        
+
+        // Classificação por Canal de Aquisição
+        const classifyItem = (i: typeof items[number]): LeadSource => classifyLeadSource({
+          tipoOrigem: i.tipoOrigem,
+          origemLead: i.origemLead,
+          fonte: i.fonte,
+          campanha: i.campanha,
+          sdr: i.sdr,
+        });
+        const canalCounts = new Map<LeadSource, number>();
+        items.forEach(i => {
+          const s = classifyItem(i);
+          canalCounts.set(s, (canalCounts.get(s) || 0) + 1);
+        });
+        const totalMql = items.length || 1;
+        const canalData = Array.from(canalCounts.entries())
+          .map(([k, v]) => ({
+            label: `${LEAD_SOURCE_LABELS[k]} (${((v / totalMql) * 100).toFixed(1)}%)`,
+            value: v,
+            highlight: (k === 'inbound' || k === 'indicacao' || k === 'evento') ? 'success' as const : 'neutral' as const,
+          }))
+          .sort((a, b) => b.value - a.value);
+
         const charts: ChartConfig[] = [
+          { type: 'bar', title: 'Por Canal de Aquisição', data: canalData },
           { type: 'bar', title: 'Por Faixa de Faturamento', data: revenueRangeData, sortable: true, sortOrder: TIER_ORDER },
         ];
         
@@ -1943,10 +1966,15 @@ export function IndicatorsTab() {
         setDetailSheetColumns([
           { key: 'product', label: 'Produto', format: columnFormatters.product },
           { key: 'company', label: 'Empresa' },
+          { key: 'canal', label: 'Canal' },
           { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
           { key: 'date', label: 'Data', format: columnFormatters.date },
         ]);
-        setDetailSheetItems(items);
+        const itemsWithCanal = items.map(i => ({
+          ...i,
+          canal: LEAD_SOURCE_LABELS[classifyItem(i)],
+        }));
+        setDetailSheetItems(itemsWithCanal);
         // Filter criteria for MQL
         const mqlCriteria: FilterCriteriaGroup[] = [];
         if (selectedBUs.includes('modelo_atual')) {

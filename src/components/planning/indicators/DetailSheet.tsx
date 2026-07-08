@@ -58,6 +58,7 @@ export interface DetailItem {
   fonte?: string;
   campanha?: string;
   bu?: string; // Modelo Atual | O2 TAX | Franquia | Oxy Hacker | Outbound
+  canal?: string; // Canal de aquisição classificado (Inbound/Outbound/Eventos/Indicação/etc)
 }
 
 interface DetailSheetProps {
