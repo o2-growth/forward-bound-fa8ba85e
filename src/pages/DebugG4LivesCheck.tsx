@@ -11,7 +11,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useModeloAtualAnalytics, type ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
-import { G4_LIVES, isCardLive } from "@/lib/g4Events";
+import { G4_LIVES, G4_EVENTOS, isCardLive, classifyG4Card, hasG4Signal } from "@/lib/g4Events";
 import { cardsForLive, computeCounts } from "@/lib/g4Funnel";
 import { LIVES_OFICIAIS } from "@/data/livesOfficial";
 
