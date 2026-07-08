@@ -35,6 +35,7 @@ import {
   type G4RealLead,
 } from "@/hooks/useG4RealMetrics";
 import { LiveDetailDialog, type G4Stage } from "./LiveDetailDialog";
+import { buildPipefyUrl } from "./pipefy";
 
 const MAIO_LIVE = "Live G4 - 20-21/05/2026";
 
@@ -475,29 +476,24 @@ export function G4RealSection() {
                         {l.closer || "—"}
                       </td>
                       <td className="px-3 py-2 text-right">
-                        {l.pipefyUrl ? (
-                          <a
-                            href={l.pipefyUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-xs text-primary hover:bg-primary/20 transition-colors"
-                          >
-                            Abrir no Pipefy
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : (
-                          <TooltipProvider delayDuration={150}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground opacity-60 cursor-not-allowed">
-                                  Abrir no Pipefy
-                                  <ExternalLink className="h-3 w-3" />
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>sem card no pipe</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
+                        {(() => {
+                          const url = buildPipefyUrl(l);
+                          return url ? (
+                            <Button size="sm" variant="default" asChild className="h-7 gap-1.5">
+                              <a
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={l.pipefyUrl ? "Abrir card no Pipefy" : "Buscar por e-mail no Pipefy"}
+                              >
+                                Pipefy
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/60">—</span>
+                          );
+                        })()}
                       </td>
                     </tr>
                   ))
