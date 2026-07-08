@@ -508,6 +508,27 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
   // Pre-compute excluded MQL card IDs at card level (any row with excluded reason excludes the whole card)
   const excludedMqlIds = useMemo(() => buildExcludedMqlCardIds(mqlByCreation), [mqlByCreation]);
 
+  // Máx dos valores monetários por card ID (hidrata movimentos antigos onde
+  // Setup/MRR/Pontual ainda não estavam preenchidos — ex.: card em "Proposta
+  // enviada" cujo Setup só foi cadastrado ao virar Contrato/Ganho).
+  const maxMonetaryByCardId = useMemo(() => {
+    const map = new Map<string, { mrr: number; setup: number; pontual: number; educacao: number }>();
+    const push = (arr: ModeloAtualCard[]) => {
+      for (const c of arr) {
+        const cur = map.get(c.id) || { mrr: 0, setup: 0, pontual: 0, educacao: 0 };
+        cur.mrr = Math.max(cur.mrr, c.valorMRR || 0);
+        cur.setup = Math.max(cur.setup, c.valorSetup || 0);
+        cur.pontual = Math.max(cur.pontual, c.valorPontual || 0);
+        cur.educacao = Math.max(cur.educacao, c.valorEducacao || 0);
+        map.set(c.id, cur);
+      }
+    };
+    push(fullHistory);
+    push(cards);
+    push(allOpenCards);
+    return map;
+  }, [fullHistory, cards, allOpenCards]);
+
   // Build a map of FIRST entry for EACH indicator per card (using full history)
   // This ensures we count each indicator only once, in the month of first entry
   const firstEntryByCardAndIndicator = useMemo(() => {
@@ -676,6 +697,12 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       if (inferred) productCategory = inferred;
     }
 
+    const hydrated = maxMonetaryByCardId.get(card.id);
+    const mrr = Math.max(card.valorMRR || 0, hydrated?.mrr || 0);
+    const setup = Math.max(card.valorSetup || 0, hydrated?.setup || 0);
+    const pontual = Math.max(card.valorPontual || 0, hydrated?.pontual || 0);
+    const total = mrr + setup + pontual;
+
     return {
       id: card.id,
       name: card.titulo || card.empresa || 'Sem título',
@@ -684,15 +711,15 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       date: (card.dataAssinatura && PHASE_TO_INDICATOR[card.fase] === 'venda'
         ? card.dataAssinatura
         : card.dataEntrada).toISOString(),
-      value: card.valor,
+      value: total > 0 ? total : card.valor,
       revenueRange: card.faixa || undefined,
       responsible: card.closer || card.responsavel || undefined, // Prioritize closer for display
       duration: card.duracao,
       product: productCategory,
-      mrr: card.valorMRR,
-      setup: card.valorSetup,
-      pontual: card.valorPontual,
-      total: (card.valorMRR || 0) + (card.valorSetup || 0) + (card.valorPontual || 0),
+      mrr,
+      setup,
+      pontual,
+      total,
       closer: card.closer,
       sdr: card.sdr,
       dataAssinatura: card.dataAssinatura?.toISOString() || undefined,
