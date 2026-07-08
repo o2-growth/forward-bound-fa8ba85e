@@ -61,6 +61,14 @@ const fmtDate = (iso: string | null | undefined) =>
       })
     : "—";
 
+function buildPipefyUrl(l: G4RealLead): string | null {
+  if (l.pipefyUrl) return l.pipefyUrl;
+  if (l.email) {
+    return `https://app.pipefy.com/search?query=${encodeURIComponent(l.email)}`;
+  }
+  return null;
+}
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -210,17 +218,25 @@ export function LiveDetailDialog({
                       )}
                     </TableCell>
                     <TableCell>
-                      {l.pipefyUrl ? (
-                        <a
-                          href={l.pipefyUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-muted-foreground hover:text-foreground"
-                          title="Abrir no Pipefy"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      ) : null}
+                      {(() => {
+                        const url = buildPipefyUrl(l);
+                        return url ? (
+                          <Button variant="outline" size="sm" asChild>
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="gap-1.5"
+                              title="Abrir no Pipefy"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              Pipefy
+                            </a>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        );
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}
