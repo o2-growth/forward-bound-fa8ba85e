@@ -307,6 +307,7 @@ export function G4RealSection() {
                 key={row.live}
                 row={row}
                 diagnosticos={diagMap.get(row.live) ?? 0}
+                onOpenStage={(live, stage) => setDetail({ live, stage })}
               />
             ))}
           </div>
