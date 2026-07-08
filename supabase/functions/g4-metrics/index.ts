@@ -118,8 +118,11 @@ Deno.serve(async (req) => {
               END AS faixa
             FROM diag
           )
-          SELECT l.nome, l.empresa, l.email, l.lives, l.presente_alguma_live, l.levantou_mao,
-                 l.live_da_mao, l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer, l.pipefy_url,
+          SELECT l.nome, l.empresa, l.email,
+                 array_remove(l.lives, 'Raio-X de Margens - G4') AS lives,
+                 l.presente_alguma_live, l.levantou_mao,
+                 CASE WHEN l.live_da_mao = 'Raio-X de Margens - G4' THEN NULL ELSE l.live_da_mao END AS live_da_mao,
+                 l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer, l.pipefy_url,
                  COALESCE(p.faixa, d.faixa) AS faixa,
                  p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe
           FROM g4_leads_360 l
@@ -127,6 +130,7 @@ Deno.serve(async (req) => {
           LEFT JOIN diag_faixa d ON d.email = l.email
           WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%@o2inc.com.br'
           ORDER BY l.levantou_mao DESC, l.fez_diagnostico DESC, l.no_pipe DESC
+
         `,
       ],
     );
