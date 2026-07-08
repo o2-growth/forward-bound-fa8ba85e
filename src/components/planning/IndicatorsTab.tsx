@@ -2435,7 +2435,7 @@ export function IndicatorsTab() {
         
         setDetailSheetTitle('Vendas - Análise de Valor (TCV)');
         setDetailSheetDescription(
-          `${items.length} contratos | TCV: ${formatCompactCurrency(tcv)} | MRR: ${formatCompactCurrency(totalMrr)} | Setup: ${formatCompactCurrency(totalSetup)} | Pontual: ${formatCompactCurrency(totalPontual)} | Ticket médio TCV: ${formatCompactCurrency(ticketMedioTCV)}`
+          `${items.length} contratos | Faturamento: ${formatCompactCurrency(faturamentoARPU)} | TCV: ${formatCompactCurrency(tcv)} | MRR: ${formatCompactCurrency(totalMrr)} | Setup: ${formatCompactCurrency(totalSetup)} | Pontual: ${formatCompactCurrency(totalPontual)} | Ticket médio TCV: ${formatCompactCurrency(ticketMedioTCV)}`
         );
         setDetailSheetKpis(kpis);
         setDetailSheetCharts(charts);
@@ -2447,6 +2447,7 @@ export function IndicatorsTab() {
           { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
           { key: 'setup', label: 'Setup', format: columnFormatters.currency },
           { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
+          { key: 'faturamento', label: 'Faturamento', format: columnFormatters.currency },
           { key: 'value', label: 'TCV', format: columnFormatters.currency },
           { key: 'sdr', label: 'SDR' },
           { key: 'responsible', label: 'Closer' },
