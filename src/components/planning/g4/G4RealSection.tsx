@@ -507,6 +507,14 @@ export function G4RealSection() {
           </CardContent>
         </Card>
       </div>
+
+      <LiveDetailDialog
+        open={detail !== null}
+        onOpenChange={(o) => !o && setDetail(null)}
+        live={detail?.live ?? ""}
+        stage={detail?.stage ?? "inscritos"}
+        leads={detailLeads}
+      />
     </div>
   );
 }
