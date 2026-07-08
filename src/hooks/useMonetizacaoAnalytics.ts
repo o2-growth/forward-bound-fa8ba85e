@@ -439,6 +439,11 @@ export function useMonetizacaoAnalytics(
   const valorGanho = cards.filter((c) => c.ganho).reduce((s, c) => s + c.valorTotal, 0);
   const ticketMedio = cards.length > 0 ? (valorPipeline + valorGanho) / cards.length : 0;
 
+  // Closer virtual: como estes cards vêm do pipe de Monetização e não possuem
+  // um Closer atribuído no mesmo padrão dos demais BUs, agrupamos todos sob
+  // "Monetização Geral" para que apareçam no filtro/ranking do Pace Comercial
+  // (evita o gap entre Consolidado e Modelo Atual).
+  const MONETIZACAO_CLOSER_VIRTUAL = 'Monetização Geral';
   const toDetailItem = (card: MonetizacaoCard): DetailItem => {
     const value = card.mrr + card.setup + card.pontual;
     return {
@@ -454,7 +459,8 @@ export function useMonetizacaoAnalytics(
       mrr: card.mrr,
       setup: card.setup,
       pontual: card.pontual,
-      responsible: card.responsavel,
+      responsible: card.responsavel || MONETIZACAO_CLOSER_VIRTUAL,
+      closer: MONETIZACAO_CLOSER_VIRTUAL,
       reason: card.motivoPerda || undefined,
       product: card.tipo,
       bu: 'Monetização',
