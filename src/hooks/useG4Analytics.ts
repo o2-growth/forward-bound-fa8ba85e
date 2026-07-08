@@ -21,6 +21,7 @@ import {
   IMPOSTO_PCT,
   COMISSAO_G4_PCT,
   classifyG4Card,
+  hasG4Signal,
   matchEventoFromCard,
   type G4Frente,
   type G4LiveConfig,
