@@ -224,14 +224,14 @@ export function LivesSection({
         }
         cards={(() => {
           if (!dialogStage) return [];
-          // Escopo: cards atribuídos à live selecionada (via matchLiveFromCard)
-          // ou a qualquer live se agregado.
+          // Escopo: TODOS os cards (não só liveCards) — matchLiveFromCard
+          // agora aceita atribuição por menção à data da live no texto.
           const scope = selectedLive
-            ? liveCards.filter((c) => {
+            ? cards.filter((c) => {
                 const m = matchLiveFromCard(c, G4_LIVES);
                 return m?.date === selectedLive.date;
               })
-            : liveCards.filter((c) => matchLiveFromCard(c, G4_LIVES) !== null);
+            : cards.filter((c) => matchLiveFromCard(c, G4_LIVES) !== null);
           return cardsByStage(scope, dialogStage);
         })()}
       />
