@@ -8,7 +8,8 @@ import { FunnelDeluxe, type DeluxeChip, type DeluxeCompareRow } from "./FunnelDe
 import { useG4FunnelStages } from "@/hooks/useG4FunnelStages";
 import type { ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
 import { G4_EVENTOS, isCardEvento, matchEventoFromCard } from "@/lib/g4Events";
-import { computeCounts, mergeStages } from "@/lib/g4Funnel";
+import { cardsByStage, computeCounts, mergeStages } from "@/lib/g4Funnel";
+import { LiveLeadsDialog } from "./LiveLeadsDialog";
 
 export interface EventoRow {
   label: string;
@@ -46,6 +47,7 @@ export function EventosSection({
   cards = [],
 }: EventosSectionProps) {
   const [selected, setSelected] = useState<string>("all");
+  const [dialogStage, setDialogStage] = useState<string | null>(null);
 
   const eventoCards = useMemo(
     () => cards.filter((c) => isCardEvento(c)),
@@ -141,9 +143,30 @@ export function EventosSection({
         contextLabel={contextLabel}
         contextSub={contextSub}
         compare={compare}
+        onStageClick={setDialogStage}
       />
 
       <FrenteDreCard title="P&L — Eventos" dre={dre} custosDetalhe={custosDetalhe} />
+
+      <LiveLeadsDialog
+        open={dialogStage !== null}
+        onOpenChange={(o) => !o && setDialogStage(null)}
+        stageKey={dialogStage ?? ""}
+        stageLabel={stages.find((s) => s.key === dialogStage)?.label ?? ""}
+        contextLabel={contextLabel}
+        totalOfficial={
+          dialogStage === "mao"
+            ? counts.mao
+            : dialogStage === "venda"
+              ? counts.venda
+              : dialogStage === "entraram"
+                ? counts.entraram
+                : dialogStage === "inscritos"
+                  ? counts.inscritos
+                  : 0
+        }
+        cards={dialogStage ? cardsByStage(scopedCards, dialogStage) : []}
+      />
     </div>
   );
 }
