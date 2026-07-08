@@ -492,6 +492,8 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
           { key: 'company' as keyof DetailItem, label: 'Empresa' },
           { key: 'value' as keyof DetailItem, label: 'Valor Total', format: columnFormatters.currency },
           { key: 'mrr' as keyof DetailItem, label: 'MRR', format: columnFormatters.currency },
+          { key: 'setup' as keyof DetailItem, label: 'Setup', format: columnFormatters.currency },
+          { key: 'pontual' as keyof DetailItem, label: 'Pontual', format: columnFormatters.currency },
           { key: 'responsible' as keyof DetailItem, label: 'Closer' },
           { key: 'diasEmProposta' as keyof DetailItem, label: 'Dias em Proposta', format: columnFormatters.agingWithAlert },
           { key: 'date' as keyof DetailItem, label: 'Data Envio', format: columnFormatters.date },
