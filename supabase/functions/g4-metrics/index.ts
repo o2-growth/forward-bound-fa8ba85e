@@ -50,6 +50,7 @@ Deno.serve(async (req) => {
           WHERE i.email NOT ILIKE '%teste%' AND i.email NOT ILIKE '%exemplo.com%'
             AND i.email NOT ILIKE '%@o2inc.com.br'
             AND i.email NOT IN ('dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com','demo@exemplo.com')
+            AND i.live <> 'Raio-X de Margens - G4'
           GROUP BY i.live ORDER BY i.live
         `,
         sql /* diagnóstico por live */`
@@ -58,12 +59,15 @@ Deno.serve(async (req) => {
           WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%exemplo.com%'
             AND email NOT ILIKE '%@o2inc.com.br'
             AND email NOT IN ('dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com','demo@exemplo.com')
+            AND (live IS NULL OR live <> 'Raio-X de Margens - G4')
           GROUP BY live ORDER BY live
         `,
         sql /* KPIs topo */`
           SELECT
             (SELECT COUNT(DISTINCT email) FROM g4_inscritos
-              WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%@o2inc.com.br') AS total_leads,
+              WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%@o2inc.com.br'
+                AND live <> 'Raio-X de Margens - G4') AS total_leads,
+
             (SELECT COUNT(*) FROM g4_levantadas_mao) AS levantaram_mao,
             (SELECT COUNT(DISTINCT email) FROM g4_diagnostico) AS diagnosticos
         `,
