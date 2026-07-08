@@ -34,6 +34,7 @@ import {
   type G4RealFunilRow,
   type G4RealLead,
 } from "@/hooks/useG4RealMetrics";
+import { LiveDetailDialog, type G4Stage } from "./LiveDetailDialog";
 
 const MAIO_LIVE = "Live G4 - 20-21/05/2026";
 
@@ -45,24 +46,23 @@ function pct(num: number, den: number | null): string {
 function LiveFunnelCard({
   row,
   diagnosticos,
+  onOpenStage,
 }: {
   row: G4RealFunilRow;
   diagnosticos: number;
+  onOpenStage: (live: string, stage: G4Stage) => void;
 }) {
   const isMaio = row.live === MAIO_LIVE;
-  const steps = [
-    { label: "Inscritos", value: row.inscritos, den: null as number | null },
-    {
-      label: "Presentes",
-      value: row.presentes,
-      den: row.inscritos,
-    },
+  const steps: { label: string; value: number | null; den: number | null; stage: G4Stage }[] = [
+    { label: "Inscritos", value: row.inscritos, den: null, stage: "inscritos" },
+    { label: "Presentes", value: row.presentes, den: row.inscritos, stage: "presentes" },
     {
       label: "Levantaram a mão",
       value: row.levantaramMao,
       den: row.presentes ?? row.inscritos,
+      stage: "mao",
     },
-    { label: "Vendas", value: row.vendas, den: row.levantaramMao },
+    { label: "Vendas", value: row.vendas, den: row.levantaramMao, stage: "vendas" },
   ];
 
   return (
@@ -92,8 +92,7 @@ function LiveFunnelCard({
 
         <div className="grid grid-cols-4 gap-2">
           {steps.map((s, idx) => {
-            const display =
-              s.value == null ? "—" : fmtInt(s.value as number);
+            const display = s.value == null ? "—" : fmtInt(s.value as number);
             const conv =
               idx === 0
                 ? null
@@ -101,9 +100,11 @@ function LiveFunnelCard({
                 ? "—"
                 : pct(s.value as number, s.den);
             return (
-              <div
+              <button
+                type="button"
                 key={s.label}
-                className="rounded-md border bg-muted/20 p-2 text-center"
+                onClick={() => onOpenStage(row.live, s.stage)}
+                className="rounded-md border bg-muted/20 p-2 text-center transition-colors hover:bg-muted/50 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/40"
               >
                 <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                   {s.label}
@@ -116,17 +117,21 @@ function LiveFunnelCard({
                     {conv}
                   </div>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
 
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t">
+        <button
+          type="button"
+          onClick={() => onOpenStage(row.live, "diagnosticos")}
+          className="flex w-full items-center justify-between text-xs text-muted-foreground pt-1 border-t hover:text-foreground transition-colors"
+        >
           <span>Diagnósticos</span>
           <span className="font-medium text-foreground tabular-nums">
             {isMaio && diagnosticos === 0 ? "—" : fmtInt(diagnosticos)}
           </span>
-        </div>
+        </button>
       </CardContent>
     </Card>
   );
@@ -151,6 +156,30 @@ export function G4RealSection() {
   const [onlyMao, setOnlyMao] = useState(false);
   const [onlyDiag, setOnlyDiag] = useState(false);
   const [onlyPresente, setOnlyPresente] = useState(false);
+  const [detail, setDetail] = useState<{ live: string; stage: G4Stage } | null>(null);
+
+  const detailLeads = useMemo<G4RealLead[]>(() => {
+    if (!detail || !data) return [];
+    const { live, stage } = detail;
+    const isTraction = /traction/i.test(live);
+    return data.leads.filter((l) => {
+      if (!l.lives.includes(live)) return false;
+      switch (stage) {
+        case "inscritos":
+          return !isTraction;
+        case "presentes":
+          return !isTraction && l.presenteAlgumaLive;
+        case "mao":
+          return isTraction || (l.levantouMao && (!l.liveDaMao || l.liveDaMao === live));
+        case "vendas":
+          return l.faseAtual === "Ganho";
+        case "diagnosticos":
+          return l.fezDiagnostico;
+        default:
+          return false;
+      }
+    });
+  }, [detail, data]);
 
   const diagMap = useMemo(() => {
     const m = new Map<string, number>();
@@ -278,6 +307,7 @@ export function G4RealSection() {
                 key={row.live}
                 row={row}
                 diagnosticos={diagMap.get(row.live) ?? 0}
+                onOpenStage={(live, stage) => setDetail({ live, stage })}
               />
             ))}
           </div>
@@ -477,6 +507,14 @@ export function G4RealSection() {
           </CardContent>
         </Card>
       </div>
+
+      <LiveDetailDialog
+        open={detail !== null}
+        onOpenChange={(o) => !o && setDetail(null)}
+        live={detail?.live ?? ""}
+        stage={detail?.stage ?? "inscritos"}
+        leads={detailLeads}
+      />
     </div>
   );
 }
