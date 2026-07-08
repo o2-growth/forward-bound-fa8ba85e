@@ -156,6 +156,30 @@ export function G4RealSection() {
   const [onlyMao, setOnlyMao] = useState(false);
   const [onlyDiag, setOnlyDiag] = useState(false);
   const [onlyPresente, setOnlyPresente] = useState(false);
+  const [detail, setDetail] = useState<{ live: string; stage: G4Stage } | null>(null);
+
+  const detailLeads = useMemo<G4RealLead[]>(() => {
+    if (!detail || !data) return [];
+    const { live, stage } = detail;
+    const isTraction = /traction/i.test(live);
+    return data.leads.filter((l) => {
+      if (!l.lives.includes(live)) return false;
+      switch (stage) {
+        case "inscritos":
+          return !isTraction;
+        case "presentes":
+          return !isTraction && l.presenteAlgumaLive;
+        case "mao":
+          return isTraction || (l.levantouMao && (!l.liveDaMao || l.liveDaMao === live));
+        case "vendas":
+          return l.faseAtual === "Ganho";
+        case "diagnosticos":
+          return l.fezDiagnostico;
+        default:
+          return false;
+      }
+    });
+  }, [detail, data]);
 
   const diagMap = useMemo(() => {
     const m = new Map<string, number>();
