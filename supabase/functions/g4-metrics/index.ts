@@ -76,12 +76,27 @@ Deno.serve(async (req) => {
             WHERE c."Fase Atual" = 'Ganho'
           ) t
         `,
-        sql /* leads 360 */`
-          SELECT nome, empresa, email, lives, presente_alguma_live, levantou_mao,
-                 live_da_mao, fez_diagnostico, no_pipe, fase_atual, closer, pipefy_url
-          FROM g4_leads_360
-          WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%@o2inc.com.br'
-          ORDER BY levantou_mao DESC, fez_diagnostico DESC, no_pipe DESC
+        sql /* leads 360 enriquecido com dados do Pipefy */`
+          WITH pipe AS (
+            SELECT DISTINCT ON (lower("E-mail"))
+              lower("E-mail") AS email,
+              "Faixa de faturamento mensal" AS faixa,
+              COALESCE("Valor MRR", 0)::float8 AS valor_mrr,
+              COALESCE("Valor Setup", 0)::float8 AS valor_setup,
+              COALESCE("Valor Pontual", 0)::float8 AS valor_pontual,
+              "SDR responsável" AS sdr,
+              "Entrada" AS data_entrada_pipe
+            FROM pipefy_moviment_cfos
+            WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
+            ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
+          )
+          SELECT l.nome, l.empresa, l.email, l.lives, l.presente_alguma_live, l.levantou_mao,
+                 l.live_da_mao, l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer, l.pipefy_url,
+                 p.faixa, p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe
+          FROM g4_leads_360 l
+          LEFT JOIN pipe p ON p.email = l.email
+          WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%@o2inc.com.br'
+          ORDER BY l.levantou_mao DESC, l.fez_diagnostico DESC, l.no_pipe DESC
         `,
       ],
     );
@@ -129,20 +144,44 @@ Deno.serve(async (req) => {
       faturamento: Number(fatRow.faturamento ?? 0),
     };
 
-    const leads = (leadRows as Array<Record<string, unknown>>).map((r) => ({
-      nome: r.nome as string | null,
-      empresa: r.empresa as string | null,
-      email: r.email as string | null,
-      lives: (r.lives as string[] | null) ?? [],
-      presenteAlgumaLive: Boolean(r.presente_alguma_live),
-      levantouMao: Boolean(r.levantou_mao),
-      liveDaMao: r.live_da_mao as string | null,
-      fezDiagnostico: Boolean(r.fez_diagnostico),
-      noPipe: Boolean(r.no_pipe),
-      faseAtual: r.fase_atual as string | null,
-      closer: r.closer as string | null,
-      pipefyUrl: r.pipefy_url as string | null,
-    }));
+    const nowMs = Date.now();
+    const leads = (leadRows as Array<Record<string, unknown>>).map((r) => {
+      const valorMRR = r.valor_mrr != null ? Number(r.valor_mrr) : null;
+      const valorSetup = r.valor_setup != null ? Number(r.valor_setup) : null;
+      const valorPontual = r.valor_pontual != null ? Number(r.valor_pontual) : null;
+      const tcv =
+        valorMRR != null || valorSetup != null || valorPontual != null
+          ? (valorMRR ?? 0) * 12 + (valorSetup ?? 0) + (valorPontual ?? 0)
+          : null;
+      const dataEntradaPipe = r.data_entrada_pipe
+        ? new Date(r.data_entrada_pipe as string).toISOString()
+        : null;
+      const diasNoPipe = dataEntradaPipe
+        ? Math.max(0, Math.floor((nowMs - new Date(dataEntradaPipe).getTime()) / 86400000))
+        : null;
+      return {
+        nome: r.nome as string | null,
+        empresa: r.empresa as string | null,
+        email: r.email as string | null,
+        lives: (r.lives as string[] | null) ?? [],
+        presenteAlgumaLive: Boolean(r.presente_alguma_live),
+        levantouMao: Boolean(r.levantou_mao),
+        liveDaMao: r.live_da_mao as string | null,
+        fezDiagnostico: Boolean(r.fez_diagnostico),
+        noPipe: Boolean(r.no_pipe),
+        faseAtual: r.fase_atual as string | null,
+        closer: r.closer as string | null,
+        pipefyUrl: r.pipefy_url as string | null,
+        faixa: (r.faixa as string | null) ?? null,
+        valorMRR,
+        valorSetup,
+        valorPontual,
+        tcv,
+        sdr: (r.sdr as string | null) ?? null,
+        dataEntradaPipe,
+        diasNoPipe,
+      };
+    });
 
     return json({
       kpis,
