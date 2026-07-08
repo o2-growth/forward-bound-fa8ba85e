@@ -8,8 +8,8 @@ import { FunnelDeluxe, type DeluxeChip, type DeluxeCompareRow } from "./FunnelDe
 import { LiveLeadsDialog } from "./LiveLeadsDialog";
 import { useG4FunnelStages } from "@/hooks/useG4FunnelStages";
 import type { ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
-import { G4_LIVES, isCardLive } from "@/lib/g4Events";
-import { cardsForLive, computeCounts, mergeStages, type ComputedCounts } from "@/lib/g4Funnel";
+import { G4_LIVES, isCardLive, matchLiveFromCard } from "@/lib/g4Events";
+import { cardsForLive, cardsByStage, computeCounts, mergeStages, type ComputedCounts } from "@/lib/g4Funnel";
 import { getLiveOverride } from "@/data/livesOfficial";
 
 
@@ -223,23 +223,16 @@ export function LivesSection({
                   : 0
         }
         cards={(() => {
-          if (dialogStage !== "mao" && dialogStage !== "venda") return [];
-          // Cards no escopo (live selecionada ou todas)
+          if (!dialogStage) return [];
+          // Escopo: cards atribuídos à live selecionada (via matchLiveFromCard)
+          // ou a qualquer live se agregado.
           const scope = selectedLive
-            ? cardsForLive(liveCards, selectedLive.date, selectedLive.captureWindowDays)
-            : G4_LIVES.flatMap((l) =>
-                cardsForLive(liveCards, l.date, l.captureWindowDays),
-              );
-          // Dedupe: último dataEntrada por id
-          const uniq = new Map<string, ModeloAtualCard>();
-          for (const c of scope) {
-            const cur = uniq.get(c.id);
-            if (!cur || c.dataEntrada > cur.dataEntrada) uniq.set(c.id, c);
-          }
-          const phases = dialogStage === "venda" ? VENDA_PHASES : MAO_PHASES;
-          return Array.from(uniq.values()).filter((c) =>
-            phases.has(c.faseAtual || c.fase),
-          );
+            ? liveCards.filter((c) => {
+                const m = matchLiveFromCard(c, G4_LIVES);
+                return m?.date === selectedLive.date;
+              })
+            : liveCards.filter((c) => matchLiveFromCard(c, G4_LIVES) !== null);
+          return cardsByStage(scope, dialogStage);
         })()}
       />
     </div>

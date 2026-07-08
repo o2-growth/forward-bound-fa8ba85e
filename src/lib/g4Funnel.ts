@@ -121,3 +121,43 @@ export function cardsForLive(
     return t !== null && t >= t0 && t <= t1;
   });
 }
+
+// ── Filtragem de cards por etapa do funil (drill-down) ──────────────────
+// Mesmos sets usados em computeCounts, expostos para uso do dialog.
+const STAGE_PHASES: Record<string, Set<string>> = {
+  inscritos: new Set(), // vazio = todos os cards do escopo
+  entraram: ENTRARAM_PHASES,
+  mao: new Set([...MAO_PHASES, ...VENDA_PHASES]),
+  venda: VENDA_PHASES,
+};
+
+/**
+ * Devolve cards únicos do escopo cuja `faseAtual` pertence à etapa.
+ * Para `inscritos`, devolve todos os cards únicos do escopo.
+ * Para etapas não mapeadas (`diagnostico`, `pico`, `pitch`), devolve [].
+ */
+export function cardsByStage(
+  scope: ModeloAtualCard[],
+  stageKey: string,
+): ModeloAtualCard[] {
+  const uniq = new Map<string, ModeloAtualCard>();
+  for (const c of scope) {
+    const cur = uniq.get(c.id);
+    if (!cur || c.dataEntrada > cur.dataEntrada) uniq.set(c.id, c);
+  }
+  const arr = Array.from(uniq.values());
+  if (stageKey === "inscritos") return arr;
+  const phases = STAGE_PHASES[stageKey];
+  if (!phases) return [];
+  return arr.filter((c) => phases.has(c.faseAtual || c.fase));
+}
+
+/** Etapas que possuem lista nominal de cards Pipefy no drill-down. */
+export function isListableStage(stageKey: string): boolean {
+  return (
+    stageKey === "inscritos" ||
+    stageKey === "entraram" ||
+    stageKey === "mao" ||
+    stageKey === "venda"
+  );
+}

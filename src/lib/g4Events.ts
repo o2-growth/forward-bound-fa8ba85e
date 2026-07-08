@@ -182,6 +182,64 @@ export function isCardLive(
 }
 
 /**
+ * Associa um card a uma live específica.
+ *
+ * Prioridade:
+ *  1. Texto — haystack contém a data da live em múltiplos formatos
+ *     (ex: "20/05", "20-05", "2026-05-20") ou o label ("live 20/05").
+ *  2. Janela de captura — data de entrada dentro de [live.date, +captureWindowDays].
+ *     Se mais de uma live casar, prefere a mais próxima anterior à entrada.
+ */
+export function matchLiveFromCard(
+  card: CardAttrs,
+  lives: G4LiveConfig[] = G4_LIVES,
+): G4LiveConfig | null {
+  if (!hasG4Signal(card)) return null;
+  const haystack = buildHaystack(card);
+
+  // 1) Match textual
+  const textMatches = lives.filter((live) => {
+    const d = new Date(live.date);
+    const dd = String(d.getUTCDate()).padStart(2, "0");
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const tokens = [
+      `${dd}/${mm}`,
+      `${dd}-${mm}`,
+      `${dd} ${mm}`,
+      live.date, // "YYYY-MM-DD"
+      norm(live.label),
+    ];
+    return tokens.some((t) => haystack.includes(t));
+  });
+  if (textMatches.length === 1) return textMatches[0];
+  if (textMatches.length > 1) {
+    // Desempata pelo mais próximo à data de entrada (ou primeiro)
+    const t = card.dataEntrada ? new Date(card.dataEntrada).getTime() : null;
+    if (t === null) return textMatches[0];
+    return [...textMatches].sort(
+      (a, b) =>
+        Math.abs(t - new Date(a.date).getTime()) -
+        Math.abs(t - new Date(b.date).getTime()),
+    )[0];
+  }
+
+  // 2) Janela de captura
+  const t = card.dataEntrada ? new Date(card.dataEntrada).getTime() : null;
+  if (t === null) return null;
+  const windowMatches = lives.filter((live) => {
+    const t0 = new Date(live.date).getTime();
+    const t1 = t0 + live.captureWindowDays * 86_400_000;
+    return t >= t0 && t <= t1;
+  });
+  if (windowMatches.length === 0) return null;
+  // Prefere a mais próxima anterior
+  return [...windowMatches].sort(
+    (a, b) =>
+      t - new Date(b.date).getTime() - (t - new Date(a.date).getTime()),
+  )[0];
+}
+
+/**
  * Associa um card ao evento G4 específico mais provável.
  *
  * Prioridade:
