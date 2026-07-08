@@ -89,15 +89,29 @@ Deno.serve(async (req) => {
     const funil = (funilRows as Array<Record<string, unknown>>).map((r) => {
       const live = String(r.live);
       const isMaio = live === MAIO_LIVE;
+      const isTraction = /traction/i.test(live);
+      const inscritosRaw = Number(r.inscritos ?? 0);
+      if (isTraction) {
+        // Eventos de traction: não temos inscritos nem presença.
+        // Os leads capturados contam apenas como "levantaram a mão".
+        return {
+          live,
+          inscritos: 0,
+          presentes: 0,
+          levantaramMao: inscritosRaw,
+          vendas: Number(r.vendas ?? 0),
+        };
+      }
       return {
         live,
-        inscritos: Number(r.inscritos ?? 0),
+        inscritos: inscritosRaw,
         // Maio não capturou presença — devolvemos null para a UI mostrar "—"
         presentes: isMaio ? null : Number(r.presentes ?? 0),
         levantaramMao: Number(r.levantaram_mao ?? 0),
         vendas: Number(r.vendas ?? 0),
       };
     });
+
 
     const diagnosticoPorLive = (diagRows as Array<Record<string, unknown>>).map(
       (r) => ({
