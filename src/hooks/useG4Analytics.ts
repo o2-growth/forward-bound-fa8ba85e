@@ -105,6 +105,9 @@ export interface G4Analytics {
   lives: G4FrenteMetrics;
   eventos: G4FrenteMetrics;
   seller: G4FrenteMetrics;
+  /** Cards com sinal G4 mas sem frente atribuída — para diagnóstico. */
+  unclassifiedCount: number;
+  unclassifiedCards: ModeloAtualCard[];
 }
 
 // ── Mapeamento de fases Pipefy → etapa do funil G4 ───────────────────────
