@@ -14,6 +14,14 @@ export type G4RealLead = {
   faseAtual: string | null;
   closer: string | null;
   pipefyUrl: string | null;
+  faixa: string | null;
+  valorMRR: number | null;
+  valorSetup: number | null;
+  valorPontual: number | null;
+  tcv: number | null;
+  sdr: string | null;
+  dataEntradaPipe: string | null;
+  diasNoPipe: number | null;
 };
 
 export type G4RealFunilRow = {
