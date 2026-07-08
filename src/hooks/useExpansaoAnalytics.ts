@@ -556,6 +556,13 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       : card.valorPontual > 0 
         ? card.valorPontual 
         : (card.produto === 'Franquia' ? 140000 : 54000),
+    total: (card.valorMRR || 0)
+      + (card.valorSetup || 0)
+      + (card.taxaFranquia > 0
+          ? card.taxaFranquia
+          : card.valorPontual > 0
+            ? card.valorPontual
+            : (card.produto === 'Franquia' ? 140000 : 54000)),
     revenueRange: cardInvestimentoMap.get(card.id) || card.investimentoDisponivel || undefined,
     dataCriacao: card.dataCriacao?.toISOString() || undefined,
     tipoOrigem: card.tipoOrigem,
