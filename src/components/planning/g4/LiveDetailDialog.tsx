@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ExternalLink, Hand, ClipboardCheck, Check } from "lucide-react";
+import { ExternalLink, Hand, ClipboardCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -261,7 +261,4 @@ export function LiveDetailDialog({
   );
 }
 
-// keep re-export for any external consumers
 export { buildPipefyUrl };
-// unused import guard
-void Check;
