@@ -58,6 +58,20 @@ export default function DebugG4LivesCheck() {
     [allCards],
   );
 
+  // Cards com sinal G4 mas sem frente classificada (dedup por id, mais recente)
+  const unclassifiedG4 = useMemo(() => {
+    const repMap = new Map<string, ModeloAtualCard>();
+    for (const c of allCards ?? []) {
+      const cur = repMap.get(c.id);
+      if (!cur || c.dataEntrada > cur.dataEntrada) repMap.set(c.id, c);
+    }
+    const out: ModeloAtualCard[] = [];
+    for (const c of repMap.values()) {
+      if (!classifyG4Card(c, G4_LIVES, G4_EVENTOS) && hasG4Signal(c)) out.push(c);
+    }
+    return out.sort((a, b) => b.dataEntrada.getTime() - a.dataEntrada.getTime());
+  }, [allCards]);
+
   const [openLive, setOpenLive] = useState<string | null>(null);
 
   if (admin === "loading" || isLoading) {
