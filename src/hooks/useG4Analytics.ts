@@ -416,9 +416,14 @@ export function useG4Analytics(dateRange: { from: Date; to: Date }): {
 
     // ── Passo 2: Classifica cada card único na sua frente G4 ────────────
     const cardFrente = new Map<string, G4Frente>();
+    const unclassifiedCards: ModeloAtualCard[] = [];
     for (const [cardId, repCard] of cardRepMap) {
       const frente = classifyG4Card(repCard, G4_LIVES, G4_EVENTOS);
-      if (frente) cardFrente.set(cardId, frente);
+      if (frente) {
+        cardFrente.set(cardId, frente);
+      } else if (hasG4Signal(repCard)) {
+        unclassifiedCards.push(repCard);
+      }
     }
 
     // ── Passo 3: Agrupa representantes por frente ────────────────────────
