@@ -261,6 +261,12 @@ export function G4Tab() {
           )}
         </TabsContent>
 
+        {/* Reais (fonte externa: lives + diagnóstico + pipe) */}
+        <TabsContent value="reais" className="mt-6">
+          <G4RealSection />
+        </TabsContent>
+
+
         {/* Lives */}
         <TabsContent value="lives" className="mt-6">
           <Suspense fallback={<SectionFallback />}>
