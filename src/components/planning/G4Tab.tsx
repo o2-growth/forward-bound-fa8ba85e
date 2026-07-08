@@ -129,7 +129,7 @@ export function G4Tab() {
   const periodLabel = `${format(dateRange.from, "dd/MM/yyyy")} – ${format(dateRange.to, "dd/MM/yyyy")}`;
 
   const { analytics, refetch } = useG4Analytics(dateRange);
-  const { loading, error, totalLeads, totalPipe, totalFaturado, lives, eventos, seller } = analytics;
+  const { loading, error, totalLeads, totalPipe, totalFaturado, lives, eventos, seller, unclassifiedCount } = analytics;
 
   // Métricas derivadas para o overview comparativo
   const livesOverview   = { totalLeads: lives.cards.length,   totalPipe: lives.pipe.aberto,   totalFaturado: lives.dre.receitaBruta   };
