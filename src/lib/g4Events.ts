@@ -130,7 +130,17 @@ function buildHaystack(card: CardAttrs): string {
     norm(card.campanha),
     norm(card.tipoOrigem),
     norm(card.fonte),
+    norm(card.paginaOrigem),
   ].join(" | ");
+}
+
+/**
+ * Sinal genérico G4: menção a "g4" no haystack ou URL em domínio G4 conhecido.
+ */
+export function hasG4Signal(card: CardAttrs): boolean {
+  if (buildHaystack(card).includes("g4")) return true;
+  const pagina = (card.paginaOrigem || "").toLowerCase();
+  return /g4(educacao|business)\.|g4\.com/.test(pagina);
 }
 
 // ── Predicados de frente ──────────────────────────────────────────────────
@@ -138,40 +148,37 @@ function buildHaystack(card: CardAttrs): string {
 /**
  * Verifica se o card pertence à frente G4 Seller.
  *
- * Sinal primário:  origemLead normalizado === "g4 seller"
- * Sinal secundário: paginaOrigem contém "tools.g4business.com"
- *
- * Nota: campo origemLead = "G4 SELLER" ainda precisa ser configurado
- * no Pipefy pelo Cunha — o fallback via paginaOrigem está ativo enquanto isso.
+ * Sinais aceitos:
+ *  - origemLead normalizado === "g4 seller"
+ *  - paginaOrigem em qualquer *.g4business.com
+ *  - hasG4Signal(card) && haystack contém "seller"
  */
-export function isCardSeller(
-  card: Pick<CardAttrs, "origemLead" | "paginaOrigem">
-): boolean {
-  return (
-    norm(card.origemLead) === "g4 seller" ||
-    norm(card.paginaOrigem).includes("tools.g4business.com")
-  );
+export function isCardSeller(card: CardAttrs): boolean {
+  if (norm(card.origemLead) === "g4 seller") return true;
+  const pagina = (card.paginaOrigem || "").toLowerCase();
+  if (/g4business\./.test(pagina)) return true;
+  return hasG4Signal(card) && buildHaystack(card).includes("seller");
 }
 
 /**
  * Verifica se o card pertence à frente G4 Lives.
  *
- * Critério: origemLead/campanha/tipoOrigem/fonte contém sinal de live G4.
- * Cards com sinal de live são sempre classificados como "lives",
- * independentemente de baterem a janela de uma live específica.
- * A janela de captura é usada apenas para contar leads por live
- * (no buildLivesRows do hook).
+ * Critério: card tem sinal G4 E (haystack contém "live" OU dataEntrada cai
+ * na janela de captura de alguma live cadastrada).
  */
 export function isCardLive(
   card: CardAttrs,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _lives: G4LiveConfig[] = G4_LIVES
+  lives: G4LiveConfig[] = G4_LIVES
 ): boolean {
-  const haystack = buildHaystack(card);
-  return (
-    haystack.includes("live g4") ||
-    (haystack.includes("g4") && haystack.includes("live"))
-  );
+  if (!hasG4Signal(card)) return false;
+  if (buildHaystack(card).includes("live")) return true;
+  const t = card.dataEntrada ? new Date(card.dataEntrada).getTime() : null;
+  if (t === null) return false;
+  return lives.some((live) => {
+    const t0 = new Date(live.date).getTime();
+    const t1 = t0 + live.captureWindowDays * 86_400_000;
+    return t >= t0 && t <= t1;
+  });
 }
 
 /**
