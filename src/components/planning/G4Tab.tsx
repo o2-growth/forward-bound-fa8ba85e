@@ -152,6 +152,11 @@ export function G4Tab() {
             <Badge variant="secondary" className="text-xs">
               Parceria G4 Educação
             </Badge>
+            {unclassifiedCount > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {unclassifiedCount} leads G4 sem frente
+              </Badge>
+            )}
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Leads, funil e retorno financeiro por frente · {periodLabel}
