@@ -240,8 +240,9 @@ export function G4Tab() {
 
       {/* ── SUB-TABS ────────────────────────────────────────────────── */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full max-w-xl grid-cols-4">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="reais">Reais</TabsTrigger>
           <TabsTrigger value="lives">Lives</TabsTrigger>
           <TabsTrigger value="eventos">Eventos</TabsTrigger>
           <TabsTrigger value="seller">G4 Seller</TabsTrigger>
