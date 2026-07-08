@@ -34,6 +34,7 @@ import {
   type G4RealFunilRow,
   type G4RealLead,
 } from "@/hooks/useG4RealMetrics";
+import { LiveDetailDialog, type G4Stage } from "./LiveDetailDialog";
 
 const MAIO_LIVE = "Live G4 - 20-21/05/2026";
 
