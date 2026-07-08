@@ -1,26 +1,66 @@
-## Problema
+## Objetivo
+Conectar o dashboard G4 (aba já existente) a uma base **PostgreSQL externa read-only** com dados reais das lives, levantadas de mão e diagnósticos — mostrando por lead a jornada completa com botão "Abrir no Pipefy".
 
-Hoje `matchLiveFromCard` (em `src/lib/g4Events.ts`) começa com `if (!hasG4Signal(card)) return null;`. Isso descarta leads cuja `origemLead`/`campanha`/`paginaOrigem` menciona a data da live (ex: "Live 20/05", "20/05/2026") mas não contém a string "g4" nem URL em domínio g4. Resultado: drill-down das lives fica com pouquíssimos cards.
+## Arquitetura
 
-## Correção
+```text
+[G4Tab / Sections] → useG4RealMetrics() → supabase.functions.invoke('g4-metrics')
+                                              ↓
+                                    Edge Function (Deno)
+                                              ↓
+                                    Postgres externo (G4_PG_URL)
+                                    read-only: só SELECT
+```
 
-### `src/lib/g4Events.ts` — `matchLiveFromCard`
+Nenhum acesso direto ao Postgres pelo browser. Credencial em secret. O visual atual do dashboard G4 é mantido.
 
-1. **Remover a exigência de `hasG4Signal` como gate inicial.** A função vira: tenta match textual por data/label primeiro; se casar, retorna a live (mesmo sem sinal G4 explícito, porque a menção à data já é a atribuição).
-2. **Reforçar tokens de data** para reduzir falso-positivo:
-   - Manter `dd/mm`, `dd-mm`, `YYYY-MM-DD`, `norm(live.label)`.
-   - Trocar `dd mm` (muito frouxo, casa "20 05" em qualquer texto) por tokens mais seguros: `dd/mm/yyyy`, `d/m` sem zero à esquerda, e a palavra `live` combinada com `dd/mm` já coberta pelo label.
-   - Exigir que o token de data apareça **em conjunto com a palavra `live`** no haystack quando não houver sinal G4 (evita casar cards não-G4 que só têm a data por coincidência). Se `hasG4Signal(card)` for true, aceita só a data.
-3. **Fallback de janela de captura** continua exigindo `hasG4Signal` (senão qualquer lead do período entraria na live).
+## Passos
 
-### Escopo em `LivesSection.tsx`
+### 1. Secret
+- Registrar `G4_PG_URL` com a connection string fornecida (usuário `dash_g4_ro`, só SELECT).
 
-O escopo atual filtra `liveCards` (cards que passaram por `isCardLive`). Com a mudança acima, cards que casam por texto+live mas falham em `isCardLive` (sem "live"/"g4" no haystack) ainda precisam entrar. Ajuste:
+### 2. Edge Function `supabase/functions/g4-metrics/index.ts`
+- Runtime Deno, CORS liberado, `verify_jwt` padrão.
+- Usa `postgres` (`https://deno.land/x/postgresjs/mod.js`) com `ssl: false`.
+- Executa as 5 queries do briefing em paralelo (`Promise.all`).
+- Retorna JSON:
+  ```json
+  {
+    "kpis": { "totalLeads": n, "levantaramMao": n, "diagnosticos": n, "faturamento": n },
+    "funil": [{ "live", "inscritos", "presentes", "levantaramMao", "vendas" }],
+    "diagnosticoPorLive": [{ "live", "diagnosticos" }],
+    "leads": [{ "nome","empresa","email","lives","presenteAlgumaLive","levantouMao","liveDaMao","fezDiagnostico","noPipe","faseAtual","closer","pipefyUrl" }],
+    "generatedAt": "ISO"
+  }
+  ```
+- Fecha `sql.end()` sempre; try/catch com 500 e mensagem.
+- Maio (`Live G4 - 20-21/05/2026`) não tem `presente` — devolver `presentes: null` para a UI mostrar "—".
 
-- Trocar `scope` no dialog para partir de **todos os `cards`** (não só `liveCards`) e filtrar por `matchLiveFromCard(...) !== null` — a nova versão da função já é o critério correto de "é card de alguma live".
+### 3. Hook `src/hooks/useG4RealMetrics.ts`
+- React Query (`queryKey: ['g4-metrics']`, `staleTime: 60s`).
+- Chama `supabase.functions.invoke('g4-metrics')`.
+- Expõe `data, isLoading, isFetching, error, refetch`.
+
+### 4. UI — reaproveitar componentes existentes em `src/components/planning/g4/`
+- **`OverviewSection`**: KPIs (Total Leads, Levantaram a mão, Diagnósticos, Faturamento) + botão **Refresh** (ícone) que chama `refetch()`; badge com `generatedAt`.
+- **`LivesSection`** / novo `LiveFunnelCard`: para cada live renderizar funil **Inscritos → Presentes → Levantaram a mão → Vendas** com % entre etapas, e métrica de **Diagnósticos** ao lado. Quando `presentes` é null, mostrar "—" com tooltip "Maio: sem presença/diagnóstico (fonte não capturou)".
+- **Nova aba/tabela `LeadsTable.tsx`** dentro de `G4Tab`:
+  - Colunas: Nome, Empresa, Live(s) (chips), Presente, Levantou a mão, Diagnóstico, Fase atual, Closer, Ação.
+  - Botão **"Abrir no Pipefy →"** por linha: `<a href={pipefyUrl} target="_blank" rel="noopener">`. Se `pipefyUrl == null`, botão desabilitado com tooltip "sem card no pipe".
+  - Filtros: `<Select>` por live, `<Select>` por fase, chips toggle (levantou a mão / fez diagnóstico / presente), input de busca (nome/empresa/email). Filtragem client-side sobre `leads`.
+- Manter tokens do design system atual (cards escuros, acento verde/vermelho O2). Nada de cor hardcoded.
+
+### 5. Comportamento e regras
+- **Venda** = `fase_atual = 'Ganho'` (já nas queries).
+- Match lead↔pipe por e-mail lowercased (já nas queries).
+- Selo/aviso "Maio: sem presença/diagnóstico (fonte não capturou)" no card da live de maio.
+- Números vão diferir do dashboard antigo — comportamento esperado.
+
+### 6. Validação
+- `supabase--curl_edge_functions` GET `/g4-metrics` para conferir shape e amostragem.
+- Playwright screenshot da aba G4 confirmando KPIs, funil por live e tabela de leads com botão Pipefy.
 
 ## Fora de escopo
-
-- Não altera `isCardLive`, `classifyG4Card`, métricas agregadas nem overrides oficiais.
-- Não mexe em Eventos nem Seller.
-- Só afeta a **listagem do drill-down** de Lives; contagens `inscritos/entraram/mao/venda` do funil continuam vindo do override oficial + cálculo atual.
+- Escrita no Postgres externo (usuário é RO).
+- Alterar cálculos / UI de outras abas do dashboard.
+- Migração das seções existentes que dependem de dados internos (Sellers, Eventos, DRE) — permanecem como estão nesta iteração.

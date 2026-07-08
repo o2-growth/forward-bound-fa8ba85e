@@ -24,6 +24,7 @@ import { G4_PERIOD_START } from "@/lib/g4Events";
 import type { LivesSectionProps } from "./g4/LivesSection";
 import type { EventosSectionProps } from "./g4/EventosSection";
 import type { SellerSectionProps } from "./g4/SellerSection";
+import { G4RealSection } from "./g4/G4RealSection";
 
 // ── Lazy-load das sections (carregam só quando a sub-tab abre) ───────────
 const LivesSection   = lazy(() => import("./g4/LivesSection").then((m) => ({ default: m.LivesSection   as unknown as ComponentType<LivesSectionProps>   })));
@@ -239,8 +240,9 @@ export function G4Tab() {
 
       {/* ── SUB-TABS ────────────────────────────────────────────────── */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full max-w-xl grid-cols-4">
+        <TabsList className="grid w-full max-w-2xl grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="reais">Reais</TabsTrigger>
           <TabsTrigger value="lives">Lives</TabsTrigger>
           <TabsTrigger value="eventos">Eventos</TabsTrigger>
           <TabsTrigger value="seller">G4 Seller</TabsTrigger>
@@ -258,6 +260,12 @@ export function G4Tab() {
             />
           )}
         </TabsContent>
+
+        {/* Reais (fonte externa: lives + diagnóstico + pipe) */}
+        <TabsContent value="reais" className="mt-6">
+          <G4RealSection />
+        </TabsContent>
+
 
         {/* Lives */}
         <TabsContent value="lives" className="mt-6">
