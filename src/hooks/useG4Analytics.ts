@@ -390,6 +390,8 @@ export function useG4Analytics(dateRange: { from: Date; to: Date }): {
         lives: emptyFrente("lives", "G4 Lives"),
         eventos: emptyFrente("eventos", "G4 Eventos"),
         seller: emptyFrente("seller", "G4 Seller"),
+        unclassifiedCount: 0,
+        unclassifiedCards: [],
       };
     }
 
