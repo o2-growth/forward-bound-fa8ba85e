@@ -31,9 +31,14 @@ interface LiveLeadsDialogProps {
 }
 
 const STAGE_HINT: Record<string, string> = {
-  mao: "Cards do Pipefy dentro da janela da(s) live(s) nas fases: Reunião agendada, Reunião Realizada, 1ª Reunião - Apresentação, Proposta enviada / Follow Up, Ganho e Contrato assinado.",
-  venda: "Cards do Pipefy nas fases Ganho ou Contrato assinado dentro da janela da(s) live(s).",
+  inscritos: "Todos os cards do Pipefy atribuídos a este escopo (agregado ou live/evento selecionado).",
+  entraram: "Cards que evoluíram para MQL ou fases posteriores.",
+  mao: "Cards nas fases: Reunião agendada, Reunião Realizada, 1ª Reunião - Apresentação, Proposta enviada / Follow Up, Ganho e Contrato assinado.",
+  venda: "Cards nas fases Ganho ou Contrato assinado.",
 };
+
+const LISTABLE = new Set(["inscritos", "entraram", "mao", "venda"]);
+
 
 function fmtDate(d: Date | null | undefined): string {
   if (!d) return "—";
@@ -53,7 +58,7 @@ export function LiveLeadsDialog({
   totalOfficial,
   cards,
 }: LiveLeadsDialogProps) {
-  const isListable = stageKey === "mao" || stageKey === "venda";
+  const isListable = LISTABLE.has(stageKey);
   const divergence = isListable && totalOfficial !== cards.length;
 
   return (
