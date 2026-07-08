@@ -24,6 +24,7 @@ import { G4_PERIOD_START } from "@/lib/g4Events";
 import type { LivesSectionProps } from "./g4/LivesSection";
 import type { EventosSectionProps } from "./g4/EventosSection";
 import type { SellerSectionProps } from "./g4/SellerSection";
+import { G4RealSection } from "./g4/G4RealSection";
 
 // ── Lazy-load das sections (carregam só quando a sub-tab abre) ───────────
 const LivesSection   = lazy(() => import("./g4/LivesSection").then((m) => ({ default: m.LivesSection   as unknown as ComponentType<LivesSectionProps>   })));
