@@ -516,12 +516,15 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     const tcv = (totalMRR * 12) + totalSetup + totalPontual;
     const ticketMedioTCV = items.length > 0 ? tcv / items.length : 0;
     
+    const faturamentoTotal = totalMRR + totalSetup + totalPontual;
+
     // KPIs
     const kpis: KpiItem[] = [
       { icon: '📋', value: items.length, label: 'Vendas', highlight: 'neutral' },
       { icon: '💵', value: formatCompactCurrency(totalSetup), label: 'Setup', highlight: 'neutral' },
       { icon: '🔁', value: formatCompactCurrency(totalMRR), label: 'MRR', highlight: 'neutral' },
       { icon: '⚡', value: formatCompactCurrency(totalPontual), label: 'Pontual', highlight: 'neutral' },
+      { icon: '💰', value: formatCompactCurrency(faturamentoTotal), label: 'Faturamento (ARPU)', highlight: 'success' },
       { icon: '📊', value: formatCompactCurrency(tcv), label: 'TCV', highlight: 'success' },
     ];
     
