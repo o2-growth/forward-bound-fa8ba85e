@@ -194,36 +194,46 @@ export function matchLiveFromCard(
   card: CardAttrs,
   lives: G4LiveConfig[] = G4_LIVES,
 ): G4LiveConfig | null {
-  if (!hasG4Signal(card)) return null;
   const haystack = buildHaystack(card);
+  const hasG4 = hasG4Signal(card);
+  const mentionsLive = haystack.includes("live");
 
-  // 1) Match textual
+  // 1) Match textual por data/label da live
   const textMatches = lives.filter((live) => {
     const d = new Date(live.date);
     const dd = String(d.getUTCDate()).padStart(2, "0");
     const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const yyyy = d.getUTCFullYear();
+    const dNoPad = String(d.getUTCDate());
+    const mNoPad = String(d.getUTCMonth() + 1);
     const tokens = [
       `${dd}/${mm}`,
       `${dd}-${mm}`,
-      `${dd} ${mm}`,
+      `${dd}/${mm}/${yyyy}`,
+      `${dNoPad}/${mNoPad}`,
       live.date, // "YYYY-MM-DD"
       norm(live.label),
     ];
     return tokens.some((t) => haystack.includes(t));
   });
-  if (textMatches.length === 1) return textMatches[0];
-  if (textMatches.length > 1) {
-    // Desempata pelo mais próximo à data de entrada (ou primeiro)
-    const t = card.dataEntrada ? new Date(card.dataEntrada).getTime() : null;
-    if (t === null) return textMatches[0];
-    return [...textMatches].sort(
-      (a, b) =>
-        Math.abs(t - new Date(a.date).getTime()) -
-        Math.abs(t - new Date(b.date).getTime()),
-    )[0];
+
+  // Sem sinal G4, exigimos também menção à palavra "live" para reduzir falso-positivo
+  const acceptText = hasG4 || mentionsLive;
+  if (acceptText) {
+    if (textMatches.length === 1) return textMatches[0];
+    if (textMatches.length > 1) {
+      const t = card.dataEntrada ? new Date(card.dataEntrada).getTime() : null;
+      if (t === null) return textMatches[0];
+      return [...textMatches].sort(
+        (a, b) =>
+          Math.abs(t - new Date(a.date).getTime()) -
+          Math.abs(t - new Date(b.date).getTime()),
+      )[0];
+    }
   }
 
-  // 2) Janela de captura
+  // 2) Janela de captura — só quando há sinal G4 (evita puxar leads não-G4 do período)
+  if (!hasG4) return null;
   const t = card.dataEntrada ? new Date(card.dataEntrada).getTime() : null;
   if (t === null) return null;
   const windowMatches = lives.filter((live) => {
@@ -232,7 +242,6 @@ export function matchLiveFromCard(
     return t >= t0 && t <= t1;
   });
   if (windowMatches.length === 0) return null;
-  // Prefere a mais próxima anterior
   return [...windowMatches].sort(
     (a, b) =>
       t - new Date(b.date).getTime() - (t - new Date(a.date).getTime()),

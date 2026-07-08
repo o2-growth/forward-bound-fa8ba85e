@@ -1,51 +1,26 @@
-## Objetivo
+## Problema
 
-Todas as etapas do funil das 3 frentes G4 (Lives, Eventos, Seller) ficam clicáveis. Ao clicar, abre um dialog listando os cards do Pipefy atribuídos àquela live/evento específico naquela etapa, com link direto para o card.
+Hoje `matchLiveFromCard` (em `src/lib/g4Events.ts`) começa com `if (!hasG4Signal(card)) return null;`. Isso descarta leads cuja `origemLead`/`campanha`/`paginaOrigem` menciona a data da live (ex: "Live 20/05", "20/05/2026") mas não contém a string "g4" nem URL em domínio g4. Resultado: drill-down das lives fica com pouquíssimos cards.
 
-## Atribuição card → live/evento
+## Correção
 
-Nova função `matchLiveFromCard(card, lives)` em `src/lib/g4Events.ts`, com prioridade:
+### `src/lib/g4Events.ts` — `matchLiveFromCard`
 
-1. **Texto** — normaliza `origemLead + campanha + tipoOrigem + fonte + paginaOrigem` e procura menção à data da live (`20/05`, `2026-05-20`, `20-05`) ou label (`live 20/05`).
-2. **Janela** (fallback) — se nenhuma live casou por texto, escolhe a live cujo intervalo `[date, date + captureWindowDays]` contém `dataEntrada`. Se mais de uma, pega a mais próxima anterior.
+1. **Remover a exigência de `hasG4Signal` como gate inicial.** A função vira: tenta match textual por data/label primeiro; se casar, retorna a live (mesmo sem sinal G4 explícito, porque a menção à data já é a atribuição).
+2. **Reforçar tokens de data** para reduzir falso-positivo:
+   - Manter `dd/mm`, `dd-mm`, `YYYY-MM-DD`, `norm(live.label)`.
+   - Trocar `dd mm` (muito frouxo, casa "20 05" em qualquer texto) por tokens mais seguros: `dd/mm/yyyy`, `d/m` sem zero à esquerda, e a palavra `live` combinada com `dd/mm` já coberta pelo label.
+   - Exigir que o token de data apareça **em conjunto com a palavra `live`** no haystack quando não houver sinal G4 (evita casar cards não-G4 que só têm a data por coincidência). Se `hasG4Signal(card)` for true, aceita só a data.
+3. **Fallback de janela de captura** continua exigindo `hasG4Signal` (senão qualquer lead do período entraria na live).
 
-Para eventos já existe `matchEventoFromCard` (usa tokens + desempate por data) — reutilizado.
+### Escopo em `LivesSection.tsx`
 
-Para seller não há sub-agrupamento: todos os cards seller vão para o mesmo drill-down.
+O escopo atual filtra `liveCards` (cards que passaram por `isCardLive`). Com a mudança acima, cards que casam por texto+live mas falham em `isCardLive` (sem "live"/"g4" no haystack) ainda precisam entrar. Ajuste:
 
-## Mapeamento etapa → fases Pipefy
-
-Reutiliza o mapa já usado em `useG4Analytics` (PHASE_TO_FUNNEL). O dialog recebe `stageKey` (`leads|mql|rm|rr|proposta|venda|inscritos|entraram|mao`) e filtra os cards do escopo cuja `faseAtual` pertence às fases daquela etapa. Para `leads/mql/rm/rr/proposta/venda` a filtragem usa histórico (allCards) para respeitar o princípio de throughput: card conta na etapa se já passou por lá. Para `inscritos/entraram` (que vêm de override oficial da G4, sem lista nominal) o dialog continua mostrando o aviso "lista não disponível no nosso banco" que já existe em `LiveLeadsDialog`.
-
-## Mudanças de arquivo
-
-### `src/lib/g4Events.ts`
-- Adicionar `matchLiveFromCard(card, lives)` (texto → janela).
-
-### `src/lib/g4Funnel.ts`
-- Adicionar helper `cardsByStage(cards, allMovements, stageKey)` que devolve cards únicos que passaram pela etapa (usa histórico para leads/mql/rm/rr/proposta, estado atual para mão/venda).
-
-### `src/components/planning/g4/LiveLeadsDialog.tsx`
-- Habilitar listagem para todas as etapas do funil (não só `mao`/`venda`). Mantém o aviso "lista não disponível" apenas para `inscritos`/`entraram`.
-- Coluna extra "Etapa atingida" já implícita via `faseAtual`.
-
-### `src/components/planning/g4/LivesSection.tsx`
-- `onStageClick` já existe. Passar `allCards` (para histórico) além dos cards representativos.
-- No cálculo de `cards` do dialog, filtrar por `matchLiveFromCard` quando `selectedLive` é null (agregado mostra todos os cards atribuídos a qualquer live).
-- Suportar todos os `stageKey` chamando `cardsByStage`.
-
-### `src/components/planning/g4/EventosSection.tsx`
-- Adicionar estado `dialogStage`, passar `onStageClick={setDialogStage}` ao `FunnelDeluxe`.
-- Renderizar `LiveLeadsDialog` com escopo = `scopedCards` (já filtrados por evento) + `cardsByStage`.
-
-### `src/components/planning/g4/SellerSection.tsx`
-- Idem Eventos, com escopo = `sellerCards`.
-
-### `src/components/planning/g4/FunnelDeluxe.tsx`
-- Confirmar que `onStageClick` é disparado para todas as stages (não só mão/venda). Se hoje está restrito, liberar.
+- Trocar `scope` no dialog para partir de **todos os `cards`** (não só `liveCards`) e filtrar por `matchLiveFromCard(...) !== null` — a nova versão da função já é o critério correto de "é card de alguma live".
 
 ## Fora de escopo
 
-- Não altera métricas nem cálculos existentes — só adiciona drill-down.
-- Não muda `useG4Analytics`.
-- Não cria endpoint novo — usa cards já carregados de `useModeloAtualAnalytics`.
+- Não altera `isCardLive`, `classifyG4Card`, métricas agregadas nem overrides oficiais.
+- Não mexe em Eventos nem Seller.
+- Só afeta a **listagem do drill-down** de Lives; contagens `inscritos/entraram/mao/venda` do funil continuam vindo do override oficial + cálculo atual.
