@@ -144,20 +144,44 @@ Deno.serve(async (req) => {
       faturamento: Number(fatRow.faturamento ?? 0),
     };
 
-    const leads = (leadRows as Array<Record<string, unknown>>).map((r) => ({
-      nome: r.nome as string | null,
-      empresa: r.empresa as string | null,
-      email: r.email as string | null,
-      lives: (r.lives as string[] | null) ?? [],
-      presenteAlgumaLive: Boolean(r.presente_alguma_live),
-      levantouMao: Boolean(r.levantou_mao),
-      liveDaMao: r.live_da_mao as string | null,
-      fezDiagnostico: Boolean(r.fez_diagnostico),
-      noPipe: Boolean(r.no_pipe),
-      faseAtual: r.fase_atual as string | null,
-      closer: r.closer as string | null,
-      pipefyUrl: r.pipefy_url as string | null,
-    }));
+    const nowMs = Date.now();
+    const leads = (leadRows as Array<Record<string, unknown>>).map((r) => {
+      const valorMRR = r.valor_mrr != null ? Number(r.valor_mrr) : null;
+      const valorSetup = r.valor_setup != null ? Number(r.valor_setup) : null;
+      const valorPontual = r.valor_pontual != null ? Number(r.valor_pontual) : null;
+      const tcv =
+        valorMRR != null || valorSetup != null || valorPontual != null
+          ? (valorMRR ?? 0) * 12 + (valorSetup ?? 0) + (valorPontual ?? 0)
+          : null;
+      const dataEntradaPipe = r.data_entrada_pipe
+        ? new Date(r.data_entrada_pipe as string).toISOString()
+        : null;
+      const diasNoPipe = dataEntradaPipe
+        ? Math.max(0, Math.floor((nowMs - new Date(dataEntradaPipe).getTime()) / 86400000))
+        : null;
+      return {
+        nome: r.nome as string | null,
+        empresa: r.empresa as string | null,
+        email: r.email as string | null,
+        lives: (r.lives as string[] | null) ?? [],
+        presenteAlgumaLive: Boolean(r.presente_alguma_live),
+        levantouMao: Boolean(r.levantou_mao),
+        liveDaMao: r.live_da_mao as string | null,
+        fezDiagnostico: Boolean(r.fez_diagnostico),
+        noPipe: Boolean(r.no_pipe),
+        faseAtual: r.fase_atual as string | null,
+        closer: r.closer as string | null,
+        pipefyUrl: r.pipefy_url as string | null,
+        faixa: (r.faixa as string | null) ?? null,
+        valorMRR,
+        valorSetup,
+        valorPontual,
+        tcv,
+        sdr: (r.sdr as string | null) ?? null,
+        dataEntradaPipe,
+        diasNoPipe,
+      };
+    });
 
     return json({
       kpis,
