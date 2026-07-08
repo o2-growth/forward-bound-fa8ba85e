@@ -1,33 +1,31 @@
-## Objetivo
-Reclassificar os leads do evento **G4-Aula-Traction-02/07/2026** no dashboard G4 Real: em vez de contarem como **Inscritos**, eles devem contar apenas como **Levantaram a Mão**. Não temos dados de inscrição nem de presença para esse tipo de evento.
+# Fix: coluna Setup vazia em "Proposta Enviada" no acelerômetro
 
-## Mudanças
+## Diagnóstico
+No drill-down clicável do funil (`ClickableFunnelChart`), a coluna **Setup** já está declarada para todos os indicadores (linha 316), mas ela vem vazia em Proposta porque:
 
-### 1. Edge Function `g4-metrics`
-Ao montar as métricas do funil por live:
-- Detectar eventos de traction pelo nome da live (padrão: contém `Traction`, case-insensitive, após normalização).
-- Para essas lives:
-  - `inscritos = 0`
-  - `presentes = 0`
-  - `levantaram_mao = <total de leads daquele evento>` (o número que hoje aparece como 16 inscritos vira 16 levantaram a mão)
-  - `vendas` permanece como está (vindo da base)
-- Lives normais (não-traction) continuam com a lógica atual, sem alteração.
+- Em `useModeloAtualAnalytics.toDetailItem` usamos `setup: card.valorSetup`.
+- `card.valorSetup` é lido do **movimento específico** da fase "Proposta enviada / Follow Up". Se o valor de Setup só foi preenchido depois (ex: quando o card avançou para Contrato Assinado / Ganho), a linha de movimento da fase Proposta fica com `valorSetup = 0`.
+- Só os `allOpenCards` passam por `hydrateOpenCardsWithHistory` (pega o max dos valores no histórico). Os cards devolvidos por `getCardsForIndicator('proposta')` não são hidratados.
 
-### 2. Agregados globais do funil
-Os totais consolidados (soma de todas as lives) passam a refletir a nova classificação automaticamente, já que somam os campos por live.
+Isso explica por que MRR/Pontual às vezes aparecem mas Setup fica em branco (ou zero).
 
-### 3. Frontend (`G4RealSection.tsx`)
-- Nenhuma mudança de layout necessária — os cards já leem `inscritos`, `presentes`, `levantaram_mao`, `vendas` da API.
-- Opcional (confirmar): adicionar um pequeno rótulo `(Traction)` ao lado do nome da live no funil para deixar claro por que inscritos/presentes estão zerados. **Incluído por padrão no plano; remover se não quiser.**
+## Correção
 
-### 4. Tabela de leads
-Sem mudança. Os leads do evento continuam aparecendo normalmente quando filtrados pela live correspondente.
+Enriquecer os cards não-vendas com o **máximo** dos valores monetários encontrados no `fullHistory` do próprio card, antes de virarem `DetailItem`.
 
-## Fora de escopo
-- Nenhuma alteração de schema no banco externo.
-- Nenhuma mudança em KPIs de outras BUs.
-- Nenhuma mudança nas queries SQL de origem — a reclassificação acontece na camada da Edge Function.
+### Passos (arquivo `src/hooks/useModeloAtualAnalytics.ts`)
 
-## Validação
-- Chamar `g4-metrics` via curl e conferir que a live `G4-Aula-Traction-02/07/2026` retorna `inscritos: 0`, `presentes: 0`, `levantaram_mao: 16`.
-- Conferir que as outras lives (não-traction) mantêm seus números originais.
+1. Criar um `useMemo` `maxMonetaryByCardId: Map<string, { mrr, setup, pontual, educacao }>` percorrendo `[...fullHistory, ...cards, ...allOpenCards]` e guardando o `Math.max` de cada `valor*` por `card.id`.
+2. Em `toDetailItem`, para cada card:
+   - buscar o registro em `maxMonetaryByCardId`;
+   - usar `Math.max(card.valorSetup, maxSetup)` (idem MRR, Pontual, Educação);
+   - recalcular `total` e `value` com esses valores hidratados.
+3. Não mexer na lógica de contagem do funil — apenas na apresentação dos itens do drill-down. Vendas continuam usando os valores do próprio movimento (que já são os corretos por definição).
+
+### Fora de escopo
+- Não altero O2 TAX / Franquia / Oxy Hacker agora (o usuário reclamou só do Modelo Atual / acelerômetro Proposta). Se quiser aplicar lá também, faço em seguida.
+- Nenhuma mudança de schema, edge function ou UI/colunas.
+
+### Validação
+- Abrir acelerômetro → clicar em **Proposta Enviada** → cards que já tinham Setup preenchido em Contrato/Ganho aparecem com o valor na coluna Setup.
+- Total da linha passa a somar MRR+Setup+Pontual corretamente.
