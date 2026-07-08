@@ -516,12 +516,15 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     const tcv = (totalMRR * 12) + totalSetup + totalPontual;
     const ticketMedioTCV = items.length > 0 ? tcv / items.length : 0;
     
+    const faturamentoTotal = totalMRR + totalSetup + totalPontual;
+
     // KPIs
     const kpis: KpiItem[] = [
       { icon: '📋', value: items.length, label: 'Vendas', highlight: 'neutral' },
       { icon: '💵', value: formatCompactCurrency(totalSetup), label: 'Setup', highlight: 'neutral' },
       { icon: '🔁', value: formatCompactCurrency(totalMRR), label: 'MRR', highlight: 'neutral' },
       { icon: '⚡', value: formatCompactCurrency(totalPontual), label: 'Pontual', highlight: 'neutral' },
+      { icon: '💰', value: formatCompactCurrency(faturamentoTotal), label: 'Faturamento (ARPU)', highlight: 'success' },
       { icon: '📊', value: formatCompactCurrency(tcv), label: 'TCV', highlight: 'success' },
     ];
     
@@ -592,9 +595,10 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
       }] : []),
     ];
     
-    // Adicionar TCV calculado a cada item para exibição na tabela
+    // Adicionar TCV e Faturamento calculados a cada item para exibição na tabela
     const itemsWithTCV = items.map(item => ({
       ...item,
+      faturamento: (item.mrr || 0) + (item.setup || 0) + (item.pontual || 0),
       value: ((item.mrr || 0) * 12) + (item.setup || 0) + (item.pontual || 0),
     }));
     
@@ -602,7 +606,7 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     setSheetCharts(charts);
     setSheetTitle('Contratos Assinados - Análise de Valor');
     setSheetDescription(
-      `${items.length} contratos | TCV: ${formatCompactCurrency(tcv)} | ` +
+      `${items.length} contratos | Faturamento: ${formatCompactCurrency(faturamentoTotal)} | TCV: ${formatCompactCurrency(tcv)} | ` +
       `MRR: ${formatCompactCurrency(totalMRR)} | Setup: ${formatCompactCurrency(totalSetup)} | ` +
       `Pontual: ${formatCompactCurrency(totalPontual)} | Ticket médio TCV: ${formatCompactCurrency(ticketMedioTCV)}`
     );
@@ -614,6 +618,7 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
       { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
       { key: 'setup', label: 'Setup', format: columnFormatters.currency },
       { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
+      { key: 'faturamento', label: 'Faturamento', format: columnFormatters.currency },
       { key: 'value', label: 'TCV', format: columnFormatters.currency },
       { key: 'sdr', label: 'SDR' },
       { key: 'responsible', label: 'Closer' },
