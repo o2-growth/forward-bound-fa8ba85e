@@ -184,11 +184,11 @@ export function G4Tab() {
       <div className="flex items-start gap-2 rounded-md border border-dashed border-amber-400/50 bg-amber-50/40 dark:bg-amber-900/10 p-3 text-xs text-muted-foreground">
         <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
         <span>
-          Dados calculados a partir do Pipefy (campo{" "}
-          <strong>origemLead / campanha / paginaOrigem</strong>).
-          Classificação: <strong>G4 Seller</strong> tem prioridade sobre Lives, que tem prioridade sobre Eventos.
-          Leads sem data de entrada atribuídos à frente &quot;Lives&quot; quando sinal de live for detectado.{" "}
-          <strong>Custos de Eventos</strong> ainda zerados (fase 1) — atualizar na planilha quando disponíveis.
+          Classificação usa <strong>origemLead / campanha / tipoOrigem / fonte / paginaOrigem</strong>.
+          Prioridade: <strong>Seller</strong> {'>'} <strong>Lives</strong> {'>'} <strong>Eventos</strong>.
+          Live também é reconhecida quando o card entra dentro da janela de captura
+          de alguma live cadastrada. Cards com sinal G4 mas sem frente aparecem em{" "}
+          <code>/debug/g4-lives-check</code>. Custos de Eventos ainda zerados (fase 1).
         </span>
       </div>
 
