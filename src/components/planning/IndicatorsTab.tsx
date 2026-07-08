@@ -2300,7 +2300,8 @@ export function IndicatorsTab() {
             return ms > 0 ? Math.floor(ms / 86_400_000) : 0;
           })();
           const itemTCV = ((item.mrr || 0) * 12) + (item.setup || 0) + (item.pontual || 0);
-          return { ...item, cicloVenda, value: itemTCV };
+          const itemFaturamento = (item.mrr || 0) + (item.setup || 0) + (item.pontual || 0);
+          return { ...item, cicloVenda, faturamento: itemFaturamento, value: itemTCV };
         });
 
         // Ciclo Médio (apenas contratos com ciclo > 0)
@@ -2316,13 +2317,16 @@ export function IndicatorsTab() {
           const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉';
           return `${medal}${p.name.split(' ')[0]}`;
         }).join(' ');
-        
+
+        const faturamentoARPU = totalMrr + totalSetup + totalPontual;
+
         // KPIs para Venda com TCV
         const kpis: KpiItem[] = [
           { icon: '📝', value: items.length, label: 'Contratos', highlight: 'neutral' },
           { icon: '💵', value: formatCompactCurrency(totalSetup), label: 'Setup', highlight: 'neutral' },
           { icon: '🔁', value: formatCompactCurrency(totalMrr), label: 'MRR', highlight: 'neutral' },
           { icon: '⚡', value: formatCompactCurrency(totalPontual), label: 'Pontual', highlight: 'neutral' },
+          { icon: '💰', value: formatCompactCurrency(faturamentoARPU), label: 'Faturamento (ARPU)', highlight: 'success' },
           { icon: '📊', value: formatCompactCurrency(tcv), label: 'TCV', highlight: 'success' },
           { icon: '⏱️', value: cicloMedio > 0 ? `${cicloMedio}d` : '-', label: 'Ciclo Médio', highlight: 'neutral' },
         ];
@@ -2431,7 +2435,7 @@ export function IndicatorsTab() {
         
         setDetailSheetTitle('Vendas - Análise de Valor (TCV)');
         setDetailSheetDescription(
-          `${items.length} contratos | TCV: ${formatCompactCurrency(tcv)} | MRR: ${formatCompactCurrency(totalMrr)} | Setup: ${formatCompactCurrency(totalSetup)} | Pontual: ${formatCompactCurrency(totalPontual)} | Ticket médio TCV: ${formatCompactCurrency(ticketMedioTCV)}`
+          `${items.length} contratos | Faturamento: ${formatCompactCurrency(faturamentoARPU)} | TCV: ${formatCompactCurrency(tcv)} | MRR: ${formatCompactCurrency(totalMrr)} | Setup: ${formatCompactCurrency(totalSetup)} | Pontual: ${formatCompactCurrency(totalPontual)} | Ticket médio TCV: ${formatCompactCurrency(ticketMedioTCV)}`
         );
         setDetailSheetKpis(kpis);
         setDetailSheetCharts(charts);
@@ -2443,6 +2447,7 @@ export function IndicatorsTab() {
           { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
           { key: 'setup', label: 'Setup', format: columnFormatters.currency },
           { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
+          { key: 'faturamento', label: 'Faturamento', format: columnFormatters.currency },
           { key: 'value', label: 'TCV', format: columnFormatters.currency },
           { key: 'sdr', label: 'SDR' },
           { key: 'responsible', label: 'Closer' },
