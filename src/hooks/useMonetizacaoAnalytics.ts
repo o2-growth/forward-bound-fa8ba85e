@@ -463,9 +463,9 @@ export function useMonetizacaoAnalytics(
   };
 
   // Classificação Proposta/Venda por evento do mês (fasesNoPeriodo), não pela Fase Atual.
-  // Regra: Downsell = churn/queda de receita de cliente da base → NÃO conta como venda
-  // (nova receita). Apenas Upsell, Cross-sell e Troca de produto entram em venda.
-  const VENDA_TIPOS_PERMITIDOS = new Set(['Upsell', 'Cross-sell', 'Troca de produto']);
+  // Regra: Downsell e Troca de produto = churn/queda de receita de cliente da base →
+  // NÃO contam como venda (nova receita). Apenas Upsell e Cross-sell entram em venda.
+  const VENDA_TIPOS_PERMITIDOS = new Set(['Upsell', 'Cross-sell']);
   const getDetailItemsForIndicator = (
     indicator: MonetizacaoIndicatorType,
   ): DetailItem[] => {
