@@ -1,23 +1,18 @@
-## Problema
+## Objetivo
 
-No drill-down "Propostas - Onde o Pipeline Está Travando?" (Modelo Atual / não-expansão), a tabela mostra apenas **Valor Total** e **MRR**, sem colunas de **Setup** e **Pontual**, diferente do padrão dos outros drill-downs.
+No drill-down "Vendas - Análise de Valor" adicionar a métrica **Faturamento (ARPU)** = MRR + Setup + Pontual (distinta do TCV que usa MRR×12).
 
-## Correção
+## Alterações em `src/components/planning/ClickableFunnelChart.tsx` (buildVendaMiniDashboard)
 
-Em `src/components/planning/ClickableFunnelChart.tsx` (linhas 490-498), adicionar as colunas `setup` e `pontual` no array `propostaColumns` do ramo não-expansão:
+1. **KPI novo** no topo, antes do TCV:
+   - `{ icon: '💰', value: formatCompactCurrency(totalMRR + totalSetup + totalPontual), label: 'Faturamento (ARPU)', highlight: 'success' }`
 
-```ts
-[
-  { key: 'product', label: 'Produto', format: columnFormatters.product },
-  { key: 'company', label: 'Empresa' },
-  { key: 'value',   label: 'Valor Total', format: columnFormatters.currency },
-  { key: 'mrr',     label: 'MRR',     format: columnFormatters.currency },
-  { key: 'setup',   label: 'Setup',   format: columnFormatters.currency },
-  { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
-  { key: 'responsible', label: 'Closer' },
-  { key: 'diasEmProposta', label: 'Dias em Proposta', format: columnFormatters.agingWithAlert },
-  { key: 'date', label: 'Data Envio', format: columnFormatters.date },
-]
-```
+2. **Descrição do drawer** — incluir Faturamento total:
+   - `... | Faturamento: R$ X | TCV: R$ Y | ...`
 
-Escopo restrito ao ramo não-expansão — o ramo `isExpansaoBU` (Franquia/Oxy) permanece inalterado, pois ali só existe Pontual (já exibido).
+3. **Coluna nova na tabela** entre Pontual e TCV:
+   - `{ key: 'faturamento', label: 'Faturamento', format: columnFormatters.currency }`
+   - Preencher em `itemsWithTCV`: `faturamento: (item.mrr||0) + (item.setup||0) + (item.pontual||0)`
+   - Adicionar `faturamento?: number` em `DetailItem` (`src/components/planning/indicators/DetailSheet.tsx`).
+
+Escopo restrito a esse drawer — TCV continua igual.
