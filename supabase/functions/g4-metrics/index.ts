@@ -50,6 +50,7 @@ Deno.serve(async (req) => {
           WHERE i.email NOT ILIKE '%teste%' AND i.email NOT ILIKE '%exemplo.com%'
             AND i.email NOT ILIKE '%@o2inc.com.br'
             AND i.email NOT IN ('dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com','demo@exemplo.com')
+            AND i.live <> 'Raio-X de Margens - G4'
           GROUP BY i.live ORDER BY i.live
         `,
         sql /* diagnóstico por live */`
@@ -58,12 +59,15 @@ Deno.serve(async (req) => {
           WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%exemplo.com%'
             AND email NOT ILIKE '%@o2inc.com.br'
             AND email NOT IN ('dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com','demo@exemplo.com')
+            AND (live IS NULL OR live <> 'Raio-X de Margens - G4')
           GROUP BY live ORDER BY live
         `,
         sql /* KPIs topo */`
           SELECT
             (SELECT COUNT(DISTINCT email) FROM g4_inscritos
-              WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%@o2inc.com.br') AS total_leads,
+              WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%@o2inc.com.br'
+                AND live <> 'Raio-X de Margens - G4') AS total_leads,
+
             (SELECT COUNT(*) FROM g4_levantadas_mao) AS levantaram_mao,
             (SELECT COUNT(DISTINCT email) FROM g4_diagnostico) AS diagnosticos
         `,
@@ -114,8 +118,11 @@ Deno.serve(async (req) => {
               END AS faixa
             FROM diag
           )
-          SELECT l.nome, l.empresa, l.email, l.lives, l.presente_alguma_live, l.levantou_mao,
-                 l.live_da_mao, l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer, l.pipefy_url,
+          SELECT l.nome, l.empresa, l.email,
+                 array_remove(l.lives, 'Raio-X de Margens - G4') AS lives,
+                 l.presente_alguma_live, l.levantou_mao,
+                 CASE WHEN l.live_da_mao = 'Raio-X de Margens - G4' THEN NULL ELSE l.live_da_mao END AS live_da_mao,
+                 l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer, l.pipefy_url,
                  COALESCE(p.faixa, d.faixa) AS faixa,
                  p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe
           FROM g4_leads_360 l
@@ -123,6 +130,7 @@ Deno.serve(async (req) => {
           LEFT JOIN diag_faixa d ON d.email = l.email
           WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%@o2inc.com.br'
           ORDER BY l.levantou_mao DESC, l.fez_diagnostico DESC, l.no_pipe DESC
+
         `,
       ],
     );
