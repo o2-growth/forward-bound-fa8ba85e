@@ -1,25 +1,23 @@
 ## Problema
 
-Na tabela "Leads Quente" (e demais drawers de temperatura), leads de **Franquia** e **Oxy Hacker** aparecem com `Total = -` mesmo quando têm Pontual preenchido (ex: Arlindo Ferri, Eberson e Sirlene, Marcia oxy hacker, Francisco Carlos).
-
-## Causa
-
-`toDetailItem` em `src/hooks/useExpansaoAnalytics.ts` (linha 537) monta o `DetailItem` com `mrr`, `setup` e `pontual`, mas **não define `total`**. Já os demais BUs (Modelo Atual, Outbound, Monetização) definem `total = mrr + setup + pontual` corretamente.
+No drill-down "Propostas - Onde o Pipeline Está Travando?" (Modelo Atual / não-expansão), a tabela mostra apenas **Valor Total** e **MRR**, sem colunas de **Setup** e **Pontual**, diferente do padrão dos outros drill-downs.
 
 ## Correção
 
-Em `src/hooks/useExpansaoAnalytics.ts`, adicionar no objeto retornado por `toDetailItem`:
+Em `src/components/planning/ClickableFunnelChart.tsx` (linhas 490-498), adicionar as colunas `setup` e `pontual` no array `propostaColumns` do ramo não-expansão:
 
 ```ts
-total: (card.valorMRR || 0)
-     + (card.valorSetup || 0)
-     + (card.taxaFranquia > 0
-         ? card.taxaFranquia
-         : card.valorPontual > 0
-           ? card.valorPontual
-           : (card.produto === 'Franquia' ? 140000 : 54000)),
+[
+  { key: 'product', label: 'Produto', format: columnFormatters.product },
+  { key: 'company', label: 'Empresa' },
+  { key: 'value',   label: 'Valor Total', format: columnFormatters.currency },
+  { key: 'mrr',     label: 'MRR',     format: columnFormatters.currency },
+  { key: 'setup',   label: 'Setup',   format: columnFormatters.currency },
+  { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
+  { key: 'responsible', label: 'Closer' },
+  { key: 'diasEmProposta', label: 'Dias em Proposta', format: columnFormatters.agingWithAlert },
+  { key: 'date', label: 'Data Envio', format: columnFormatters.date },
+]
 ```
 
-Usando exatamente a mesma expressão do `pontual` para manter consistência com o valor exibido na coluna Pontual.
-
-Nenhuma outra alteração é necessária — a coluna Total do DetailSheet já formata `item.total` como moeda quando presente.
+Escopo restrito ao ramo não-expansão — o ramo `isExpansaoBU` (Franquia/Oxy) permanece inalterado, pois ali só existe Pontual (já exibido).
