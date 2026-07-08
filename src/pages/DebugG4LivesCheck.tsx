@@ -11,7 +11,7 @@ import { useMemo, useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useModeloAtualAnalytics, type ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
-import { G4_LIVES, isCardLive } from "@/lib/g4Events";
+import { G4_LIVES, G4_EVENTOS, isCardLive, classifyG4Card, hasG4Signal } from "@/lib/g4Events";
 import { cardsForLive, computeCounts } from "@/lib/g4Funnel";
 import { LIVES_OFICIAIS } from "@/data/livesOfficial";
 
@@ -58,6 +58,20 @@ export default function DebugG4LivesCheck() {
     [allCards],
   );
 
+  // Cards com sinal G4 mas sem frente classificada (dedup por id, mais recente)
+  const unclassifiedG4 = useMemo(() => {
+    const repMap = new Map<string, ModeloAtualCard>();
+    for (const c of allCards ?? []) {
+      const cur = repMap.get(c.id);
+      if (!cur || c.dataEntrada > cur.dataEntrada) repMap.set(c.id, c);
+    }
+    const out: ModeloAtualCard[] = [];
+    for (const c of repMap.values()) {
+      if (!classifyG4Card(c, G4_LIVES, G4_EVENTOS) && hasG4Signal(c)) out.push(c);
+    }
+    return out.sort((a, b) => b.dataEntrada.getTime() - a.dataEntrada.getTime());
+  }, [allCards]);
+
   const [openLive, setOpenLive] = useState<string | null>(null);
 
   if (admin === "loading" || isLoading) {
@@ -75,6 +89,67 @@ export default function DebugG4LivesCheck() {
           fallback hoje). Total de cards classificados como live no período:{" "}
           <strong>{liveCards.length}</strong>.
         </p>
+      </div>
+
+      {/* ── Cards G4 detectados sem frente ─────────────────────────────── */}
+      <div className="border rounded-lg p-4 bg-card">
+        <div className="flex items-baseline justify-between mb-2">
+          <h2 className="font-semibold text-lg">
+            Cards com sinal G4 mas sem frente atribuída
+          </h2>
+          <span className="text-sm text-muted-foreground">
+            {unclassifiedG4.length} card(s)
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Cards que têm menção a "G4" em algum campo de atribuição
+          (origem/campanha/tipoOrigem/fonte/paginaOrigem) mas não bateram nenhuma
+          regra de Seller / Lives / Eventos. Use esta lista para descobrir
+          tokens/domínios faltando e ampliar as regras em <code>g4Events.ts</code>.
+        </p>
+        {unclassifiedG4.length === 0 ? (
+          <p className="text-sm text-emerald-600">Nenhum card sem frente. ✓</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b">
+                  <th className="py-1 pr-2">ID</th>
+                  <th className="py-1 pr-2">Título</th>
+                  <th className="py-1 pr-2">origemLead</th>
+                  <th className="py-1 pr-2">campanha</th>
+                  <th className="py-1 pr-2">tipoOrigem</th>
+                  <th className="py-1 pr-2">fonte</th>
+                  <th className="py-1 pr-2">paginaOrigem</th>
+                  <th className="py-1 pr-2">Entrada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unclassifiedG4.slice(0, 200).map((c) => (
+                  <tr key={c.id} className="border-b last:border-0 align-top">
+                    <td className="py-1 pr-2 font-mono">{c.id}</td>
+                    <td className="py-1 pr-2">{c.titulo}</td>
+                    <td className="py-1 pr-2">{c.origemLead || "-"}</td>
+                    <td className="py-1 pr-2">{c.campanha || "-"}</td>
+                    <td className="py-1 pr-2">{c.tipoOrigem || "-"}</td>
+                    <td className="py-1 pr-2">{c.fonte || "-"}</td>
+                    <td className="py-1 pr-2 max-w-[220px] truncate">
+                      {c.paginaOrigem || "-"}
+                    </td>
+                    <td className="py-1 pr-2">
+                      {c.dataEntrada.toLocaleString("pt-BR")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {unclassifiedG4.length > 200 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Mostrando 200 de {unclassifiedG4.length}.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {G4_LIVES.map((live) => {

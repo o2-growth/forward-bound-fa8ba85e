@@ -21,6 +21,7 @@ import {
   IMPOSTO_PCT,
   COMISSAO_G4_PCT,
   classifyG4Card,
+  hasG4Signal,
   matchEventoFromCard,
   type G4Frente,
   type G4LiveConfig,
@@ -104,6 +105,9 @@ export interface G4Analytics {
   lives: G4FrenteMetrics;
   eventos: G4FrenteMetrics;
   seller: G4FrenteMetrics;
+  /** Cards com sinal G4 mas sem frente atribuída — para diagnóstico. */
+  unclassifiedCount: number;
+  unclassifiedCards: ModeloAtualCard[];
 }
 
 // ── Mapeamento de fases Pipefy → etapa do funil G4 ───────────────────────
@@ -386,6 +390,8 @@ export function useG4Analytics(dateRange: { from: Date; to: Date }): {
         lives: emptyFrente("lives", "G4 Lives"),
         eventos: emptyFrente("eventos", "G4 Eventos"),
         seller: emptyFrente("seller", "G4 Seller"),
+        unclassifiedCount: 0,
+        unclassifiedCards: [],
       };
     }
 
@@ -410,9 +416,14 @@ export function useG4Analytics(dateRange: { from: Date; to: Date }): {
 
     // ── Passo 2: Classifica cada card único na sua frente G4 ────────────
     const cardFrente = new Map<string, G4Frente>();
+    const unclassifiedCards: ModeloAtualCard[] = [];
     for (const [cardId, repCard] of cardRepMap) {
       const frente = classifyG4Card(repCard, G4_LIVES, G4_EVENTOS);
-      if (frente) cardFrente.set(cardId, frente);
+      if (frente) {
+        cardFrente.set(cardId, frente);
+      } else if (hasG4Signal(repCard)) {
+        unclassifiedCards.push(repCard);
+      }
     }
 
     // ── Passo 3: Agrupa representantes por frente ────────────────────────
@@ -512,6 +523,8 @@ export function useG4Analytics(dateRange: { from: Date; to: Date }): {
       lives: livesMetrics,
       eventos: eventosMetrics,
       seller: sellerMetrics,
+      unclassifiedCount: unclassifiedCards.length,
+      unclassifiedCards,
     };
   }, [allCards, isLoading, error, dateRange.from, dateRange.to]); // eslint-disable-line react-hooks/exhaustive-deps
 
