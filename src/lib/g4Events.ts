@@ -197,9 +197,8 @@ export function matchEventoFromCard(
 ): G4EventoConfig | null {
   const haystack = buildHaystack(card);
 
-  // Guard: só considera "evento G4" se houver sinal explícito de G4
-  // em algum campo de atribuição (origem/campanha/tipoOrigem/fonte).
-  if (!haystack.includes("g4")) return null;
+  // Guard: só considera "evento G4" se houver sinal G4 (incl. paginaOrigem).
+  if (!hasG4Signal(card)) return null;
 
   const entradaMs = card.dataEntrada
     ? new Date(card.dataEntrada).getTime()
@@ -242,16 +241,16 @@ const EVENT_TOKENS = [
 
 /**
  * Verifica se o card pertence à frente G4 Eventos.
- * Exige "g4" E ao menos um token de evento em origem/campanha/tipo/fonte.
+ * Exige sinal G4 E (token de evento OU matchEventoFromCard positivo).
  */
 export function isCardEvento(
   card: CardAttrs,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _eventos: G4EventoConfig[] = G4_EVENTOS
+  eventos: G4EventoConfig[] = G4_EVENTOS
 ): boolean {
+  if (!hasG4Signal(card)) return false;
   const haystack = buildHaystack(card);
-  if (!haystack.includes("g4")) return false;
-  return EVENT_TOKENS.some((t) => haystack.includes(t));
+  if (EVENT_TOKENS.some((t) => haystack.includes(t))) return true;
+  return matchEventoFromCard(card, eventos) !== null;
 }
 
 /**
