@@ -697,6 +697,12 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       if (inferred) productCategory = inferred;
     }
 
+    const hydrated = maxMonetaryByCardId.get(card.id);
+    const mrr = Math.max(card.valorMRR || 0, hydrated?.mrr || 0);
+    const setup = Math.max(card.valorSetup || 0, hydrated?.setup || 0);
+    const pontual = Math.max(card.valorPontual || 0, hydrated?.pontual || 0);
+    const total = mrr + setup + pontual;
+
     return {
       id: card.id,
       name: card.titulo || card.empresa || 'Sem título',
@@ -705,15 +711,15 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       date: (card.dataAssinatura && PHASE_TO_INDICATOR[card.fase] === 'venda'
         ? card.dataAssinatura
         : card.dataEntrada).toISOString(),
-      value: card.valor,
+      value: total > 0 ? total : card.valor,
       revenueRange: card.faixa || undefined,
       responsible: card.closer || card.responsavel || undefined, // Prioritize closer for display
       duration: card.duracao,
       product: productCategory,
-      mrr: card.valorMRR,
-      setup: card.valorSetup,
-      pontual: card.valorPontual,
-      total: (card.valorMRR || 0) + (card.valorSetup || 0) + (card.valorPontual || 0),
+      mrr,
+      setup,
+      pontual,
+      total,
       closer: card.closer,
       sdr: card.sdr,
       dataAssinatura: card.dataAssinatura?.toISOString() || undefined,
