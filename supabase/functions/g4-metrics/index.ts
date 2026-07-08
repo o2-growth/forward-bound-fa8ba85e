@@ -89,7 +89,8 @@ Deno.serve(async (req) => {
               COALESCE("Valor Setup", 0)::float8 AS valor_setup,
               COALESCE("Valor Pontual", 0)::float8 AS valor_pontual,
               "SDR responsável" AS sdr,
-              "Entrada" AS data_entrada_pipe
+              "Entrada" AS data_entrada_pipe,
+              "ID" AS card_id
             FROM pipefy_moviment_cfos
             WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
             ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
@@ -122,7 +123,8 @@ Deno.serve(async (req) => {
                  array_remove(l.lives, 'Raio-X de Margens - G4') AS lives,
                  l.presente_alguma_live, l.levantou_mao,
                  CASE WHEN l.live_da_mao = 'Raio-X de Margens - G4' THEN NULL ELSE l.live_da_mao END AS live_da_mao,
-                 l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer, l.pipefy_url,
+                 l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer,
+                 COALESCE(l.pipefy_url, 'https://app.pipefy.com/open-cards/' || p.card_id) AS pipefy_url,
                  COALESCE(p.faixa, d.faixa) AS faixa,
                  p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe
           FROM g4_leads_360 l
