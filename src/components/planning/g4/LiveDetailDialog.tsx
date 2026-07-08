@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import {
   Dialog,
@@ -15,8 +16,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { G4RealLead } from "@/hooks/useG4RealMetrics";
+import { isMqlQualified } from "@/hooks/useModeloAtualMetas";
 
 export type G4Stage =
   | "inscritos"
@@ -33,6 +42,25 @@ const STAGE_LABEL: Record<G4Stage, string> = {
   diagnosticos: "Diagnósticos",
 };
 
+const fmtBRL = (v: number | null | undefined) =>
+  v == null
+    ? "—"
+    : new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(v);
+
+const fmtDate = (iso: string | null | undefined) =>
+  iso
+    ? new Date(iso).toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+      })
+    : "—";
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -48,42 +76,65 @@ export function LiveDetailDialog({
   stage,
   leads,
 }: Props) {
+  const [onlyMql, setOnlyMql] = useState(false);
+
+  const filtered = useMemo(
+    () => (onlyMql ? leads.filter((l) => isMqlQualified(l.faixa ?? undefined)) : leads),
+    [leads, onlyMql],
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent className="max-w-[95vw] lg:max-w-6xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             {STAGE_LABEL[stage]}
             <Badge variant="secondary">{live}</Badge>
-            <Badge variant="outline">{leads.length}</Badge>
+            <Badge variant="outline">{filtered.length}</Badge>
+            <div className="ml-auto">
+              <Button
+                size="sm"
+                variant={onlyMql ? "default" : "outline"}
+                onClick={() => setOnlyMql((v) => !v)}
+              >
+                Só MQL (≥ R$ 200k)
+              </Button>
+            </div>
           </DialogTitle>
           <DialogDescription>
             {stage === "presentes"
-              ? "Presença atual é agregada por lead (em alguma live) — quando a fonte cadastrar presença por live específica, esta lista fica exata."
-              : "Detalhamento a partir do banco unificado das lives (g4_leads_360)."}
+              ? "Presença é agregada por lead (em alguma live) — quando a fonte cadastrar presença por live específica, esta lista fica exata."
+              : "Detalhamento a partir do banco unificado das lives (g4_leads_360) + Pipefy."}
           </DialogDescription>
         </DialogHeader>
 
-        {leads.length === 0 ? (
+        {filtered.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             Nenhum lead encontrado nesta etapa.
           </p>
         ) : (
-          <ScrollArea className="max-h-[60vh]">
+          <ScrollArea className="max-h-[65vh]">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome / e-mail</TableHead>
                   <TableHead>Empresa</TableHead>
+                  <TableHead>Faixa</TableHead>
+                  <TableHead className="text-right">MRR</TableHead>
+                  <TableHead className="text-right">Setup</TableHead>
+                  <TableHead className="text-right">Pontual</TableHead>
+                  <TableHead className="text-right">TCV</TableHead>
                   <TableHead>Fase atual</TableHead>
+                  <TableHead>SDR</TableHead>
                   <TableHead>Closer</TableHead>
+                  <TableHead className="text-right">Dias</TableHead>
                   <TableHead className="text-center">Mão</TableHead>
                   <TableHead className="text-center">Diag.</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leads.map((l, i) => (
+                {filtered.map((l, i) => (
                   <TableRow key={`${l.email ?? "no-email"}-${i}`}>
                     <TableCell className="font-medium">
                       {l.nome || "—"}
@@ -93,6 +144,27 @@ export function LiveDetailDialog({
                     </TableCell>
                     <TableCell>{l.empresa || "—"}</TableCell>
                     <TableCell>
+                      {l.faixa ? (
+                        <Badge variant="outline" className="font-normal whitespace-nowrap">
+                          {l.faixa}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {fmtBRL(l.valorMRR)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {fmtBRL(l.valorSetup)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {fmtBRL(l.valorPontual)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-xs font-medium">
+                      {fmtBRL(l.tcv)}
+                    </TableCell>
+                    <TableCell>
                       {l.faseAtual ? (
                         <Badge variant="outline" className="font-normal">
                           {l.faseAtual}
@@ -101,8 +173,23 @@ export function LiveDetailDialog({
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs">
-                      {l.closer || "—"}
+                    <TableCell className="text-xs">{l.sdr || "—"}</TableCell>
+                    <TableCell className="text-xs">{l.closer || "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums text-xs">
+                      {l.diasNoPipe != null ? (
+                        <TooltipProvider delayDuration={150}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span>{l.diasNoPipe}d</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Entrou em {fmtDate(l.dataEntradaPipe)}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-center">
                       {l.levantouMao ? (
