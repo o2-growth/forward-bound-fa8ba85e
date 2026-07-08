@@ -3244,8 +3244,6 @@ export function IndicatorsTab() {
     if (!includesModeloAtual) return [];
     const terminalPhases = new Set([
       'ganho',
-      'contrato assinado',
-      'contrato em elaboração',
       'perdido',
       'perda',
       'arquivado',
@@ -3253,6 +3251,7 @@ export function IndicatorsTab() {
       'concluido',
       'finalizado',
     ]);
+
     // Agrupa todas as linhas por card para inspecionar histórico e latest
     const rowsById = new Map<string, (typeof modeloAtualAnalyticsRaw.allCards)[number][]>();
     for (const card of modeloAtualAnalyticsRaw.allCards) {
