@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
             WHERE c."Fase Atual" = 'Ganho'
           ) t
         `,
-        sql /* leads 360 enriquecido com dados do Pipefy */`
+        sql /* leads 360 enriquecido com Pipefy + faixa via diagnóstico */`
           WITH pipe AS (
             SELECT DISTINCT ON (lower("E-mail"))
               lower("E-mail") AS email,
@@ -89,12 +89,38 @@ Deno.serve(async (req) => {
             FROM pipefy_moviment_cfos
             WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
             ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
+          ),
+          diag AS (
+            SELECT DISTINCT ON (lower(email))
+              lower(email) AS email,
+              NULLIF(payload->>'revenue_monthly','')::numeric AS revenue_monthly
+            FROM g4_diagnostico
+            WHERE email IS NOT NULL AND email <> ''
+              AND payload->>'revenue_monthly' IS NOT NULL
+            ORDER BY lower(email), ts DESC NULLS LAST
+          ),
+          diag_faixa AS (
+            SELECT email,
+              CASE
+                WHEN revenue_monthly >= 5000000 THEN 'Acima de R$ 5 milhões'
+                WHEN revenue_monthly >= 1000000 THEN 'Entre R$ 1 milhão e R$ 5 milhões'
+                WHEN revenue_monthly >= 500000  THEN 'Entre R$ 500 mil e R$ 1 milhão'
+                WHEN revenue_monthly >= 350000  THEN 'Entre R$ 350 mil e R$ 500 mil'
+                WHEN revenue_monthly >= 200000  THEN 'Entre R$ 200 mil e R$ 350 mil'
+                WHEN revenue_monthly >= 100000  THEN 'Entre R$ 100 mil e R$ 200 mil'
+                WHEN revenue_monthly >= 50000   THEN 'Entre R$ 50 mil e R$ 100 mil'
+                WHEN revenue_monthly > 0        THEN 'Até R$ 50 mil'
+                ELSE NULL
+              END AS faixa
+            FROM diag
           )
           SELECT l.nome, l.empresa, l.email, l.lives, l.presente_alguma_live, l.levantou_mao,
                  l.live_da_mao, l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer, l.pipefy_url,
-                 p.faixa, p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe
+                 COALESCE(p.faixa, d.faixa) AS faixa,
+                 p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe
           FROM g4_leads_360 l
           LEFT JOIN pipe p ON p.email = l.email
+          LEFT JOIN diag_faixa d ON d.email = l.email
           WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%@o2inc.com.br'
           ORDER BY l.levantou_mao DESC, l.fez_diagnostico DESC, l.no_pipe DESC
         `,

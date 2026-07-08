@@ -1,33 +1,23 @@
-# G4 Real: enriquecer detalhamento do funil por live + filtro MQL
+# Faixa de faturamento no G4 Real — fallback via g4_diagnostico
 
-## Backend — `supabase/functions/g4-metrics/index.ts`
-Ampliar a query `g4_leads_360` fazendo `LEFT JOIN` com `pipefy_moviment_cfos` (deduplicado por e-mail, pegando o card mais recente — mesmo padrão usado no funil) para trazer por lead:
-- `faixa` (Faixa de faturamento)
-- `valor_mrr`, `valor_setup`, `valor_pontual`
-- `tcv` = `valor_mrr * 12 + valor_setup + valor_pontual` (calculado no map)
-- `sdr` (SDR responsável)
-- `data_entrada_pipe` (Entrada do card mais recente)
-- `dias_no_pipe` (calculado no map: hoje − dataEntrada, em dias)
+## Diagnóstico
+- `pipefy_moviment_cfos."Faixa de faturamento mensal"` só existe para leads que viraram card no Pipe. Leads que só se inscreveram/preencheram diagnóstico ficam com `faixa = null`.
+- Já confirmei via curl que o join com Pipe está devolvendo a faixa correta para quem tem card (ex.: "Entre R$ 1 milhão e R$ 5 milhões").
+- Faltando: enriquecer com a faixa que o próprio lead responde no **formulário do diagnóstico** (coluna `g4_diagnostico.payload` — jsonb).
 
-Devolvidos no array `leads[]` já existente.
+## Passos
 
-## Tipos — `src/hooks/useG4RealMetrics.ts`
-Adicionar em `G4RealLead`: `faixa`, `valorMRR`, `valorSetup`, `valorPontual`, `tcv`, `sdr`, `dataEntradaPipe`, `diasNoPipe`.
+### 1. Descobrir a chave no payload
+Adicionar `g4_diagnostico` à `validTables` de `supabase/functions/query-external-db/index.ts` (só leitura, mesmo padrão dos outros) e usar `action: preview` para inspecionar 1 payload.
 
-## Dialog — `src/components/planning/g4/LiveDetailDialog.tsx`
-Novas colunas na tabela:
-- **Faixa** (badge)
-- **MRR / Setup / Pontual / TCV** (currency, tabulares)
-- **SDR**
-- **Dias no pipe** (número + data de entrada em tooltip)
+### 2. Atualizar `supabase/functions/g4-metrics/index.ts`
+Na CTE dos leads, criar `diag_faixa` que agrupa por email pegando o `payload->>'<chave>'` (COALESCE das variações mais prováveis: `faixa_de_faturamento_mensal`, `faixa_faturamento`, `Faixa de faturamento mensal`, `faixa`), preferindo o registro mais recente por `ts`.
 
-Manter as já existentes (Nome/e-mail, Empresa, Fase atual, Closer, Mão, Diag, link Pipefy).
+`SELECT ... COALESCE(p.faixa, d.faixa) AS faixa` no output final.
 
-Adicionar **toggle "Só MQL"** no cabeçalho do dialog:
-- Regra MQL Modelo Atual: `faixa` mapeada para valor ≥ R$ 200k (reusar helper `isMqlQualified` de `useModeloAtualAnalytics` — extrair para `src/lib/mqlFaixa.ts` para poder importar em ambos os lados sem dependência circular).
-- Quando ativo, filtra a lista mostrada e atualiza o contador no badge.
+### 3. Sem mudanças na UI
+O dialog já lê `faixa`. Vai aparecer automaticamente para os leads que só têm diagnóstico.
 
 ## Fora de escopo
-- Sem mudanças em KPIs de topo, tabela de leads geral, ou nos cards do funil por live.
-- Sem migração/schema — leitura pura do DB externo.
-- Não altero regra de contagem do funil (edge function segue mesma contagem).
+- Não puxo faixa de `g4_inscritos` (a tabela não tem esse campo).
+- Não altero regra de contagem de nada — só enriqueço a coluna Faixa exibida.
