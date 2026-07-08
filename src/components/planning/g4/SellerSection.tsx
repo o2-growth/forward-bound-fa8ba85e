@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ShoppingBag, Info } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,10 +6,11 @@ import { fmtInt } from "@/components/planning/ceo/ceoShared";
 import { FrenteMetricsRow } from "./FrenteMetricsRow";
 import { FrenteDreCard, type G4Dre } from "./FrenteDreCard";
 import { FunnelDeluxe } from "./FunnelDeluxe";
+import { LiveLeadsDialog } from "./LiveLeadsDialog";
 import { useG4FunnelStages } from "@/hooks/useG4FunnelStages";
 import type { ModeloAtualCard } from "@/hooks/useModeloAtualAnalytics";
 import { isCardSeller } from "@/lib/g4Events";
-import { computeCounts, mergeStages } from "@/lib/g4Funnel";
+import { cardsByStage, computeCounts, mergeStages } from "@/lib/g4Funnel";
 
 export interface SellerSectionProps {
   leads: number;
@@ -28,6 +29,8 @@ export function SellerSection({
   dre,
   cards = [],
 }: SellerSectionProps) {
+  const [dialogStage, setDialogStage] = useState<string | null>(null);
+
   const dreNorm: G4Dre = {
     receitaBruta: dre.receitaBruta,
     imposto: dre.imposto,
@@ -91,9 +94,30 @@ export function SellerSection({
         stages={stages}
         contextLabel="Canal G4 Seller"
         contextSub="Consolidado"
+        onStageClick={setDialogStage}
       />
 
       <FrenteDreCard title="P&L — G4 Seller" dre={dreNorm} />
+
+      <LiveLeadsDialog
+        open={dialogStage !== null}
+        onOpenChange={(o) => !o && setDialogStage(null)}
+        stageKey={dialogStage ?? ""}
+        stageLabel={stages.find((s) => s.key === dialogStage)?.label ?? ""}
+        contextLabel="Canal G4 Seller"
+        totalOfficial={
+          dialogStage === "mao"
+            ? counts.mao
+            : dialogStage === "venda"
+              ? counts.venda
+              : dialogStage === "entraram"
+                ? counts.entraram
+                : dialogStage === "inscritos"
+                  ? counts.inscritos
+                  : 0
+        }
+        cards={dialogStage ? cardsByStage(sellerCards, dialogStage) : []}
+      />
     </div>
   );
 }
