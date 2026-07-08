@@ -3242,24 +3242,54 @@ export function IndicatorsTab() {
 
   const hotOpportunityItems = (() => {
     if (!includesModeloAtual) return [];
-    const terminalPhases = new Set(['ganho', 'contrato assinado', 'perdido', 'arquivado']);
-    const latestById = new Map<string, (typeof modeloAtualAnalyticsRaw.allCards)[number]>();
+    const terminalPhases = new Set([
+      'ganho',
+      'contrato assinado',
+      'contrato em elaboração',
+      'perdido',
+      'perda',
+      'arquivado',
+      'concluído',
+      'concluido',
+      'finalizado',
+    ]);
+    // Agrupa todas as linhas por card para inspecionar histórico e latest
+    const rowsById = new Map<string, (typeof modeloAtualAnalyticsRaw.allCards)[number][]>();
     for (const card of modeloAtualAnalyticsRaw.allCards) {
-      const current = latestById.get(card.id);
-      if (!current || card.dataEntrada > current.dataEntrada) latestById.set(card.id, card);
+      if (!rowsById.has(card.id)) rowsById.set(card.id, []);
+      rowsById.get(card.id)!.push(card);
+    }
+    const norm = (s: string) => (s || '').trim().toLowerCase();
+    const latestById = new Map<string, (typeof modeloAtualAnalyticsRaw.allCards)[number]>();
+    for (const [id, rows] of rowsById.entries()) {
+      const sorted = [...rows].sort((a, b) => (a.dataEntrada > b.dataEntrada ? 1 : -1));
+      latestById.set(id, sorted[sorted.length - 1]);
     }
     return Array.from(latestById.values())
       .filter(card => {
-        const currentPhase = (card.faseAtual || card.fase || '').trim().toLowerCase();
+        const rows = rowsById.get(card.id) ?? [card];
+        // Exclui se em qualquer momento o card passou por fase terminal
+        const passedTerminal = rows.some(r =>
+          terminalPhases.has(norm(r.faseAtual || '')) ||
+          terminalPhases.has(norm(r.fase || '')) ||
+          terminalPhases.has(norm(r.faseDestino || '')),
+        );
+        if (passedTerminal) return false;
+        // Exclui se tem motivo de perda registrado (mesmo que fase atual não seja "Perdido")
+        const hasLossReason = rows.some(r => !!(r.motivoPerda && String(r.motivoPerda).trim()));
+        if (hasLossReason) return false;
+        const currentPhase = norm(card.faseAtual || card.fase || '');
+        if (terminalPhases.has(currentPhase)) return false;
         const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer);
         const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsavel);
-        return card.temperatura === 'Quente' && !terminalPhases.has(currentPhase) && matchCloser && matchSdr && matchesOrigemFilter(card);
+        return card.temperatura === 'Quente' && matchCloser && matchSdr && matchesOrigemFilter(card);
       })
       .map(card => ({
         ...modeloAtualAnalyticsRaw.toDetailItem(card),
         value: card.valorMRR + card.valorSetup + card.valorPontual,
       }));
   })();
+
 
   if (commercialPaceOpen) {
     const metaFor = (key: IndicatorType) => {
