@@ -43,10 +43,31 @@ const LOST_PHASES = new Set([
   "no show",
   "sem interesse",
 ]);
-const isLostPhase = (fase: unknown): boolean => LOST_PHASES.has(normalize(fase));
+const isLostPhase = (fase: unknown): boolean => {
+  const n = normalize(fase);
+  if (!n) return false;
+  if (LOST_PHASES.has(n)) return true;
+  // Cobre variações do tipo "Perdido - Sem interesse", "Perda - ICP fora"
+  return n.startsWith("perdido") || n.startsWith("perda");
+};
 
 const WON_PHASES = new Set(["ganho", "contrato assinado", "concluido"]);
 const isWonPhase = (fase: unknown): boolean => WON_PHASES.has(normalize(fase));
+
+// Checa se qualquer linha do card indica perda (fase atual, fase, faseDestino,
+// flag `perdido` ou motivoPerda preenchido).
+function anyRowIsLost(rows: any[]): boolean {
+  for (const r of rows) {
+    if (!r) continue;
+    if (r.perdido === true) return true;
+    if (r.motivoPerda && String(r.motivoPerda).trim()) return true;
+    if (isLostPhase(r.faseAtual)) return true;
+    if (isLostPhase(r.fase)) return true;
+    if (isLostPhase(r.faseDestino)) return true;
+  }
+  return false;
+}
+
 
 type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
 type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
