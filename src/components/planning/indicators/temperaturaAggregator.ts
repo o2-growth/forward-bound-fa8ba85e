@@ -172,20 +172,28 @@ export function aggregateByTemperatura({
     if (!src.enabled) continue;
     activeLabels.push(src.buLabel);
 
-    const byId = new Map<string, any>();
+    // Agrupa todas as linhas por id para inspecionar o histórico do card
+    // (uma linha marcada como Perdido em qualquer momento invalida o card).
+    const rowsById = new Map<string, any[]>();
+    const latestById = new Map<string, any>();
     for (const c of src.cards) {
       if (!c?.dataEntrada) continue;
       if (!includeAllOpenIgnoringPeriod) {
         const t = c.dataEntrada.getTime();
         if (t < startTime || t > endTime) continue;
       }
-      const ex = byId.get(c.id);
-      if (!ex || c.dataEntrada > ex.dataEntrada) byId.set(c.id, c);
+      if (!rowsById.has(c.id)) rowsById.set(c.id, []);
+      rowsById.get(c.id)!.push(c);
+      const ex = latestById.get(c.id);
+      if (!ex || c.dataEntrada > ex.dataEntrada) latestById.set(c.id, c);
     }
 
-    for (const card of byId.values()) {
-      // Exclui cards na fase Perdido ou já fechados (Ganho/Contrato assinado)
-      if (isLostPhase((card as any).faseAtual) || isWonPhase((card as any).faseAtual)) continue;
+    for (const [id, card] of latestById.entries()) {
+      const rows = rowsById.get(id) ?? [card];
+      // Exclui cards fechados como Ganho / Contrato assinado
+      if (isWonPhase((card as any).faseAtual)) continue;
+      // Exclui cards perdidos (fase atual, histórico, flag ou motivoPerda)
+      if (anyRowIsLost(rows)) continue;
       if (card.temperatura) {
         const item = src.toDetail(card);
         buckets[card.temperatura as Temperatura].push({
@@ -197,6 +205,7 @@ export function aggregateByTemperatura({
       }
     }
   }
+
 
   // Monetização: Upsell, Cross-sell, Troca de produto entram como Quente
   if (monetizacaoAnalytics && monetizacaoAnalytics.cards.length > 0) {
