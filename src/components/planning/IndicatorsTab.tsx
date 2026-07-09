@@ -1938,6 +1938,7 @@ export function IndicatorsTab() {
           fonte: i.fonte,
           campanha: i.campanha,
           sdr: i.sdr,
+          produto: (i as any).produto,
         });
         const canalCounts = new Map<LeadSource, number>();
         items.forEach(i => {
