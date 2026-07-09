@@ -220,6 +220,7 @@ export function CaixaSection({ dateRange }: Props) {
           )}
         </CardContent>
       </Card>
+      <CeoMetricDialog payload={drill} open={!!drill} onOpenChange={(o) => !o && setDrill(null)} />
     </div>
   );
 }
