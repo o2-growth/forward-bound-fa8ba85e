@@ -529,6 +529,135 @@ export function IndicatorsTab() {
   const [detailSheetCharts, setDetailSheetCharts] = useState<ChartConfig[]>([]);
   const [detailSheetFilterCriteria, setDetailSheetFilterCriteria] = useState<FilterCriteriaGroup[]>([]);
   const [detailSheetExtraContent, setDetailSheetExtraContent] = useState<React.ReactNode>(null);
+
+  // RR drill-down: toggle between "Realizadas" and "No-Shows"
+  const [rrView, setRrView] = useState<'realizadas' | 'no_shows'>('realizadas');
+  const [rrSheetData, setRrSheetData] = useState<null | {
+    rrItems: DetailItem[];
+    noShowItems: DetailItem[];
+    rmCount: number;
+    taxaShow: number;
+    noShows: number;
+    potencial: number;
+    potencialNoShow: number;
+    topCloser: { name: string; count: number };
+    activeFilters: string[];
+  }>(null);
+
+  // Rebuild RR sheet content whenever view or data changes
+  useEffect(() => {
+    if (!rrSheetData) return;
+    const { rrItems, noShowItems, rmCount, taxaShow, noShows, potencial, potencialNoShow, topCloser, activeFilters } = rrSheetData;
+
+    const kpis: KpiItem[] = [
+      {
+        icon: '✅',
+        value: rrItems.length,
+        label: 'Realizadas',
+        highlight: 'neutral',
+        active: rrView === 'realizadas',
+        onClick: () => setRrView('realizadas'),
+      },
+      { icon: '📊', value: `${taxaShow}%`, label: 'Taxa Show', highlight: taxaShow >= 80 ? 'success' : taxaShow >= 60 ? 'neutral' : 'warning' },
+      {
+        icon: '❌',
+        value: noShows > 0 ? noShows : '-',
+        label: 'No-Shows',
+        highlight: noShows > 5 ? 'danger' : noShows > 0 ? 'warning' : 'success',
+        active: rrView === 'no_shows',
+        onClick: noShowItems.length > 0 ? () => setRrView('no_shows') : undefined,
+      },
+      { icon: '💰', value: formatCompactCurrency(rrView === 'no_shows' ? potencialNoShow : potencial), label: rrView === 'no_shows' ? 'Potencial perdido' : 'Potencial', highlight: 'neutral' },
+      { icon: '🏆', value: topCloser.name.split(' ')[0] || '-', label: 'Top', highlight: 'neutral' },
+    ];
+
+    if (rrView === 'no_shows') {
+      setDetailSheetTitle('RR - No-Shows (Reuniões marcadas que não aconteceram)');
+      setDetailSheetDescription(
+        `${noShowItems.length} no-shows${rmCount > 0 ? ` de ${rmCount} reuniões marcadas (${Math.round((noShowItems.length / rmCount) * 100)}%)` : ''} | Potencial perdido: ${formatCompactCurrency(potencialNoShow)}`
+      );
+      setDetailSheetKpis(kpis);
+      setDetailSheetCharts([]);
+      setDetailSheetExtraContent(noShowItems.length > 0 ? buildProdutoBreakdown(noShowItems, 'value') : null);
+      setDetailSheetColumns([
+        { key: 'product', label: 'Produto', format: columnFormatters.product },
+        { key: 'company', label: 'Empresa' },
+        { key: 'sdr', label: 'SDR' },
+        { key: 'responsible', label: 'Closer' },
+        { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
+        { key: 'date', label: 'Data RM', format: columnFormatters.date },
+      ]);
+      setDetailSheetItems(noShowItems);
+      setDetailSheetFilterCriteria([
+        { title: '▸ No-Shows', items: [
+          'Cards que entraram em "Reunião Agendada" (RM) dentro do período selecionado',
+          'MAS nunca chegaram na fase "Reunião Realizada" (RR) até hoje',
+          'Comparação feita por ID de card entre as listas de RM e RR',
+          'Inclui cards que ainda podem virar RR — reflete o estado atual',
+        ]},
+        { title: '▸ Filtros ativos', items: activeFilters },
+      ]);
+      return;
+    }
+
+    // Realizadas (default) - charts
+    const closerStats = new Map<string, { realized: number }>();
+    rrItems.forEach(i => {
+      const closer = i.responsible || i.closer || 'Sem Closer';
+      const stats = closerStats.get(closer) || { realized: 0 };
+      stats.realized += 1;
+      closerStats.set(closer, stats);
+    });
+    const closerRankingData = Array.from(closerStats.entries())
+      .map(([label, stats]) => ({ label: label.split(' ')[0], value: stats.realized }))
+      .sort((a, b) => b.value - a.value);
+
+    const revenueRangeCounts = new Map<string, number>();
+    rrItems.forEach(i => {
+      const range = i.revenueRange || 'Não informado';
+      revenueRangeCounts.set(range, (revenueRangeCounts.get(range) || 0) + 1);
+    });
+    const revenueRangeData = Array.from(revenueRangeCounts.entries())
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const charts: ChartConfig[] = [
+      { type: 'bar', title: 'Ranking por Closer', data: closerRankingData },
+      { type: 'bar', title: 'Por Faixa Faturamento', data: revenueRangeData },
+    ];
+
+    setDetailSheetTitle('RR - Quem Apareceu nas Reuniões?');
+    setDetailSheetDescription(
+      `${rrItems.length} realizadas | Taxa Show: ${taxaShow}% (${rrItems.length} de ${rmCount}) | ${noShows > 0 ? `${noShows} no-shows | ` : ''}Potencial: ${formatCompactCurrency(potencial)} | Top: ${topCloser.name}`
+    );
+    setDetailSheetKpis(kpis);
+    setDetailSheetCharts(charts);
+    setDetailSheetExtraContent(buildProdutoBreakdown(rrItems, 'value'));
+    setDetailSheetColumns([
+      { key: 'product', label: 'Produto', format: columnFormatters.product },
+      { key: 'company', label: 'Empresa' },
+      { key: 'responsible', label: 'Closer' },
+      { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
+      { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
+      { key: 'duration', label: 'Tempo até Reunir', format: columnFormatters.duration },
+      { key: 'date', label: 'Data', format: columnFormatters.date },
+    ]);
+    setDetailSheetItems(rrItems);
+    setDetailSheetFilterCriteria([
+      { title: '▸ Reunião Realizada (RR)', items: [
+        'Card entrou na fase "Reunião Realizada" ou "1ª Reunião Realizada - Apresentação" dentro do período',
+        'Conta a primeira vez que o card aparece nesta fase (evita duplicação)',
+        'A data considerada é a data da primeira movimentação para esta fase',
+        'Para Modelo Atual e O2 TAX: fase "Reunião Realizada" no Pipefy',
+        'Para Oxy Hacker e Franquia: fase equivalente no pipe de Expansão',
+      ]},
+      { title: '▸ Filtros ativos', items: activeFilters },
+    ]);
+  }, [rrView, rrSheetData]);
+
+
+  
   
 
   const handleSync = () => {
@@ -2123,79 +2252,46 @@ export function IndicatorsTab() {
       
       case 'rr': {
         // RR: "Quem Apareceu nas Reuniões?"
+        const rmItemsRaw = getItemsForIndicator('rm');
+        // Deduplicate RM by id, keep first occurrence
+        const seenRmIds = new Set<string>();
+        const rmItems = rmItemsRaw.filter(i => {
+          const id = String(i.id ?? '');
+          if (!id) return true;
+          if (seenRmIds.has(id)) return false;
+          seenRmIds.add(id);
+          return true;
+        });
+        const rrIds = new Set(items.map(i => String(i.id ?? '')).filter(Boolean));
+        const noShowItems = rmItems.filter(rm => {
+          const id = String(rm.id ?? '');
+          return id && !rrIds.has(id);
+        });
+
         const rmCount = getRealizedForIndicator(indicatorConfigs.find(c => c.key === 'rm')!);
         const taxaShow = rmCount > 0 ? Math.round((items.length / rmCount) * 100) : 0;
-        const noShows = rmCount - items.length;
+        const noShows = Math.max(rmCount - items.length, noShowItems.length);
         const potencial = items.reduce((sum, i) => sum + (i.value || 0), 0);
+        const potencialNoShow = noShowItems.reduce((sum, i) => sum + (i.value || 0), 0);
         const topCloser = findTopPerformer(items, 'closer');
-        
-        // KPIs para RR
-        const kpis: KpiItem[] = [
-          { icon: '✅', value: items.length, label: 'Realizadas', highlight: 'neutral' },
-          { icon: '📊', value: `${taxaShow}%`, label: 'Taxa Show', highlight: taxaShow >= 80 ? 'success' : taxaShow >= 60 ? 'neutral' : 'warning' },
-          { icon: '❌', value: noShows > 0 ? noShows : '-', label: 'No-Shows', highlight: noShows > 5 ? 'danger' : noShows > 0 ? 'warning' : 'success' },
-          { icon: '💰', value: formatCompactCurrency(potencial), label: 'Potencial', highlight: 'neutral' },
-          { icon: '🏆', value: topCloser.name.split(' ')[0], label: `Top`, highlight: 'neutral' },
-        ];
-        
-        // Charts para RR
-        // 1. Ranking de Closers por taxa de show
-        const closerStats = new Map<string, { realized: number }>();
-        items.forEach(i => {
-          const closer = i.responsible || i.closer || 'Sem Closer';
-          const stats = closerStats.get(closer) || { realized: 0 };
-          stats.realized += 1;
-          closerStats.set(closer, stats);
+
+        setRrSheetData({
+          rrItems: items,
+          noShowItems,
+          rmCount,
+          taxaShow,
+          noShows,
+          potencial,
+          potencialNoShow,
+          topCloser,
+          activeFilters: buildActiveFilters(),
         });
-        const closerRankingData = Array.from(closerStats.entries())
-          .map(([label, stats]) => ({ label: label.split(' ')[0], value: stats.realized }))
-          .sort((a, b) => b.value - a.value);
-        
-        // 2. Potencial por faixa de faturamento
-        const revenueRangeCounts = new Map<string, number>();
-        items.forEach(i => {
-          const range = i.revenueRange || 'Não informado';
-          revenueRangeCounts.set(range, (revenueRangeCounts.get(range) || 0) + 1);
-        });
-        const revenueRangeData = Array.from(revenueRangeCounts.entries())
-          .map(([label, value]) => ({ label, value }))
-          .sort((a, b) => b.value - a.value);
-        
-        const charts: ChartConfig[] = [
-          { type: 'bar', title: 'Ranking por Closer', data: closerRankingData },
-          { type: 'bar', title: 'Por Faixa Faturamento', data: revenueRangeData },
-        ];
-        
-        setDetailSheetTitle('RR - Quem Apareceu nas Reuniões?');
-        setDetailSheetDescription(
-          `${items.length} realizadas | Taxa Show: ${taxaShow}% (${items.length} de ${rmCount}) | ${noShows > 0 ? `${noShows} no-shows | ` : ''}Potencial: ${formatCompactCurrency(potencial)} | Top: ${topCloser.name}`
-        );
-        setDetailSheetKpis(kpis);
-        setDetailSheetCharts(charts);
-        setDetailSheetExtraContent(buildProdutoBreakdown(items, 'value'));
-        setDetailSheetColumns([
-          { key: 'product', label: 'Produto', format: columnFormatters.product },
-          { key: 'company', label: 'Empresa' },
-          { key: 'responsible', label: 'Closer' },
-          { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
-          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
-          { key: 'duration', label: 'Tempo até Reunir', format: columnFormatters.duration },
-          { key: 'date', label: 'Data', format: columnFormatters.date },
-        ]);
-        setDetailSheetItems(items);
-        setDetailSheetFilterCriteria([
-          { title: '▸ Reunião Realizada (RR)', items: [
-            'Card entrou na fase "Reunião Realizada" ou "1ª Reunião Realizada - Apresentação" dentro do período',
-            'Conta a primeira vez que o card aparece nesta fase (evita duplicação)',
-            'A data considerada é a data da primeira movimentação para esta fase',
-            'Para Modelo Atual e O2 TAX: fase "Reunião Realizada" no Pipefy',
-            'Para Oxy Hacker e Franquia: fase equivalente no pipe de Expansão',
-          ]},
-          { title: '▸ Filtros ativos', items: buildActiveFilters() },
-        ]);
+        setRrView('realizadas');
         setDetailSheetOpen(true);
         return;
       }
+      
+
       
       case 'proposta': {
         // Proposta: "Onde o Pipeline Está Travando?"
@@ -3821,7 +3917,7 @@ export function IndicatorsTab() {
       {/* Detail Sheet for Radial Cards */}
       <DetailSheet
         open={detailSheetOpen}
-        onOpenChange={setDetailSheetOpen}
+        onOpenChange={(open) => { setDetailSheetOpen(open); if (!open) { setRrSheetData(null); setRrView('realizadas'); } }}
         title={detailSheetTitle}
         description={detailSheetDescription}
         items={detailSheetItems}
