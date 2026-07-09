@@ -443,20 +443,23 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
         return deduped;
       }
 
-      // For venda: dedup extra por (id, mês-da-data-efetiva) preferindo 'Ganho' sobre 'Contrato assinado'
-      // O mesmo card pode passar pelas duas fases finais no mesmo mês — contamos 1 venda única.
+      // For venda: dedup extra por (id, mês-da-data-efetiva).
+      // Regra global: prefere 'Ganho' sobre 'Contrato assinado'.
+      // Exceção Jul/26: prefere 'Contrato assinado' (ver salesDedupPolicy).
       if (indicator === 'venda') {
         const byCardMonth = new Map<string, O2TaxCard>();
         for (const card of result) {
           const effectiveDate = card.dataAssinatura || card.dataEntrada;
           const monthKey = `${card.id}|${effectiveDate.getFullYear()}-${effectiveDate.getMonth()}`;
+          const preferContrato = preferContratoAssinado(effectiveDate);
+          const winner = preferContrato ? 'Contrato assinado' : 'Ganho';
           const existing = byCardMonth.get(monthKey);
-          if (!existing || (card.fase === 'Ganho' && existing.fase !== 'Ganho')) {
+          if (!existing || (card.fase === winner && existing.fase !== winner)) {
             byCardMonth.set(monthKey, card);
           }
         }
         const deduped = Array.from(byCardMonth.values());
-        console.log(`[O2 TAX Analytics] getCardsForIndicator(venda): ${result.length} → ${deduped.length} (dedup id|mês, prefere Ganho)`);
+        console.log(`[O2 TAX Analytics] getCardsForIndicator(venda): ${result.length} → ${deduped.length} (dedup id|mês, prefere Ganho; Jul/26 prefere Contrato assinado)`);
         return deduped;
       }
 
