@@ -26,6 +26,8 @@ export function CaixaSection({ dateRange }: Props) {
   const oxy = useOxyFinance();
   const expenses = useOxyExpenses({ startDate: dateRange.from, endDate: dateRange.to });
   const OXY_YEAR = 2026;
+  const [drill, setDrill] = useState<CeoMetricDialogPayload | null>(null);
+  const periodLabel = `${dateRange.from.toLocaleDateString("pt-BR")} – ${dateRange.to.toLocaleDateString("pt-BR")}`;
 
   const data = useMemo(() => {
     // Achado #3 auditoria CEO — iterar por Date e ignorar meses fora do ano Oxy.
