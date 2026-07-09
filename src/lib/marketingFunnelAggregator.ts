@@ -5,6 +5,7 @@
 // receita padrão (MRR + Setup + Pontual, sem Educação) e TCV.
 
 import type { AttributionCard } from "@/components/planning/marketing-indicators/types";
+import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
 
 export type FunnelStage =
   | "leads"

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { buildExcludedMqlCardIds } from "@/hooks/useModeloAtualMetas";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
+import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
 
 export interface O2TaxCard {
   id: string;

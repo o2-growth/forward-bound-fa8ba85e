@@ -7,6 +7,7 @@ import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isTestCar
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { useClientesProdutos } from "./useClientesProdutos";
 import { classifyProduto, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
+import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
 
 export interface ModeloAtualCard {
   id: string;
