@@ -65,11 +65,33 @@ export function CaixaSection({ dateRange }: Props) {
           <p className="text-xs text-muted-foreground">Entradas, saídas, saldo do mês e acumulado dentro do intervalo escolhido.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <MetricCard label="Entradas (período)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} />
-            <MetricCard label="Saídas (período)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} />
-            <MetricCard label="Saldo (período)" value={fmt(data.saldo)} large source={SRC_CASH} />
-          </div>
+          {(() => {
+            const cashPayload: CeoMetricDialogPayload = {
+              title: "Fluxo de caixa",
+              subtitle: periodLabel,
+              breakdown: { title: "Totais do período", rows: [
+                { label: "Entradas", value: fmtFull(data.totalIn), tone: "success" },
+                { label: "Saídas", value: fmtFull(data.totalOut), tone: "danger" },
+                { label: "Saldo do período", value: fmtFull(data.saldo), tone: data.saldo >= 0 ? "success" : "danger" },
+              ] },
+              table: { title: "Mês a mês", columns: [
+                { key: "month", label: "Mês" },
+                { key: "inflows", label: "Entradas", align: "right", format: (r: any) => fmtFull(r.inflows) },
+                { key: "outflows", label: "Saídas", align: "right", format: (r: any) => fmtFull(r.outflows) },
+                { key: "saldo", label: "Saldo do mês", align: "right", format: (r: any) => fmtFull(r.inflows - r.outflows) },
+                { key: "acumulado", label: "Acumulado", align: "right", format: (r: any) => fmtFull(r.acumulado) },
+              ], rows: data.rows as any, emptyMessage: "Sem dados de fluxo de caixa." },
+              notes: [SRC_CASH.origem, `Cálculo: ${SRC_CASH.calculo ?? ""}`],
+            };
+            const openCash = (title: string, value: string) => setDrill({ ...cashPayload, title, value });
+            return (
+              <div className="grid grid-cols-3 gap-3">
+                <MetricCard label="Entradas (período)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} onClick={() => openCash("Entradas do período", fmt(data.totalIn))} />
+                <MetricCard label="Saídas (período)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} onClick={() => openCash("Saídas do período", fmt(data.totalOut))} />
+                <MetricCard label="Saldo (período)" value={fmt(data.saldo)} large source={SRC_CASH} onClick={() => openCash("Saldo do período", fmt(data.saldo))} />
+              </div>
+            );
+          })()}
           {data.outOfYear > 0 && (
             <p className="text-xs text-amber-600">⚠ {data.outOfYear} {data.outOfYear === 1 ? "mês foi ignorado" : "meses foram ignorados"} por estar(em) fora do ano carregado pelo Oxy Finance (2026).</p>
           )}
@@ -88,7 +110,18 @@ export function CaixaSection({ dateRange }: Props) {
                 {data.rows.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground">Sem dados de fluxo de caixa.</TableCell></TableRow>
                 ) : data.rows.map((r) => (
-                  <TableRow key={r.month}>
+                  <TableRow key={r.month} className="cursor-pointer hover:bg-accent/40" onClick={() => setDrill({
+                    title: `Fluxo de caixa — ${r.month}`,
+                    value: fmtFull(r.inflows - r.outflows),
+                    subtitle: "Saldo do mês",
+                    breakdown: { title: "Detalhes", rows: [
+                      { label: "Entradas", value: fmtFull(r.inflows), tone: "success" },
+                      { label: "Saídas", value: fmtFull(r.outflows), tone: "danger" },
+                      { label: "Saldo do mês", value: fmtFull(r.inflows - r.outflows) },
+                      { label: "Acumulado no período", value: fmtFull(r.acumulado) },
+                    ] },
+                    notes: [SRC_CASH.origem],
+                  })}>
                     <TableCell className="font-medium">{r.month}</TableCell>
                     <TableCell className="text-right tabular-nums text-green-600 dark:text-green-400">{fmt(r.inflows, "")}</TableCell>
                     <TableCell className="text-right tabular-nums text-destructive">{fmt(r.outflows, "")}</TableCell>
