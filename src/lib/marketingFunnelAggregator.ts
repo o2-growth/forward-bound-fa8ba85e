@@ -5,6 +5,7 @@
 // receita padrão (MRR + Setup + Pontual, sem Educação) e TCV.
 
 import type { AttributionCard } from "@/components/planning/marketing-indicators/types";
+import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
 
 export type FunnelStage =
   | "leads"
@@ -95,9 +96,18 @@ export function dedupSalesByMonthPreferGanho(
       byKey.set(key, c);
       continue;
     }
+    // Exceção Jul/26: prefere 'Contrato assinado' sobre 'Ganho'.
+    // Regra global: prefere 'Ganho' sobre 'Contrato assinado'.
+    const preferContrato = preferContratoAssinado(date);
     const existingIsGanho = normalize(existing.fase) === "ganho";
     const incomingIsGanho = normalize(c.fase) === "ganho";
-    if (incomingIsGanho && !existingIsGanho) byKey.set(key, c);
+    const existingIsContrato = normalize(existing.fase) === "contrato assinado";
+    const incomingIsContrato = normalize(c.fase) === "contrato assinado";
+    if (preferContrato) {
+      if (incomingIsContrato && !existingIsContrato) byKey.set(key, c);
+    } else {
+      if (incomingIsGanho && !existingIsGanho) byKey.set(key, c);
+    }
   }
   return Array.from(byKey.values());
 }
