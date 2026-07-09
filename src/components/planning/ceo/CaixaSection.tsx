@@ -150,11 +150,31 @@ export function CaixaSection({ dateRange }: Props) {
             <p className="py-6 text-center text-sm text-muted-foreground">Sem saídas registradas no período.</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                <MetricCard label="Total de saídas (período)" value={fmt(expenses.total)} tone="danger" large source={SRC_EXP} />
-                <MetricCard label="Itens diferentes" value={String(expenses.items.length)} source={SRC_EXP} />
-                <MetricCard label="Top 1 representa" value={expenses.total > 0 ? `${((topSaidas[0].total / expenses.total) * 100).toFixed(1)}%` : "—"} sublabel={topSaidas[0]?.label} source={SRC_EXP} />
-              </div>
+              {(() => {
+                const expPayload: CeoMetricDialogPayload = {
+                  title: "Principais saídas",
+                  subtitle: periodLabel,
+                  breakdown: { title: "Resumo", rows: [
+                    { label: "Total de saídas", value: fmtFull(expenses.total), tone: "danger" },
+                    { label: "Itens diferentes", value: String(expenses.items.length) },
+                    { label: "Top 1", value: topSaidas[0] ? `${topSaidas[0].label} — ${fmtFull(topSaidas[0].total)}` : "—" },
+                  ] },
+                  table: { title: "Ranking completo", columns: [
+                    { key: "label", label: "Categoria / Fornecedor" },
+                    { key: "total", label: "Total", align: "right", format: (r: any) => fmtFull(r.total) },
+                    { key: "pct", label: "% do total", align: "right", format: (r: any) => expenses.total > 0 ? `${((r.total / expenses.total) * 100).toFixed(1)}%` : "—" },
+                  ], rows: expenses.items as any },
+                  notes: [SRC_EXP.origem, `Cálculo: ${SRC_EXP.calculo ?? ""}`],
+                };
+                const openExp = (title: string, value: string) => setDrill({ ...expPayload, title, value });
+                return (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                    <MetricCard label="Total de saídas (período)" value={fmt(expenses.total)} tone="danger" large source={SRC_EXP} onClick={() => openExp("Total de saídas", fmt(expenses.total))} />
+                    <MetricCard label="Itens diferentes" value={String(expenses.items.length)} source={SRC_EXP} onClick={() => openExp("Itens diferentes", String(expenses.items.length))} />
+                    <MetricCard label="Top 1 representa" value={expenses.total > 0 ? `${((topSaidas[0].total / expenses.total) * 100).toFixed(1)}%` : "—"} sublabel={topSaidas[0]?.label} source={SRC_EXP} onClick={() => openExp("Top 1 representa", expenses.total > 0 ? `${((topSaidas[0].total / expenses.total) * 100).toFixed(1)}%` : "—")} />
+                  </div>
+                );
+              })()}
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -166,7 +186,16 @@ export function CaixaSection({ dateRange }: Props) {
                   </TableHeader>
                   <TableBody>
                     {topSaidas.map((c) => (
-                      <TableRow key={c.label}>
+                      <TableRow key={c.label} className="cursor-pointer hover:bg-accent/40" onClick={() => setDrill({
+                        title: `Saída: ${c.label}`,
+                        value: fmtFull(c.total),
+                        subtitle: periodLabel,
+                        breakdown: { title: "Detalhes", rows: [
+                          { label: "Total", value: fmtFull(c.total), tone: "danger" },
+                          { label: "% do total de saídas", value: expenses.total > 0 ? `${((c.total / expenses.total) * 100).toFixed(1)}%` : "—" },
+                        ] },
+                        notes: [SRC_EXP.origem],
+                      })}>
                         <TableCell className="font-medium">{c.label}</TableCell>
                         <TableCell className="text-right tabular-nums">{fmtFull(c.total)}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
