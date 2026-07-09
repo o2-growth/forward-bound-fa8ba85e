@@ -3917,7 +3917,7 @@ export function IndicatorsTab() {
       {/* Detail Sheet for Radial Cards */}
       <DetailSheet
         open={detailSheetOpen}
-        onOpenChange={setDetailSheetOpen}
+        onOpenChange={(open) => { setDetailSheetOpen(open); if (!open) { setRrSheetData(null); setRrView('realizadas'); } }}
         title={detailSheetTitle}
         description={detailSheetDescription}
         items={detailSheetItems}
