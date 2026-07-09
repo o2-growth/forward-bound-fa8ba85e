@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { CeoMetricDialog, type CeoMetricDialogPayload } from "./CeoMetricDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Wallet, AlertTriangle } from "lucide-react";
@@ -24,6 +25,8 @@ export function FinanceiroSection({ dateRange }: Props) {
   const ops = useOperationsData();
   const receivables = useOxyReceivables({ startDate: dateRange.from, endDate: dateRange.to });
   const kpis = ops.data?.kpis;
+  const [drill, setDrill] = useState<CeoMetricDialogPayload | null>(null);
+  const periodLabel = `${dateRange.from.toLocaleDateString("pt-BR")} – ${dateRange.to.toLocaleDateString("pt-BR")}`;
 
   const topInad = useMemo(() => receivables.items.slice(0, 15), [receivables.items]);
   const clientesInad = receivables.items.length;
@@ -40,17 +43,33 @@ export function FinanceiroSection({ dateRange }: Props) {
           <p className="text-xs text-muted-foreground">Clientes ativos vs inativos.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <MetricCard label="Clientes ativos" value={fmtInt(kpis?.totalAtivos)} large source={SRC_BASE} />
-            <MetricCard label="Clientes inativos (churn)" value={fmtInt(kpis?.churn)} tone="danger" source={SRC_BASE} />
-            <MetricCard
-              label="Churn Rate"
-              value={kpis?.churnRate != null ? `${kpis.churnRate.toFixed(1)}%` : "—"}
-              sublabel="Histórico total — ignora filtro de data"
-              tone="danger"
-              source={SRC_BASE}
-            />
-          </div>
+          {(() => {
+            const baseBreakdown: CeoMetricDialogPayload = {
+              title: "Base de clientes",
+              subtitle: "Snapshot atual — Central de Projetos",
+              breakdown: { title: "Composição", rows: [
+                { label: "Clientes ativos", value: fmtInt(kpis?.totalAtivos), tone: "success" },
+                { label: "Clientes inativos (churn)", value: fmtInt(kpis?.churn), tone: "danger" },
+                { label: "Churn Rate", value: kpis?.churnRate != null ? `${kpis.churnRate.toFixed(1)}%` : "—", tone: "danger" },
+              ] },
+              notes: [SRC_BASE.origem, `Cálculo: ${SRC_BASE.calculo ?? ""}`],
+            };
+            const openBase = (title: string, value: string) => setDrill({ ...baseBreakdown, title, value });
+            return (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <MetricCard label="Clientes ativos" value={fmtInt(kpis?.totalAtivos)} large source={SRC_BASE} onClick={() => openBase("Clientes ativos", fmtInt(kpis?.totalAtivos))} />
+                <MetricCard label="Clientes inativos (churn)" value={fmtInt(kpis?.churn)} tone="danger" source={SRC_BASE} onClick={() => openBase("Clientes inativos (churn)", fmtInt(kpis?.churn))} />
+                <MetricCard
+                  label="Churn Rate"
+                  value={kpis?.churnRate != null ? `${kpis.churnRate.toFixed(1)}%` : "—"}
+                  sublabel="Histórico total — ignora filtro de data"
+                  tone="danger"
+                  source={SRC_BASE}
+                  onClick={() => openBase("Churn Rate", kpis?.churnRate != null ? `${kpis.churnRate.toFixed(1)}%` : "—")}
+                />
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -67,15 +86,36 @@ export function FinanceiroSection({ dateRange }: Props) {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                <MetricCard label="Total inadimplente" value={fmt(receivables.total)} tone="danger" large source={SRC_INAD} />
-                <MetricCard label="Clientes em atraso" value={fmtInt(clientesInad)} tone="danger" source={SRC_INAD} />
-                <MetricCard
-                  label="Ticket médio de dívida"
-                  value={fmt(clientesInad > 0 ? receivables.total / clientesInad : null)}
-                  source={SRC_INAD}
-                />
-              </div>
+              {(() => {
+                const inadPayload: CeoMetricDialogPayload = {
+                  title: "Inadimplência",
+                  subtitle: periodLabel,
+                  breakdown: { title: "Resumo", rows: [
+                    { label: "Total inadimplente", value: fmtFull(receivables.total), tone: "danger" },
+                    { label: "Clientes em atraso", value: fmtInt(clientesInad), tone: "danger" },
+                    { label: "Ticket médio de dívida", value: fmt(clientesInad > 0 ? receivables.total / clientesInad : null) },
+                  ] },
+                  table: { title: "Top clientes em atraso", columns: [
+                    { key: "label", label: "Cliente" },
+                    { key: "total", label: "Total em atraso", align: "right", format: (r: any) => fmtFull(r.total) },
+                    { key: "pct", label: "% do total", align: "right", format: (r: any) => receivables.total > 0 ? `${((r.total / receivables.total) * 100).toFixed(1)}%` : "—" },
+                  ], rows: receivables.items as any },
+                  notes: [SRC_INAD.origem, `Cálculo: ${SRC_INAD.calculo ?? ""}`],
+                };
+                const openInad = (title: string, value: string) => setDrill({ ...inadPayload, title, value });
+                return (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                    <MetricCard label="Total inadimplente" value={fmt(receivables.total)} tone="danger" large source={SRC_INAD} onClick={() => openInad("Total inadimplente", fmt(receivables.total))} />
+                    <MetricCard label="Clientes em atraso" value={fmtInt(clientesInad)} tone="danger" source={SRC_INAD} onClick={() => openInad("Clientes em atraso", fmtInt(clientesInad))} />
+                    <MetricCard
+                      label="Ticket médio de dívida"
+                      value={fmt(clientesInad > 0 ? receivables.total / clientesInad : null)}
+                      source={SRC_INAD}
+                      onClick={() => openInad("Ticket médio de dívida", fmt(clientesInad > 0 ? receivables.total / clientesInad : null))}
+                    />
+                  </div>
+                );
+              })()}
 
               {topInad.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">Nenhum recebível vencido no período. ✅</p>
@@ -91,7 +131,16 @@ export function FinanceiroSection({ dateRange }: Props) {
                     </TableHeader>
                     <TableBody>
                       {topInad.map((c) => (
-                        <TableRow key={c.label}>
+                        <TableRow key={c.label} className="cursor-pointer hover:bg-accent/40" onClick={() => setDrill({
+                          title: `Cliente inadimplente: ${c.label}`,
+                          value: fmtFull(c.total),
+                          subtitle: periodLabel,
+                          breakdown: { title: "Detalhes", rows: [
+                            { label: "Total em atraso", value: fmtFull(c.total), tone: "danger" },
+                            { label: "% do total inadimplente", value: receivables.total > 0 ? `${((c.total / receivables.total) * 100).toFixed(1)}%` : "—" },
+                          ] },
+                          notes: [SRC_INAD.origem],
+                        })}>
                           <TableCell className="font-medium">{c.label}</TableCell>
                           <TableCell className="text-right tabular-nums">{fmtFull(c.total)}</TableCell>
                           <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
@@ -117,6 +166,7 @@ export function FinanceiroSection({ dateRange }: Props) {
           )}
         </CardContent>
       </Card>
+      <CeoMetricDialog payload={drill} open={!!drill} onOpenChange={(o) => !o && setDrill(null)} />
     </div>
   );
 }

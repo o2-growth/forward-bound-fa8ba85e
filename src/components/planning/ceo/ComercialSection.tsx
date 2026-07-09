@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { CeoMetricDialog, type CeoMetricDialogPayload } from "./CeoMetricDialog";
 import { startOfMonth, endOfMonth, subMonths, differenceInCalendarDays, getDaysInMonth } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -55,6 +56,8 @@ const SRC_PACE: MetricSource = {
 
 export function ComercialSection({ dateRange }: Props) {
   const { from: startDate, to: endDate } = dateRange;
+  const [drill, setDrill] = useState<CeoMetricDialogPayload | null>(null);
+  const periodLabel = `${startDate.toLocaleDateString("pt-BR")} – ${endDate.toLocaleDateString("pt-BR")}`;
 
   // Analytics do período selecionado
   const modeloAtual = useModeloAtualAnalytics(startDate, endDate);
@@ -280,6 +283,23 @@ export function ComercialSection({ dateRange }: Props) {
     };
   }, [lmModelo, lmO2tax, lmFranq, lmOxy, lmOut, l3Modelo, l3O2tax, l3Franq, l3Oxy, l3Out, mtdModelo, mtdO2tax, mtdFranq, mtdOxy, mtdOut]);
 
+  // Helpers de drill-down
+  const pipeBreakdownRows = (rows: { k: string; valor: number; count: number }[]) =>
+    rows.slice(0, 20).map((r) => ({ label: r.k, value: fmt(r.valor), extra: `${r.count} deal${r.count === 1 ? "" : "s"}` }));
+  const openPipeDrill = (title: string, value: string, tempLabel: string) => setDrill({
+    title, value, subtitle: `Pipe em negociação · ${periodLabel}`,
+    breakdown: { title: "Por temperatura", rows: [
+      { label: "🔥 Quente", value: fmt(pipe.quente), tone: "success" },
+      { label: "🌡️ Morno", value: fmt(pipe.morno) },
+      { label: "❄️ Frio", value: fmt(pipe.frio), tone: "danger" },
+    ], totalsLabel: "Pipe total", totalsValue: fmt(pipe.total) },
+    table: { title: `Top ${tempLabel} por closer`, columns: [
+      { key: "label", label: "Closer" },
+      { key: "extra", label: "Deals", align: "right" },
+      { key: "value", label: "Valor", align: "right" },
+    ], rows: pipeBreakdownRows(pipe.byCloser), emptyMessage: "Sem pipe no período." },
+    notes: [SRC_PIPE.origem, `Cálculo: ${SRC_PIPE.calculo ?? ""}`],
+  });
 
   return (
     <div className="space-y-6">
@@ -327,16 +347,16 @@ export function ComercialSection({ dateRange }: Props) {
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                <MetricCard label="Pipe total" value={fmt(pipe.total)} icon={<ShoppingCart className="h-5 w-5" />} large source={SRC_PIPE} />
-                <MetricCard label="Quente" value={fmt(pipe.quente)} icon={<Flame className="h-5 w-5" />} tone="success" source={SRC_PIPE} />
-                <MetricCard label="Morno" value={fmt(pipe.morno)} icon={<Thermometer className="h-5 w-5" />} source={SRC_PIPE} />
-                <MetricCard label="Frio" value={fmt(pipe.frio)} icon={<Snowflake className="h-5 w-5" />} tone="danger" source={SRC_PIPE} />
+                <MetricCard label="Pipe total" value={fmt(pipe.total)} icon={<ShoppingCart className="h-5 w-5" />} large source={SRC_PIPE} onClick={() => openPipeDrill("Pipe total em negociação", fmt(pipe.total), "geral")} />
+                <MetricCard label="Quente" value={fmt(pipe.quente)} icon={<Flame className="h-5 w-5" />} tone="success" source={SRC_PIPE} onClick={() => openPipeDrill("Pipe Quente", fmt(pipe.quente), "quente")} />
+                <MetricCard label="Morno" value={fmt(pipe.morno)} icon={<Thermometer className="h-5 w-5" />} source={SRC_PIPE} onClick={() => openPipeDrill("Pipe Morno", fmt(pipe.morno), "morno")} />
+                <MetricCard label="Frio" value={fmt(pipe.frio)} icon={<Snowflake className="h-5 w-5" />} tone="danger" source={SRC_PIPE} onClick={() => openPipeDrill("Pipe Frio", fmt(pipe.frio), "frio")} />
               </div>
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <PipeBreakdown title="Por closer" rows={pipe.byCloser} />
-                <PipeBreakdown title="Por canal" rows={pipe.byCanal} />
-                <PipeBreakdown title="Por BU" rows={pipe.byBu} />
-                <PipeBreakdown title="Por produto" rows={pipe.byProduto} />
+                <PipeBreakdown title="Por closer" rows={pipe.byCloser} onRowClick={(r) => setDrill({ title: `Closer: ${r.k}`, value: fmt(r.valor), subtitle: `${r.count} deal${r.count===1?"":"s"} · ${periodLabel}`, notes: [SRC_PIPE.origem] })} />
+                <PipeBreakdown title="Por canal" rows={pipe.byCanal} onRowClick={(r) => setDrill({ title: `Canal: ${r.k}`, value: fmt(r.valor), subtitle: `${r.count} deal${r.count===1?"":"s"} · ${periodLabel}`, notes: [SRC_PIPE.origem] })} />
+                <PipeBreakdown title="Por BU" rows={pipe.byBu} onRowClick={(r) => setDrill({ title: `BU: ${r.k}`, value: fmt(r.valor), subtitle: `${r.count} deal${r.count===1?"":"s"} · ${periodLabel}`, notes: [SRC_PIPE.origem] })} />
+                <PipeBreakdown title="Por produto" rows={pipe.byProduto} onRowClick={(r) => setDrill({ title: `Produto: ${r.k}`, value: fmt(r.valor), subtitle: `${r.count} deal${r.count===1?"":"s"} · ${periodLabel}`, notes: [SRC_PIPE.origem] })} />
               </div>
             </>
           )}
@@ -366,7 +386,18 @@ export function ComercialSection({ dateRange }: Props) {
                 {FUNNEL_STAGES.map((s) => {
                   const r = funil.byStage[s.real] ?? { real: 0, meta: 0, conv: null, atingimento: null };
                   return (
-                    <TableRow key={s.real}>
+                    <TableRow key={s.real} className="cursor-pointer hover:bg-accent/40" onClick={() => setDrill({
+                      title: `Funil — ${s.label}`,
+                      value: fmtInt(r.real),
+                      subtitle: `Realizado vs meta · ${periodLabel}`,
+                      breakdown: { title: "Detalhamento", rows: [
+                        { label: "Realizado", value: fmtInt(r.real) },
+                        { label: "Meta", value: r.meta > 0 ? fmtInt(r.meta) : "—" },
+                        { label: "Atingimento", value: r.atingimento != null ? fmtPct(r.atingimento) : "—", tone: (r.atingimento ?? 0) >= 100 ? "success" : "default" },
+                        { label: "Conversão da etapa anterior", value: r.conv != null ? fmtPct(r.conv) : "—" },
+                      ] },
+                      notes: [SRC_FUNNEL.origem, `Cálculo: ${SRC_FUNNEL.calculo ?? ""}`],
+                    })}>
                       <TableCell className="font-medium">{s.label}</TableCell>
                       <TableCell className="text-right tabular-nums">{fmtInt(r.real)}</TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">{r.meta > 0 ? fmtInt(r.meta) : "—"}</TableCell>
@@ -398,19 +429,40 @@ export function ComercialSection({ dateRange }: Props) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <MetricCard label="Realizado" value={fmt(pace.realizadoFat)} large source={SRC_PACE} />
-            <MetricCard label="Meta do período" value={fmt(pace.metaFat)} source={SRC_PACE} />
-            <MetricCard label="Atingimento da meta" value={fmtPct(pace.atingimentoMeta)} tone={pace.atingimentoMeta != null && pace.atingimentoMeta >= 100 ? "success" : "default"} source={SRC_PACE} />
-            <MetricCard label="vs Pace (esperado hoje)" value={fmtPct(pace.atingimentoPace)} sublabel={`esperado ${fmt(pace.expected)}`} tone={pace.atingimentoPace != null && pace.atingimentoPace >= 100 ? "success" : "danger"} source={SRC_PACE} />
+            {(() => {
+              const paceBreakdown: CeoMetricDialogPayload = {
+                title: "Previsto × Realizado + Pace",
+                subtitle: periodLabel,
+                breakdown: {
+                  title: "Números do período",
+                  rows: [
+                    { label: "Meta do período", value: fmt(pace.metaFat) },
+                    { label: "Esperado até hoje (pace)", value: fmt(pace.expected) },
+                    { label: "Realizado", value: fmt(pace.realizadoFat), tone: (pace.atingimentoPace ?? 0) >= 100 ? "success" : "danger" },
+                    { label: "Atingimento da meta", value: fmtPct(pace.atingimentoMeta), tone: (pace.atingimentoMeta ?? 0) >= 100 ? "success" : "default" },
+                    { label: "vs Pace", value: fmtPct(pace.atingimentoPace), tone: (pace.atingimentoPace ?? 0) >= 100 ? "success" : "danger" },
+                  ],
+                },
+                notes: [SRC_PACE.origem, `Cálculo: ${SRC_PACE.calculo ?? ""}`],
+              };
+              const openPace = (title: string, value: string) => setDrill({ ...paceBreakdown, title, value });
+              return (<>
+                <MetricCard label="Realizado" value={fmt(pace.realizadoFat)} large source={SRC_PACE} onClick={() => openPace("Faturamento realizado", fmt(pace.realizadoFat))} />
+                <MetricCard label="Meta do período" value={fmt(pace.metaFat)} source={SRC_PACE} onClick={() => openPace("Meta do período", fmt(pace.metaFat))} />
+                <MetricCard label="Atingimento da meta" value={fmtPct(pace.atingimentoMeta)} tone={pace.atingimentoMeta != null && pace.atingimentoMeta >= 100 ? "success" : "default"} source={SRC_PACE} onClick={() => openPace("Atingimento da meta", fmtPct(pace.atingimentoMeta))} />
+                <MetricCard label="vs Pace (esperado hoje)" value={fmtPct(pace.atingimentoPace)} sublabel={`esperado ${fmt(pace.expected)}`} tone={pace.atingimentoPace != null && pace.atingimentoPace >= 100 ? "success" : "danger"} source={SRC_PACE} onClick={() => openPace("vs Pace (esperado hoje)", fmtPct(pace.atingimentoPace))} />
+              </>);
+            })()}
           </div>
           <AiNoteAuto section="Comercial" title="Previsto x Realizado + Pace" buildContext={() => ({ metaFat: pace.metaFat, realizadoFat: pace.realizadoFat, expected: pace.expected, atingimentoMeta: pace.atingimentoMeta, atingimentoPace: pace.atingimentoPace })} />
         </CardContent>
       </Card>
+      <CeoMetricDialog payload={drill} open={!!drill} onOpenChange={(o) => !o && setDrill(null)} />
     </div>
   );
 }
 
-function PipeBreakdown({ title, rows }: { title: string; rows: { k: string; valor: number; count: number }[] }) {
+function PipeBreakdown({ title, rows, onRowClick }: { title: string; rows: { k: string; valor: number; count: number }[]; onRowClick?: (r: { k: string; valor: number; count: number }) => void }) {
   const top = rows.slice(0, 8);
   return (
     <div className="rounded-lg border border-border/60 p-3">
@@ -420,10 +472,16 @@ function PipeBreakdown({ title, rows }: { title: string; rows: { k: string; valo
       ) : (
         <div className="space-y-1.5">
           {top.map((r) => (
-            <div key={r.k} className="flex items-center justify-between gap-3 text-sm">
+            <button
+              key={r.k}
+              type="button"
+              onClick={onRowClick ? () => onRowClick(r) : undefined}
+              disabled={!onRowClick}
+              className={`flex w-full items-center justify-between gap-3 rounded px-1 py-0.5 text-left text-sm ${onRowClick ? "cursor-pointer hover:bg-accent/40" : "cursor-default"}`}
+            >
               <span className="min-w-0 truncate">{r.k}</span>
               <span className="shrink-0 tabular-nums font-medium">{fmt(r.valor)} <span className="text-[10px] text-muted-foreground">({r.count})</span></span>
-            </div>
+            </button>
           ))}
         </div>
       )}

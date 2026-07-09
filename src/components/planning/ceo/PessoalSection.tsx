@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { CeoMetricDialog, type CeoMetricDialogPayload } from "./CeoMetricDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Users } from "lucide-react";
@@ -18,6 +19,8 @@ const SRC: MetricSource = {
 
 export function PessoalSection({ dateRange }: Props) {
   const { from, to } = dateRange;
+  const [drill, setDrill] = useState<CeoMetricDialogPayload | null>(null);
+  const periodLabel = `${from.toLocaleDateString("pt-BR")} – ${to.toLocaleDateString("pt-BR")}`;
   const oxy = useOxyFinance();
   const hr = useHrData({ startDate: from, endDate: to });
   const ops = useOperationsData();
@@ -56,12 +59,27 @@ export function PessoalSection({ dateRange }: Props) {
           <p className="text-xs text-muted-foreground">Eficiência da operação — receita e MRR gerados por colaborador.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <MetricCard label="Receita / pessoa" value={fmt(receitaPorPessoaGeral)} large source={SRC} />
-            <MetricCard label="MRR / pessoa" value={fmt(mrrPorPessoa)} source={SRC} />
-            <MetricCard label="Headcount total" value={fmtInt(setores.totalPessoas)} source={SRC} />
-            <MetricCard label="Receita do período" value={fmt(setores.totalReceita)} source={SRC} />
-          </div>
+          {(() => {
+            const setoresBreakdown: CeoMetricDialogPayload["breakdown"] = {
+              title: "Por setor",
+              rows: setores.rows.map((r) => ({ label: r.setor, value: fmtFull(r.receita), extra: `${r.pessoas} pessoa${r.pessoas === 1 ? "" : "s"} · ${fmt(r.receitaPorPessoa)}/pessoa` })),
+              totalsLabel: "Total",
+              totalsValue: `${fmtFull(setores.totalReceita)} · ${setores.totalPessoas} pessoas`,
+            };
+            const openDrill = (title: string, value: string) => setDrill({
+              title, value, subtitle: periodLabel,
+              breakdown: setoresBreakdown,
+              notes: [SRC.origem, `Cálculo: ${SRC.calculo ?? ""}`],
+            });
+            return (
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <MetricCard label="Receita / pessoa" value={fmt(receitaPorPessoaGeral)} large source={SRC} onClick={() => openDrill("Receita por pessoa", fmt(receitaPorPessoaGeral))} />
+                <MetricCard label="MRR / pessoa" value={fmt(mrrPorPessoa)} source={SRC} onClick={() => openDrill("MRR por pessoa", fmt(mrrPorPessoa))} />
+                <MetricCard label="Headcount total" value={fmtInt(setores.totalPessoas)} source={SRC} onClick={() => openDrill("Headcount total", fmtInt(setores.totalPessoas))} />
+                <MetricCard label="Receita do período" value={fmt(setores.totalReceita)} source={SRC} onClick={() => openDrill("Receita do período", fmt(setores.totalReceita))} />
+              </div>
+            );
+          })()}
 
           <div className="overflow-x-auto">
             <Table>
@@ -75,7 +93,17 @@ export function PessoalSection({ dateRange }: Props) {
               </TableHeader>
               <TableBody>
                 {setores.rows.map((r) => (
-                  <TableRow key={r.setor}>
+                  <TableRow key={r.setor} className="cursor-pointer hover:bg-accent/40" onClick={() => setDrill({
+                    title: `Setor: ${r.setor}`,
+                    value: fmt(r.receitaPorPessoa),
+                    subtitle: `Receita por pessoa · ${periodLabel}`,
+                    breakdown: { title: "Detalhes", rows: [
+                      { label: "Receita do setor", value: fmtFull(r.receita) },
+                      { label: "Pessoas", value: fmtInt(r.pessoas) },
+                      { label: "Receita / pessoa", value: fmt(r.receitaPorPessoa) },
+                    ] },
+                    notes: [SRC.origem],
+                  })}>
                     <TableCell className="font-medium">{r.setor}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtFull(r.receita)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtInt(r.pessoas)}</TableCell>
@@ -99,6 +127,7 @@ export function PessoalSection({ dateRange }: Props) {
           "Entradas e saídas de pessoas projetadas para o mês",
         ]}
       />
+      <CeoMetricDialog payload={drill} open={!!drill} onOpenChange={(o) => !o && setDrill(null)} />
     </div>
   );
 }
