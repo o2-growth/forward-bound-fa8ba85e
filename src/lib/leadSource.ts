@@ -40,6 +40,7 @@ export interface ClassifyInput {
   fonte?: string | null;
   campanha?: string | null;
   sdr?: string | null;
+  produto?: string | null;
 }
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
@@ -136,6 +137,11 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   if ((c.tipoOrigem || '').trim() === MONETIZACAO_ORIGEM_SENTINEL) {
     return 'monetizacao';
   }
+
+  // 0.1) FRANQUIA — regra de negócio: todo card do produto Franquia é Inbound,
+  // independente de os campos de origem estarem preenchidos no Pipefy.
+  const produto = norm(c.produto);
+  if (produto.includes('franquia')) return 'inbound';
 
   const allEmpty = !tipo && !origem && !fonte && !campanha && !sdr;
   if (allEmpty) return 'sem_origem';

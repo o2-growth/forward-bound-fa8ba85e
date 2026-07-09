@@ -70,6 +70,7 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
       fonte: card.fonte,
       campanha: card.campanha,
       sdr: card.responsavel || card.sdr,
+      produto: (card as any).produto,
     });
     return selectedOrigens.includes(src);
   };
