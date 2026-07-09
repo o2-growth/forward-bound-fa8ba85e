@@ -40,6 +40,7 @@ export interface ClassifyInput {
   fonte?: string | null;
   campanha?: string | null;
   sdr?: string | null;
+  produto?: string | null;
 }
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
