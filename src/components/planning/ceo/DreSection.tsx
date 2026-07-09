@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { CeoMetricDialog, type CeoMetricDialogPayload } from "./CeoMetricDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, FileSpreadsheet } from "lucide-react";
@@ -32,6 +33,8 @@ const PL_ORDER: { code: string; label?: string; kind: "subtotal" | "detail" | "d
 export function DreSection({ dateRange }: Props) {
   const oxy = useOxyFinance();
   const OXY_YEAR = 2026; // useOxyFinance() usa esse ano por padrão
+  const [drill, setDrill] = useState<CeoMetricDialogPayload | null>(null);
+  const periodLabel = `${dateRange.from.toLocaleDateString("pt-BR")} – ${dateRange.to.toLocaleDateString("pt-BR")}`;
 
   const data = useMemo(() => {
     // Achado #3 da auditoria CEO: iterar por Date para respeitar ano corretamente.
@@ -144,7 +147,13 @@ export function DreSection({ dateRange }: Props) {
                   const isSubtotal = bu.kind === "subtotal";
                   const av = receitaPorBu.totalTotal !== 0 ? (bu.total / receitaPorBu.totalTotal) * 100 : null;
                   return (
-                    <TableRow key={bu.key} className={isSubtotal ? "bg-muted/30" : ""}>
+                    <TableRow key={bu.key} className={`${isSubtotal ? "bg-muted/30" : ""} cursor-pointer hover:bg-accent/40`} onClick={() => setDrill({
+                      title: `Receita — ${bu.label}`,
+                      value: fmtFull(bu.total),
+                      subtitle: periodLabel,
+                      breakdown: { title: "Mês a mês", rows: bu.cells.map((v, i) => ({ label: receitaPorBu.months[i], value: v !== 0 ? fmtFull(v) : "—" })), totalsLabel: "Total", totalsValue: fmtFull(bu.total) },
+                      notes: [`AV% sobre Receita Bruta Oxy: ${av != null ? fmtPct(av) : "—"}`, "Fonte: Oxy Finance (DRE por BU)"],
+                    })}>
                       <TableCell className={isSubtotal ? "font-semibold whitespace-nowrap" : "font-medium whitespace-nowrap"}>{bu.label}</TableCell>
                       {bu.cells.map((v, i) => <TableCell key={i} className="text-right tabular-nums">{v !== 0 ? fmt(v, "") : "—"}</TableCell>)}
                       <TableCell className="text-right tabular-nums font-semibold">{bu.total !== 0 ? fmtFull(bu.total) : "—"}</TableCell>
@@ -208,12 +217,19 @@ export function DreSection({ dateRange }: Props) {
                     return (
                       <TableRow
                         key={r.code}
+                        onClick={() => setDrill({
+                          title: `DRE — ${r.label}`,
+                          value: fmtFull(r.total),
+                          subtitle: periodLabel,
+                          breakdown: { title: "Mês a mês", rows: r.cells.map((v, i) => ({ label: data.monthsUpTo[i], value: v !== 0 ? fmtFull(v) : "—", tone: isNegative ? "danger" : "default" })), totalsLabel: "Total", totalsValue: fmtFull(r.total) },
+                          notes: [`AV% sobre Receita Bruta: ${r.av != null ? fmtPct(r.av) : "—"}`, "Fonte: Oxy Finance — DRE realizado"],
+                        })}
                         className={
-                          isSubtotal
+                          `cursor-pointer hover:bg-accent/40 ${isSubtotal
                             ? "border-t bg-muted/40 font-semibold"
                             : isNegative
                               ? "text-destructive/90"
-                              : ""
+                              : ""}`
                         }
                       >
                         <TableCell className={isSubtotal ? "font-semibold" : "pl-6 text-sm text-muted-foreground"}>{r.label}</TableCell>
@@ -234,6 +250,7 @@ export function DreSection({ dateRange }: Props) {
           <AiNoteAuto section="DRE" title="Demonstrativo de Resultados" buildContext={() => ({ rows: data.rows.map((r: any) => ({ label: r.label ?? r.code, total: r.total, av: r.av })), receitaBrutaTotal: data.rbTotal, meses: data.monthsUpTo?.map((m: any) => MONTHS_PT[m.month] ?? m) })} />
         </CardContent>
       </Card>
+      <CeoMetricDialog payload={drill} open={!!drill} onOpenChange={(o) => !o && setDrill(null)} />
     </div>
   );
 }

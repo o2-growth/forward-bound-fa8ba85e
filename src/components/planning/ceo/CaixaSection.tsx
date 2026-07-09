@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { CeoMetricDialog, type CeoMetricDialogPayload } from "./CeoMetricDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Banknote, TrendingDown } from "lucide-react";
@@ -25,6 +26,8 @@ export function CaixaSection({ dateRange }: Props) {
   const oxy = useOxyFinance();
   const expenses = useOxyExpenses({ startDate: dateRange.from, endDate: dateRange.to });
   const OXY_YEAR = 2026;
+  const [drill, setDrill] = useState<CeoMetricDialogPayload | null>(null);
+  const periodLabel = `${dateRange.from.toLocaleDateString("pt-BR")} – ${dateRange.to.toLocaleDateString("pt-BR")}`;
 
   const data = useMemo(() => {
     // Achado #3 auditoria CEO — iterar por Date e ignorar meses fora do ano Oxy.
@@ -62,11 +65,33 @@ export function CaixaSection({ dateRange }: Props) {
           <p className="text-xs text-muted-foreground">Entradas, saídas, saldo do mês e acumulado dentro do intervalo escolhido.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <MetricCard label="Entradas (período)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} />
-            <MetricCard label="Saídas (período)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} />
-            <MetricCard label="Saldo (período)" value={fmt(data.saldo)} large source={SRC_CASH} />
-          </div>
+          {(() => {
+            const cashPayload: CeoMetricDialogPayload = {
+              title: "Fluxo de caixa",
+              subtitle: periodLabel,
+              breakdown: { title: "Totais do período", rows: [
+                { label: "Entradas", value: fmtFull(data.totalIn), tone: "success" },
+                { label: "Saídas", value: fmtFull(data.totalOut), tone: "danger" },
+                { label: "Saldo do período", value: fmtFull(data.saldo), tone: data.saldo >= 0 ? "success" : "danger" },
+              ] },
+              table: { title: "Mês a mês", columns: [
+                { key: "month", label: "Mês" },
+                { key: "inflows", label: "Entradas", align: "right", format: (r: any) => fmtFull(r.inflows) },
+                { key: "outflows", label: "Saídas", align: "right", format: (r: any) => fmtFull(r.outflows) },
+                { key: "saldo", label: "Saldo do mês", align: "right", format: (r: any) => fmtFull(r.inflows - r.outflows) },
+                { key: "acumulado", label: "Acumulado", align: "right", format: (r: any) => fmtFull(r.acumulado) },
+              ], rows: data.rows as any, emptyMessage: "Sem dados de fluxo de caixa." },
+              notes: [SRC_CASH.origem, `Cálculo: ${SRC_CASH.calculo ?? ""}`],
+            };
+            const openCash = (title: string, value: string) => setDrill({ ...cashPayload, title, value });
+            return (
+              <div className="grid grid-cols-3 gap-3">
+                <MetricCard label="Entradas (período)" value={fmt(data.totalIn)} tone="success" source={SRC_CASH} onClick={() => openCash("Entradas do período", fmt(data.totalIn))} />
+                <MetricCard label="Saídas (período)" value={fmt(data.totalOut)} tone="danger" source={SRC_CASH} onClick={() => openCash("Saídas do período", fmt(data.totalOut))} />
+                <MetricCard label="Saldo (período)" value={fmt(data.saldo)} large source={SRC_CASH} onClick={() => openCash("Saldo do período", fmt(data.saldo))} />
+              </div>
+            );
+          })()}
           {data.outOfYear > 0 && (
             <p className="text-xs text-amber-600">⚠ {data.outOfYear} {data.outOfYear === 1 ? "mês foi ignorado" : "meses foram ignorados"} por estar(em) fora do ano carregado pelo Oxy Finance (2026).</p>
           )}
@@ -85,7 +110,18 @@ export function CaixaSection({ dateRange }: Props) {
                 {data.rows.length === 0 ? (
                   <TableRow><TableCell colSpan={5} className="text-center text-sm text-muted-foreground">Sem dados de fluxo de caixa.</TableCell></TableRow>
                 ) : data.rows.map((r) => (
-                  <TableRow key={r.month}>
+                  <TableRow key={r.month} className="cursor-pointer hover:bg-accent/40" onClick={() => setDrill({
+                    title: `Fluxo de caixa — ${r.month}`,
+                    value: fmtFull(r.inflows - r.outflows),
+                    subtitle: "Saldo do mês",
+                    breakdown: { title: "Detalhes", rows: [
+                      { label: "Entradas", value: fmtFull(r.inflows), tone: "success" },
+                      { label: "Saídas", value: fmtFull(r.outflows), tone: "danger" },
+                      { label: "Saldo do mês", value: fmtFull(r.inflows - r.outflows) },
+                      { label: "Acumulado no período", value: fmtFull(r.acumulado) },
+                    ] },
+                    notes: [SRC_CASH.origem],
+                  })}>
                     <TableCell className="font-medium">{r.month}</TableCell>
                     <TableCell className="text-right tabular-nums text-green-600 dark:text-green-400">{fmt(r.inflows, "")}</TableCell>
                     <TableCell className="text-right tabular-nums text-destructive">{fmt(r.outflows, "")}</TableCell>
@@ -114,11 +150,31 @@ export function CaixaSection({ dateRange }: Props) {
             <p className="py-6 text-center text-sm text-muted-foreground">Sem saídas registradas no período.</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                <MetricCard label="Total de saídas (período)" value={fmt(expenses.total)} tone="danger" large source={SRC_EXP} />
-                <MetricCard label="Itens diferentes" value={String(expenses.items.length)} source={SRC_EXP} />
-                <MetricCard label="Top 1 representa" value={expenses.total > 0 ? `${((topSaidas[0].total / expenses.total) * 100).toFixed(1)}%` : "—"} sublabel={topSaidas[0]?.label} source={SRC_EXP} />
-              </div>
+              {(() => {
+                const expPayload: CeoMetricDialogPayload = {
+                  title: "Principais saídas",
+                  subtitle: periodLabel,
+                  breakdown: { title: "Resumo", rows: [
+                    { label: "Total de saídas", value: fmtFull(expenses.total), tone: "danger" },
+                    { label: "Itens diferentes", value: String(expenses.items.length) },
+                    { label: "Top 1", value: topSaidas[0] ? `${topSaidas[0].label} — ${fmtFull(topSaidas[0].total)}` : "—" },
+                  ] },
+                  table: { title: "Ranking completo", columns: [
+                    { key: "label", label: "Categoria / Fornecedor" },
+                    { key: "total", label: "Total", align: "right", format: (r: any) => fmtFull(r.total) },
+                    { key: "pct", label: "% do total", align: "right", format: (r: any) => expenses.total > 0 ? `${((r.total / expenses.total) * 100).toFixed(1)}%` : "—" },
+                  ], rows: expenses.items as any },
+                  notes: [SRC_EXP.origem, `Cálculo: ${SRC_EXP.calculo ?? ""}`],
+                };
+                const openExp = (title: string, value: string) => setDrill({ ...expPayload, title, value });
+                return (
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                    <MetricCard label="Total de saídas (período)" value={fmt(expenses.total)} tone="danger" large source={SRC_EXP} onClick={() => openExp("Total de saídas", fmt(expenses.total))} />
+                    <MetricCard label="Itens diferentes" value={String(expenses.items.length)} source={SRC_EXP} onClick={() => openExp("Itens diferentes", String(expenses.items.length))} />
+                    <MetricCard label="Top 1 representa" value={expenses.total > 0 ? `${((topSaidas[0].total / expenses.total) * 100).toFixed(1)}%` : "—"} sublabel={topSaidas[0]?.label} source={SRC_EXP} onClick={() => openExp("Top 1 representa", expenses.total > 0 ? `${((topSaidas[0].total / expenses.total) * 100).toFixed(1)}%` : "—")} />
+                  </div>
+                );
+              })()}
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -130,7 +186,16 @@ export function CaixaSection({ dateRange }: Props) {
                   </TableHeader>
                   <TableBody>
                     {topSaidas.map((c) => (
-                      <TableRow key={c.label}>
+                      <TableRow key={c.label} className="cursor-pointer hover:bg-accent/40" onClick={() => setDrill({
+                        title: `Saída: ${c.label}`,
+                        value: fmtFull(c.total),
+                        subtitle: periodLabel,
+                        breakdown: { title: "Detalhes", rows: [
+                          { label: "Total", value: fmtFull(c.total), tone: "danger" },
+                          { label: "% do total de saídas", value: expenses.total > 0 ? `${((c.total / expenses.total) * 100).toFixed(1)}%` : "—" },
+                        ] },
+                        notes: [SRC_EXP.origem],
+                      })}>
                         <TableCell className="font-medium">{c.label}</TableCell>
                         <TableCell className="text-right tabular-nums">{fmtFull(c.total)}</TableCell>
                         <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
@@ -155,6 +220,7 @@ export function CaixaSection({ dateRange }: Props) {
           )}
         </CardContent>
       </Card>
+      <CeoMetricDialog payload={drill} open={!!drill} onOpenChange={(o) => !o && setDrill(null)} />
     </div>
   );
 }
