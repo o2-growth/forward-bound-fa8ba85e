@@ -150,6 +150,7 @@ export function EventosG4Section({
           fonte: c.fonte,
           campanha: c.campanha,
           sdr: (c as any).responsavel || c.sdr,
+          produto: (c as any).produto,
         }) === "evento",
     );
   }, [allCards]);
