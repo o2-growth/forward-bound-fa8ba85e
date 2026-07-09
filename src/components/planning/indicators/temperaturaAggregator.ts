@@ -43,10 +43,31 @@ const LOST_PHASES = new Set([
   "no show",
   "sem interesse",
 ]);
-const isLostPhase = (fase: unknown): boolean => LOST_PHASES.has(normalize(fase));
+const isLostPhase = (fase: unknown): boolean => {
+  const n = normalize(fase);
+  if (!n) return false;
+  if (LOST_PHASES.has(n)) return true;
+  // Cobre variações do tipo "Perdido - Sem interesse", "Perda - ICP fora"
+  return n.startsWith("perdido") || n.startsWith("perda");
+};
 
 const WON_PHASES = new Set(["ganho", "contrato assinado", "concluido"]);
 const isWonPhase = (fase: unknown): boolean => WON_PHASES.has(normalize(fase));
+
+// Checa se qualquer linha do card indica perda (fase atual, fase, faseDestino,
+// flag `perdido` ou motivoPerda preenchido).
+function anyRowIsLost(rows: any[]): boolean {
+  for (const r of rows) {
+    if (!r) continue;
+    if (r.perdido === true) return true;
+    if (r.motivoPerda && String(r.motivoPerda).trim()) return true;
+    if (isLostPhase(r.faseAtual)) return true;
+    if (isLostPhase(r.fase)) return true;
+    if (isLostPhase(r.faseDestino)) return true;
+  }
+  return false;
+}
+
 
 type ModeloAnalytics = ReturnType<typeof useModeloAtualAnalytics>;
 type ExpansaoAnalyticsT = ReturnType<typeof useExpansaoAnalytics>;
@@ -151,20 +172,28 @@ export function aggregateByTemperatura({
     if (!src.enabled) continue;
     activeLabels.push(src.buLabel);
 
-    const byId = new Map<string, any>();
+    // Agrupa todas as linhas por id para inspecionar o histórico do card
+    // (uma linha marcada como Perdido em qualquer momento invalida o card).
+    const rowsById = new Map<string, any[]>();
+    const latestById = new Map<string, any>();
     for (const c of src.cards) {
       if (!c?.dataEntrada) continue;
       if (!includeAllOpenIgnoringPeriod) {
         const t = c.dataEntrada.getTime();
         if (t < startTime || t > endTime) continue;
       }
-      const ex = byId.get(c.id);
-      if (!ex || c.dataEntrada > ex.dataEntrada) byId.set(c.id, c);
+      if (!rowsById.has(c.id)) rowsById.set(c.id, []);
+      rowsById.get(c.id)!.push(c);
+      const ex = latestById.get(c.id);
+      if (!ex || c.dataEntrada > ex.dataEntrada) latestById.set(c.id, c);
     }
 
-    for (const card of byId.values()) {
-      // Exclui cards na fase Perdido ou já fechados (Ganho/Contrato assinado)
-      if (isLostPhase((card as any).faseAtual) || isWonPhase((card as any).faseAtual)) continue;
+    for (const [id, card] of latestById.entries()) {
+      const rows = rowsById.get(id) ?? [card];
+      // Exclui cards fechados como Ganho / Contrato assinado
+      if (isWonPhase((card as any).faseAtual)) continue;
+      // Exclui cards perdidos (fase atual, histórico, flag ou motivoPerda)
+      if (anyRowIsLost(rows)) continue;
       if (card.temperatura) {
         const item = src.toDetail(card);
         buckets[card.temperatura as Temperatura].push({
@@ -176,6 +205,7 @@ export function aggregateByTemperatura({
       }
     }
   }
+
 
   // Monetização: Upsell, Cross-sell, Troca de produto entram como Quente
   if (monetizacaoAnalytics && monetizacaoAnalytics.cards.length > 0) {
