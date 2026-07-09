@@ -529,6 +529,21 @@ export function IndicatorsTab() {
   const [detailSheetCharts, setDetailSheetCharts] = useState<ChartConfig[]>([]);
   const [detailSheetFilterCriteria, setDetailSheetFilterCriteria] = useState<FilterCriteriaGroup[]>([]);
   const [detailSheetExtraContent, setDetailSheetExtraContent] = useState<React.ReactNode>(null);
+
+  // RR drill-down: toggle between "Realizadas" and "No-Shows"
+  const [rrView, setRrView] = useState<'realizadas' | 'no_shows'>('realizadas');
+  const [rrSheetData, setRrSheetData] = useState<null | {
+    rrItems: DetailItem[];
+    noShowItems: DetailItem[];
+    rmCount: number;
+    taxaShow: number;
+    noShows: number;
+    potencial: number;
+    potencialNoShow: number;
+    topCloser: { name: string; count: number };
+    activeFilters: string[];
+  }>(null);
+  
   
 
   const handleSync = () => {
