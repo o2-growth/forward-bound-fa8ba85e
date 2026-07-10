@@ -48,6 +48,7 @@ interface CommercialPaceDashboardProps {
   onBack: () => void;
   onDateChange?: (start: Date, end: Date) => void;
   onBUsChange?: (bus: string[]) => void;
+  onHotOpportunitiesClick?: (items: DetailItem[], closerLabel?: string) => void;
 }
 
 const METRIC_DEFS: { key: MetricKey; label: string; varName: string; indicator: string }[] = [
