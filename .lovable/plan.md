@@ -1,32 +1,64 @@
 
-## Escopo (restrito a Outbound)
+## Diagnóstico
 
-Aplicar a nova regra de RR **apenas** no funil do pipe Outbound (`src/hooks/useOutboundAnalytics.ts` — tabela `pipefy_moviment_outbound`, SDR fixo Matheus Staruck). Modelo Atual, O2 TAX, Expansão, marketing agregador e verificador Pipefy **ficam intocados**.
+A função robusta que Modelo Atual usa para banir cards de teste é `isJunkCard` (em `src/hooks/useModeloAtualMetas.ts`). Ela combina duas checagens:
 
-## Regra nova de RR (só Outbound)
+- `isTestCard(id)` — allowlist fixa de IDs conhecidos.
+- `isTestByTitle(titulo, empresa, nome, contato)` — regex em título/empresa/contato: `teste`, `test`, `testing`, `asdf`, `qwerty`, `abc`, `xxx`, só dígitos 1-4 chars, só símbolos.
 
-Card do pipe Outbound conta 1x como RR no mês M (dedup `id|mês`) se qualquer uma:
+**Auditoria das BUs:**
 
-1. Visitou fase mapeada como RR no mês M. *(regra atual mantida)*
-2. **[NOVO]** Visitou no mês M `Proposta enviada / Follow Up`, `Contrato assinado` ou `Ganho`, E o histórico do card tem passagem anterior por fase mapeada como RM (`Reunião agendada / Qualificado`).
-3. **[NOVO]** Visitou no mês M `Contato futuro` **vindo diretamente** de fase mapeada como RM (fase imediatamente anterior no `phases_history` ordenado por `firstTimeIn`).
+| Hook | Filtro atual | Status |
+|---|---|---|
+| `useModeloAtualAnalytics` | `isJunkCard(card)` em todos os paths | ✅ OK |
+| `useO2TaxAnalytics` | `isJunkCard(c)` no parse | ✅ (mas confirmar que MQL usa a lista filtrada) |
+| `useMonetizacaoAnalytics` | `isJunkCard({id, titulo, empresa: cliente})` | ✅ (idem) |
+| `useOutboundAnalytics` | `isJunkCard(c)` no parse | ✅ |
+| **`useExpansaoAnalytics`** | **só `isTestCard(id)`** em 3 pontos (linhas 331, 347, 366) | ❌ **gap principal** |
 
-Exclusões atuais mantidas (test cards, motivos de perda, dedup).
+Expansão perde todo card de teste cujo ID não esteja na allowlist fixa. Novos cards com título "teste", "abc", "123", etc. passam direto para MQL e demais indicadores.
 
-## Onde tocar
+## Correção
 
-- `src/hooks/useOutboundAnalytics.ts` — só o bloco de agregação de RR.
+### 1. Expansão (fix principal)
 
-Nada mais é alterado. Modelo Atual, O2 TAX, Expansão, `marketingFunnelAggregator`, `pipefy-verify-modelo-atual`: **sem mudança**.
+Em `src/hooks/useExpansaoAnalytics.ts`, substituir as 3 chamadas `isTestCard(String(row['ID']))` por checagem baseada em `isJunkCard` usando **id + Título** do row:
+
+```ts
+// antes
+if (isTestCard(String(row['ID'] || ''))) continue;
+
+// depois
+const _id = String(row['ID'] || '');
+const _titulo = String(row['Título'] || '');
+if (isJunkCard({ id: _id, titulo: _titulo })) continue;
+```
+
+Trocar import: `isTestCard` → `isJunkCard`.
+
+### 2. Auditoria confirmatória (O2 TAX, Monetização, Outbound)
+
+Passar rapidamente nos hooks para garantir que **todo path que gera contagem de MQL/indicadores** consome a lista já filtrada — não relê `rawRows` sem passar por `isJunkCard`. Se algum path escapar, aplicar `isJunkCard` também.
+
+Especificamente verificar:
+- `useO2TaxAnalytics`: paths de MQL usando `periodCards` e `signatureCards` (ambos já filtrados).
+- `useMonetizacaoAnalytics`: agregação de fases usa `cards` já filtrado.
+- `useOutboundAnalytics`: `cardsInPeriod` deriva de `cards` já filtrado.
+
+Se todos os paths consomem só as listas filtradas, nenhuma mudança adicional é necessária além do fix em Expansão.
 
 ## Impacto
 
-- **Só Outbound.** Nenhum outro funil, meta, DRE ou monetário muda.
-- Regra é aditiva → meses passados de Outbound só podem ganhar RRs, nunca perder. Dedup `id|mês` evita dupla contagem.
-- Panelaço Pet (1387327144) passa a contar via regra 2 (foi p/ Proposta enviada). Grupo Moas (1406950101) passa a contar via regra 3 (Reunião agendada → Contato futuro).
+- **Só adiciona filtro** — cards de teste somem, cards reais permanecem.
+- Meses passados: métricas de teste caem; nenhum card real é impactado.
+- Sem mudança em metas, DRE, monetário ou lógica de negócio.
 
 ## Validação
 
 1. Typecheck.
-2. Abrir dashboard Outbound em Jul/2026 e conferir que Panelaço e Moas aparecem em RR (drill-down).
-3. Spot-check meses passados de Outbound: RRs adicionais devem ser justificáveis (cards que avançaram para Proposta/Ganho ou Contato futuro pós-RM).
+2. Abrir dashboard Expansão em Jul/2026 e confirmar sumiço dos cards de teste em MQL.
+3. Spot-check O2 TAX / Monetização / Outbound: se ainda aparecer teste, é sinal de path não-coberto → aplicar filtro nesse ponto específico.
+
+## Pergunta
+
+Você viu cards de teste especificamente em **quais BUs**? (Expansão sozinha, ou também O2 TAX / Monetização / Outbound?) Isso ajuda a focar na etapa 2 sem precisar auditar tudo às cegas.
