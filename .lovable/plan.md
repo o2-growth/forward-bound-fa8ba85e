@@ -1,46 +1,42 @@
-## Causa raiz
+## Causa raiz (Francisco Carlos, ID 1367018386)
 
-O drill-down MQL/Leads das BUs Franquia e Oxy Hacker (sem filtro de closer/SDR/origem) usa `useExpansaoMetas.getDetailItemsForIndicator` e `useOxyHackerMetas.getDetailItemsForIndicator`, **não** o `useExpansaoAnalytics`. Esses dois hooks (`useExpansaoMetas.ts`, `useOxyHackerMetas.ts`) **nunca aplicam `isJunkCard`** — por isso títulos como `teste`, `nao_atender_teste_track@gmail.com` e IDs conhecidos de teste continuam vazando.
+Card entrou várias vezes em RR em julho, alternando `Produtos`:
 
-`useO2TaxMetas.ts` tem o mesmo gap (mesmo padrão de código) e será alinhado por consistência.
+| Entrada | Fase | Produtos |
+|---|---|---|
+| 2026-07-01 19:42 | Reunião Realizada | Franquia |
+| 2026-07-02 20:19 | Reunião Realizada | Oxy Hacker |
+| 2026-07-06 20:46 | Reunião Realizada | Oxy Hacker |
 
-Verifiquei em `useModeloAtualMetas.ts` que `isJunkCard` cobre:
-- allowlist fixa de IDs (`TEST_CARD_IDS`)
-- padrões de título: `\bteste?s?\b`, `\btesting\b`, `asdf`, `qwerty`, `abc`, `xxx`, apenas dígitos curtos, só símbolos
+Produto atual do card hoje: **Oxy Hacker** (linha mais recente / `Fase Atual` = Contrato em elaboração, Produtos = Oxy Hacker).
 
-Isso já pega "teste" e "TESTE". Não pega `nao_atender_teste_track@gmail.com` porque `_` é word char e quebra o `\b`. Vou adicionar um padrão para casos assim (`nao_atender`, `nao atender`, `noreply`, e a substring "teste" quando cercada por `_`).
+`useExpansaoMetas` (Franquia) e `useOxyHackerMetas` filtram por produto no início e dedupam só por `cardId` dentro do próprio produto → Francisco cai em Franquia (via 07-01) e em Oxy Hacker (via 07-02/06). Consolidado duplica. Mesmo problema em RM.
 
-## Mudanças
+O `useExpansaoAnalytics` já foi corrigido antes, mas usa "earliest entry vence" — pela regra nova do usuário, também está errado (colocaria em Franquia, não no produto atual).
 
-### 1. `src/hooks/useModeloAtualMetas.ts`
-Ampliar `TEST_TITLE_PATTERNS` para cobrir emails/handles de teste:
+## Regra correta
 
-```ts
-/nao[_\s-]?atender/i,     // nao_atender, nao atender, nao-atender
-/no[_\s-]?reply/i,        // noreply, no_reply
-/[_.-]teste?[_.-]/i,      // _teste_, .teste., -teste-
-/teste?_?track/i,         // teste_track, testetrack
-```
+Um card conta **1x por mês por indicador**, atribuído ao **produto atual do card** (`Produtos` da linha mais recente / `Fase Atual`), independente de em qual produto ele estava quando entrou nas fases.
 
-### 2. `src/hooks/useExpansaoMetas.ts`
-- Importar `isJunkCard` de `useModeloAtualMetas`.
-- No loop `for (const row of responseData.data)` que constrói `movements`, adicionar antes de qualquer processamento:
-  ```ts
-  if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
-  ```
+## Correção
 
-### 3. `src/hooks/useOxyHackerMetas.ts`
-Mesma mudança do item 2 (mesmo padrão de código; usa a mesma tabela `pipefy_cards_movements_expansao`, filtrando `Oxy Hacker`).
+Aplicar em três hooks: `useExpansaoAnalytics.ts`, `useExpansaoMetas.ts`, `useOxyHackerMetas.ts`.
 
-### 4. `src/hooks/useO2TaxMetas.ts`
-Mesma mudança do item 2 para o loop que parseia rows do Pipefy (aplicar `isJunkCard` na origem, antes de contar em qtd/valor/detail items).
+1. **Determinar produto atual por cardId** (uma vez, cross-product):
+   - Varrer todas as linhas cross-product.
+   - Para cada `cardId`, escolher a linha com `Entrada` (ou `updated_at` como fallback) mais recente → `currentProdutoByCard.set(cardId, produto)`.
+
+2. **Dedup por `cardId__indicator__YYYY-MM`** (como já existe no analytics), mas na hora de filtrar por produto do hook, comparar contra `currentProdutoByCard.get(cardId)` em vez de `entry.produto`.
+
+3. Aplicar a mesma regra em:
+   - `useExpansaoAnalytics.getCardsForIndicator` (leads, mql, rm, rr, proposta, venda)
+   - `useExpansaoMetas.getQtyForPeriod`, `getValueForPeriod`, `getGroupedData`, `getDetailItemsForIndicator`
+   - `useOxyHackerMetas.getQtyForPeriod`, `getValueForPeriod`, `getGroupedData`, `getDetailItemsForIndicator`
+
+4. Nos metas hooks, remover o `if (produto !== 'Franquia') continue` do parse inicial — precisamos das linhas de todos os produtos para calcular `currentProdutoByCard`. O filtro por produto passa a acontecer no consumo, via `currentProdutoByCard.get(cardId) === PRODUTO_DO_HOOK`.
 
 ## Efeito esperado
 
-- Rows como `teste`, `nao_atender_teste_track@gmail.com`, `123`, `asdf`, etc. deixam de aparecer nos drill-downs de MQL/Leads/RM/RR/Proposta/Venda de Franquia, Oxy Hacker e O2 TAX.
-- Contagens (`getQtyForPeriod`, `getValueForPeriod`) das gauges caem para excluir esses cards — coerente com o comportamento já existente em Modelo Atual e nas próprias funções de `useExpansaoAnalytics`.
-- Nomes reais listados pelo usuário (Maria Missileide, Rogelio, Fernando, etc.) **não** serão filtrados — apenas cards com título que casa com os padrões de teste. Se algum desses também for um card de teste real (ex.: SDR criou lead fictício com seu próprio nome), me avise quais IDs para incluir na allowlist `TEST_CARD_IDS`.
-
-## Observação sobre a lista enviada
-
-Vários nomes na lista (ex.: Maria Missileide, Rogelio Duran Amoedo, Rafael Guimarães, Fernando, Claudio, Marcos André) **não têm marcadores óbvios de teste no título**. Se esses também devem ser filtrados, preciso do critério: são cards do SDR "teste" no Pipefy? Vieram sem `Data de criação`? Estão em pipe de sandbox? Manda 2-3 IDs de exemplo e adapto o filtro (por SDR, por origem, ou por ID direto).
+- Francisco Carlos (produto atual = Oxy Hacker) some da lista de Franquia RR e RM de julho. Conta 1x em Oxy Hacker RR e 1x em Oxy Hacker RM. Consolidado = 1x cada.
+- Regra vale para todos os cards que trocaram de produto durante o funil.
+- Gauges e drill-down consolidado ficam consistentes.
