@@ -172,17 +172,27 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
     retry: 1,
   });
 
-  // Get total qty for a specific indicator and date range
-  // Count UNIQUE CARDS that entered a phase during the period
   // Build investimento map per card (field is the same across all movements of a card)
   const cardInvestimento = new Map<string, string | null>();
+  // currentProdutoByCard: produto da linha com dataEntrada MAIS RECENTE por card.
+  // Usado para atribuir cada card ao produto ATUAL, evitando duplicação
+  // cross-product (Franquia vs Oxy Hacker).
+  const currentProdutoByCard = new Map<string, { produto: string; when: number }>();
   if (data?.movements) {
     for (const m of data.movements) {
       if (m.investimentoDisponivel && !cardInvestimento.has(m.id)) {
         cardInvestimento.set(m.id, m.investimentoDisponivel);
       }
+      const when = m.dataEntrada.getTime();
+      const prev = currentProdutoByCard.get(m.id);
+      if (!prev || when > prev.when) {
+        currentProdutoByCard.set(m.id, { produto: m.produto, when });
+      }
     }
   }
+  const isCurrentProduct = (id: string) =>
+    (currentProdutoByCard.get(id)?.produto || '') === 'Oxy Hacker';
+
 
   const getQtyForPeriod = (indicator: OxyHackerIndicator, start?: Date, end?: Date): number => {
     if (!data?.movements || data.movements.length === 0) return 0;
