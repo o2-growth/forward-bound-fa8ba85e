@@ -8,6 +8,7 @@ import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate 
 import { useClientesProdutos } from "./useClientesProdutos";
 import { classifyProduto, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
 import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
+import { sumMrrFields } from "@/lib/mrrFields";
 
 export interface ModeloAtualCard {
   id: string;
@@ -199,7 +200,7 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
     dataEntrada = fixed;
     correctedAssinatura = fixed;
   }
-  const valorMRR = parseNumericValue(row['Valor MRR'] || row['valor_mrr'] || 0);
+  const valorMRR = sumMrrFields(row);
   const valorPontualRaw = parseNumericValue(row['Valor Pontual'] || row['valor_pontual'] || 0);
   const valorEducacao = parseNumericValue(row['Valor Educação'] || row['Valor Educacao'] || row['valor_educacao'] || 0);
   let valorSetup = parseNumericValue(row['Valor Setup'] || row['valor_setup'] || 0);

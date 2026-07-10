@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { sumMrrFields } from "@/lib/mrrFields";
 
 export type ModeloAtualIndicator = 'proposta' | 'venda';
 
@@ -97,7 +98,7 @@ export function useModeloAtualValues(startDate?: Date, endDate?: Date) {
           cardId: String(cardId),
           entrada,
           destino,
-          valorMRR: parseNumericValue(row['Valor MRR']),
+          valorMRR: sumMrrFields(row) || parseNumericValue(row['Valor MRR']),
           valorPontual: parseNumericValue(row['Valor Pontual']),
           valorEducacao: parseNumericValue(row['Valor Educação'] || row['Valor Educacao']),
           valorSetup: parseNumericValue(row['Valor Setup']),

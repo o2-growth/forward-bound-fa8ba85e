@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 import { isO2TaxMqlQualified } from "@/hooks/useO2TaxAnalytics";
 import { isJunkCard } from "@/hooks/useModeloAtualMetas";
+import { sumMrrFields } from "@/lib/mrrFields";
 
 export type O2TaxIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -78,7 +79,7 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
           dataSaida: parseDate(row['Saída']),
           dataCriacao: parseDate(row['Data Criação']),
           faixaFaturamento: row['Faixa de faturamento mensal'] || null,
-          valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
+          valorMRR: sumMrrFields(row) || (row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null),
           valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
           valorSetup: row['Valor Setup'] ? parseFloat(row['Valor Setup']) : null,
         };
@@ -103,7 +104,7 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
             dataSaida: parseDate(row['Saída']),
             dataCriacao: parseDate(row['Data Criação']),
             faixaFaturamento: row['Faixa de faturamento mensal'] || null,
-            valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
+            valorMRR: sumMrrFields(row) || (row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null),
             valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
             valorSetup: row['Valor Setup'] ? parseFloat(row['Valor Setup']) : null,
           }));

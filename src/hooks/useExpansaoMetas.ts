@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
 import { isJunkCard } from "./useModeloAtualMetas";
+import { sumMrrFields } from "@/lib/mrrFields";
 
 export type ExpansaoIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -134,7 +135,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           faseAtual: row['Fase Atual'] || '',
           dataEntrada,
           dataSaida: parseDate(row['Saída']),
-          valorMRR: readNum('Valor MRR', 'Valor mensal', 'MRR'),
+          valorMRR: sumMrrFields(row) || readNum('Valor MRR', 'Valor mensal', 'MRR'),
           valorPontual: readNum('Valor Pontual', 'Valor pontual'),
           valorSetup: readNum('Valor Setup', 'Valor setup'),
           taxaFranquia: readNum(
