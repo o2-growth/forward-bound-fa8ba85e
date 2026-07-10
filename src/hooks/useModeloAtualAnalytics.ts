@@ -8,6 +8,7 @@ import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate 
 import { useClientesProdutos } from "./useClientesProdutos";
 import { classifyProduto, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
 import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
+import { sumMrrFields } from "@/lib/mrrFields";
 
 export interface ModeloAtualCard {
   id: string;
