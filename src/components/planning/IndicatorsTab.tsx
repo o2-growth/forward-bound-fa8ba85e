@@ -3406,49 +3406,67 @@ export function IndicatorsTab() {
       return config ? getMetaForIndicator(config) : 0;
     };
     return (
-      <CommercialPaceDashboard
-        startDate={startDate}
-        endDate={endDate}
-        selectedBUs={selectedBUs}
-        selectedClosers={selectedClosers}
-        selectedSDRs={selectedSDRs}
-        selectedOrigens={selectedOrigens}
-        itemsByIndicator={itemsByIndicator}
-        hotOpportunityItems={hotOpportunityItems}
-        revenueMeta={getMetaMonetaryForIndicator({ key: 'faturamento', label: 'Fat Incremento', shortLabel: 'Fat Inc.', format: 'currency' })}
-        funnelMetas={{ mql: metaFor('mql'), rm: metaFor('rm'), rr: metaFor('rr'), proposta: metaFor('proposta'), venda: metaFor('venda') }}
-        isLoading={isLoading || modeloAtualAnalytics.isLoading || o2TaxAnalytics.isLoading || isLoadingExpansao || isLoadingO2Tax}
-        onBack={() => setCommercialPaceOpen(false)}
-        onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
-        onBUsChange={(bus) => setSelectedBUs(bus as BUType[])}
-        onHotOpportunitiesClick={(items, closerLabel) => {
-          setDetailSheetTitle(
-            closerLabel
-              ? `Oportunidades quentes — ${closerLabel}`
-              : 'Oportunidades quentes — Modelo Atual'
-          );
-          setDetailSheetColumns([
-            { key: 'name', label: 'Empresa' },
-            { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
-            { key: 'value', label: 'Valor (MRR+Setup+Pontual)', format: columnFormatters.currency },
-            { key: 'responsible', label: 'Closer' },
-            { key: 'date', label: 'Data Entrada', format: columnFormatters.date },
-          ]);
-          setDetailSheetItems([...items].sort((a, b) => (b.value || 0) - (a.value || 0)));
-          setDetailSheetFilterCriteria([
-            {
-              title: 'Critérios',
-              items: [
-                'Temperatura = Quente',
-                'Sem fase terminal (Ganho/Perdido/Arquivado)',
-                'Sem motivo de perda registrado',
-                ...(closerLabel ? [`Closer = ${closerLabel}`] : []),
-              ],
-            },
-          ]);
-          setDetailSheetOpen(true);
-        }}
-      />
+      <>
+        <CommercialPaceDashboard
+          startDate={startDate}
+          endDate={endDate}
+          selectedBUs={selectedBUs}
+          selectedClosers={selectedClosers}
+          selectedSDRs={selectedSDRs}
+          selectedOrigens={selectedOrigens}
+          itemsByIndicator={itemsByIndicator}
+          hotOpportunityItems={hotOpportunityItems}
+          revenueMeta={getMetaMonetaryForIndicator({ key: 'faturamento', label: 'Fat Incremento', shortLabel: 'Fat Inc.', format: 'currency' })}
+          funnelMetas={{ mql: metaFor('mql'), rm: metaFor('rm'), rr: metaFor('rr'), proposta: metaFor('proposta'), venda: metaFor('venda') }}
+          isLoading={isLoading || modeloAtualAnalytics.isLoading || o2TaxAnalytics.isLoading || isLoadingExpansao || isLoadingO2Tax}
+          onBack={() => setCommercialPaceOpen(false)}
+          onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
+          onBUsChange={(bus) => setSelectedBUs(bus as BUType[])}
+          onHotOpportunitiesClick={(items, closerLabel) => {
+            setDetailSheetTitle(
+              closerLabel
+                ? `Oportunidades quentes — ${closerLabel}`
+                : 'Oportunidades quentes — Modelo Atual'
+            );
+            setDetailSheetDescription('');
+            setDetailSheetKpis([]);
+            setDetailSheetCharts([]);
+            setDetailSheetExtraContent(null);
+            setDetailSheetColumns([
+              { key: 'name', label: 'Empresa' },
+              { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
+              { key: 'value', label: 'Valor (MRR+Setup+Pontual)', format: columnFormatters.currency },
+              { key: 'responsible', label: 'Closer' },
+              { key: 'date', label: 'Data Entrada', format: columnFormatters.date },
+            ]);
+            setDetailSheetItems([...items].sort((a, b) => (b.value || 0) - (a.value || 0)));
+            setDetailSheetFilterCriteria([
+              {
+                title: 'Critérios',
+                items: [
+                  'Temperatura = Quente',
+                  'Sem fase terminal (Ganho/Perdido/Arquivado)',
+                  'Sem motivo de perda registrado',
+                  ...(closerLabel ? [`Closer = ${closerLabel}`] : []),
+                ],
+              },
+            ]);
+            setDetailSheetOpen(true);
+          }}
+        />
+        <DetailSheet
+          open={detailSheetOpen}
+          onOpenChange={(open) => { setDetailSheetOpen(open); if (!open) { setRrSheetData(null); setRrView('realizadas'); } }}
+          title={detailSheetTitle}
+          description={detailSheetDescription}
+          items={detailSheetItems}
+          columns={detailSheetColumns}
+          kpis={detailSheetKpis}
+          charts={detailSheetCharts}
+          filterCriteria={detailSheetFilterCriteria}
+          extraContent={detailSheetExtraContent}
+        />
+      </>
     );
   }
 
