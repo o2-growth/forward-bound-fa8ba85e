@@ -3381,10 +3381,22 @@ export function IndicatorsTab() {
         const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsavel);
         return card.temperatura === 'Quente' && matchCloser && matchSdr && matchesOrigemFilter(card);
       })
-      .map(card => ({
-        ...modeloAtualAnalyticsRaw.toDetailItem(card),
-        value: card.valorMRR + card.valorSetup + card.valorPontual,
-      }));
+      .map(card => {
+        // Resolve o Closer "efetivo" varrendo o histórico do card:
+        // pega o closer mais recente não-vazio; fallback para sdr histórico ou responsavel.
+        const rows = rowsById.get(card.id) ?? [card];
+        const sortedDesc = [...rows].sort((a, b) => (a.dataEntrada > b.dataEntrada ? -1 : 1));
+        const effectiveCloser =
+          sortedDesc.find(r => (r.closer || '').trim())?.closer?.trim() ||
+          sortedDesc.find(r => (r.sdr || '').trim())?.sdr?.trim() ||
+          (card.responsavel || '').trim() ||
+          '';
+        const enriched = { ...card, closer: effectiveCloser || card.closer };
+        return {
+          ...modeloAtualAnalyticsRaw.toDetailItem(enriched),
+          value: card.valorMRR + card.valorSetup + card.valorPontual,
+        };
+      });
   })();
 
 
