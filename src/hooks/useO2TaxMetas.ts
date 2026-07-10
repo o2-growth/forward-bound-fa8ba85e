@@ -79,7 +79,7 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
           dataSaida: parseDate(row['Saída']),
           dataCriacao: parseDate(row['Data Criação']),
           faixaFaturamento: row['Faixa de faturamento mensal'] || null,
-          valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
+          valorMRR: sumMrrFields(row) || (row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null),
           valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
           valorSetup: row['Valor Setup'] ? parseFloat(row['Valor Setup']) : null,
         };
