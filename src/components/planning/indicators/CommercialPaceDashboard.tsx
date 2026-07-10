@@ -94,6 +94,7 @@ export function CommercialPaceDashboard({
   onBack,
   onDateChange,
   onBUsChange,
+  onHotOpportunitiesClick,
 }: CommercialPaceDashboardProps) {
   const [mode, setMode] = useState<"cum" | "daily">("cum");
   const [paceOn, setPaceOn] = useState(true);
