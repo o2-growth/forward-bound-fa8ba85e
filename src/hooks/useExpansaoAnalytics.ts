@@ -352,6 +352,34 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     return out;
   }, [data?.historyRows, produto, defaultTicket]);
 
+  // ============================================================
+  // CROSS-PRODUCT dedup source (Franquia + Oxy Hacker juntos)
+  // ------------------------------------------------------------
+  // Cards podem mudar de produto durante o funil (ex.: Francisco
+  // Carlos entrou como Franquia e virou Oxy Hacker no mesmo mês).
+  // Se cada instância deduplicar isoladamente, o card conta 1x em
+  // Franquia + 1x em Oxy Hacker = 2x no consolidado.
+  //
+  // Fix: construir o mapa "earliest entry por card+indicador+mês"
+  // usando TODAS as movimentações (independente de produto).
+  // O produto atribuído é o da earliest entry. Cada instância
+  // (Franquia/Oxy Hacker) filtra depois por entry.produto === produto,
+  // garantindo que o card conta apenas 1x no mês.
+  // ============================================================
+  const allMovementsUnfiltered = useMemo<ExpansaoCard[]>(() => {
+    const rows = [...(data?.allRows || []), ...(data?.historyRows || [])];
+    const seen = new Set<string>();
+    const out: ExpansaoCard[] = [];
+    for (const row of rows) {
+      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || '') })) continue;
+      const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(parseRawCard(row, defaultTicket));
+    }
+    return out;
+  }, [data?.allRows, data?.historyRows, defaultTicket]);
+
   const allOpenCards = useMemo<ExpansaoCard[]>(() => {
     const rows = data?.openRows || [];
     const historyById = new Map<string, ExpansaoCard[]>();
@@ -382,28 +410,28 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
   }, [data?.openRows, fullHistory, produto, defaultTicket]);
 
   // Build a map of FIRST entry per card+indicator+calendar_month (monthly dedup)
+  // CROSS-PRODUCT: usa allMovementsUnfiltered → produto atribuído = produto da earliest entry.
   // Key: `cardId__indicator__YYYY-MM` → earliest ExpansaoCard in that month
   const monthlyFirstEntries = useMemo(() => {
     const entries = new Map<string, ExpansaoCard>();
-    const historyToUse = fullHistory.length > 0 ? fullHistory : cards;
-    
-    for (const card of historyToUse) {
+
+    for (const card of allMovementsUnfiltered) {
       const indicator = PHASE_TO_INDICATOR[card.fase];
       if (!indicator) continue;
-      
+
       const monthKey = `${card.dataEntrada.getFullYear()}-${String(card.dataEntrada.getMonth() + 1).padStart(2, '0')}`;
       const dedupKey = `${card.id}__${indicator}__${monthKey}`;
-      
+
       const existing = entries.get(dedupKey);
       // Keep the EARLIEST entry for this card+indicator within this calendar month
       if (!existing || card.dataEntrada < existing.dataEntrada) {
         entries.set(dedupKey, card);
       }
     }
-    
-    console.log(`[${produto} Analytics] Built monthly dedup map with ${entries.size} entries`);
+
+    console.log(`[${produto} Analytics] Built monthly dedup map with ${entries.size} entries (cross-product)`);
     return entries;
-  }, [cards, fullHistory, produto]);
+  }, [allMovementsUnfiltered]);
 
   // Get cards for a specific indicator (EVERY ENTRY logic)
   // Counts every movement whose phase matches the indicator and dataEntrada is in the period
