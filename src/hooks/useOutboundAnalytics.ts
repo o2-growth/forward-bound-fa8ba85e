@@ -5,6 +5,7 @@ import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import type { ModeloAtualCard } from "./useModeloAtualAnalytics";
 import { parseTemperatura } from "./useModeloAtualAnalytics";
+import { isJunkCard } from "./useModeloAtualMetas";
 
 // SDR fixo do pipe outbound (definido pelo user — todos os cards desse pipe
 // são prospecção ativa do Matheus, independente do que vendedor_respons_vel diga).
@@ -165,8 +166,9 @@ export function useOutboundAnalytics(startDate: Date, endDate: Date) {
         throw err;
       }
       const rows: any[] = resp?.data || [];
-      const cards = rows.map(parseOutboundRow);
-      console.log(`[useOutboundAnalytics] Loaded ${cards.length} outbound movements`);
+      // Filtra cards de teste (título "teste", "123" etc + allowlist de IDs)
+      const cards = rows.map(parseOutboundRow).filter((c) => !isJunkCard(c));
+      console.log(`[useOutboundAnalytics] Loaded ${cards.length} outbound movements (após filtro de teste)`);
       return { cards };
     },
     staleTime: 30 * 60 * 1000,

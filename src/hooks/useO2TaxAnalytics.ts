@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
-import { buildExcludedMqlCardIds } from "@/hooks/useModeloAtualMetas";
+import { buildExcludedMqlCardIds, isJunkCard } from "@/hooks/useModeloAtualMetas";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
 
@@ -204,12 +204,13 @@ export function useO2TaxAnalytics(startDate: Date, endDate: Date) {
       }
 
       console.log(`[O2 TAX Analytics] Period query returned ${periodRes.data.data.length} movements`);
-      const cards = periodRes.data.data.map(parseRawCard);
+      // Filtra cards de teste (título "teste", "123", "abc" etc + allowlist de IDs)
+      const cards: O2TaxCard[] = periodRes.data.data.map(parseRawCard).filter((c: O2TaxCard) => !isJunkCard(c));
 
       // Signature cards (cards signed in period but entered earlier)
       let signatureCards: O2TaxCard[] = [];
       if (!sigRes.error && sigRes.data?.data) {
-        signatureCards = sigRes.data.data.map(parseRawCard);
+        signatureCards = sigRes.data.data.map(parseRawCard).filter((c: O2TaxCard) => !isJunkCard(c));
         console.log(`[O2 TAX Analytics] Signature query returned ${signatureCards.length} movements`);
       }
 

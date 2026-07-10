@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { DetailItem } from '@/components/planning/indicators/DetailSheet';
 import { MONETIZACAO_ORIGEM_SENTINEL } from '@/lib/leadSource';
+import { isJunkCard } from '@/hooks/useModeloAtualMetas';
 
 export type MonetizacaoIndicatorType = 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 
@@ -401,7 +402,7 @@ export function useMonetizacaoAnalytics(
       perdido: !!motivoPerda,
       fasesNoPeriodo,
     };
-  });
+  }).filter((c) => !isJunkCard({ id: c.id, titulo: c.titulo, empresa: c.cliente }));
 
   // Agregação por fase (ordem canônica) — usa faseAtual
   const faseAgg = new Map<string, { count: number; valor: number }>();

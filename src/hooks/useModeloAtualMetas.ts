@@ -67,6 +67,46 @@ export function isTestCard(id?: string): boolean {
   return TEST_CARD_IDS.has(id);
 }
 
+// Padrões de título que indicam card de teste — mais robusto que allowlist
+// fixa (novos cards com "teste" no título são detectados automaticamente).
+// Casa como palavra separada ou início: "teste", "test", "testing", "abc",
+// "asdf", "qwerty", "xxx" ou apenas dígitos sem sentido tipo "123", "1234".
+const TEST_TITLE_PATTERNS: RegExp[] = [
+  /\bteste?s?\b/i,           // teste, testes, test
+  /\btesting\b/i,
+  /\basdf?\b/i,               // asd, asdf
+  /\bqwerty\b/i,
+  /\babc\b/i,
+  /\bxxx+\b/i,
+  /^[\s\d]{1,4}$/,            // só 1-4 dígitos (título "123", "1", "1234", " 5 ")
+  /^\W*$/,                    // só símbolos/espaço em branco
+];
+
+// Detecta se o título indica card de teste (nome, empresa, razão social).
+// Aceita qualquer string identificadora — checa o primeiro campo não vazio.
+export function isTestByTitle(...candidates: (string | undefined | null)[]): boolean {
+  for (const cand of candidates) {
+    if (!cand) continue;
+    const raw = String(cand).trim();
+    if (!raw) continue;
+    const norm = normalizeStr(raw);
+    for (const pat of TEST_TITLE_PATTERNS) {
+      if (pat.test(norm)) return true;
+    }
+  }
+  return false;
+}
+
+// Helper combinado: aceita card com id + candidatos de título/empresa/nome.
+// Substitui `isTestCard(id)` nos hooks — captura junk cards por qualquer via.
+export function isJunkCard(
+  card: { id?: string; titulo?: string; empresa?: string; nome?: string; contato?: string } | undefined | null
+): boolean {
+  if (!card) return false;
+  if (isTestCard(card.id)) return true;
+  return isTestByTitle(card.titulo, card.empresa, card.nome, card.contato);
+}
+
 const NORMALIZED_EXCLUDED_REASONS = MQL_EXCLUDED_LOSS_REASONS.map(normalizeStr);
 
 // Verifica se o card deve ser excluído da contagem de MQL por motivo de perda

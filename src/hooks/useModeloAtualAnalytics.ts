@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
-import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isTestCard } from "@/hooks/useModeloAtualMetas";
+import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isJunkCard } from "@/hooks/useModeloAtualMetas";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { useClientesProdutos } from "./useClientesProdutos";
 import { classifyProduto, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
@@ -427,7 +427,8 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
         console.error('[useModeloAtualAnalytics] Error fetching creation data:', creationResponse.error);
       }
 
-      let allOpenCards = parseCards(openRows, true).filter((c) => !isTestCard(c.id));
+      // isJunkCard captura tanto allowlist de IDs quanto padrões de título ("teste", "123", "abc")
+      let allOpenCards = parseCards(openRows, true).filter((c) => !isJunkCard(c));
       console.log(`[useModeloAtualAnalytics] Open pipeline cards loaded: ${allOpenCards.length}`);
       
       // Parse signature-date cards (captures sales signed in period but moved later in Pipefy)
@@ -585,7 +586,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
         for (const card of mqlByCreation) {
           if (!card.dataCriacao) continue;
           const creationTime = card.dataCriacao.getTime();
-          if (creationTime >= startTime && creationTime <= endTime && isMqlQualified(card.faixa) && !isTestCard(card.id) && !excludedMqlIds.has(card.id)) {
+          if (creationTime >= startTime && creationTime <= endTime && isMqlQualified(card.faixa) && !isJunkCard(card) && !excludedMqlIds.has(card.id)) {
             // Deduplicate by card ID - keep first occurrence
             if (!uniqueCards.has(card.id)) {
               uniqueCards.set(card.id, card);
@@ -808,7 +809,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
           creationTime >= startTime &&
           creationTime <= endTime &&
           isMqlQualified(card.faixa) &&
-          !isTestCard(card.id) &&
+          !isJunkCard(card) &&
           !excludedMqlIds.has(card.id) &&
           !seenIds.has(card.id)
         ) {
@@ -853,7 +854,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
     for (const card of mqlByCreation) {
       if (!card.dataCriacao) continue;
       const creationTime = card.dataCriacao.getTime();
-      if (creationTime >= startTime && creationTime <= endTime && isMqlQualified(card.faixa) && !isTestCard(card.id)) {
+      if (creationTime >= startTime && creationTime <= endTime && isMqlQualified(card.faixa) && !isJunkCard(card)) {
         allMqlIds.add(card.id);
       }
     }
