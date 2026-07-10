@@ -143,7 +143,7 @@ async function fetchModeloAtualMonth(year: number, monthIndex: number, monthName
     const dataAssinatura = parseDateOnly(row['Data de assinatura do contrato']);
     if (fase === 'Contrato assinado' && dataAssinatura) dataEntrada = fixPossibleDateInversion(dataAssinatura, dataEntrada);
 
-    const valorMRR = parseNumericValue(row['Valor MRR'] || 0);
+    const valorMRR = sumMrrFields(row);
     const valorPontual = parseNumericValue(row['Valor Pontual'] || 0);
     const valorEducacao = parseNumericValue(row['Valor Educação'] || row['Valor Educacao'] || 0);
     let valorSetup = parseNumericValue(row['Valor Setup'] || 0);
