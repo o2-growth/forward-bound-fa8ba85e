@@ -116,15 +116,15 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
       }
 
       // Parse movements - each row is a phase transition
-      // Filter only "Oxy Hacker" products for this hook
+      // CROSS-PRODUCT: mantemos TODOS os produtos aqui. Filtro por "Oxy Hacker"
+      // acontece no consumo via currentProdutoByCard (produto ATUAL do card),
+      // eliminando duplicação de cards que mudam de produto no funil.
       const movements: OxyHackerMovement[] = [];
       
       for (const row of allRows) {
         if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
         const produto = row['Produtos'] || '';
         
-        // Filter only "Oxy Hacker" products for this hook
-        if (produto !== 'Oxy Hacker') continue;
         
         const fase = row['Fase'] || '';
         const titulo = row['Título'] || '';
@@ -172,17 +172,27 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
     retry: 1,
   });
 
-  // Get total qty for a specific indicator and date range
-  // Count UNIQUE CARDS that entered a phase during the period
   // Build investimento map per card (field is the same across all movements of a card)
   const cardInvestimento = new Map<string, string | null>();
+  // currentProdutoByCard: produto da linha com dataEntrada MAIS RECENTE por card.
+  // Usado para atribuir cada card ao produto ATUAL, evitando duplicação
+  // cross-product (Franquia vs Oxy Hacker).
+  const currentProdutoByCard = new Map<string, { produto: string; when: number }>();
   if (data?.movements) {
     for (const m of data.movements) {
       if (m.investimentoDisponivel && !cardInvestimento.has(m.id)) {
         cardInvestimento.set(m.id, m.investimentoDisponivel);
       }
+      const when = m.dataEntrada.getTime();
+      const prev = currentProdutoByCard.get(m.id);
+      if (!prev || when > prev.when) {
+        currentProdutoByCard.set(m.id, { produto: m.produto, when });
+      }
     }
   }
+  const isCurrentProduct = (id: string) =>
+    (currentProdutoByCard.get(id)?.produto || '') === 'Oxy Hacker';
+
 
   const getQtyForPeriod = (indicator: OxyHackerIndicator, start?: Date, end?: Date): number => {
     if (!data?.movements || data.movements.length === 0) return 0;
@@ -193,6 +203,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
     const uniqueCards = new Set<string>();
 
     for (const movement of data.movements) {
+      if (!isCurrentProduct(movement.id)) continue;
       const entryTime = movement.dataEntrada.getTime();
       if (entryTime >= startTime && entryTime <= endTime) {
         const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
@@ -237,6 +248,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
     const cardValues = new Map<string, number>();
     
     for (const movement of data.movements) {
+      if (!isCurrentProduct(movement.id)) continue;
       const entryTime = movement.dataEntrada.getTime();
       if (entryTime >= startTime && entryTime <= endTime) {
         const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
@@ -329,6 +341,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
       const uniqueCards = new Set<string>();
       
       for (const movement of data.movements) {
+        if (!isCurrentProduct(movement.id)) continue;
         const entryTime = movement.dataEntrada.getTime();
         if (entryTime >= periodStart && entryTime <= periodEnd) {
           const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
@@ -411,6 +424,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
     const byCard = new Map<string, any>();
 
     for (const movement of data.movements) {
+      if (!isCurrentProduct(movement.id)) continue;
       const entryTime = movement.dataEntrada.getTime();
       if (entryTime < startTime || entryTime > endTime) continue;
 

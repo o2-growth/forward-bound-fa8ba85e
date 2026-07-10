@@ -79,15 +79,17 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       }
 
       // Parse movements - each row is a phase transition
-      // Filter only "Franquia" products for this hook
+      // CROSS-PRODUCT: mantemos TODOS os produtos aqui. O filtro por "Franquia"
+      // é aplicado no consumo (getQty/getValue/etc) via currentProdutoByCard,
+      // para atribuir o card ao produto ATUAL (última linha do card) — evita
+      // duplicação quando o card muda de produto (Franquia ↔ Oxy Hacker).
       const movements: ExpansaoMovement[] = [];
       
       for (const row of responseData.data) {
         if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
         const produto = row['Produtos'] || '';
         
-        // Filter only "Franquia" products for this hook
-        if (produto !== 'Franquia') continue;
+        
         
         
         let dataEntrada = parseDate(row['Entrada']) || new Date();
@@ -176,13 +178,26 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
 
   // Build investimento map per card
   const cardInvestimento = new Map<string, string | null>();
+  // Build currentProdutoByCard: produto da linha com dataEntrada MAIS RECENTE
+  // por card. Usado para atribuir cada card ao seu produto ATUAL,
+  // eliminando duplicação cross-product (Franquia vs Oxy Hacker).
+  const currentProdutoByCard = new Map<string, { produto: string; when: number }>();
   if (data?.movements) {
     for (const m of data.movements) {
       if (m.investimentoDisponivel && !cardInvestimento.has(m.id)) {
         cardInvestimento.set(m.id, m.investimentoDisponivel);
       }
+      const when = m.dataEntrada.getTime();
+      const prev = currentProdutoByCard.get(m.id);
+      if (!prev || when > prev.when) {
+        currentProdutoByCard.set(m.id, { produto: m.produto, when });
+      }
     }
   }
+  const isCurrentProduct = (id: string) =>
+    (currentProdutoByCard.get(id)?.produto || '') === 'Franquia';
+
+
 
   // Get total qty for a specific indicator and date range
   // Count UNIQUE CARDS that entered a phase during the period
@@ -195,6 +210,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
     const uniqueCards = new Set<string>();
 
     for (const movement of data.movements) {
+      if (!isCurrentProduct(movement.id)) continue;
       const entryTime = movement.dataEntrada.getTime();
       if (entryTime >= startTime && entryTime <= endTime) {
         const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
@@ -239,6 +255,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
     const cardValues = new Map<string, number>();
     
     for (const movement of data.movements) {
+      if (!isCurrentProduct(movement.id)) continue;
       const entryTime = movement.dataEntrada.getTime();
       if (entryTime >= startTime && entryTime <= endTime) {
         const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
@@ -331,6 +348,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       const uniqueCards = new Set<string>();
       
       for (const movement of data.movements) {
+        if (!isCurrentProduct(movement.id)) continue;
         const entryTime = movement.dataEntrada.getTime();
         if (entryTime >= periodStart && entryTime <= periodEnd) {
           const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
@@ -414,6 +432,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
     const byCard = new Map<string, any>();
 
     for (const movement of data.movements) {
+      if (!isCurrentProduct(movement.id)) continue;
       const entryTime = movement.dataEntrada.getTime();
       if (entryTime < startTime || entryTime > endTime) continue;
 
