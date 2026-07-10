@@ -348,6 +348,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       const uniqueCards = new Set<string>();
       
       for (const movement of data.movements) {
+        if (!isCurrentProduct(movement.id)) continue;
         const entryTime = movement.dataEntrada.getTime();
         if (entryTime >= periodStart && entryTime <= periodEnd) {
           const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
