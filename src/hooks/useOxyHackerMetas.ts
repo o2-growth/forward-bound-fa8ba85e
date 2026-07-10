@@ -116,15 +116,15 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
       }
 
       // Parse movements - each row is a phase transition
-      // Filter only "Oxy Hacker" products for this hook
+      // CROSS-PRODUCT: mantemos TODOS os produtos aqui. Filtro por "Oxy Hacker"
+      // acontece no consumo via currentProdutoByCard (produto ATUAL do card),
+      // eliminando duplicação de cards que mudam de produto no funil.
       const movements: OxyHackerMovement[] = [];
       
       for (const row of allRows) {
         if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
         const produto = row['Produtos'] || '';
         
-        // Filter only "Oxy Hacker" products for this hook
-        if (produto !== 'Oxy Hacker') continue;
         
         const fase = row['Fase'] || '';
         const titulo = row['Título'] || '';
