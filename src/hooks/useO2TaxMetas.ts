@@ -68,6 +68,7 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
       const movements: O2TaxMovement[] = [];
       
       for (const row of responseData.data) {
+        if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
         const movement: O2TaxMovement = {
           id: String(row.ID),
           titulo: row['Título'] || '',
