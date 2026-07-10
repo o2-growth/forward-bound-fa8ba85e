@@ -120,6 +120,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
       const movements: OxyHackerMovement[] = [];
       
       for (const row of allRows) {
+        if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
         const produto = row['Produtos'] || '';
         
         // Filter only "Oxy Hacker" products for this hook
