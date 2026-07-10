@@ -135,7 +135,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           faseAtual: row['Fase Atual'] || '',
           dataEntrada,
           dataSaida: parseDate(row['Saída']),
-          valorMRR: readNum('Valor MRR', 'Valor mensal', 'MRR'),
+          valorMRR: sumMrrFields(row) || readNum('Valor MRR', 'Valor mensal', 'MRR'),
           valorPontual: readNum('Valor Pontual', 'Valor pontual'),
           valorSetup: readNum('Valor Setup', 'Valor setup'),
           taxaFranquia: readNum(
