@@ -3421,6 +3421,33 @@ export function IndicatorsTab() {
         onBack={() => setCommercialPaceOpen(false)}
         onDateChange={(s, e) => { setStartDate(s); setEndDate(e); }}
         onBUsChange={(bus) => setSelectedBUs(bus as BUType[])}
+        onHotOpportunitiesClick={(items, closerLabel) => {
+          setDetailSheetTitle(
+            closerLabel
+              ? `Oportunidades quentes — ${closerLabel}`
+              : 'Oportunidades quentes — Modelo Atual'
+          );
+          setDetailSheetColumns([
+            { key: 'name', label: 'Empresa' },
+            { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
+            { key: 'value', label: 'Valor (MRR+Setup+Pontual)', format: columnFormatters.currency },
+            { key: 'responsible', label: 'Closer' },
+            { key: 'date', label: 'Data Entrada', format: columnFormatters.date },
+          ]);
+          setDetailSheetItems([...items].sort((a, b) => (b.value || 0) - (a.value || 0)));
+          setDetailSheetFilterCriteria([
+            {
+              title: 'Critérios',
+              items: [
+                'Temperatura = Quente',
+                'Sem fase terminal (Ganho/Perdido/Arquivado)',
+                'Sem motivo de perda registrado',
+                ...(closerLabel ? [`Closer = ${closerLabel}`] : []),
+              ],
+            },
+          ]);
+          setDetailSheetOpen(true);
+        }}
       />
     );
   }
