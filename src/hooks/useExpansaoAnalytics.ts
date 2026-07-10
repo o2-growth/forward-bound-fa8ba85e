@@ -380,6 +380,22 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     return out;
   }, [data?.allRows, data?.historyRows, defaultTicket]);
 
+  // currentProdutoByCard: produto do movimento mais RECENTE por card.
+  // Cada card é atribuído ao produto ATUAL (última linha), evitando duplicação
+  // quando o card mudou de produto durante o funil (ex.: Franquia → Oxy Hacker).
+  const currentProdutoByCard = useMemo(() => {
+    const map = new Map<string, { produto: string; when: number }>();
+    for (const c of allMovementsUnfiltered) {
+      const when = c.dataEntrada.getTime();
+      const prev = map.get(c.id);
+      if (!prev || when > prev.when) {
+        map.set(c.id, { produto: c.produto, when });
+      }
+    }
+    return map;
+  }, [allMovementsUnfiltered]);
+
+
   const allOpenCards = useMemo<ExpansaoCard[]>(() => {
     const rows = data?.openRows || [];
     const historyById = new Map<string, ExpansaoCard[]>();
