@@ -92,19 +92,21 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
         body: { table: 'pipefy_cards_movements', action: 'query_period_by_creation', limit: 5000 }
       });
       if (!mqlCreationError && mqlCreationData?.data) {
-        mqlByCreation = mqlCreationData.data.map((row: any) => ({
-          id: String(row.ID),
-          titulo: row['Título'] || '',
-          fase: row['Fase'] || '',
-          faseAtual: row['Fase Atual'] || '',
-          dataEntrada: parseDate(row['Entrada']) || new Date(),
-          dataSaida: parseDate(row['Saída']),
-          dataCriacao: parseDate(row['Data Criação']),
-          faixaFaturamento: row['Faixa de faturamento mensal'] || null,
-          valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
-          valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
-          valorSetup: row['Valor Setup'] ? parseFloat(row['Valor Setup']) : null,
-        }));
+        mqlByCreation = mqlCreationData.data
+          .filter((row: any) => !isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') }))
+          .map((row: any) => ({
+            id: String(row.ID),
+            titulo: row['Título'] || '',
+            fase: row['Fase'] || '',
+            faseAtual: row['Fase Atual'] || '',
+            dataEntrada: parseDate(row['Entrada']) || new Date(),
+            dataSaida: parseDate(row['Saída']),
+            dataCriacao: parseDate(row['Data Criação']),
+            faixaFaturamento: row['Faixa de faturamento mensal'] || null,
+            valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
+            valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
+            valorSetup: row['Valor Setup'] ? parseFloat(row['Valor Setup']) : null,
+          }));
         console.log(`[useO2TaxMetas] MQL by creation: ${mqlByCreation.length} movements`);
       }
 
