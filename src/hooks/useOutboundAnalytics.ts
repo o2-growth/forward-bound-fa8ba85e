@@ -198,24 +198,88 @@ export function useOutboundAnalytics(startDate: Date, endDate: Date) {
    * Retorna cards cuja fase de DESTINO mapeia para o indicador solicitado,
    * dentro do período. Mesma lógica dos outros analytics hooks.
    */
+  // Throughput para RR (só Outbound): captura reuniões realizadas mesmo
+  // quando o operador pula a fase "REUNIÃO QUALIFICADA".
+  // Regras (união, dedup por card):
+  //   1) row com Destino ∈ {REUNIÃO QUALIFICADA, PROPOSTA ENVIADA, Ganho,
+  //      Contrato assinado} dentro do período.
+  //   2) row com Destino='Contato futuro' OU faseAtual='Contato futuro'
+  //      no período, E o card teve alguma vez (em qualquer período) uma
+  //      passagem por REUNIÃO AGENDADA (Destino='REUNIÃO AGENDADA').
+  const RR_THROUGHPUT_DESTINOS = new Set([
+    "REUNIÃO QUALIFICADA",
+    "PROPOSTA ENVIADA",
+    "Ganho",
+    "Contrato assinado",
+  ]);
+
+  const cardIdsWithRmEver = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of cards) {
+      if ((c.faseDestino || "").toUpperCase() === "REUNIÃO AGENDADA") set.add(c.id);
+    }
+    return set;
+  }, [cards]);
+
+  const rrThroughputCardIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const c of cardsInPeriod) {
+      const destino = (c.faseDestino || "").trim();
+      const faseAtual = (c.faseAtual || "").trim();
+      // Regra 1
+      if (RR_THROUGHPUT_DESTINOS.has(destino)) {
+        ids.add(c.id);
+        continue;
+      }
+      // Regra 2
+      const isContatoFuturo =
+        destino === "Contato futuro" || faseAtual === "Contato futuro";
+      if (isContatoFuturo && cardIdsWithRmEver.has(c.id)) {
+        ids.add(c.id);
+      }
+    }
+    return ids;
+  }, [cardsInPeriod, cardIdsWithRmEver]);
+
   const getCardsForIndicator = useMemo(() => {
     return (indicator: IndicatorType): ModeloAtualCard[] => {
       const result: ModeloAtualCard[] = [];
       const seen = new Set<string>();
+
+      // Regra estrita atual (todas as demais fases)
       for (const c of cardsInPeriod) {
-        // Usa destino quando disponível (= próxima fase para onde o card foi)
         const phase = c.faseDestino || c.fase;
         if (PHASE_TO_INDICATOR[phase] === indicator) {
-          // Dedup: 1 entrada por card+indicator (primeira passagem na fase)
           if (!seen.has(c.id)) {
             seen.add(c.id);
             result.push(c);
           }
         }
       }
+
+      // Throughput extra só para RR: adiciona cards que satisfazem a nova regra
+      // mas não foram capturados pela regra estrita.
+      if (indicator === "rr") {
+        // Pega a "melhor" row por card (prioriza a mais recente no período)
+        const bestByCard = new Map<string, ModeloAtualCard>();
+        for (const c of cardsInPeriod) {
+          if (!rrThroughputCardIds.has(c.id)) continue;
+          const prev = bestByCard.get(c.id);
+          if (!prev || c.dataEntrada.getTime() > prev.dataEntrada.getTime()) {
+            bestByCard.set(c.id, c);
+          }
+        }
+        for (const [id, c] of bestByCard) {
+          if (!seen.has(id)) {
+            seen.add(id);
+            result.push(c);
+          }
+        }
+      }
+
       return result;
     };
-  }, [cardsInPeriod]);
+  }, [cardsInPeriod, rrThroughputCardIds]);
 
   /**
    * Converte cards para DetailItem (formato consumido por DetailSheet e
