@@ -79,15 +79,17 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       }
 
       // Parse movements - each row is a phase transition
-      // Filter only "Franquia" products for this hook
+      // CROSS-PRODUCT: mantemos TODOS os produtos aqui. O filtro por "Franquia"
+      // é aplicado no consumo (getQty/getValue/etc) via currentProdutoByCard,
+      // para atribuir o card ao produto ATUAL (última linha do card) — evita
+      // duplicação quando o card muda de produto (Franquia ↔ Oxy Hacker).
       const movements: ExpansaoMovement[] = [];
       
       for (const row of responseData.data) {
         if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
         const produto = row['Produtos'] || '';
         
-        // Filter only "Franquia" products for this hook
-        if (produto !== 'Franquia') continue;
+        
         
         
         let dataEntrada = parseDate(row['Entrada']) || new Date();
