@@ -57,6 +57,7 @@ import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
+import { aggregateByTemperatura } from "./indicators/temperaturaAggregator";
 import { EventosG4Section } from "./indicators/EventosG4Section";
 import { CenarioCaixaSection } from "./indicators/CenarioCaixaSection";
 import { MonetizacaoSection } from "./indicators/MonetizacaoSection";
@@ -3338,66 +3339,26 @@ export function IndicatorsTab() {
     }
   };
 
-  const hotOpportunityItems = (() => {
-    if (!includesModeloAtual) return [];
-    const terminalPhases = new Set([
-      'ganho',
-      'perdido',
-      'perda',
-      'arquivado',
-      'concluído',
-      'concluido',
-      'finalizado',
-    ]);
+  // Mesma lógica do chip 🔥 Quente (TemperaturaSection): usa aggregateByTemperatura
+  // para todas as BUs selecionadas, incluindo Outbound, Franquia, Oxy Hacker e Monetização.
+  const hotOpportunityItems = useMemo(() => {
+    const { buckets } = aggregateByTemperatura({
+      modeloAtualAnalytics: modeloAtualAnalyticsRaw,
+      franquiaAnalytics,
+      oxyHackerAnalytics,
+      outboundAnalytics,
+      monetizacaoAnalytics,
+      selectedBUs,
+      startDate,
+      endDate,
+      includeAllOpenIgnoringPeriod: true,
+    });
+    return buckets.Quente.map(item => ({
+      ...item,
+      value: (item.mrr || 0) + (item.setup || 0) + (item.pontual || 0) || item.value || 0,
+    }));
+  }, [modeloAtualAnalyticsRaw, franquiaAnalytics, oxyHackerAnalytics, outboundAnalytics, monetizacaoAnalytics, selectedBUs, startDate, endDate]);
 
-    // Agrupa todas as linhas por card para inspecionar histórico e latest
-    const rowsById = new Map<string, (typeof modeloAtualAnalyticsRaw.allCards)[number][]>();
-    for (const card of modeloAtualAnalyticsRaw.allCards) {
-      if (!rowsById.has(card.id)) rowsById.set(card.id, []);
-      rowsById.get(card.id)!.push(card);
-    }
-    const norm = (s: string) => (s || '').trim().toLowerCase();
-    const latestById = new Map<string, (typeof modeloAtualAnalyticsRaw.allCards)[number]>();
-    for (const [id, rows] of rowsById.entries()) {
-      const sorted = [...rows].sort((a, b) => (a.dataEntrada > b.dataEntrada ? 1 : -1));
-      latestById.set(id, sorted[sorted.length - 1]);
-    }
-    return Array.from(latestById.values())
-      .filter(card => {
-        const rows = rowsById.get(card.id) ?? [card];
-        // Exclui se em qualquer momento o card passou por fase terminal
-        const passedTerminal = rows.some(r =>
-          terminalPhases.has(norm(r.faseAtual || '')) ||
-          terminalPhases.has(norm(r.fase || '')) ||
-          terminalPhases.has(norm(r.faseDestino || '')),
-        );
-        if (passedTerminal) return false;
-        // Exclui se tem motivo de perda registrado (mesmo que fase atual não seja "Perdido")
-        const hasLossReason = rows.some(r => !!(r.motivoPerda && String(r.motivoPerda).trim()));
-        if (hasLossReason) return false;
-        const currentPhase = norm(card.faseAtual || card.fase || '');
-        if (terminalPhases.has(currentPhase)) return false;
-        const matchCloser = effectiveSelectedClosers.length === 0 || matchesCloserFilter(card.closer);
-        const matchSdr = effectiveSelectedSDRs.length === 0 || matchesSdrFilter(card.sdr || card.responsavel);
-        return card.temperatura === 'Quente' && matchCloser && matchSdr && matchesOrigemFilter(card);
-      })
-      .map(card => {
-        // Resolve o Closer "efetivo" varrendo o histórico do card:
-        // pega o closer mais recente não-vazio; fallback para sdr histórico ou responsavel.
-        const rows = rowsById.get(card.id) ?? [card];
-        const sortedDesc = [...rows].sort((a, b) => (a.dataEntrada > b.dataEntrada ? -1 : 1));
-        const effectiveCloser =
-          sortedDesc.find(r => (r.closer || '').trim())?.closer?.trim() ||
-          sortedDesc.find(r => (r.sdr || '').trim())?.sdr?.trim() ||
-          (card.responsavel || '').trim() ||
-          '';
-        const enriched = { ...card, closer: effectiveCloser || card.closer };
-        return {
-          ...modeloAtualAnalyticsRaw.toDetailItem(enriched),
-          value: card.valorMRR + card.valorSetup + card.valorPontual,
-        };
-      });
-  })();
 
 
   if (commercialPaceOpen) {
