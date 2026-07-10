@@ -656,10 +656,26 @@ export function CommercialPaceDashboard({
         </section>
 
         {/* OPORTUNIDADES QUENTES */}
-        <section className="cp-card span-5">
+        <section
+          className="cp-card span-5"
+          style={{ cursor: onHotOpportunitiesClick && hotActive.length > 0 ? "pointer" : undefined }}
+          role={onHotOpportunitiesClick ? "button" : undefined}
+          tabIndex={onHotOpportunitiesClick ? 0 : undefined}
+          onClick={() => {
+            if (!onHotOpportunitiesClick || hotActive.length === 0) return;
+            onHotOpportunitiesClick(hotActive, selected?.name);
+          }}
+          onKeyDown={(e) => {
+            if (!onHotOpportunitiesClick || hotActive.length === 0) return;
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onHotOpportunitiesClick(hotActive, selected?.name);
+            }
+          }}
+        >
           <div className="hot-head">
             <div>
-              <div className="cp-card-label">Oportunidades quentes</div>
+              <div className="cp-card-label">Oportunidades quentes {onHotOpportunitiesClick && hotActive.length > 0 && <span style={{ fontSize: 10, color: "var(--cp-chalk-4)", marginLeft: 6 }}>(clique para detalhes)</span>}</div>
               <div className="hot-value num">{brl(hotTotal)}</div>
               <div className="cp-card-sub">
                 {hotActive.length} proposta{hotActive.length === 1 ? "" : "s"} quente{hotActive.length === 1 ? "" : "s"} · {selectedCloserLocal === "all" ? "todos os closers" : selected?.name}
@@ -675,7 +691,19 @@ export function CommercialPaceDashboard({
                 .filter(c => c.propHot > 0)
                 .sort((a, b) => b.propHot - a.propHot)
                 .map(c => (
-                  <div className="hot-row" key={c.id}>
+                  <div
+                    className="hot-row"
+                    key={c.id}
+                    style={{ cursor: onHotOpportunitiesClick ? "pointer" : undefined }}
+                    onClick={(e) => {
+                      if (!onHotOpportunitiesClick) return;
+                      e.stopPropagation();
+                      const filtered = hotOpportunityItems.filter(
+                        i => firstNameKey(personName(i)) === c.id
+                      );
+                      if (filtered.length > 0) onHotOpportunitiesClick(filtered, c.name);
+                    }}
+                  >
                     <span className="h-name">{c.name}</span>
                     <span className="h-bar"><i style={{ width: `${c.propPipe ? c.propHot / c.propPipe * 100 : 0}%` }} /></span>
                     <span className="h-val num">{brl(c.propHot)}</span>
