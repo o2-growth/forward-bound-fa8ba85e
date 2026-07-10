@@ -68,7 +68,7 @@ const cum = (a: number[]) => a.reduce<number[]>((acc, v, i) => (acc.push((acc[i 
 
 const EXCLUDED_CLOSERS = new Set(["matheus staruck dos reis"]);
 function personName(item: DetailItem): string {
-  const name = ((item.closer || "") as string).trim();
+  const name = (((item.closer || (item as any).responsible || '') as string)).trim();
   if (!name) return "";
   if (EXCLUDED_CLOSERS.has(name.toLowerCase())) return "";
   return name;
