@@ -1,64 +1,55 @@
 
-## Diagnóstico
+## Diagnóstico — Francisco Carlos (ID 1367018386)
 
-A função robusta que Modelo Atual usa para banir cards de teste é `isJunkCard` (em `src/hooks/useModeloAtualMetas.ts`). Ela combina duas checagens:
+Confirmei no banco: **um único card** com 3 movimentações para "Reunião Realizada" em julho:
 
-- `isTestCard(id)` — allowlist fixa de IDs conhecidos.
-- `isTestByTitle(titulo, empresa, nome, contato)` — regex em título/empresa/contato: `teste`, `test`, `testing`, `asdf`, `qwerty`, `abc`, `xxx`, só dígitos 1-4 chars, só símbolos.
-
-**Auditoria das BUs:**
-
-| Hook | Filtro atual | Status |
+| Data | Fase | Produto |
 |---|---|---|
-| `useModeloAtualAnalytics` | `isJunkCard(card)` em todos os paths | ✅ OK |
-| `useO2TaxAnalytics` | `isJunkCard(c)` no parse | ✅ (mas confirmar que MQL usa a lista filtrada) |
-| `useMonetizacaoAnalytics` | `isJunkCard({id, titulo, empresa: cliente})` | ✅ (idem) |
-| `useOutboundAnalytics` | `isJunkCard(c)` no parse | ✅ |
-| **`useExpansaoAnalytics`** | **só `isTestCard(id)`** em 3 pontos (linhas 331, 347, 366) | ❌ **gap principal** |
+| 01/07 19:42 | Reunião Realizada | **Franquia** |
+| 02/07 20:19 | Reunião Realizada | **Oxy Hacker** |
+| 06/07 20:46 | Reunião Realizada | **Oxy Hacker** |
 
-Expansão perde todo card de teste cujo ID não esteja na allowlist fixa. Novos cards com título "teste", "abc", "123", etc. passam direto para MQL e demais indicadores.
+O card **mudou de produto** (Franquia → Oxy Hacker) durante o mês.
 
-## Correção
+## Por que aparece múltiplas vezes
 
-### 1. Expansão (fix principal)
+`useExpansaoAnalytics` é instanciado **duas vezes** no `IndicatorsTab`: uma para `Franquia`, outra para `Oxy Hacker`. Cada instância:
 
-Em `src/hooks/useExpansaoAnalytics.ts`, substituir as 3 chamadas `isTestCard(String(row['ID']))` por checagem baseada em `isJunkCard` usando **id + Título** do row:
+1. Filtra `cards`/`fullHistory` por `parsed.produto === produto`.
+2. Aplica dedup mensal `(cardId, indicator, monthKey)` **dentro do seu produto**.
 
-```ts
-// antes
-if (isTestCard(String(row['ID'] || ''))) continue;
+Resultado para Francisco Carlos em jul/2026:
+- Instância **Franquia** → vê 1 movimentação RR (01/07) → conta **1**.
+- Instância **Oxy Hacker** → vê 2 movimentações RR, dedup mensal colapsa → conta **1**.
 
-// depois
-const _id = String(row['ID'] || '');
-const _titulo = String(row['Título'] || '');
-if (isJunkCard({ id: _id, titulo: _titulo })) continue;
-```
+O funil consolidado soma: `1 (Franquia) + 1 (Oxy Hacker) = 2` RRs para o mesmo card.
 
-Trocar import: `isTestCard` → `isJunkCard`.
+**Como chega a 4:** existem chamadas separadas que somam de novo os detail items em outros pontos da tela (drill-down "Consolidado" vs. barras por BU, ou repetição no chart de reuniões vs. funil clicável) — cada instância aparece 1x por lugar. Preciso confirmar qual bloco da tela é o que você viu com "4x" (drill-down, chart, tabela?) para ter certeza da origem exata.
 
-### 2. Auditoria confirmatória (O2 TAX, Monetização, Outbound)
+## Correção proposta
 
-Passar rapidamente nos hooks para garantir que **todo path que gera contagem de MQL/indicadores** consome a lista já filtrada — não relê `rawRows` sem passar por `isJunkCard`. Se algum path escapar, aplicar `isJunkCard` também.
+Introduzir **dedup por card + mês cross-product** para os indicadores de reunião/proposta/venda em Expansão. Um card não deveria contar mais de 1 vez por mês, independente do produto atual — a "reunião realizada" é um evento único no ciclo de vida do card.
 
-Especificamente verificar:
-- `useO2TaxAnalytics`: paths de MQL usando `periodCards` e `signatureCards` (ambos já filtrados).
-- `useMonetizacaoAnalytics`: agregação de fases usa `cards` já filtrado.
-- `useOutboundAnalytics`: `cardsInPeriod` deriva de `cards` já filtrado.
+### Estratégia
 
-Se todos os paths consomem só as listas filtradas, nenhuma mudança adicional é necessária além do fix em Expansão.
+1. Elevar a atribuição de produto de **movimentação-a-movimentação** para **produto do card no momento do evento contado**. Após dedup mensal por card+indicador, atribui-se ao produto da entry vencedora (earliest RR).
+2. Cada card só passa por **uma** das duas instâncias (Franquia OU Oxy Hacker), definido pelo produto da earliest RR (ou earliest MQL/RM/proposta/venda) do card naquele mês.
+3. Ajuste concentrado em `src/hooks/useExpansaoAnalytics.ts`:
+   - `cards` continua filtrado por produto para MQL/leads (o produto no momento da criação faz sentido).
+   - `monthlyFirstEntries` passa a ser construído a partir do **fullHistory sem filtro de produto** (compartilhado), mas cada entry carrega seu `produto`. O consumer decide qual instância "adota" o card.
+   - `getCardsForIndicator(indicator)` para `rm/rr/proposta/venda` filtra as entries dedup'adas pelo produto da entry (`entry.produto === produto`).
 
-## Impacto
+Efeito: Francisco Carlos aparece 1x em Oxy Hacker (dono da earliest RR em jul: 02/07 20:19 caiu depois de 01/07 Franquia — então **1x em Franquia**, produto da earliest RR). Total consolidado = 1.
 
-- **Só adiciona filtro** — cards de teste somem, cards reais permanecem.
-- Meses passados: métricas de teste caem; nenhum card real é impactado.
-- Sem mudança em metas, DRE, monetário ou lógica de negócio.
+### Alternativa mais simples
 
-## Validação
-
-1. Typecheck.
-2. Abrir dashboard Expansão em Jul/2026 e confirmar sumiço dos cards de teste em MQL.
-3. Spot-check O2 TAX / Monetização / Outbound: se ainda aparecer teste, é sinal de path não-coberto → aplicar filtro nesse ponto específico.
+Se o comportamento desejado for "card conta 1x por produto por mês" (aceita duplicação Franquia+OxyHacker no consolidado): remover a duplicação apenas na camada de agregação do consolidado (ClickableFunnelChart + IndicatorsTab), fazendo `Set<cardId>` cross-instance antes de somar. Cada BU individual continua vendo o card no seu produto.
 
 ## Pergunta
 
-Você viu cards de teste especificamente em **quais BUs**? (Expansão sozinha, ou também O2 TAX / Monetização / Outbound?) Isso ajuda a focar na etapa 2 sem precisar auditar tudo às cegas.
+Qual comportamento você prefere?
+
+1. **Dedup total** — card conta 1x no mês, no produto da **primeira RR** (não aparece nas duas BUs). *Mais correto conceitualmente; alinha com "throughput = evento único".*
+2. **Dedup por produto** — card conta 1x em cada BU onde teve RR no mês, mas o consolidado deduplica para 1. *Mantém a visão por produto informativa.*
+
+E confirme: onde exatamente você viu "4x"? (drill-down do card RR, gráfico de barras de reuniões, tabela de detalhes?) Isso ajuda a garantir que a correção atinge o ponto certo.

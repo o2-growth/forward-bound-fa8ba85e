@@ -352,6 +352,34 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     return out;
   }, [data?.historyRows, produto, defaultTicket]);
 
+  // ============================================================
+  // CROSS-PRODUCT dedup source (Franquia + Oxy Hacker juntos)
+  // ------------------------------------------------------------
+  // Cards podem mudar de produto durante o funil (ex.: Francisco
+  // Carlos entrou como Franquia e virou Oxy Hacker no mesmo mês).
+  // Se cada instância deduplicar isoladamente, o card conta 1x em
+  // Franquia + 1x em Oxy Hacker = 2x no consolidado.
+  //
+  // Fix: construir o mapa "earliest entry por card+indicador+mês"
+  // usando TODAS as movimentações (independente de produto).
+  // O produto atribuído é o da earliest entry. Cada instância
+  // (Franquia/Oxy Hacker) filtra depois por entry.produto === produto,
+  // garantindo que o card conta apenas 1x no mês.
+  // ============================================================
+  const allMovementsUnfiltered = useMemo<ExpansaoCard[]>(() => {
+    const rows = [...(data?.allRows || []), ...(data?.historyRows || [])];
+    const seen = new Set<string>();
+    const out: ExpansaoCard[] = [];
+    for (const row of rows) {
+      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || '') })) continue;
+      const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(parseRawCard(row, defaultTicket));
+    }
+    return out;
+  }, [data?.allRows, data?.historyRows, defaultTicket]);
+
   const allOpenCards = useMemo<ExpansaoCard[]>(() => {
     const rows = data?.openRows || [];
     const historyById = new Map<string, ExpansaoCard[]>();
@@ -382,42 +410,42 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
   }, [data?.openRows, fullHistory, produto, defaultTicket]);
 
   // Build a map of FIRST entry per card+indicator+calendar_month (monthly dedup)
+  // CROSS-PRODUCT: usa allMovementsUnfiltered → produto atribuído = produto da earliest entry.
   // Key: `cardId__indicator__YYYY-MM` → earliest ExpansaoCard in that month
   const monthlyFirstEntries = useMemo(() => {
     const entries = new Map<string, ExpansaoCard>();
-    const historyToUse = fullHistory.length > 0 ? fullHistory : cards;
-    
-    for (const card of historyToUse) {
+
+    for (const card of allMovementsUnfiltered) {
       const indicator = PHASE_TO_INDICATOR[card.fase];
       if (!indicator) continue;
-      
+
       const monthKey = `${card.dataEntrada.getFullYear()}-${String(card.dataEntrada.getMonth() + 1).padStart(2, '0')}`;
       const dedupKey = `${card.id}__${indicator}__${monthKey}`;
-      
+
       const existing = entries.get(dedupKey);
       // Keep the EARLIEST entry for this card+indicator within this calendar month
       if (!existing || card.dataEntrada < existing.dataEntrada) {
         entries.set(dedupKey, card);
       }
     }
-    
-    console.log(`[${produto} Analytics] Built monthly dedup map with ${entries.size} entries`);
+
+    console.log(`[${produto} Analytics] Built monthly dedup map with ${entries.size} entries (cross-product)`);
     return entries;
-  }, [cards, fullHistory, produto]);
+  }, [allMovementsUnfiltered]);
 
   // Get cards for a specific indicator (EVERY ENTRY logic)
   // Counts every movement whose phase matches the indicator and dataEntrada is in the period
   // Build investimento map per card
   const cardInvestimentoMap = useMemo(() => {
     const map = new Map<string, string | undefined>();
-    const allMovements = [...cards, ...(fullHistory.length > 0 ? fullHistory : [])];
-    for (const card of allMovements) {
+    // Cross-product: card pode ter investimento preenchido em qualquer movimento
+    for (const card of allMovementsUnfiltered) {
       if (card.investimentoDisponivel && !map.has(card.id)) {
         map.set(card.id, card.investimentoDisponivel);
       }
     }
     return map;
-  }, [cards, fullHistory]);
+  }, [allMovementsUnfiltered]);
 
   // ============================================================
   // FIX: Atribuição retroativa de SDR/Closer via fullHistory
@@ -467,13 +495,18 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
 
   const getCardsForIndicator = useMemo(() => {
     return (indicator: IndicatorType): ExpansaoCard[] => {
-      const allMovements = [...cards, ...(fullHistory.length > 0 ? fullHistory : [])];
-      const seenKeys = new Set<string>();
+      // CROSS-PRODUCT: usa allMovementsUnfiltered (Franquia + Oxy Hacker juntos)
+      // e dedup por cardId. Depois filtra pelo produto da entry vencedora, para
+      // que o card conte apenas 1x no consolidado (produto da earliest entry).
+      // Ordenação por dataEntrada garante que "earliest" seja consistente.
+      const allMovements = allMovementsUnfiltered
+        .slice()
+        .sort((a, b) => a.dataEntrada.getTime() - b.dataEntrada.getTime());
       const result: ExpansaoCard[] = [];
 
       if (indicator === 'leads') {
-        // Leads: cards com fase 'leads' (Start form, Lead, Tentativas de contato)
-        // Funil cumulativo - inclui cards que avancaram alem de leads
+        // Leads: cards com qualquer fase do funil (cumulativo)
+        // Dedup por card ID (cada card conta 1x, atribuído ao produto da earliest entry)
         const indicatorsToCheck: IndicatorType[] = ['leads', 'mql', 'rm', 'rr', 'proposta', 'venda'];
         const seenCardIds = new Set<string>();
 
@@ -483,16 +516,15 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
 
           const entryTime = card.dataEntrada.getTime();
           if (entryTime >= startTime && entryTime <= endTime) {
-            // Para leads: dedup por card ID (cada card conta 1x)
             if (!seenCardIds.has(card.id)) {
               seenCardIds.add(card.id);
-              result.push(card);
+              if (card.produto === produto) result.push(card);
             }
           }
         }
       } else if (indicator === 'mql') {
         // MQL: cards com fase Lead/MQL que tem investimento qualificado
-        // Dedup por card ID (cada card conta 1x)
+        // Dedup por card ID cross-product, atribui ao produto da earliest entry
         const seenCardIds = new Set<string>();
 
         for (const card of allMovements) {
@@ -504,13 +536,14 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
               const inv = cardInvestimentoMap.get(card.id);
               if (isExpansaoMqlQualified(inv, produto)) {
                 seenCardIds.add(card.id);
-                result.push(card);
+                if (card.produto === produto) result.push(card);
               }
             }
           }
         }
       } else {
         // rm, rr, proposta, venda: monthly dedup — first entry per card+indicator+month
+        // Cross-product: filtra pelo produto da entry vencedora (earliest do mês)
         const seenCardIds = new Set<string>();
         for (const [dedupKey, entry] of monthlyFirstEntries) {
           const parts = dedupKey.split('__');
@@ -522,7 +555,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
             const cardId = parts[0];
             if (!seenCardIds.has(cardId)) {
               seenCardIds.add(cardId);
-              result.push(entry);
+              if (entry.produto === produto) result.push(entry);
             }
           }
         }
@@ -531,7 +564,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       // Enriquece com SDR/Closer efetivos do histórico (fix Expansão Lead/MQL)
       return result.map(enrichCardWithEffectiveOwners);
     };
-  }, [cards, fullHistory, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners]);
+  }, [allMovementsUnfiltered, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners]);
 
   // Helper function to convert ExpansaoCard to DetailItem
   const toDetailItem = (rawCard: ExpansaoCard): DetailItem => {
