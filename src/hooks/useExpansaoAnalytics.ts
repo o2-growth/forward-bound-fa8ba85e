@@ -6,6 +6,7 @@ import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
 import { isJunkCard } from "./useModeloAtualMetas";
 import { parseTemperatura } from "./useModeloAtualAnalytics";
+import { sumMrrFields } from "@/lib/mrrFields";
 
 // Cards forçados como "Quente" por BU/produto (Quentes junho 2026).
 // Match por título normalizado: lowercase + NFD (sem acento) + trim.
