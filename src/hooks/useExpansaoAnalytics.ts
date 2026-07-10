@@ -438,14 +438,14 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
   // Build investimento map per card
   const cardInvestimentoMap = useMemo(() => {
     const map = new Map<string, string | undefined>();
-    const allMovements = [...cards, ...(fullHistory.length > 0 ? fullHistory : [])];
-    for (const card of allMovements) {
+    // Cross-product: card pode ter investimento preenchido em qualquer movimento
+    for (const card of allMovementsUnfiltered) {
       if (card.investimentoDisponivel && !map.has(card.id)) {
         map.set(card.id, card.investimentoDisponivel);
       }
     }
     return map;
-  }, [cards, fullHistory]);
+  }, [allMovementsUnfiltered]);
 
   // ============================================================
   // FIX: Atribuição retroativa de SDR/Closer via fullHistory
