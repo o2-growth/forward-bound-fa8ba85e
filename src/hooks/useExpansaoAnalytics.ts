@@ -162,7 +162,7 @@ function parseRawCard(row: any, defaultTicket: number): ExpansaoCard {
   }
   
   let taxaFranquia = row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : 0;
-  let valorMRR = row['Valor MRR'] ? parseFloat(row['Valor MRR']) : 0;
+  let valorMRR = sumMrrFields(row);
   let valorPontual = row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : 0;
   let valorSetup = row['Valor Setup'] ? parseFloat(row['Valor Setup']) : 0;
   let produto = row['Produtos'] || '';
