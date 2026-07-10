@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 import { isO2TaxMqlQualified } from "@/hooks/useO2TaxAnalytics";
+import { isJunkCard } from "@/hooks/useModeloAtualMetas";
 
 export type O2TaxIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
