@@ -248,6 +248,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
     const cardValues = new Map<string, number>();
     
     for (const movement of data.movements) {
+      if (!isCurrentProduct(movement.id)) continue;
       const entryTime = movement.dataEntrada.getTime();
       if (entryTime >= startTime && entryTime <= endTime) {
         const movementIndicator = PHASE_TO_INDICATOR[movement.fase];
