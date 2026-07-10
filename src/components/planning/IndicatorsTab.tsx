@@ -57,6 +57,7 @@ import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
+import { aggregateByTemperatura } from "./indicators/temperaturaAggregator";
 import { EventosG4Section } from "./indicators/EventosG4Section";
 import { CenarioCaixaSection } from "./indicators/CenarioCaixaSection";
 import { MonetizacaoSection } from "./indicators/MonetizacaoSection";
