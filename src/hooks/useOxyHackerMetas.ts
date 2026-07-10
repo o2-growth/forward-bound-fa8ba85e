@@ -424,6 +424,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
     const byCard = new Map<string, any>();
 
     for (const movement of data.movements) {
+      if (!isCurrentProduct(movement.id)) continue;
       const entryTime = movement.dataEntrada.getTime();
       if (entryTime < startTime || entryTime > endTime) continue;
 
