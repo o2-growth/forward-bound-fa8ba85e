@@ -7,6 +7,7 @@ import { useOxyHackerMetas } from "./useOxyHackerMetas";
 import { useExpansaoMetas } from "./useExpansaoMetas";
 import { isMqlQualified, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
 import { fixPossibleDateInversion } from "./dateUtils";
+import { sumMrrFields } from "@/lib/mrrFields";
 import { months, BUKey } from "@/components/planning/salesData";
 
 // Month name to month index (0-based)
