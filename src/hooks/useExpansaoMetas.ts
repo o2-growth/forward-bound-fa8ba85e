@@ -178,13 +178,26 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
 
   // Build investimento map per card
   const cardInvestimento = new Map<string, string | null>();
+  // Build currentProdutoByCard: produto da linha com dataEntrada MAIS RECENTE
+  // por card. Usado para atribuir cada card ao seu produto ATUAL,
+  // eliminando duplicação cross-product (Franquia vs Oxy Hacker).
+  const currentProdutoByCard = new Map<string, { produto: string; when: number }>();
   if (data?.movements) {
     for (const m of data.movements) {
       if (m.investimentoDisponivel && !cardInvestimento.has(m.id)) {
         cardInvestimento.set(m.id, m.investimentoDisponivel);
       }
+      const when = m.dataEntrada.getTime();
+      const prev = currentProdutoByCard.get(m.id);
+      if (!prev || when > prev.when) {
+        currentProdutoByCard.set(m.id, { produto: m.produto, when });
+      }
     }
   }
+  const isCurrentProduct = (id: string) =>
+    (currentProdutoByCard.get(id)?.produto || '') === 'Franquia';
+
+
 
   // Get total qty for a specific indicator and date range
   // Count UNIQUE CARDS that entered a phase during the period
