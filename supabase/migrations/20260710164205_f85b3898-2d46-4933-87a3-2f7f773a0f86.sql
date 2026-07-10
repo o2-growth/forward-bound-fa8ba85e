@@ -1,0 +1,1 @@
+DELETE FROM public.user_roles WHERE user_id='b217396d-b250-41ea-aa10-2523b9d1d020' AND role='user'; INSERT INTO public.user_roles (user_id, role) VALUES ('b217396d-b250-41ea-aa10-2523b9d1d020','admin') ON CONFLICT (user_id, role) DO NOTHING;
