@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 import { isO2TaxMqlQualified } from "@/hooks/useO2TaxAnalytics";
+import { isJunkCard } from "@/hooks/useModeloAtualMetas";
 
 export type O2TaxIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -67,6 +68,7 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
       const movements: O2TaxMovement[] = [];
       
       for (const row of responseData.data) {
+        if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
         const movement: O2TaxMovement = {
           id: String(row.ID),
           titulo: row['Título'] || '',
@@ -90,19 +92,21 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
         body: { table: 'pipefy_cards_movements', action: 'query_period_by_creation', limit: 5000 }
       });
       if (!mqlCreationError && mqlCreationData?.data) {
-        mqlByCreation = mqlCreationData.data.map((row: any) => ({
-          id: String(row.ID),
-          titulo: row['Título'] || '',
-          fase: row['Fase'] || '',
-          faseAtual: row['Fase Atual'] || '',
-          dataEntrada: parseDate(row['Entrada']) || new Date(),
-          dataSaida: parseDate(row['Saída']),
-          dataCriacao: parseDate(row['Data Criação']),
-          faixaFaturamento: row['Faixa de faturamento mensal'] || null,
-          valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
-          valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
-          valorSetup: row['Valor Setup'] ? parseFloat(row['Valor Setup']) : null,
-        }));
+        mqlByCreation = mqlCreationData.data
+          .filter((row: any) => !isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') }))
+          .map((row: any) => ({
+            id: String(row.ID),
+            titulo: row['Título'] || '',
+            fase: row['Fase'] || '',
+            faseAtual: row['Fase Atual'] || '',
+            dataEntrada: parseDate(row['Entrada']) || new Date(),
+            dataSaida: parseDate(row['Saída']),
+            dataCriacao: parseDate(row['Data Criação']),
+            faixaFaturamento: row['Faixa de faturamento mensal'] || null,
+            valorMRR: row['Valor MRR'] ? parseFloat(row['Valor MRR']) : null,
+            valorPontual: row['Valor Pontual'] ? parseFloat(row['Valor Pontual']) : null,
+            valorSetup: row['Valor Setup'] ? parseFloat(row['Valor Setup']) : null,
+          }));
         console.log(`[useO2TaxMetas] MQL by creation: ${mqlByCreation.length} movements`);
       }
 

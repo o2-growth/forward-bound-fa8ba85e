@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
+import { isJunkCard } from "./useModeloAtualMetas";
 
 export type ExpansaoIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -82,10 +83,12 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       const movements: ExpansaoMovement[] = [];
       
       for (const row of responseData.data) {
+        if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
         const produto = row['Produtos'] || '';
         
         // Filter only "Franquia" products for this hook
         if (produto !== 'Franquia') continue;
+        
         
         let dataEntrada = parseDate(row['Entrada']) || new Date();
         const titulo = row['Título'] || '';

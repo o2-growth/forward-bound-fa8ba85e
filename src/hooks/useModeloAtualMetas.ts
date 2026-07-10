@@ -80,6 +80,10 @@ const TEST_TITLE_PATTERNS: RegExp[] = [
   /\bxxx+\b/i,
   /^[\s\d]{1,4}$/,            // só 1-4 dígitos (título "123", "1", "1234", " 5 ")
   /^\W*$/,                    // só símbolos/espaço em branco
+  /nao[_\s-]?atender/i,       // nao_atender, nao atender, nao-atender
+  /no[_\s-]?reply/i,          // noreply, no_reply
+  /[_.-]teste?s?[_.-]/i,      // _teste_, .teste., -teste-
+  /teste?_?track/i,           // teste_track, testetrack
 ];
 
 // Detecta se o título indica card de teste (nome, empresa, razão social).
