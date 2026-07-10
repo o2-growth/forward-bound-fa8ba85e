@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
-import { isTestCard } from "./useModeloAtualMetas";
+import { isJunkCard } from "./useModeloAtualMetas";
 import { parseTemperatura } from "./useModeloAtualAnalytics";
 
 // Cards forçados como "Quente" por BU/produto (Quentes junho 2026).
@@ -328,7 +328,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const seen = new Set<string>();
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
-      if (isTestCard(String(row['ID'] || ''))) continue;
+      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || '') })) continue;
       const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
       if (seen.has(key)) continue;
       const parsed = parseRawCard(row, defaultTicket);
@@ -344,7 +344,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const rows = data?.historyRows || [];
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
-      if (isTestCard(String(row['ID'] || ''))) continue;
+      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || '') })) continue;
       const parsed = parseRawCard(row, defaultTicket);
       if (parsed.produto !== produto) continue;
       out.push(parsed);
@@ -363,7 +363,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const seen = new Set<string>();
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
-      if (isTestCard(String(row['ID'] || ''))) continue;
+      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || '') })) continue;
       const parsed = parseRawCard(row, defaultTicket);
       if (parsed.produto !== produto) continue;
       if (seen.has(parsed.id)) continue;
