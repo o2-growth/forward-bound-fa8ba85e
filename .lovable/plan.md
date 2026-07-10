@@ -1,35 +1,11 @@
-## Objetivo
+## Causa
 
-Tornar o card "Oportunidades quentes" do Pace Comercial clicável para abrir o `DetailSheet` com a lista completa de propostas quentes (mesmo padrão dos drill-downs de indicadores do dashboard).
+Quando o Pace Comercial está aberto, `IndicatorsTab.tsx` faz um `return` antecipado (L3396-3426) renderizando só `<CommercialPaceDashboard />`. O `<DetailSheet />` só é montado no return principal (L3957), então o clique dispara `setDetailSheetOpen(true)` mas não há sheet no DOM para abrir.
 
-## Mudanças
+## Correção
 
-### 1) `CommercialPaceDashboard.tsx`
+No branch `if (commercialPaceOpen)` do `IndicatorsTab.tsx`, envolver o `<CommercialPaceDashboard />` em um Fragment e renderizar o `<DetailSheet />` logo abaixo, com as mesmas props do sheet do return principal.
 
-- Adicionar prop opcional `onHotOpportunitiesClick?: (items: DetailItem[]) => void`.
-- No `<section className="cp-card span-5">` do card "Oportunidades quentes" (~L657):
-  - Adicionar `role="button"`, `tabIndex={0}`, cursor pointer e `onClick` que chama `onHotOpportunitiesClick(hotActive)` (respeitando o filtro de closer selecionado).
-  - Suportar Enter/Space no `onKeyDown`.
-  - Título/subtítulo com dica visual "clique para ver detalhes".
-- Também tornar cada linha por closer (`.hot-row`, L676) clicável — chama o mesmo handler filtrando `hotOpportunityItems` pelo `firstNameKey` do closer da linha.
+## Arquivo
 
-### 2) `IndicatorsTab.tsx` — handler que abre o DetailSheet existente
-
-Passar `onHotOpportunitiesClick={(items) => { ... }}` para `<CommercialPaceDashboard>` (~L3405) que:
-
-- Seta `detailSheetTitle` = "Oportunidades quentes — Modelo Atual".
-- Seta `detailSheetColumns` com: Empresa, Fase atual, Valor (MRR+Setup+Pontual), Closer, Data entrada — reusando `columnFormatters.currency`/`date`.
-- Ordena por valor desc.
-- `setDetailSheetFilterCriteria([])` (ou 1-2 chips explicando: "Temperatura = Quente", "Sem fase terminal", "Sem motivo de perda").
-- `setDetailSheetOpen(true)`.
-
-## Efeito
-
-- Clique no card total abre lista de todos os quentes filtrados (por closer selecionado no Pace, se houver).
-- Clique na linha de um closer específico abre a lista somente daquele closer.
-- Nenhum impacto em cálculos — apenas UI/navegação.
-
-## Arquivos
-
-- `src/components/planning/indicators/CommercialPaceDashboard.tsx`
-- `src/components/planning/IndicatorsTab.tsx`
+- `src/components/planning/IndicatorsTab.tsx` (branch `commercialPaceOpen`, ~L3396-3426)
