@@ -1,23 +1,29 @@
-# Excluir "Contato futuro" dos Quentes (Indicadores → Comercial)
+# Fix: card "Viver" (Amanda) aparecendo em 🔥 Quente mesmo estando Frio no Pipefy
 
-## Problema
-Cards em fase **"Contato futuro"** (lead em standby) estão aparecendo no chip 🔥 Quente da seção Temperatura dos Leads e no Pace Comercial, poluindo o pipeline "vivo".
+## Causa raiz
+O hook `src/hooks/useModeloAtualAnalytics.ts` mantém uma lista sazonal `FORCED_QUENTE_TITLES` (linhas 153-170) que força certos títulos como 🔥 Quente **ignorando** o valor real do Pipefy. O título `'viver'` está nessa lista desde junho/2026.
 
-## Solução
-No agregador de temperatura (`src/components/planning/indicators/temperaturaAggregator.ts`), tratar "Contato futuro" como fase excluída — mesma lógica de exclusão já usada para fases perdidas/ganhas.
+Verificação no banco (card `1376121014` — "Viver", Amanda Teixeira Serafim):
+- `Labels = 'Frio'` em todas as 8 linhas de movimento ✅
+- `Prioridade do Lead` / `Prioridade Lead` vazios
+- O parser `parseTemperatura` já lê `row['Labels']` como primeira opção, então removendo o forced ele cai corretamente em ❄ **Frio** — não em "Sem tag".
 
-### Mudanças
-1. Adicionar constante `STANDBY_PHASES = new Set(["contato futuro"])` e helper `isStandbyPhase(fase)` (usando o `normalize` já existente).
-2. Dentro do loop das 4 BUs comerciais (Modelo Atual, Outbound, Franquia, Oxy Hacker), após `isWonPhase` e `anyRowIsLost`, adicionar:
-   ```ts
-   if (isStandbyPhase(card.faseAtual)) continue;
-   ```
-3. No bloco de Monetização, adicionar a mesma checagem junto das demais exclusões (`perdido || ganho || isLostPhase || isWonPhase || isStandbyPhase`).
+## Mudança
+Arquivo: `src/hooks/useModeloAtualAnalytics.ts`
+
+Remover apenas a linha `'viver',` do `FORCED_QUENTE_TITLES` (linha 159). Os outros 10 títulos de junho/2026 permanecem intocados (conforme sua escolha).
+
+```diff
+   // Quentes junho 2026
+-  'viver',
+   'rede sander',
+   ...
+```
 
 ## Impacto
-- Chip 🔥 Quente, 🌤 Morno e ❄ Frio param de contar cards em "Contato futuro".
-- Pace Comercial (que consome o mesmo agregador) passa a refletir só o pipeline realmente ativo.
-- Nenhuma outra tela é afetada — os hooks de MQL/RM/RR/Venda continuam contando "Contato futuro" como MQL conforme regra atual do Outbound.
+- Card "Viver" da Amanda sai do chip 🔥 Quente e passa para ❄ Frio na seção "Temperatura dos Leads" e no Pace Comercial.
+- Nenhum outro card é afetado.
+- Nenhuma outra tela / hook / meta muda.
 
 ## Arquivo alterado
-- `src/components/planning/indicators/temperaturaAggregator.ts`
+- `src/hooks/useModeloAtualAnalytics.ts` (1 linha removida)
