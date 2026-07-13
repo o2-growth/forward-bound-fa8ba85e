@@ -4,6 +4,7 @@ import {
   ExternalLink,
   Search,
   AlertCircle,
+  Info,
   Users,
   Hand,
   ClipboardCheck,
@@ -38,6 +39,25 @@ import { LiveDetailDialog, type G4Stage } from "./LiveDetailDialog";
 import { buildPipefyUrl } from "./pipefy";
 
 const MAIO_LIVE = "Live G4 - 20-21/05/2026";
+
+// ── Canonicalização de rótulos de lives ──────────────────────────────────
+// A fonte externa tem variações do mesmo evento (ex.: "Live - G4 - 20-mai"
+// vs "Live G4 - 20/05/2026"). Consolidamos aqui no rótulo canônico.
+const LIVE_CANONICAL_MAP: Record<string, string> = {
+  "Live - G4 - 20-mai": "Live G4 - 20/05/2026",
+  "Live - G4 - 21-mai": "Live G4 - 21/05/2026",
+};
+const canonLive = (s: string): string => LIVE_CANONICAL_MAP[s] ?? s;
+
+// ── Presentes medidos manualmente (contagem no Zoom durante a live) ──────
+// A fonte externa não exporta presença; esses números foram contados ao vivo.
+const PRESENTES_OVERRIDE: Record<string, number> = {
+  "Live G4 - 20/05/2026": 52,
+  "Live G4 - 21/05/2026": 48,
+  "Live G4 - 17/06/2026": 243,
+  "Live G4 - 18/06/2026": 168,
+  "Live G4 - 02/07/2026": 165,
+};
 
 function pct(num: number, den: number | null): string {
   if (den == null || den <= 0) return "—";
