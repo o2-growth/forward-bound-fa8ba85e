@@ -1,29 +1,41 @@
-# Fix: card "Viver" (Amanda) aparecendo em 🔥 Quente mesmo estando Frio no Pipefy
+# Fix: Oportunidades Quentes — separar colunas MRR, Setup e Pontual no drawer
 
-## Causa raiz
-O hook `src/hooks/useModeloAtualAnalytics.ts` mantém uma lista sazonal `FORCED_QUENTE_TITLES` (linhas 153-170) que força certos títulos como 🔥 Quente **ignorando** o valor real do Pipefy. O título `'viver'` está nessa lista desde junho/2026.
+## Diagnóstico
+Verificação do card exibido (Agrovet — `1405995793`):
 
-Verificação no banco (card `1376121014` — "Viver", Amanda Teixeira Serafim):
-- `Labels = 'Frio'` em todas as 8 linhas de movimento ✅
-- `Prioridade do Lead` / `Prioridade Lead` vazios
-- O parser `parseTemperatura` já lê `row['Labels']` como primeira opção, então removendo o forced ele cai corretamente em ❄ **Frio** — não em "Sem tag".
+| Campo Pipefy | Valor no banco |
+|---|---|
+| Valor MRR | vazio |
+| Valor Setup | R$ 10.644,00 |
+| Valor Pontual | vazio |
+
+O total `R$ 10.644` é **exatamente o Setup** — ou seja, o agregado já está somando MRR + Setup + Pontual corretamente (`itemRevenue` em `CommercialPaceDashboard.tsx` linha 77-80 e `value` em `IndicatorsTab.tsx` linha 3358). O que engana é a coluna única "Valor (MRR+Setup+Pontual)" no drawer, que não deixa ver que Setup entrou e MRR/Pontual estão zerados por falta de preenchimento no Pipefy.
 
 ## Mudança
-Arquivo: `src/hooks/useModeloAtualAnalytics.ts`
+Arquivo: `src/components/planning/IndicatorsTab.tsx` — bloco `onHotOpportunitiesClick` (linhas 3396-3402).
 
-Remover apenas a linha `'viver',` do `FORCED_QUENTE_TITLES` (linha 159). Os outros 10 títulos de junho/2026 permanecem intocados (conforme sua escolha).
+Substituir as colunas do drawer para mostrar a composição:
 
-```diff
-   // Quentes junho 2026
--  'viver',
-   'rede sander',
-   ...
+```ts
+setDetailSheetColumns([
+  { key: 'name', label: 'Empresa' },
+  { key: 'bu', label: 'BU' },
+  { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
+  { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
+  { key: 'setup', label: 'Setup', format: columnFormatters.currency },
+  { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
+  { key: 'value', label: 'Total', format: columnFormatters.currency },
+  { key: 'responsible', label: 'Closer' },
+  { key: 'date', label: 'Data Entrada', format: columnFormatters.date },
+]);
 ```
 
+Os campos `mrr`, `setup`, `pontual` já vêm preenchidos em `DetailItem` pelos `toDetailItem` de cada BU — não é preciso mexer nos hooks. O total continua = MRR + Setup + Pontual.
+
 ## Impacto
-- Card "Viver" da Amanda sai do chip 🔥 Quente e passa para ❄ Frio na seção "Temperatura dos Leads" e no Pace Comercial.
-- Nenhum outro card é afetado.
-- Nenhuma outra tela / hook / meta muda.
+- Drawer de "Oportunidades quentes" passa a ter 4 colunas monetárias (MRR / Setup / Pontual / Total) + BU, tornando visível a composição de cada card.
+- Nenhum cálculo agregado muda.
+- Nenhuma outra tela é afetada.
 
 ## Arquivo alterado
-- `src/hooks/useModeloAtualAnalytics.ts` (1 linha removida)
+- `src/components/planning/IndicatorsTab.tsx` (bloco de colunas do drawer, ~7 linhas)
