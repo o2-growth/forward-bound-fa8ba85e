@@ -1,55 +1,23 @@
-## Objetivo
+# Excluir "Contato futuro" dos Quentes (Indicadores → Comercial)
 
-Ao ler MRR de qualquer card, somar **todos** os campos da row cujo nome contém "mrr" (case-insensitive), em vez de ler só `Valor MRR` / `valor_mrr`. Aplica a todos os hooks de analytics.
+## Problema
+Cards em fase **"Contato futuro"** (lead em standby) estão aparecendo no chip 🔥 Quente da seção Temperatura dos Leads e no Pace Comercial, poluindo o pipeline "vivo".
 
-## Nova helper compartilhada
+## Solução
+No agregador de temperatura (`src/components/planning/indicators/temperaturaAggregator.ts`), tratar "Contato futuro" como fase excluída — mesma lógica de exclusão já usada para fases perdidas/ganhas.
 
-Criar `src/lib/mrrFields.ts`:
+### Mudanças
+1. Adicionar constante `STANDBY_PHASES = new Set(["contato futuro"])` e helper `isStandbyPhase(fase)` (usando o `normalize` já existente).
+2. Dentro do loop das 4 BUs comerciais (Modelo Atual, Outbound, Franquia, Oxy Hacker), após `isWonPhase` e `anyRowIsLost`, adicionar:
+   ```ts
+   if (isStandbyPhase(card.faseAtual)) continue;
+   ```
+3. No bloco de Monetização, adicionar a mesma checagem junto das demais exclusões (`perdido || ganho || isLostPhase || isWonPhase || isStandbyPhase`).
 
-```ts
-// Soma todos os campos numéricos da row cujo nome contém "mrr"
-// (case-insensitive), ignorando agregados conhecidos.
-const AGGREGATE_KEYS = new Set(['valor_total']);
-const parseNum = (v: any): number => {
-  if (v === null || v === undefined || v === '') return 0;
-  if (typeof v === 'number') return v;
-  const s = String(v).replace(/[R$\s.]/g, '').replace(',', '.');
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : 0;
-};
-export function sumMrrFields(row: Record<string, any>): number {
-  if (!row) return 0;
-  let total = 0;
-  for (const key of Object.keys(row)) {
-    if (AGGREGATE_KEYS.has(key)) continue;
-    if (/mrr/i.test(key)) total += parseNum(row[key]);
-  }
-  return total;
-}
-```
+## Impacto
+- Chip 🔥 Quente, 🌤 Morno e ❄ Frio param de contar cards em "Contato futuro".
+- Pace Comercial (que consome o mesmo agregador) passa a refletir só o pipeline realmente ativo.
+- Nenhuma outra tela é afetada — os hooks de MQL/RM/RR/Venda continuam contando "Contato futuro" como MQL conforme regra atual do Outbound.
 
-## Uso — substituir leituras pontuais por `sumMrrFields(row)`
-
-Em cada arquivo, trocar as expressões que faziam `parseNumericValue(row['Valor MRR'] || row['valor_mrr'] || 0)` (ou equivalentes) por `sumMrrFields(row)`:
-
-1. `src/hooks/useModeloAtualAnalytics.ts` — L202 (`valorMRR = sumMrrFields(row)`)
-2. `src/hooks/useExpansaoAnalytics.ts` — L164 (`valorMRR = sumMrrFields(row)`; manter `= 0` quando `perdido/duplicado`)
-3. `src/hooks/useExpansaoMetas.ts` — L137 (`valorMRR: sumMrrFields(row)`)
-4. `src/hooks/useO2TaxMetas.ts` — L81, L106 (`valorMRR: sumMrrFields(row) || null`)
-5. `src/hooks/useModeloAtualValues.ts` — L100 (`valorMRR: sumMrrFields(row)`)
-6. `src/hooks/useIndicatorsRealized.ts` — L145, L174 (`valorMRR = sumMrrFields(row)`)
-7. `src/hooks/useOutboundAnalytics.ts` — encontrar leitura de Valor MRR e trocar
-8. `src/hooks/useMonetizacaoAnalytics.ts` — a linha L86 já ignora `valor_mrr` como agregado; garantir que a leitura de MRR use `sumMrrFields(row)` (excluindo `valor_mrr` como agregado já está coberto pelo `AGGREGATE_KEYS`).
-
-Se precisar preservar `valor_mrr` como agregado em Monetização, adicionar `'valor_mrr'` ao `AGGREGATE_KEYS` também.
-
-## Comportamento
-
-- Cards com apenas `Valor MRR` continuam iguais.
-- Cards com múltiplos campos MRR (ex: `Valor MRR`, `MRR Adicional`, `MRR Extra`, `Valor MRR Recorrente`) passam a somar todos.
-- Campos agregados conhecidos (`valor_total`, opcionalmente `valor_mrr` do Monetização) são ignorados para evitar dupla contagem.
-
-## Arquivos
-
-- Novo: `src/lib/mrrFields.ts`
-- Editados: `useModeloAtualAnalytics.ts`, `useExpansaoAnalytics.ts`, `useExpansaoMetas.ts`, `useO2TaxMetas.ts`, `useModeloAtualValues.ts`, `useIndicatorsRealized.ts`, `useOutboundAnalytics.ts`, `useMonetizacaoAnalytics.ts`
+## Arquivo alterado
+- `src/components/planning/indicators/temperaturaAggregator.ts`

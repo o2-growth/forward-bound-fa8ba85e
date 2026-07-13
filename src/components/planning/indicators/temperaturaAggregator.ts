@@ -54,6 +54,10 @@ const isLostPhase = (fase: unknown): boolean => {
 const WON_PHASES = new Set(["ganho", "contrato assinado", "concluido"]);
 const isWonPhase = (fase: unknown): boolean => WON_PHASES.has(normalize(fase));
 
+const STANDBY_PHASES = new Set(["contato futuro"]);
+const isStandbyPhase = (fase: unknown): boolean =>
+  STANDBY_PHASES.has(normalize(fase));
+
 // Checa se qualquer linha do card indica perda (fase atual, fase, faseDestino,
 // flag `perdido` ou motivoPerda preenchido).
 function anyRowIsLost(rows: any[]): boolean {
