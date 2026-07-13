@@ -54,6 +54,10 @@ const isLostPhase = (fase: unknown): boolean => {
 const WON_PHASES = new Set(["ganho", "contrato assinado", "concluido"]);
 const isWonPhase = (fase: unknown): boolean => WON_PHASES.has(normalize(fase));
 
+const STANDBY_PHASES = new Set(["contato futuro"]);
+const isStandbyPhase = (fase: unknown): boolean =>
+  STANDBY_PHASES.has(normalize(fase));
+
 // Checa se qualquer linha do card indica perda (fase atual, fase, faseDestino,
 // flag `perdido` ou motivoPerda preenchido).
 function anyRowIsLost(rows: any[]): boolean {
@@ -194,6 +198,8 @@ export function aggregateByTemperatura({
       if (isWonPhase((card as any).faseAtual)) continue;
       // Exclui cards perdidos (fase atual, histórico, flag ou motivoPerda)
       if (anyRowIsLost(rows)) continue;
+      // Exclui cards em standby (Contato futuro) — não são pipeline vivo
+      if (isStandbyPhase((card as any).faseAtual)) continue;
       if (card.temperatura) {
         const item = src.toDetail(card);
         buckets[card.temperatura as Temperatura].push({
@@ -216,7 +222,7 @@ export function aggregateByTemperatura({
     for (const card of monetizacaoAnalytics.cards) {
       if (!MONETIZACAO_QUENTE_TIPOS.has(card.tipo)) continue;
       // Exclui cards perdidos ou já ganhos (Concluído)
-      if (card.perdido || card.ganho || isLostPhase(card.faseAtual) || isWonPhase(card.faseAtual)) continue;
+      if (card.perdido || card.ganho || isLostPhase(card.faseAtual) || isWonPhase(card.faseAtual) || isStandbyPhase(card.faseAtual)) continue;
       const entradaTime = card.entrada
         ? new Date(card.entrada).getTime()
         : NaN;
