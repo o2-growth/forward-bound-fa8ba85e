@@ -1,41 +1,54 @@
-# Fix: Oportunidades Quentes — separar colunas MRR, Setup e Pontual no drawer
 
-## Diagnóstico
-Verificação do card exibido (Agrovet — `1405995793`):
+## O que ajustar
 
-| Campo Pipefy | Valor no banco |
-|---|---|
-| Valor MRR | vazio |
-| Valor Setup | R$ 10.644,00 |
-| Valor Pontual | vazio |
+Na seção **Dados reais das lives G4** (`src/components/planning/g4/G4RealSection.tsx`), fazer 3 correções — tudo no frontend, sem tocar na edge function `g4-metrics` nem no banco externo:
 
-O total `R$ 10.644` é **exatamente o Setup** — ou seja, o agregado já está somando MRR + Setup + Pontual corretamente (`itemRevenue` em `CommercialPaceDashboard.tsx` linha 77-80 e `value` em `IndicatorsTab.tsx` linha 3358). O que engana é a coluna única "Valor (MRR+Setup+Pontual)" no drawer, que não deixa ver que Setup entrou e MRR/Pontual estão zerados por falta de preenchimento no Pipefy.
+### 1. Deduplicar lives com nomes diferentes vindos da fonte
 
-## Mudança
-Arquivo: `src/components/planning/IndicatorsTab.tsx` — bloco `onHotOpportunitiesClick` (linhas 3396-3402).
+Hoje aparecem cards separados para a mesma live porque o campo `live` da tabela `g4_inscritos` tem variações de nome:
 
-Substituir as colunas do drawer para mostrar a composição:
+- `Live G4 - 20/05/2026` **e** `Live - G4 - 20-mai` → mesma live (20/05)
+- `Live G4 - 21/05/2026` **e** `Live - G4 - 21-mai` → mesma live (21/05)
 
-```ts
-setDetailSheetColumns([
-  { key: 'name', label: 'Empresa' },
-  { key: 'bu', label: 'BU' },
-  { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
-  { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
-  { key: 'setup', label: 'Setup', format: columnFormatters.currency },
-  { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
-  { key: 'value', label: 'Total', format: columnFormatters.currency },
-  { key: 'responsible', label: 'Closer' },
-  { key: 'date', label: 'Data Entrada', format: columnFormatters.date },
-]);
+**Fix:** aplicar um mapa de canonicalização no cliente (antes de renderizar `data.funil`, `data.leads[].lives` e `data.diagnosticoPorLive`). Somar `inscritos`, `levantaramMao`, `vendas` e `diagnósticos` das variantes no rótulo canônico. Filtrar do dropdown de lives as variantes antigas para não aparecerem em lugar nenhum.
+
+Mapa canônico proposto:
+```
+"Live - G4 - 20-mai"       → "Live G4 - 20/05/2026"
+"Live - G4 - 21-mai"       → "Live G4 - 21/05/2026"
+```
+(fácil estender no futuro adicionando entradas.)
+
+### 2. Injetar contagem manual de "Presentes" (medida ao vivo no Zoom)
+
+A coluna `presentes` vem `null`/`0` da fonte porque não foi exportada. Sobrescrever no cliente com os valores medidos manualmente pelo time:
+
+```
+Live 20/05  → 52
+Live 21/05  → 48
+Live 17/06  → 243
+Live 18/06  → 168
+Live 02/07  → 165
 ```
 
-Os campos `mrr`, `setup`, `pontual` já vêm preenchidos em `DetailItem` pelos `toDetailItem` de cada BU — não é preciso mexer nos hooks. O total continua = MRR + Setup + Pontual.
+Chaves reais dos rótulos da tabela: `Live G4 - 20/05/2026`, `Live G4 - 21/05/2026`, `Live G4 - 17/06/2026`, `Live G4 - 18/06/2026`, `Live G4 - 02/07/2026` (ajusto no código conforme os labels reais retornados pela edge — se algum vier diferente, mapeio pela data).
 
-## Impacto
-- Drawer de "Oportunidades quentes" passa a ter 4 colunas monetárias (MRR / Setup / Pontual / Total) + BU, tornando visível a composição de cada card.
-- Nenhum cálculo agregado muda.
-- Nenhuma outra tela é afetada.
+### 3. Tooltip explicando a origem do "Presentes"
 
-## Arquivo alterado
-- `src/components/planning/IndicatorsTab.tsx` (bloco de colunas do drawer, ~7 linhas)
+No `LiveFunnelCard`, envolver o botão da coluna **Presentes** com um `Tooltip` (padrão shadcn, já importado no arquivo) com o texto:
+
+> "Não exportado pela fonte — número medido manualmente pela equipe contando os participantes no Zoom durante a live."
+
+Também colocar um pequeno indicador visual (ícone `Info` ao lado do label "PRESENTES") só nesse card para deixar claro que é manual.
+
+## Fora de escopo
+
+- Nenhuma alteração na edge function `g4-metrics` nem no banco G4 externo.
+- Nenhuma mudança em outras seções (Lives G4 acima, Eventos, Seller).
+- Nenhuma mudança na tabela de leads embaixo — só canonicalização dos nomes de live já pega ela de graça (via `l.lives`).
+
+## Detalhes técnicos
+
+- Arquivo único alterado: `src/components/planning/g4/G4RealSection.tsx`.
+- Novos artefatos locais no arquivo: `LIVE_CANONICAL_MAP: Record<string,string>`, `PRESENTES_OVERRIDE: Record<string,number>`, e um `useMemo` que remapeia `data.funil` + `data.leads[].lives` + `data.diagnosticoPorLive` antes de tudo o que já existe.
+- Sem novas dependências.
