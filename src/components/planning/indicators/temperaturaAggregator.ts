@@ -198,6 +198,8 @@ export function aggregateByTemperatura({
       if (isWonPhase((card as any).faseAtual)) continue;
       // Exclui cards perdidos (fase atual, histórico, flag ou motivoPerda)
       if (anyRowIsLost(rows)) continue;
+      // Exclui cards em standby (Contato futuro) — não são pipeline vivo
+      if (isStandbyPhase((card as any).faseAtual)) continue;
       if (card.temperatura) {
         const item = src.toDetail(card);
         buckets[card.temperatura as Temperatura].push({
