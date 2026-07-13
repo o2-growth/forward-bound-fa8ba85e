@@ -156,7 +156,6 @@ const FORCED_QUENTE_TITLES = new Set<string>([
   'viga',
   'espolio carpena',
   // Quentes junho 2026
-  'viver',
   'rede sander',
   'instituto da boca',
   'sb travel',
