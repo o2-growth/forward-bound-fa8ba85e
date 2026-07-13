@@ -209,7 +209,58 @@ function BoolBadge({ v, off = "—" }: { v: boolean; off?: string }) {
 }
 
 export function G4RealSection() {
-  const { data, isLoading, isFetching, error, refetch } = useG4RealMetrics();
+  const { data: rawData, isLoading, isFetching, error, refetch } = useG4RealMetrics();
+
+  // Normaliza rótulos de live (dedup) e injeta presentes manuais.
+  const data = useMemo(() => {
+    if (!rawData) return rawData;
+
+    // Consolida funil por rótulo canônico
+    const funilMap = new Map<string, G4RealFunilRow>();
+    for (const row of rawData.funil) {
+      const canon = canonLive(row.live);
+      const cur = funilMap.get(canon);
+      if (!cur) {
+        funilMap.set(canon, { ...row, live: canon });
+      } else {
+        cur.inscritos += row.inscritos;
+        cur.levantaramMao += row.levantaramMao;
+        cur.vendas += row.vendas;
+        if (row.presentes != null) {
+          cur.presentes = (cur.presentes ?? 0) + row.presentes;
+        }
+      }
+    }
+    // Aplica override manual de presentes
+    for (const [live, row] of funilMap) {
+      if (PRESENTES_OVERRIDE[live] != null) {
+        row.presentes = PRESENTES_OVERRIDE[live];
+      }
+    }
+    const funil = Array.from(funilMap.values()).sort((a, b) =>
+      a.live.localeCompare(b.live),
+    );
+
+    // Consolida diagnósticos por rótulo canônico
+    const diagMap = new Map<string, number>();
+    for (const d of rawData.diagnosticoPorLive) {
+      const canon = canonLive(d.live);
+      diagMap.set(canon, (diagMap.get(canon) ?? 0) + d.diagnosticos);
+    }
+    const diagnosticoPorLive = Array.from(diagMap.entries()).map(
+      ([live, diagnosticos]) => ({ live, diagnosticos }),
+    );
+
+    // Canonicaliza lives dos leads (dedup dentro do array)
+    const leads = rawData.leads.map((l) => ({
+      ...l,
+      lives: Array.from(new Set(l.lives.map(canonLive))),
+      liveDaMao: l.liveDaMao ? canonLive(l.liveDaMao) : l.liveDaMao,
+    }));
+
+    return { ...rawData, funil, diagnosticoPorLive, leads };
+  }, [rawData]);
+
 
   const [search, setSearch] = useState("");
   const [liveFilter, setLiveFilter] = useState<string>("all");
