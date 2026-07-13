@@ -419,6 +419,7 @@ export function G4RealSection() {
                 key={row.live}
                 row={row}
                 diagnosticos={diagMap.get(row.live) ?? 0}
+                presentesManual={PRESENTES_OVERRIDE[row.live] != null}
                 onOpenStage={(live, stage) => setDetail({ live, stage })}
               />
             ))}
