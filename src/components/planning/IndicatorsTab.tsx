@@ -3395,8 +3395,12 @@ export function IndicatorsTab() {
             setDetailSheetExtraContent(null);
             setDetailSheetColumns([
               { key: 'name', label: 'Empresa' },
+              { key: 'bu', label: 'BU' },
               { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
-              { key: 'value', label: 'Valor (MRR+Setup+Pontual)', format: columnFormatters.currency },
+              { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
+              { key: 'setup', label: 'Setup', format: columnFormatters.currency },
+              { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
+              { key: 'value', label: 'Total', format: columnFormatters.currency },
               { key: 'responsible', label: 'Closer' },
               { key: 'date', label: 'Data Entrada', format: columnFormatters.date },
             ]);
