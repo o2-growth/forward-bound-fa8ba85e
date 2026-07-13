@@ -4,6 +4,7 @@ import {
   ExternalLink,
   Search,
   AlertCircle,
+  Info,
   Users,
   Hand,
   ClipboardCheck,
@@ -39,6 +40,25 @@ import { buildPipefyUrl } from "./pipefy";
 
 const MAIO_LIVE = "Live G4 - 20-21/05/2026";
 
+// ── Canonicalização de rótulos de lives ──────────────────────────────────
+// A fonte externa tem variações do mesmo evento (ex.: "Live - G4 - 20-mai"
+// vs "Live G4 - 20/05/2026"). Consolidamos aqui no rótulo canônico.
+const LIVE_CANONICAL_MAP: Record<string, string> = {
+  "Live - G4 - 20-mai": "Live G4 - 20/05/2026",
+  "Live - G4 - 21-mai": "Live G4 - 21/05/2026",
+};
+const canonLive = (s: string): string => LIVE_CANONICAL_MAP[s] ?? s;
+
+// ── Presentes medidos manualmente (contagem no Zoom durante a live) ──────
+// A fonte externa não exporta presença; esses números foram contados ao vivo.
+const PRESENTES_OVERRIDE: Record<string, number> = {
+  "Live G4 - 20/05/2026": 52,
+  "Live G4 - 21/05/2026": 48,
+  "Live G4 - 17/06/2026": 243,
+  "Live G4 - 18/06/2026": 168,
+  "Live G4 - 02/07/2026": 165,
+};
+
 function pct(num: number, den: number | null): string {
   if (den == null || den <= 0) return "—";
   return `${((num / den) * 100).toFixed(1)}%`;
@@ -47,10 +67,12 @@ function pct(num: number, den: number | null): string {
 function LiveFunnelCard({
   row,
   diagnosticos,
+  presentesManual,
   onOpenStage,
 }: {
   row: G4RealFunilRow;
   diagnosticos: number;
+  presentesManual: boolean;
   onOpenStage: (live: string, stage: G4Stage) => void;
 }) {
   const isMaio = row.live === MAIO_LIVE;
@@ -71,24 +93,45 @@ function LiveFunnelCard({
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div className="font-medium text-foreground text-sm">{row.live}</div>
-          {isMaio && (
-            <TooltipProvider delayDuration={150}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400"
-                  >
-                    <AlertCircle className="h-3 w-3" />
-                    sem presença
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Maio: sem presença/diagnóstico (fonte não capturou)
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          <div className="flex items-center gap-1">
+            {presentesManual && (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] gap-1 border-sky-500/40 text-sky-600 dark:text-sky-400"
+                    >
+                      <Info className="h-3 w-3" />
+                      presença manual
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[260px] text-xs">
+                    Não exportado pela fonte — número contado manualmente pela
+                    equipe olhando os participantes no Zoom durante a live.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {isMaio && (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                    >
+                      <AlertCircle className="h-3 w-3" />
+                      sem presença
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Maio: sem presença/diagnóstico (fonte não capturou)
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-2">
@@ -100,15 +143,19 @@ function LiveFunnelCard({
                 : s.value == null
                 ? "—"
                 : pct(s.value as number, s.den);
-            return (
+            const isPresentesManual = presentesManual && s.stage === "presentes";
+            const btn = (
               <button
                 type="button"
                 key={s.label}
                 onClick={() => onOpenStage(row.live, s.stage)}
-                className="rounded-md border bg-muted/20 p-2 text-center transition-colors hover:bg-muted/50 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className={`rounded-md border bg-muted/20 p-2 text-center transition-colors hover:bg-muted/50 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                  isPresentesManual ? "border-sky-500/40" : ""
+                }`}
               >
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">
                   {s.label}
+                  {isPresentesManual && <Info className="h-3 w-3 text-sky-500" />}
                 </div>
                 <div className="text-lg font-semibold tabular-nums text-foreground">
                   {display}
@@ -119,6 +166,19 @@ function LiveFunnelCard({
                   </div>
                 )}
               </button>
+            );
+            if (!isPresentesManual) return btn;
+            return (
+              <TooltipProvider key={s.label} delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                  <TooltipContent className="max-w-[260px] text-xs">
+                    Esse número não foi exportado da fonte oficial — ele foi
+                    contado manualmente pela equipe vendo os participantes no
+                    Zoom durante a live.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             );
           })}
         </div>
@@ -149,7 +209,58 @@ function BoolBadge({ v, off = "—" }: { v: boolean; off?: string }) {
 }
 
 export function G4RealSection() {
-  const { data, isLoading, isFetching, error, refetch } = useG4RealMetrics();
+  const { data: rawData, isLoading, isFetching, error, refetch } = useG4RealMetrics();
+
+  // Normaliza rótulos de live (dedup) e injeta presentes manuais.
+  const data = useMemo(() => {
+    if (!rawData) return rawData;
+
+    // Consolida funil por rótulo canônico
+    const funilMap = new Map<string, G4RealFunilRow>();
+    for (const row of rawData.funil) {
+      const canon = canonLive(row.live);
+      const cur = funilMap.get(canon);
+      if (!cur) {
+        funilMap.set(canon, { ...row, live: canon });
+      } else {
+        cur.inscritos += row.inscritos;
+        cur.levantaramMao += row.levantaramMao;
+        cur.vendas += row.vendas;
+        if (row.presentes != null) {
+          cur.presentes = (cur.presentes ?? 0) + row.presentes;
+        }
+      }
+    }
+    // Aplica override manual de presentes
+    for (const [live, row] of funilMap) {
+      if (PRESENTES_OVERRIDE[live] != null) {
+        row.presentes = PRESENTES_OVERRIDE[live];
+      }
+    }
+    const funil = Array.from(funilMap.values()).sort((a, b) =>
+      a.live.localeCompare(b.live),
+    );
+
+    // Consolida diagnósticos por rótulo canônico
+    const diagMap = new Map<string, number>();
+    for (const d of rawData.diagnosticoPorLive) {
+      const canon = canonLive(d.live);
+      diagMap.set(canon, (diagMap.get(canon) ?? 0) + d.diagnosticos);
+    }
+    const diagnosticoPorLive = Array.from(diagMap.entries()).map(
+      ([live, diagnosticos]) => ({ live, diagnosticos }),
+    );
+
+    // Canonicaliza lives dos leads (dedup dentro do array)
+    const leads = rawData.leads.map((l) => ({
+      ...l,
+      lives: Array.from(new Set(l.lives.map(canonLive))),
+      liveDaMao: l.liveDaMao ? canonLive(l.liveDaMao) : l.liveDaMao,
+    }));
+
+    return { ...rawData, funil, diagnosticoPorLive, leads };
+  }, [rawData]);
+
 
   const [search, setSearch] = useState("");
   const [liveFilter, setLiveFilter] = useState<string>("all");
@@ -308,6 +419,7 @@ export function G4RealSection() {
                 key={row.live}
                 row={row}
                 diagnosticos={diagMap.get(row.live) ?? 0}
+                presentesManual={PRESENTES_OVERRIDE[row.live] != null}
                 onOpenStage={(live, stage) => setDetail({ live, stage })}
               />
             ))}
