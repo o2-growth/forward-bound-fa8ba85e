@@ -67,10 +67,12 @@ function pct(num: number, den: number | null): string {
 function LiveFunnelCard({
   row,
   diagnosticos,
+  presentesManual,
   onOpenStage,
 }: {
   row: G4RealFunilRow;
   diagnosticos: number;
+  presentesManual: boolean;
   onOpenStage: (live: string, stage: G4Stage) => void;
 }) {
   const isMaio = row.live === MAIO_LIVE;
@@ -91,24 +93,45 @@ function LiveFunnelCard({
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div className="font-medium text-foreground text-sm">{row.live}</div>
-          {isMaio && (
-            <TooltipProvider delayDuration={150}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400"
-                  >
-                    <AlertCircle className="h-3 w-3" />
-                    sem presença
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Maio: sem presença/diagnóstico (fonte não capturou)
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          <div className="flex items-center gap-1">
+            {presentesManual && (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] gap-1 border-sky-500/40 text-sky-600 dark:text-sky-400"
+                    >
+                      <Info className="h-3 w-3" />
+                      presença manual
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[260px] text-xs">
+                    Não exportado pela fonte — número contado manualmente pela
+                    equipe olhando os participantes no Zoom durante a live.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            {isMaio && (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                    >
+                      <AlertCircle className="h-3 w-3" />
+                      sem presença
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Maio: sem presença/diagnóstico (fonte não capturou)
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-2">
@@ -120,15 +143,19 @@ function LiveFunnelCard({
                 : s.value == null
                 ? "—"
                 : pct(s.value as number, s.den);
-            return (
+            const isPresentesManual = presentesManual && s.stage === "presentes";
+            const btn = (
               <button
                 type="button"
                 key={s.label}
                 onClick={() => onOpenStage(row.live, s.stage)}
-                className="rounded-md border bg-muted/20 p-2 text-center transition-colors hover:bg-muted/50 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className={`rounded-md border bg-muted/20 p-2 text-center transition-colors hover:bg-muted/50 hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/40 ${
+                  isPresentesManual ? "border-sky-500/40" : ""
+                }`}
               >
-                <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                <div className="text-[10px] uppercase tracking-wide text-muted-foreground inline-flex items-center gap-1">
                   {s.label}
+                  {isPresentesManual && <Info className="h-3 w-3 text-sky-500" />}
                 </div>
                 <div className="text-lg font-semibold tabular-nums text-foreground">
                   {display}
@@ -139,6 +166,19 @@ function LiveFunnelCard({
                   </div>
                 )}
               </button>
+            );
+            if (!isPresentesManual) return btn;
+            return (
+              <TooltipProvider key={s.label} delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>{btn}</TooltipTrigger>
+                  <TooltipContent className="max-w-[260px] text-xs">
+                    Esse número não foi exportado da fonte oficial — ele foi
+                    contado manualmente pela equipe vendo os participantes no
+                    Zoom durante a live.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             );
           })}
         </div>
