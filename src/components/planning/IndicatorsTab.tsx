@@ -51,7 +51,7 @@ import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
 import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
-import { classifyLeadSource, LeadSource, LEAD_SOURCE_LABELS } from "@/lib/leadSource";
+import { classifyLeadSource, LeadSource, LEAD_SOURCE_LABELS, MONETIZACAO_ORIGEM_SENTINEL } from "@/lib/leadSource";
 const RevenuePaceChart = lazy(() => import("./indicators/RevenuePaceChart").then(m => ({ default: m.RevenuePaceChart })));
 
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
