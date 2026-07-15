@@ -3520,6 +3520,24 @@ export function IndicatorsTab() {
         </p>
       </div>
 
+      {/* Ticket Médio (respeita todos os filtros) */}
+      {(() => {
+        const vendaItems = getItemsForIndicator('venda');
+        const ticketMedio = vendaItems.length > 0
+          ? vendaItems.reduce((sum, i) => sum + (i.setup || 0) + (i.mrr || 0) + (i.pontual || 0), 0) / vendaItems.length
+          : 0;
+        return (
+          <div className="flex items-center justify-end">
+            <div className="rounded-lg border border-border bg-card/40 px-4 py-2 text-sm">
+              <span className="text-muted-foreground">Ticket Médio: </span>
+              <span className="font-semibold text-foreground">
+                {ticketMedio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+              </span>
+              <span className="ml-2 text-xs text-muted-foreground">({vendaItems.length} {vendaItems.length === 1 ? 'venda' : 'vendas'})</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Cards - Quantity Indicators */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
