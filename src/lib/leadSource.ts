@@ -164,6 +164,19 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     return 'monetizacao';
   }
 
+  // 0.05) OVERRIDE HARDCODED — empresas/títulos forçados como Outbound.
+  const tituloNorm = norm(c.titulo);
+  const empresaNorm = norm(c.empresa);
+  if (OUTBOUND_HARDCODED_COMPANIES.length > 0) {
+    const hay = `${tituloNorm} ${empresaNorm}`.trim();
+    if (hay) {
+      const tokens = hay.split(/\s+/);
+      if (OUTBOUND_HARDCODED_COMPANIES.some(name => tokens.includes(name))) {
+        return 'outbound';
+      }
+    }
+  }
+
   // 0) MONETIZAÇÃO — sentinel injetado por useMonetizacaoAnalytics,
   //    OU bu === 'Monetização' (redundância caso o sentinel se perca),
   //    OU tipoMovimentacao típico do pipe Monetização (Upsell/Cross-sell/Troca/Downsell)
