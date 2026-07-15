@@ -155,6 +155,9 @@ export interface MonetizacaoCard {
   perdido: boolean;
   /** Fases que o card passou dentro do período */
   fasesNoPeriodo: string[];
+  bu?: string;
+  tipoOrigem?: string;
+  tipoMovimentacao?: string;
 }
 
 interface MonetizacaoAnalytics {
