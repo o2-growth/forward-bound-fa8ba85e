@@ -41,6 +41,10 @@ export interface ClassifyInput {
   origemLead?: string | null;
   fonte?: string | null;
   campanha?: string | null;
+  /** Posicionamento/placement do anúncio (ex.: 'paid_social', 'facebook_feed'). */
+  posicionamento?: string | null;
+  /** Conjunto/grupo de anúncio (ex.: '{{ad.name}}' quando o Meta não substitui a variável). */
+  conjunto?: string | null;
   sdr?: string | null;
   produto?: string | null;
   /** BU label (ex.: 'Monetização'); usado como sinal redundante quando o sentinel se perde no caminho. */
