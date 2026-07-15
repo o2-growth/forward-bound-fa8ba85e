@@ -35,6 +35,8 @@
 export type LeadSource = 'inbound' | 'outbound' | 'evento' | 'indicacao' | 'monetizacao' | 'sem_origem';
 
 export interface ClassifyInput {
+  /** ID do card no Pipefy — usado para overrides hardcoded. */
+  id?: string | number | null;
   tipoOrigem?: string | null;
   origemLead?: string | null;
   fonte?: string | null;
@@ -46,6 +48,7 @@ export interface ClassifyInput {
   /** Tipo de movimentação do pipe Monetização (Upsell / Cross-sell / Troca de produto / Downsell). */
   tipoMovimentacao?: string | null;
 }
+
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   inbound: 'Inbound',
