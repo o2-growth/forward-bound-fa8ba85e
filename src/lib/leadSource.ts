@@ -177,6 +177,31 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     buNorm === 'franquia' || buNorm === 'oxy hacker'
   ) return 'inbound';
 
+  // 0.15) META ADS placeholders não resolvidos ({{site_source_name}}, {{campaign.name}},
+  // {{ad.name}}, {{adset.name}}, etc.) OU posicionamento típico de mídia paga
+  // (paid_social, facebook_feed, instagram_feed, stories, reels, etc.).
+  // Se o card carrega qualquer um desses sinais, é Inbound (veio de anúncio pago).
+  const posicionamentoNorm = norm(c.posicionamento);
+  const conjuntoRaw = (c.conjunto || '').trim();
+  const placeholderRe = /\{\{[^}]+\}\}/;
+  const rawSignals = [c.fonte, c.campanha, c.origemLead, c.posicionamento, conjuntoRaw]
+    .filter(Boolean) as string[];
+  if (rawSignals.some(v => placeholderRe.test(v))) {
+    return 'inbound';
+  }
+  if (
+    containsAny(posicionamentoNorm, [
+      'paid social', 'paid_social', 'facebook feed', 'instagram feed',
+      'stories', 'reels', 'audience network', 'messenger', 'marketplace',
+      'facebook_stories', 'instagram_stories',
+    ])
+  ) {
+    return 'inbound';
+  }
+  // Fonte literal 'site_source_name' (placeholder que ficou como texto após normalização)
+  if (fonte === 'site source name' || fonte === '{{site source name}}') {
+    return 'inbound';
+  }
 
   const allEmpty = !tipo && !origem && !fonte && !campanha && !sdr;
 
