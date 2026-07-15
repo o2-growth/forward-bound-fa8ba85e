@@ -71,6 +71,8 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
       origemLead: card.origemLead,
       fonte: card.fonte,
       campanha: card.campanha,
+      posicionamento: (card as any).posicionamento ?? (card as any).placement,
+      conjunto: (card as any).conjunto ?? (card as any).conjuntoGrupo ?? (card as any).adset,
       sdr: card.responsavel || card.sdr,
       produto: (card as any).produto ?? (card as any).product,
       bu: (card as any).bu,
