@@ -450,7 +450,7 @@ export function useModeloAtualMetas(startDate?: Date, endDate?: Date) {
       for (const movement of mqlByCreation) {
         if (!movement.dataCriacao) continue;
         const creationTime = movement.dataCriacao.getTime();
-        if (creationTime >= startTime && creationTime <= endTime && isMqlQualified(movement.faixaFaturamento) && !isTestCard(movement.id) && !excludedMqlIds.has(movement.id) && !seenIds.has(movement.id)) {
+        if (creationTime >= startTime && creationTime <= endTime && isMqlQualified(movement.faixaFaturamento) && !isJunkCard(movement) && !excludedMqlIds.has(movement.id) && !seenIds.has(movement.id)) {
           seenIds.add(movement.id);
         }
       }
