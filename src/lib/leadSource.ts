@@ -47,6 +47,9 @@ export interface ClassifyInput {
   conjunto?: string | null;
   sdr?: string | null;
   produto?: string | null;
+  /** Título do card / nome da empresa — usado para overrides hardcoded por nome. */
+  titulo?: string | null;
+  empresa?: string | null;
   /** BU label (ex.: 'Monetização'); usado como sinal redundante quando o sentinel se perde no caminho. */
   bu?: string | null;
   /** Tipo de movimentação do pipe Monetização (Upsell / Cross-sell / Troca de produto / Downsell). */
@@ -72,6 +75,11 @@ export const MONETIZACAO_ORIGEM_SENTINEL = '__monetizacao__';
 const MONETIZACAO_HARDCODED_IDS = new Set<string>([
   '1064873254',
 ]);
+
+// Overrides hardcoded: empresas/títulos que devem ser classificados como
+// Outbound mesmo quando os campos de origem sugerem outra coisa.
+// Match é feito por token normalizado (case/acento-insensível) contra `titulo` e `empresa`.
+const OUTBOUND_HARDCODED_COMPANIES = ['gsc'];
 
 
 
@@ -154,6 +162,19 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   // 0.0) OVERRIDE HARDCODED — cards específicos forçados como Monetização.
   if (c.id != null && MONETIZACAO_HARDCODED_IDS.has(String(c.id))) {
     return 'monetizacao';
+  }
+
+  // 0.05) OVERRIDE HARDCODED — empresas/títulos forçados como Outbound.
+  const tituloNorm = norm(c.titulo);
+  const empresaNorm = norm(c.empresa);
+  if (OUTBOUND_HARDCODED_COMPANIES.length > 0) {
+    const hay = `${tituloNorm} ${empresaNorm}`.trim();
+    if (hay) {
+      const tokens = hay.split(/\s+/);
+      if (OUTBOUND_HARDCODED_COMPANIES.some(name => tokens.includes(name))) {
+        return 'outbound';
+      }
+    }
   }
 
   // 0) MONETIZAÇÃO — sentinel injetado por useMonetizacaoAnalytics,

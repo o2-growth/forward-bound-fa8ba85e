@@ -75,6 +75,8 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
       conjunto: (card as any).conjunto ?? (card as any).conjuntoGrupo ?? (card as any).adset,
       sdr: card.responsavel || card.sdr,
       produto: (card as any).produto ?? (card as any).product,
+      titulo: (card as any).titulo ?? (card as any).title ?? (card as any).name,
+      empresa: (card as any).empresa ?? (card as any).company,
       bu: (card as any).bu,
       tipoMovimentacao: (card as any).tipoMovimentacao || (card as any).tipo_de_movimenta_o || (card as any).tipo,
     });
