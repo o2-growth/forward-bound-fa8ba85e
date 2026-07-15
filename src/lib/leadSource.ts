@@ -193,8 +193,11 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   // Checa `produto` E `bu` (DetailItem expõe só `bu`, não `produto`).
   const produto = norm(c.produto);
   const buNorm = norm(c.bu);
+  // Nota: `produto` aqui pode vir da categoria classificada (classifyProduto),
+  // que devolve 'OXY' para vendas Oxy Hacker feitas via pipe Modelo Atual.
+  // Tratamos 'oxy' como equivalente a Oxy Hacker para efeitos de origem.
   if (
-    produto.includes('franquia') || produto.includes('oxy hacker') ||
+    produto.includes('franquia') || produto.includes('oxy hacker') || produto === 'oxy' ||
     buNorm === 'franquia' || buNorm === 'oxy hacker'
   ) return 'inbound';
 
