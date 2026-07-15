@@ -2081,6 +2081,8 @@ export function IndicatorsTab() {
           conjunto: (i as any).conjunto ?? (i as any).conjuntoGrupo ?? (i as any).adset,
           sdr: i.sdr,
           produto: (i as any).produto ?? (i as any).product,
+          titulo: (i as any).titulo ?? (i as any).title ?? (i as any).name,
+          empresa: (i as any).empresa ?? (i as any).company,
           bu: (i as any).bu,
           tipoMovimentacao: (i as any).tipoMovimentacao || (i as any).tipo_de_movimenta_o || (i as any).tipo,
         });
