@@ -53,7 +53,7 @@ import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
 import { classifyLeadSource, LeadSource, LEAD_SOURCE_LABELS } from "@/lib/leadSource";
 const RevenuePaceChart = lazy(() => import("./indicators/RevenuePaceChart").then(m => ({ default: m.RevenuePaceChart })));
-import { TcvHeroBanner } from "./indicators/TcvHeroBanner";
+
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
@@ -3520,8 +3520,6 @@ export function IndicatorsTab() {
         </p>
       </div>
 
-      {/* TCV Hero Banner */}
-      <TcvHeroBanner vendaItems={getItemsForIndicator('venda')} />
 
       {/* Cards - Quantity Indicators */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
