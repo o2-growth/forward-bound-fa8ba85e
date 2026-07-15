@@ -2075,6 +2075,8 @@ export function IndicatorsTab() {
           origemLead: i.origemLead,
           fonte: i.fonte,
           campanha: i.campanha,
+          posicionamento: (i as any).posicionamento ?? (i as any).placement,
+          conjunto: (i as any).conjunto ?? (i as any).conjuntoGrupo ?? (i as any).adset,
           sdr: i.sdr,
           produto: (i as any).produto ?? (i as any).product,
           bu: (i as any).bu,
