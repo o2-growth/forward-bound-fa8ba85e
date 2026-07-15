@@ -401,7 +401,12 @@ export function useMonetizacaoAnalytics(
       ganho: isClosedInPeriod,
       perdido: !!motivoPerda,
       fasesNoPeriodo,
-    };
+      // Sinais redundantes para o classificador de origem (leadSource.ts)
+      // caso o card seja iterado sem passar pelo toDetailItem.
+      bu: 'Monetização',
+      tipoOrigem: MONETIZACAO_ORIGEM_SENTINEL,
+      tipoMovimentacao: TIPO_LABEL_MAP[tipoRaw] || tipoRaw || '',
+    } as MonetizacaoCard;
   }).filter((c) => !isJunkCard({ id: c.id, titulo: c.titulo, empresa: c.cliente }));
 
   // Agregação por fase (ordem canônica) — usa faseAtual
