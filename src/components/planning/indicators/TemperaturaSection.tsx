@@ -104,6 +104,7 @@ export function TemperaturaSection(props: AggregateInput) {
         columns={[
           { key: "name", label: "Empresa" },
           { key: "bu", label: "BU" },
+          { key: "product", label: "Produto", format: columnFormatters.product },
           { key: "phase", label: "Fase Atual", format: columnFormatters.phase },
           { key: "sdr", label: "SDR" },
           { key: "closer", label: "Closer" },
