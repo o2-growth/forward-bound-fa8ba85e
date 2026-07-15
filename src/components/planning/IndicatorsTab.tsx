@@ -985,6 +985,8 @@ export function IndicatorsTab() {
     if (selectedOrigens.length === 0) return true;
     if (!card) return false;
     const source = classifyLeadSource({
+      id: (card as any).id ?? (card as any).cardId,
+
       tipoOrigem: card.tipoOrigem,
       origemLead: card.origemLead,
       fonte: card.fonte,
@@ -2065,6 +2067,8 @@ export function IndicatorsTab() {
 
         // Classificação por Canal de Aquisição
         const classifyItem = (i: typeof items[number]): LeadSource => classifyLeadSource({
+          id: (i as any).id ?? (i as any).cardId,
+
           tipoOrigem: i.tipoOrigem,
           origemLead: i.origemLead,
           fonte: i.fonte,

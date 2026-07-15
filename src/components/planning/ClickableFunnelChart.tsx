@@ -65,6 +65,8 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
     if (!selectedOrigens?.length) return true;
     if (!card) return false;
     const src = classifyLeadSource({
+      id: (card as any).id ?? (card as any).cardId,
+
       tipoOrigem: card.tipoOrigem,
       origemLead: card.origemLead,
       fonte: card.fonte,

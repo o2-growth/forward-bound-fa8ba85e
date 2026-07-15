@@ -35,6 +35,8 @@
 export type LeadSource = 'inbound' | 'outbound' | 'evento' | 'indicacao' | 'monetizacao' | 'sem_origem';
 
 export interface ClassifyInput {
+  /** ID do card no Pipefy — usado para overrides hardcoded. */
+  id?: string | number | null;
   tipoOrigem?: string | null;
   origemLead?: string | null;
   fonte?: string | null;
@@ -46,6 +48,7 @@ export interface ClassifyInput {
   /** Tipo de movimentação do pipe Monetização (Upsell / Cross-sell / Troca de produto / Downsell). */
   tipoMovimentacao?: string | null;
 }
+
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   inbound: 'Inbound',
@@ -59,6 +62,13 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
 // Sentinel value used by useMonetizacaoAnalytics to tag cards coming from
 // the "Funil de Monetização" pipe so classifyLeadSource maps them to 'monetizacao'.
 export const MONETIZACAO_ORIGEM_SENTINEL = '__monetizacao__';
+
+// Overrides hardcoded: cards do Pipefy que devem ser classificados como
+// Monetização mesmo quando os campos de origem não batem com a heurística.
+const MONETIZACAO_HARDCODED_IDS = new Set<string>([
+  '1064873254',
+]);
+
 
 
 const norm = (s?: string | null): string => {
@@ -136,6 +146,11 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   const fonte = norm(c.fonte);
   const campanha = norm(c.campanha);
   const sdr = norm(c.sdr);
+
+  // 0.0) OVERRIDE HARDCODED — cards específicos forçados como Monetização.
+  if (c.id != null && MONETIZACAO_HARDCODED_IDS.has(String(c.id))) {
+    return 'monetizacao';
+  }
 
   // 0) MONETIZAÇÃO — sentinel injetado por useMonetizacaoAnalytics,
   //    OU bu === 'Monetização' (redundância caso o sentinel se perca),
