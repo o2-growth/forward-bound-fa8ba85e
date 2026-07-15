@@ -51,7 +51,7 @@ import { KpiItem } from "./indicators/KpiCard";
 import { ChartConfig } from "./indicators/DrillDownCharts";
 import { TIER_ORDER, normalizeTier } from "@/lib/revenueTiers";
 import { MultiSelect, MultiSelectOption } from "@/components/ui/multi-select";
-import { classifyLeadSource, LeadSource, LEAD_SOURCE_LABELS } from "@/lib/leadSource";
+import { classifyLeadSource, LeadSource, LEAD_SOURCE_LABELS, MONETIZACAO_ORIGEM_SENTINEL } from "@/lib/leadSource";
 const RevenuePaceChart = lazy(() => import("./indicators/RevenuePaceChart").then(m => ({ default: m.RevenuePaceChart })));
 
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
@@ -2432,7 +2432,12 @@ export function IndicatorsTab() {
         });
 
         // Ciclo Médio (apenas contratos com ciclo > 0)
-        const ciclosValidos = itemsWithTCV.map(i => i.cicloVenda).filter(c => c > 0);
+        // Exclui Monetização (upsell/cross-sell): são clientes da base, não novos
+        // no funil comercial — o ciclo deles distorce a média de aquisição.
+        const ciclosValidos = itemsWithTCV
+          .filter(i => i.bu !== 'Monetização' && i.tipoOrigem !== MONETIZACAO_ORIGEM_SENTINEL)
+          .map(i => i.cicloVenda)
+          .filter(c => c > 0);
         const cicloMedio = ciclosValidos.length > 0
           ? Math.round(ciclosValidos.reduce((s, c) => s + c, 0) / ciclosValidos.length)
           : 0;
