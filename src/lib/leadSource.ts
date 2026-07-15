@@ -41,6 +41,10 @@ export interface ClassifyInput {
   campanha?: string | null;
   sdr?: string | null;
   produto?: string | null;
+  /** BU label (ex.: 'Monetização'); usado como sinal redundante quando o sentinel se perde no caminho. */
+  bu?: string | null;
+  /** Tipo de movimentação do pipe Monetização (Upsell / Cross-sell / Troca de produto / Downsell). */
+  tipoMovimentacao?: string | null;
 }
 
 export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
