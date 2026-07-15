@@ -47,6 +47,9 @@ export interface ClassifyInput {
   conjunto?: string | null;
   sdr?: string | null;
   produto?: string | null;
+  /** Título do card / nome da empresa — usado para overrides hardcoded por nome. */
+  titulo?: string | null;
+  empresa?: string | null;
   /** BU label (ex.: 'Monetização'); usado como sinal redundante quando o sentinel se perde no caminho. */
   bu?: string | null;
   /** Tipo de movimentação do pipe Monetização (Upsell / Cross-sell / Troca de produto / Downsell). */
