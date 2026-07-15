@@ -2071,6 +2071,8 @@ export function IndicatorsTab() {
           campanha: i.campanha,
           sdr: i.sdr,
           produto: (i as any).produto,
+          bu: (i as any).bu,
+          tipoMovimentacao: (i as any).tipoMovimentacao || (i as any).tipo_de_movimenta_o || (i as any).tipo,
         });
         const canalCounts = new Map<LeadSource, number>();
         items.forEach(i => {
