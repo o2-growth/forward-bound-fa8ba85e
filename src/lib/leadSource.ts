@@ -137,8 +137,14 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   const campanha = norm(c.campanha);
   const sdr = norm(c.sdr);
 
-  // 0) MONETIZAÇÃO — sentinel injetado por useMonetizacaoAnalytics
+  // 0) MONETIZAÇÃO — sentinel injetado por useMonetizacaoAnalytics,
+  //    OU bu === 'Monetização' (redundância caso o sentinel se perca),
+  //    OU tipoMovimentacao típico do pipe Monetização (Upsell/Cross-sell/Troca/Downsell)
+  //    quando nenhum outro campo de origem está preenchido.
   if ((c.tipoOrigem || '').trim() === MONETIZACAO_ORIGEM_SENTINEL) {
+    return 'monetizacao';
+  }
+  if (norm(c.bu) === 'monetizacao') {
     return 'monetizacao';
   }
 
@@ -148,6 +154,14 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   if (produto.includes('franquia') || produto.includes('oxy hacker')) return 'inbound';
 
   const allEmpty = !tipo && !origem && !fonte && !campanha && !sdr;
+
+  // 0.2) Heurística Monetização: cards de upsell/cross-sell/troca/downsell que
+  // vieram por pipes de BU sem nenhum campo de origem preenchido → Monetização.
+  const tipoMov = norm(c.tipoMovimentacao);
+  if (allEmpty && tipoMov && /(upsell|cross ?sell|cross|troca de produto|downsell|novo produto)/.test(tipoMov)) {
+    return 'monetizacao';
+  }
+
   if (allEmpty) return 'sem_origem';
 
 
