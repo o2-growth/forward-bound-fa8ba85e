@@ -1410,16 +1410,6 @@ export function MediaInvestmentTab() {
       ['oxyHacker', 'oxy_hacker'],
       ['franquia', 'franquia'],
     ];
-    // Override cirúrgico SOMENTE para Jul/Modelo Atual (config aprovada pelo usuário)
-    // ticket 18k, CPMQL 500, taxas 50/85/75/25%
-    const JUL_MODELO_ATUAL_OVERRIDE: Partial<FunnelMetrics> = {
-      ticketMedio: 18000,
-      cpmql: 500,
-      mqlToRm: 0.50,
-      rmToRr: 0.85,
-      rrToProp: 0.75,
-      propToVenda: 0.25,
-    };
     const result: Record<string, Record<string, FunnelMetrics>> = {};
     for (const [stateKey, dbKey] of buPairs) {
       const monthMap = getIndicatorsForBU(dbKey);
@@ -1427,7 +1417,7 @@ export function MediaInvestmentTab() {
       const perMonth: Record<string, FunnelMetrics> = {};
       months.forEach(mo => {
         const cfg = monthMap[mo];
-        let entry: FunnelMetrics = cfg ? {
+        perMonth[mo] = cfg ? {
           ...base,
           ticketMedio: cfg.ticketMedio || base.ticketMedio,
           cpmql: cfg.cpmql || base.cpmql,
@@ -1437,15 +1427,12 @@ export function MediaInvestmentTab() {
           rrToProp: cfg.rrToProp || base.rrToProp,
           propToVenda: cfg.propToVenda || base.propToVenda,
         } : base;
-        if (stateKey === 'modeloAtual' && mo === 'Jul') {
-          entry = { ...entry, ...JUL_MODELO_ATUAL_OVERRIDE };
-        }
-        perMonth[mo] = entry;
       });
       result[stateKey] = perMonth;
     }
     return result;
   }, [getIndicatorsForBU, funnelMetrics]);
+
 
 
   // Metas mensais distribuídas - prioritize DB, fallback to quarterly distribution
