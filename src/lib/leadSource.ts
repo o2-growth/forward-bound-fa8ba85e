@@ -76,6 +76,11 @@ const MONETIZACAO_HARDCODED_IDS = new Set<string>([
   '1064873254',
 ]);
 
+// Overrides hardcoded: empresas/títulos que devem ser classificados como
+// Outbound mesmo quando os campos de origem sugerem outra coisa.
+// Match é feito por token normalizado (case/acento-insensível) contra `titulo` e `empresa`.
+const OUTBOUND_HARDCODED_COMPANIES = ['gsc'];
+
 
 
 const norm = (s?: string | null): string => {
