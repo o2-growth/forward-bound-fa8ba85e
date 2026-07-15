@@ -138,10 +138,10 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     return 'monetizacao';
   }
 
-  // 0.1) FRANQUIA — regra de negócio: todo card do produto Franquia é Inbound,
-  // independente de os campos de origem estarem preenchidos no Pipefy.
+  // 0.1) FRANQUIA + OXY HACKER — regra de negócio: todo card desses produtos
+  // é Inbound, independente de os campos de origem estarem preenchidos no Pipefy.
   const produto = norm(c.produto);
-  if (produto.includes('franquia')) return 'inbound';
+  if (produto.includes('franquia') || produto.includes('oxy hacker')) return 'inbound';
 
   const allEmpty = !tipo && !origem && !fonte && !campanha && !sdr;
   if (allEmpty) return 'sem_origem';
