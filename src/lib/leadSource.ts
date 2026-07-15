@@ -165,8 +165,14 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
 
   // 0.1) FRANQUIA + OXY HACKER — regra de negócio: todo card desses produtos
   // é Inbound, independente de os campos de origem estarem preenchidos no Pipefy.
+  // Checa `produto` E `bu` (DetailItem expõe só `bu`, não `produto`).
   const produto = norm(c.produto);
-  if (produto.includes('franquia') || produto.includes('oxy hacker')) return 'inbound';
+  const buNorm = norm(c.bu);
+  if (
+    produto.includes('franquia') || produto.includes('oxy hacker') ||
+    buNorm === 'franquia' || buNorm === 'oxy hacker'
+  ) return 'inbound';
+
 
   const allEmpty = !tipo && !origem && !fonte && !campanha && !sdr;
 

@@ -72,7 +72,7 @@ export function ClickableFunnelChart({ startDate, endDate, selectedBU, selectedB
       fonte: card.fonte,
       campanha: card.campanha,
       sdr: card.responsavel || card.sdr,
-      produto: (card as any).produto,
+      produto: (card as any).produto ?? (card as any).product,
       bu: (card as any).bu,
       tipoMovimentacao: (card as any).tipoMovimentacao || (card as any).tipo_de_movimenta_o || (card as any).tipo,
     });
