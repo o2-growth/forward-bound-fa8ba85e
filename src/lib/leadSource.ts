@@ -63,6 +63,13 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
 // the "Funil de Monetização" pipe so classifyLeadSource maps them to 'monetizacao'.
 export const MONETIZACAO_ORIGEM_SENTINEL = '__monetizacao__';
 
+// Overrides hardcoded: cards do Pipefy que devem ser classificados como
+// Monetização mesmo quando os campos de origem não batem com a heurística.
+const MONETIZACAO_HARDCODED_IDS = new Set<string>([
+  '1064873254',
+]);
+
+
 
 const norm = (s?: string | null): string => {
   if (!s) return '';
