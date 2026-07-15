@@ -147,6 +147,11 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   const campanha = norm(c.campanha);
   const sdr = norm(c.sdr);
 
+  // 0.0) OVERRIDE HARDCODED — cards específicos forçados como Monetização.
+  if (c.id != null && MONETIZACAO_HARDCODED_IDS.has(String(c.id))) {
+    return 'monetizacao';
+  }
+
   // 0) MONETIZAÇÃO — sentinel injetado por useMonetizacaoAnalytics,
   //    OU bu === 'Monetização' (redundância caso o sentinel se perca),
   //    OU tipoMovimentacao típico do pipe Monetização (Upsell/Cross-sell/Troca/Downsell)
