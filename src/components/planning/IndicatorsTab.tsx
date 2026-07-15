@@ -2442,6 +2442,27 @@ export function IndicatorsTab() {
           ? Math.round(ciclosValidos.reduce((s, c) => s + c, 0) / ciclosValidos.length)
           : 0;
 
+        // DEBUG TEMPORÁRIO: mostrar top ciclos que puxam a média
+        try {
+          const debugRows = itemsWithTCV
+            .filter(i => i.bu !== 'Monetização' && i.tipoOrigem !== MONETIZACAO_ORIGEM_SENTINEL && (i.cicloVenda ?? 0) > 0)
+            .sort((a, b) => (b.cicloVenda ?? 0) - (a.cicloVenda ?? 0))
+            .slice(0, 20)
+            .map(i => ({
+              cliente: i.company || i.name,
+              bu: i.bu,
+              closer: i.closer,
+              dataCriacao: i.dataCriacao,
+              dataAssinatura: i.dataAssinatura,
+              ciclo_dias: i.cicloVenda,
+              mrr: i.mrr, setup: i.setup, pontual: i.pontual,
+            }));
+          // eslint-disable-next-line no-console
+          console.warn('[CicloMedio][DEBUG] média =', cicloMedio, 'd | n =', ciclosValidos.length, '| top 20 ciclos:');
+          // eslint-disable-next-line no-console
+          console.table(debugRows);
+        } catch {}
+
         const produtoExtraContent = buildProdutoBreakdown(itemsWithTCV, 'value');
 
         const podium = findTopPerformerByRevenue(items);
