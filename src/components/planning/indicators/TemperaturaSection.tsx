@@ -7,6 +7,7 @@ import {
   type Temperatura,
   type AggregateInput,
 } from "./temperaturaAggregator";
+import { classifyLeadSource, LEAD_SOURCE_LABELS } from "@/lib/leadSource";
 
 const CONFIG: Record<Temperatura, { icon: string; chipClass: string }> = {
   Quente: {
