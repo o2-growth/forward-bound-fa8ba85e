@@ -1,26 +1,46 @@
-# Por que está errado
+# Diagnóstico — Filtro Closer Bruna x MQLs Franquia+Oxy Hacker (01–16/Jul)
 
-O que eu fiz na última rodada foi apenas destravar o guard da Bruna com valores nominais de **1** em `closer_absolute_metas` (Jul/2026). Como os cards do dashboard (Reuniões, Propostas, Vendas, Fat Incremento) leem a meta individual **direto dessa tabela**, a Bruna aparece com Meta 1 e Meta R$ 1 — exatamente o que a screenshot mostra.
+## Resumo
 
-A tabela `closer_absolute_metas` é **por closer + mês (global, sem BU)**. Não dá pra "somar Franquia + Oxy só pra ela" via BU — tem que gravar o total já consolidado na linha da Bruna.
+- **Sem filtro de closer (Franquia + Oxy Hacker):** 20 MQLs — todos os cards que entraram nas fases `Lead` ou `MQL` no período e passam no threshold de investimento ≥ R$ 15k.
+- **Com filtro Closer = Bruna:** 7 MQLs — apenas cards cujo campo `Closer responsável` está preenchido com "Bruna" no momento em que a UI filtra.
 
-# Correção
+Ou seja: **os outros 13 MQLs existem, contam para a BU, mas não têm `Closer responsável` = Bruna gravado no card** (nem preenchimento equivalente no histórico).
 
-Sobrescrever a linha `closer_absolute_metas` da **Bruna / Jul / 2026** com a soma das metas de Franquia + Oxy Hacker de Julho:
+## Por que isso acontece
 
-| Campo | Franquia Jul | Oxy Hacker Jul | Total Bruna Jul |
-|---|---|---|---|
-| rm_meta (Reuniões Agendadas) | 32 | 32 | **64** |
-| rr_meta (Reuniões Realizadas) | 27 | 27 | **54** |
-| prop_meta (Propostas) | 20 | 20 | **40** |
-| venda_meta (Vendas) | 3 | 3 | **6** |
-| faturamento_meta | 420.000 | 108.000 | **R$ 528.000** |
+1. Em Franquia e Oxy Hacker, `Closer responsável` é preenchido no Pipefy tipicamente a partir de fases mais avançadas (Reunião Agendada / Realizada / Proposta). Cards que ainda estão em `Lead` ou `MQL` normalmente **não têm closer** — o campo fica vazio.
+2. O hook `useExpansaoAnalytics.ts` tenta corrigir isso com o `enrichCardWithEffectiveOwners` (linhas ~498–528): ele varre `fullHistory` do próprio card e adota o último `Closer responsável` não-vazio encontrado em qualquer movimento daquele card.
+3. Isso só funciona se o card **já tenha avançado** para uma fase onde algum closer foi preenchido no passado. Para os MQLs recém-criados em Jul (ainda em Lead/MQL), o histórico não tem nenhum movimento com closer → `card.closer` permanece `null` após enrichment.
+4. Em `IndicatorsTab.tsx` (linhas 1557–1558 Franquia, 1639–1640 Oxy Hacker), quando `hasPeopleFilter` está ativo, a série do gráfico usa `buildQtyArrayFromFilteredCards`, que filtra por `matchesCloserFilter(card.closer)` (linha 1488). Sem closer no card, o MQL é excluído.
+5. O rateio 100% Bruna em Jul definido em `closer_metas` afeta **metas**, não a atribuição de cards realizados. A atribuição de card exige o nome no campo real do Pipefy (ou no histórico do card).
 
-Fonte: `funnel_metas` (quantidades) e `monetary_metas.pontual` (financeiro, já que Franquia e Oxy são BUs pontual-only).
+Resultado: 20 (real da BU) − 13 (sem closer preenchido) = **7 (com Bruna explícita)**.
 
-Nenhum outro closer/mês é tocado. Rateio `closer_metas` (Bruna 100% em Jul nas 2 BUs) permanece do ajuste anterior.
+## Como confirmar rapidamente (opcional)
 
-# Observação sobre MQLs / MRR / Setup
+Abrir a lista de MQLs sem filtro de closer no período e ordenar por "Closer": os 13 excedentes aparecerão com Closer vazio. Ao aplicar Closer=Bruna, somem exatamente esses 13.
 
-- **MQL Meta: 66** vem de `funnel_metas` agregado, não de `closer_absolute_metas` — não muda com esse ajuste (e a Bruna aparecer com meta de MQL "de todo mundo" é comportamento de outra origem de dados; se quiser, trato separado).
-- **MRR/Setup Meta** (R$ 68k / R$ 164k) vêm de `monetary_metas` com rateio de dias úteis e cobrem outras BUs (Modelo Atual/O2 TAX). Franquia e Oxy não têm MRR/Setup — só Pontual. Esses cards vão continuar mostrando 0% de atingido pra Bruna, o que é correto.
+## Opções de correção (a decidir com você)
+
+Todas mantêm a lógica atual para outras BUs; só muda o comportamento do filtro Closer em **Franquia e Oxy Hacker**:
+
+**Opção A — Fallback por rateio da BU (recomendada):**
+Quando o card tem `closer` vazio E o filtro Closer está ativo, considerar o card como pertencendo aos closers com % > 0 em `closer_metas` para aquela BU/mês. Em Jul, Bruna = 100% em ambas → todos os 20 MQLs entram no filtro dela. Em meses com rateio dividido (ex.: 50/50), o card entra para ambos os closers do rateio.
+
+**Opção B — Fallback fixo "Bruna em Jul":**
+Hardcode temporário: se BU ∈ {Franquia, Oxy Hacker} E mês = Jul/2026 E `card.closer` vazio → tratar como Bruna. Simples, mas específico e não escala.
+
+**Opção C — Não filtrar MQL por closer em Franquia/Oxy Hacker:**
+Como MQL é fase pré-atribuição de closer, ignorar o filtro Closer especificamente para o indicador `mql` nessas BUs (mostrar sempre os 20). O filtro continua valendo para RM/RR/Proposta/Venda.
+
+**Opção D — Não mexer, apenas documentar:**
+Manter 7 como está, com um tooltip explicando que MQL não tem closer atribuído no Pipefy nessa fase.
+
+## Detalhes técnicos
+
+- Arquivo principal do MQL Expansão: `src/hooks/useExpansaoAnalytics.ts` (linhas 561–579 branch MQL; 498–528 enrichment).
+- Aplicação do filtro no gráfico/gauges: `src/components/planning/IndicatorsTab.tsx` linhas 1481–1496 (`buildQtyArrayFromFilteredCards`) e 946–963 (`matchesCloserFilter`).
+- Rateio de metas Bruna Jul/2026: `closer_metas` (100% Franquia + 100% Oxy Hacker) — não é usado hoje para atribuição de cards realizados.
+
+Qual opção você quer que eu implemente? (Se escolher A, é a mais consistente com o rateio que você já configurou.)
