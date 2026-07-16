@@ -2612,6 +2612,7 @@ export function IndicatorsTab() {
         setDetailSheetColumns([
           { key: 'product', label: 'Produto', format: columnFormatters.product },
           { key: 'company', label: 'Empresa' },
+          { key: 'canal', label: 'Canal' },
           { key: 'dataAssinatura', label: 'Data Assinatura', format: columnFormatters.date },
           { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
           { key: 'setup', label: 'Setup', format: columnFormatters.currency },
@@ -2622,8 +2623,27 @@ export function IndicatorsTab() {
           { key: 'responsible', label: 'Closer' },
           { key: 'cicloVenda', label: 'Ciclo', format: columnFormatters.cicloVenda },
         ]);
+        // Enriquecer com Canal de aquisição (mesma classificação do MQL)
+        const itemsWithCanalVenda = itemsWithTCV.map(i => ({
+          ...i,
+          canal: LEAD_SOURCE_LABELS[classifyLeadSource({
+            id: (i as any).id ?? (i as any).cardId,
+            tipoOrigem: (i as any).tipoOrigem,
+            origemLead: (i as any).origemLead,
+            fonte: (i as any).fonte,
+            campanha: (i as any).campanha,
+            posicionamento: (i as any).posicionamento ?? (i as any).placement,
+            conjunto: (i as any).conjunto ?? (i as any).conjuntoGrupo ?? (i as any).adset,
+            sdr: (i as any).sdr,
+            produto: (i as any).produto ?? (i as any).product,
+            titulo: (i as any).titulo ?? (i as any).title ?? (i as any).name,
+            empresa: (i as any).empresa ?? (i as any).company,
+            bu: (i as any).bu,
+            tipoMovimentacao: (i as any).tipoMovimentacao || (i as any).tipo_de_movimenta_o || (i as any).tipo,
+          })],
+        }));
         // Sort by TCV descending
-        setDetailSheetItems(itemsWithTCV.sort((a, b) => (b.value || 0) - (a.value || 0)));
+        setDetailSheetItems(itemsWithCanalVenda.sort((a, b) => (b.value || 0) - (a.value || 0)));
         setDetailSheetFilterCriteria([
           { title: '▸ Venda Fechada', items: [
             'Card chegou na fase "Ganho" / "Contrato Assinado" dentro do período selecionado',
