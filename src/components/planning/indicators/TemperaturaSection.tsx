@@ -44,6 +44,32 @@ export function TemperaturaSection(props: AggregateInput) {
     ],
   );
 
+  const bucketsWithCanal = useMemo(() => {
+    const result: Record<Temperatura, DetailItem[]> = {
+      Quente: [],
+      Morno: [],
+      Frio: [],
+    };
+    (Object.keys(buckets) as Temperatura[]).forEach((temp) => {
+      result[temp] = buckets[temp].map((item) => {
+        const source = classifyLeadSource({
+          id: item.id,
+          tipoOrigem: item.tipoOrigem,
+          origemLead: item.origemLead,
+          fonte: item.fonte,
+          campanha: item.campanha,
+          sdr: item.sdr,
+          produto: item.product,
+          titulo: item.name,
+          empresa: item.company,
+          bu: item.bu,
+        });
+        return { ...item, canal: LEAD_SOURCE_LABELS[source] };
+      });
+    });
+    return result;
+  }, [buckets]);
+
   if (totalTagged === 0) return null;
 
   const order: Temperatura[] = ["Quente", "Morno", "Frio"];
