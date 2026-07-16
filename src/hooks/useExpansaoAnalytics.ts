@@ -732,6 +732,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const mqlIds = new Set<string>();
     for (const card of allMovements) {
       if (card.fase !== 'Lead' && card.fase !== 'MQL') continue;
+      if (duplicadoCardIds.has(card.id)) continue;
       const entryTime = card.dataEntrada.getTime();
       if (entryTime >= startTime && entryTime <= endTime) {
         const inv = cardInvestimentoMap.get(card.id);
@@ -741,7 +742,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       }
     }
     return mqlIds.size;
-  }, [cards, fullHistory, cardInvestimentoMap, startTime, endTime, produto]);
+  }, [cards, fullHistory, cardInvestimentoMap, startTime, endTime, produto, duplicadoCardIds]);
 
   // Get lost deals: faseAtual=Perdido AND created during the period
   const getLostDeals = useMemo(() => {
