@@ -1,39 +1,26 @@
-# Ajuste de metas da Bruna (Closer) — Julho/2026
+# Por que está errado
 
-Aplicar somente ao mês **Jul/2026**. Demais meses ficam inalterados.
+O que eu fiz na última rodada foi apenas destravar o guard da Bruna com valores nominais de **1** em `closer_absolute_metas` (Jul/2026). Como os cards do dashboard (Reuniões, Propostas, Vendas, Fat Incremento) leem a meta individual **direto dessa tabela**, a Bruna aparece com Meta 1 e Meta R$ 1 — exatamente o que a screenshot mostra.
 
-## O que muda
+A tabela `closer_absolute_metas` é **por closer + mês (global, sem BU)**. Não dá pra "somar Franquia + Oxy só pra ela" via BU — tem que gravar o total já consolidado na linha da Bruna.
 
-### 1. `src/hooks/useCloserMetas.ts` — adicionar Bruna como closer de Oxy Hacker
-```ts
-BU_CLOSERS = {
-  ...
-  oxy_hacker: ['Pedro Albite', 'Daniel Trindade', 'Bruna'],  // + Bruna
-  franquia:   ['Pedro Albite', 'Daniel Trindade', 'Bruna'],  // já está
-}
-```
-Sem isso, o rateio da Bruna em Oxy Hacker é ignorado pelo `getFilteredMeta`.
+# Correção
 
-### 2. Tabela `closer_metas` (rateio %) — apenas month = 'Jul', year = 2026
-Upsert:
-- `franquia / Jul / Bruna` → **100**
-- `franquia / Jul / Pedro Albite` → **0**
-- `franquia / Jul / Daniel Trindade` → **0**
-- `oxy_hacker / Jul / Bruna` → **100**
-- `oxy_hacker / Jul / Pedro Albite` → **0**
-- `oxy_hacker / Jul / Daniel Trindade` → **0**
+Sobrescrever a linha `closer_absolute_metas` da **Bruna / Jul / 2026** com a soma das metas de Franquia + Oxy Hacker de Julho:
 
-### 3. Tabela `closer_absolute_metas` (metas absolutas RM/RR/Prop/Venda/Faturamento) — apenas Jul/2026
-O `getFilteredMeta` só considera closers com meta absoluta > 0 no mês (guard `absoluteMetaIndex`). Para o pace da Bruna aparecer, precisa existir linha absoluta dela em Jul para as duas BUs.
+| Campo | Franquia Jul | Oxy Hacker Jul | Total Bruna Jul |
+|---|---|---|---|
+| rm_meta (Reuniões Agendadas) | 32 | 32 | **64** |
+| rr_meta (Reuniões Realizadas) | 27 | 27 | **54** |
+| prop_meta (Propostas) | 20 | 20 | **40** |
+| venda_meta (Vendas) | 3 | 3 | **6** |
+| faturamento_meta | 420.000 | 108.000 | **R$ 528.000** |
 
-- Somar as linhas absolutas de Jul de **Pedro Albite + Daniel Trindade + Bruna (se existir)** em `franquia` → gravar o total em `Bruna / franquia / Jul` e zerar as linhas de Pedro e Daniel nesse mês/BU.
-- Mesmo procedimento em `oxy_hacker`.
+Fonte: `funnel_metas` (quantidades) e `monetary_metas.pontual` (financeiro, já que Franquia e Oxy são BUs pontual-only).
 
-Campos consolidados: `rm_meta`, `rr_meta`, `prop_meta`, `venda_meta`, `faturamento_meta`.
+Nenhum outro closer/mês é tocado. Rateio `closer_metas` (Bruna 100% em Jul nas 2 BUs) permanece do ajuste anterior.
 
-## Execução
-Migration SQL única cobrindo os 2 upserts (closer_metas + closer_absolute_metas) + edição do `BU_CLOSERS` no hook. Nenhum outro mês é tocado. Nenhuma tela precisa mudar — os componentes já leem esses hooks.
+# Observação sobre MQLs / MRR / Setup
 
-## Riscos
-- Se houver closer absoluto em Jul de Oxy Hacker que hoje não está no `BU_CLOSERS`, ele deixa de ser somado (esperado, já que a Bruna absorve).
-- Reversível: basta rodar upsert restaurando os valores anteriores (posso gerar snapshot antes).
+- **MQL Meta: 66** vem de `funnel_metas` agregado, não de `closer_absolute_metas` — não muda com esse ajuste (e a Bruna aparecer com meta de MQL "de todo mundo" é comportamento de outra origem de dados; se quiser, trato separado).
+- **MRR/Setup Meta** (R$ 68k / R$ 164k) vêm de `monetary_metas` com rateio de dias úteis e cobrem outras BUs (Modelo Atual/O2 TAX). Franquia e Oxy não têm MRR/Setup — só Pontual. Esses cards vão continuar mostrando 0% de atingido pra Bruna, o que é correto.
