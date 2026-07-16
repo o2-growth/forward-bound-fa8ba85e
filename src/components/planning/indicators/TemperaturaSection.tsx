@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DetailSheet, columnFormatters } from "./DetailSheet";
+import { DetailSheet, columnFormatters, type DetailItem } from "./DetailSheet";
 import {
   aggregateByTemperatura,
   type Temperatura,
