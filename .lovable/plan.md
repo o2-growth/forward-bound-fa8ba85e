@@ -1,35 +1,39 @@
-## Contexto
-Cards em qualquer pipe podem chegar com campos de origem preenchidos com **placeholders literais do Meta Ads não resolvidos** (o Meta não substituiu as variáveis por falta de parâmetros na URL). Exemplos observados:
+# Ajuste de metas da Bruna (Closer) — Julho/2026
 
-- Fonte: `{{site_source_name}}`
-- Posicionamento: `paid_social`
-- Campanha: `{{campaign.name}}`
-- Conjunto/grupo: `{{ad.name}}`
+Aplicar somente ao mês **Jul/2026**. Demais meses ficam inalterados.
 
-Hoje esses cards caem em **Sem origem** porque a heurística não reconhece os placeholders. Como o próprio placeholder já prova que o card veio de um anúncio pago (Meta Ads), devem contar como **Inbound**.
+## O que muda
 
-## Alteração
-**Arquivo:** `src/lib/leadSource.ts`
+### 1. `src/hooks/useCloserMetas.ts` — adicionar Bruna como closer de Oxy Hacker
+```ts
+BU_CLOSERS = {
+  ...
+  oxy_hacker: ['Pedro Albite', 'Daniel Trindade', 'Bruna'],  // + Bruna
+  franquia:   ['Pedro Albite', 'Daniel Trindade', 'Bruna'],  // já está
+}
+```
+Sem isso, o rateio da Bruna em Oxy Hacker é ignorado pelo `getFilteredMeta`.
 
-1. Adicionar campo opcional `posicionamento?: string | null` ao `ClassifyInput` (novo sinal explícito do pipe).
-2. Nova regra dentro do bloco INBOUND (regra 4), antes do fallback final:
-   - Se **qualquer** um dos campos (`fonte`, `campanha`, `origemLead`, ou o novo `posicionamento`) contém padrão de placeholder Meta não resolvido — regex `/\{\{[^}]+\}\}/` — retorna `'inbound'`.
-   - Se `posicionamento` (normalizado) contém `paid_social`, `paid social`, `facebook_feed`, `instagram_feed`, `stories`, `reels`, `audience_network`, `messenger` → `'inbound'`.
-   - Se `fonte` normalizado === `site_source_name` (placeholder que virou literal após normalização) → `'inbound'`.
+### 2. Tabela `closer_metas` (rateio %) — apenas month = 'Jul', year = 2026
+Upsert:
+- `franquia / Jul / Bruna` → **100**
+- `franquia / Jul / Pedro Albite` → **0**
+- `franquia / Jul / Daniel Trindade` → **0**
+- `oxy_hacker / Jul / Bruna` → **100**
+- `oxy_hacker / Jul / Pedro Albite` → **0**
+- `oxy_hacker / Jul / Daniel Trindade` → **0**
 
-## Propagação
-Passar `posicionamento` nas 3 chamadas existentes de `classifyLeadSource`, quando disponível no card:
-- `src/components/planning/IndicatorsTab.tsx` (2 chamadas)
-- `src/components/planning/ClickableFunnelChart.tsx` (1 chamada)
+### 3. Tabela `closer_absolute_metas` (metas absolutas RM/RR/Prop/Venda/Faturamento) — apenas Jul/2026
+O `getFilteredMeta` só considera closers com meta absoluta > 0 no mês (guard `absoluteMetaIndex`). Para o pace da Bruna aparecer, precisa existir linha absoluta dela em Jul para as duas BUs.
 
-Uso: `posicionamento: (card as any).posicionamento ?? (card as any).placement`.
+- Somar as linhas absolutas de Jul de **Pedro Albite + Daniel Trindade + Bruna (se existir)** em `franquia` → gravar o total em `Bruna / franquia / Jul` e zerar as linhas de Pedro e Daniel nesse mês/BU.
+- Mesmo procedimento em `oxy_hacker`.
 
-Se os hooks/tipos do card ainda não carregam esse campo, a checagem por placeholder em `fonte`/`campanha` já cobre a maior parte dos casos — nenhum trabalho de schema extra necessário para o MVP.
+Campos consolidados: `rm_meta`, `rr_meta`, `prop_meta`, `venda_meta`, `faturamento_meta`.
 
-## Impacto
-- Zero risco de regressão em outras origens: as novas condições só disparam com sinais **explícitos de Meta Ads** (placeholders literais ou tokens de placement).
-- Cards que hoje aparecem em **Sem origem** por conta desses placeholders passam a aparecer em **Inbound** no filtro da aba Comercial.
-- Não altera contagem total nem outras BUs — apenas realoca `sem_origem → inbound`.
+## Execução
+Migration SQL única cobrindo os 2 upserts (closer_metas + closer_absolute_metas) + edição do `BU_CLOSERS` no hook. Nenhum outro mês é tocado. Nenhuma tela precisa mudar — os componentes já leem esses hooks.
 
-## Verificação
-Após implementar, abrir aba Comercial com filtro **Inbound** e conferir que cards com fonte `{{site_source_name}}` aparecem; e com filtro **Sem origem** que eles saíram.
+## Riscos
+- Se houver closer absoluto em Jul de Oxy Hacker que hoje não está no `BU_CLOSERS`, ele deixa de ser somado (esperado, já que a Bruna absorve).
+- Reversível: basta rodar upsert restaurando os valores anteriores (posso gerar snapshot antes).
