@@ -599,7 +599,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       // Enriquece com SDR/Closer efetivos do histórico (fix Expansão Lead/MQL)
       return result.map(enrichCardWithEffectiveOwners);
     };
-  }, [allMovementsUnfiltered, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners, currentProdutoByCard]);
+  }, [allMovementsUnfiltered, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners, currentProdutoByCard, duplicadoCardIds]);
 
 
   // Helper function to convert ExpansaoCard to DetailItem
