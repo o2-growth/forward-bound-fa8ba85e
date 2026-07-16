@@ -127,9 +127,10 @@ export function TemperaturaSection(props: AggregateInput) {
             ? `Cards marcados como ${openTemp} no Pipefy (campo Labels / Prioridade Lead) com movimentação no período selecionado. Escopo: ${scopeLabel}.`
             : undefined
         }
-        items={openTemp ? buckets[openTemp] : []}
+        items={openTemp ? bucketsWithCanal[openTemp] : []}
         columns={[
           { key: "name", label: "Empresa" },
+          { key: "canal", label: "Canal" },
           { key: "bu", label: "BU" },
           { key: "product", label: "Produto", format: columnFormatters.product },
           { key: "phase", label: "Fase Atual", format: columnFormatters.phase },
