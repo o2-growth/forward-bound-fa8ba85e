@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DetailSheet, columnFormatters } from "./DetailSheet";
+import { DetailSheet, columnFormatters, type DetailItem } from "./DetailSheet";
 import {
   aggregateByTemperatura,
   type Temperatura,
   type AggregateInput,
 } from "./temperaturaAggregator";
+import { classifyLeadSource, LEAD_SOURCE_LABELS } from "@/lib/leadSource";
 
 const CONFIG: Record<Temperatura, { icon: string; chipClass: string }> = {
   Quente: {
@@ -42,6 +43,32 @@ export function TemperaturaSection(props: AggregateInput) {
       props.endDate,
     ],
   );
+
+  const bucketsWithCanal = useMemo(() => {
+    const result: Record<Temperatura, DetailItem[]> = {
+      Quente: [],
+      Morno: [],
+      Frio: [],
+    };
+    (Object.keys(buckets) as Temperatura[]).forEach((temp) => {
+      result[temp] = buckets[temp].map((item) => {
+        const source = classifyLeadSource({
+          id: item.id,
+          tipoOrigem: item.tipoOrigem,
+          origemLead: item.origemLead,
+          fonte: item.fonte,
+          campanha: item.campanha,
+          sdr: item.sdr,
+          produto: item.product,
+          titulo: item.name,
+          empresa: item.company,
+          bu: item.bu,
+        });
+        return { ...item, canal: LEAD_SOURCE_LABELS[source] };
+      });
+    });
+    return result;
+  }, [buckets]);
 
   if (totalTagged === 0) return null;
 
@@ -100,9 +127,10 @@ export function TemperaturaSection(props: AggregateInput) {
             ? `Cards marcados como ${openTemp} no Pipefy (campo Labels / Prioridade Lead) com movimentação no período selecionado. Escopo: ${scopeLabel}.`
             : undefined
         }
-        items={openTemp ? buckets[openTemp] : []}
+        items={openTemp ? bucketsWithCanal[openTemp] : []}
         columns={[
           { key: "name", label: "Empresa" },
+          { key: "canal", label: "Canal" },
           { key: "bu", label: "BU" },
           { key: "product", label: "Produto", format: columnFormatters.product },
           { key: "phase", label: "Fase Atual", format: columnFormatters.phase },
