@@ -564,6 +564,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
 
         for (const card of allMovements) {
           if (card.fase !== 'Lead' && card.fase !== 'MQL') continue;
+          if (duplicadoCardIds.has(card.id)) continue;
 
           const entryTime = card.dataEntrada.getTime();
           if (entryTime >= startTime && entryTime <= endTime) {
