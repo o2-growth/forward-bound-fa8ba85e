@@ -1,37 +1,36 @@
-# Fallback de Closer = Bruna (Franquia + Oxy Hacker)
+# Temperatura dos Leads — aplicar filtros globais (exceto data)
 
 ## Objetivo
-Todo card das BUs **Expansão Franquia** e **Oxy Hacker** que estiver sem `Closer responsável` preenchido passa a ser tratado como se fosse da **Bruna** em todo o dashboard (filtros, drill-downs, rateios, rankings).
+Hoje a seção "🌡 Temperatura dos Leads" (aba Indicadores › Comercial) só respeita o filtro de **BU**. Passará a respeitar também **Closer**, **SDR** e **Origem/Canal**, continuando a ignorar apenas o filtro de **período** (para manter a visão de pipeline vivo).
 
 ## Escopo
-- Aplica-se APENAS a Franquia e Oxy Hacker.
-- Modelo Atual e O2 TAX continuam intocados.
-- Vale para TODOS os indicadores dessas BUs (MQL, RM, RR, Proposta, Venda) — não só MQL.
-- Vale em qualquer período (não é hardcode só de Jul/2026).
+- Arquivo principal: `src/components/planning/indicators/TemperaturaSection.tsx`
+- Aggregator: `src/components/planning/indicators/temperaturaAggregator.ts`
+- Nenhuma alteração em outras seções, hooks de analytics ou banco.
 
-## Mudança técnica
-Ponto único de enrichment em `src/hooks/useExpansaoAnalytics.ts` (função que resolve `card.closer` a partir dos movimentos do Pipefy, linhas ~498–528):
+## Mudanças
 
-```
-após resolver closer do card:
-  if (!card.closer || card.closer.trim() === '') {
-    if (bu === 'Franquia' || bu === 'Oxy Hacker') {
-      card.closer = 'Bruna';
-    }
-  }
-```
+### 1. `TemperaturaSection` recebe os filtros ativos
+Adicionar props opcionais: `selectedClosers`, `selectedSdrs`, `selectedOrigens` (mesmos tipos já usados no `IndicatorsTab`). O `IndicatorsTab` passa esses arrays ao renderizar `<TemperaturaSection ... />`.
 
-Como todo consumo do filtro Closer em Franquia/Oxy Hacker passa por `card.closer` (via `matchesCloserFilter` em `IndicatorsTab.tsx`), a correção se propaga automaticamente para:
-- Cards de qtd por indicador (linhas 946–963 Oxy, 1481–1496 Franquia).
-- Drill-down (sheet lateral mostrará "Bruna" na coluna Closer para esses cards).
-- Rankings de closer.
-- Rateio monetário por closer.
+### 2. Filtragem por card no aggregator
+Em `aggregateByTemperatura`, após montar `latestById` e antes de empurrar para `buckets`, aplicar (quando o filtro estiver preenchido):
 
-## Efeito esperado (validação)
-- Franquia + Oxy Hacker, 01–16/Jul, filtro Closer=Bruna: MQL passa de **7 → 20**.
-- Sem filtro: totais permanecem iguais (nenhum card é duplicado, só rotulado).
-- Meses futuros com Closer real preenchido no Pipefy: prevalece o valor real; fallback só age quando vazio.
+- **Closer**: comparar com `card.closer` (case-insensitive, partial match — mesma regra do `matchesCloserFilter` do IndicatorsTab). Para Franquia/Oxy Hacker o fallback "Bruna" já vem resolvido no hook, então funciona nativamente.
+- **SDR**: comparar com `card.sdr` (mesma regra).
+- **Origem/Canal**: classificar o card via `classifyLeadSource(...)` (já usado no `bucketsWithCanal`) e checar inclusão em `selectedOrigens`.
 
-## Ressalvas
-- Se no futuro entrar outro closer em Franquia/Oxy Hacker, cards sem preenchimento continuarão indo para Bruna até você pedir mudança. Alternativa (não incluída aqui): usar rateio dinâmico do `closer_metas` do mês. Diga se prefere essa versão.
-- Rankings de closer passarão a inflar a Bruna nesses meses — é o comportamento pedido, mas confirme antes de eu implementar.
+Cards de **Monetização** seguem a mesma lógica; se o filtro de origem estiver ativo e não incluir "Monetização", eles saem.
+
+### 3. Rótulo do escopo
+O texto "Escopo atual: …" passa a listar também os filtros aplicados (ex.: "Modelo Atual + Franquia · Closer: Bruna · Canal: Inbound"), só para deixar claro para o usuário o que está filtrando.
+
+## Fora de escopo
+- Filtro de período continua ignorado (proposital — pipeline em aberto).
+- Nenhuma mudança nos cálculos de Cenário de Caixa (que já consome o mesmo aggregator com `includeAllOpenIgnoringPeriod`). Se você quiser que o Cenário de Caixa **também** respeite Closer/SDR/Origem, me diga que eu incluo — hoje minha proposta é aplicar só na Temperatura dos Leads, como você pediu.
+
+## Validação
+- Sem filtros: contagens idênticas às atuais.
+- Filtro Closer = Bruna: só Quente/Morno/Frio de cards cujo closer resolvido é Bruna.
+- Filtro Canal = Inbound: só cards classificados como Inbound.
+- Combinar BU + Closer + Canal: interseção.
