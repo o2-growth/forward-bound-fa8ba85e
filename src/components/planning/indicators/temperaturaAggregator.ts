@@ -116,6 +116,7 @@ export function aggregateByTemperatura({
   startDate,
   endDate,
   includeAllOpenIgnoringPeriod = false,
+  cardFilter,
 }: AggregateInput): AggregateResult {
   const startTime = startDate.getTime();
   const endTime = new Date(
