@@ -231,6 +231,8 @@ export function aggregateByTemperatura({
       if (!MONETIZACAO_QUENTE_TIPOS.has(card.tipo)) continue;
       // Exclui cards perdidos ou já ganhos (Concluído)
       if (card.perdido || card.ganho || isLostPhase(card.faseAtual) || isWonPhase(card.faseAtual) || isStandbyPhase(card.faseAtual)) continue;
+      // Aplica filtros externos (Closer / SDR / Origem)
+      if (cardFilter && !cardFilter(card, "Monetização")) continue;
       const entradaTime = card.entrada
         ? new Date(card.entrada).getTime()
         : NaN;
