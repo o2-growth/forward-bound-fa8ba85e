@@ -3813,6 +3813,7 @@ export function IndicatorsTab() {
 
 
       {/* Revenue Pace Chart */}
+      <CollapsibleBlock title="Faturamento — Pace vs Meta" storageKey="revenue-pace" defaultOpen={false}>
       {(() => {
         const today = new Date();
         const daysElapsed = Math.min(
