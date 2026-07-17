@@ -513,19 +513,24 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     return (card: ExpansaoCard): ExpansaoCard => {
       const hasSdr = !!(card.sdr && card.sdr.trim());
       const hasCloser = !!(card.closer && card.closer.trim());
-      if (hasSdr && hasCloser) return card;
-      const effSdr = effectiveSdrByCard.get(card.id) || null;
-      const effCloser = effectiveCloserByCard.get(card.id) || null;
-      const newSdr = hasSdr ? card.sdr : effSdr;
-      const newCloser = hasCloser ? card.closer : effCloser;
-      // `responsavel` mantém a regra do parser: Closer || SDR
-      const newResponsavel = card.responsavel || newCloser || newSdr;
-      if (newSdr === card.sdr && newCloser === card.closer && newResponsavel === card.responsavel) {
+      const effSdr = hasSdr ? card.sdr : (effectiveSdrByCard.get(card.id) || null);
+      let effCloser = hasCloser ? card.closer : (effectiveCloserByCard.get(card.id) || null);
+      // Fallback Bruna: em Franquia/Oxy Hacker, todo card sem Closer
+      // preenchido no Pipefy (nem no card atual nem em nenhum movimento
+      // do histórico) é atribuído à Bruna. Escopo garantido: este hook
+      // só roda para Expansão (produto === 'Franquia' | 'Oxy Hacker').
+      if (!effCloser || !String(effCloser).trim()) {
+        if (produto === 'Franquia' || produto === 'Oxy Hacker') {
+          effCloser = 'Bruna';
+        }
+      }
+      const newResponsavel = card.responsavel || effCloser || effSdr;
+      if (effSdr === card.sdr && effCloser === card.closer && newResponsavel === card.responsavel) {
         return card;
       }
-      return { ...card, sdr: newSdr, closer: newCloser, responsavel: newResponsavel };
+      return { ...card, sdr: effSdr, closer: effCloser, responsavel: newResponsavel };
     };
-  }, [effectiveSdrByCard, effectiveCloserByCard]);
+  }, [effectiveSdrByCard, effectiveCloserByCard, produto]);
 
   const getCardsForIndicator = useMemo(() => {
     return (indicator: IndicatorType): ExpansaoCard[] => {
