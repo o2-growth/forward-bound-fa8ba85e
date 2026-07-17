@@ -92,6 +92,11 @@ export interface AggregateInput {
    * Usado no Cenário de Caixa para mostrar todo o pipeline vivo.
    */
   includeAllOpenIgnoringPeriod?: boolean;
+  /**
+   * Predicado opcional aplicado a cada card antes de entrar em Quente/Morno/Frio.
+   * Usado para propagar filtros de Closer / SDR / Origem da aba Indicadores.
+   */
+  cardFilter?: (card: any, buLabel: BuLabel) => boolean;
 }
 
 export interface AggregateResult {
@@ -111,6 +116,7 @@ export function aggregateByTemperatura({
   startDate,
   endDate,
   includeAllOpenIgnoringPeriod = false,
+  cardFilter,
 }: AggregateInput): AggregateResult {
   const startTime = startDate.getTime();
   const endTime = new Date(
@@ -200,6 +206,8 @@ export function aggregateByTemperatura({
       if (anyRowIsLost(rows)) continue;
       // Exclui cards em standby (Contato futuro) — não são pipeline vivo
       if (isStandbyPhase((card as any).faseAtual)) continue;
+      // Aplica filtros externos (Closer / SDR / Origem)
+      if (cardFilter && !cardFilter(card, src.buLabel)) continue;
       if (card.temperatura) {
         const item = src.toDetail(card);
         buckets[card.temperatura as Temperatura].push({
@@ -223,6 +231,8 @@ export function aggregateByTemperatura({
       if (!MONETIZACAO_QUENTE_TIPOS.has(card.tipo)) continue;
       // Exclui cards perdidos ou já ganhos (Concluído)
       if (card.perdido || card.ganho || isLostPhase(card.faseAtual) || isWonPhase(card.faseAtual) || isStandbyPhase(card.faseAtual)) continue;
+      // Aplica filtros externos (Closer / SDR / Origem)
+      if (cardFilter && !cardFilter(card, "Monetização")) continue;
       const entradaTime = card.entrada
         ? new Date(card.entrada).getTime()
         : NaN;
