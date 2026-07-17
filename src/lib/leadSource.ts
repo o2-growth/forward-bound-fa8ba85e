@@ -261,6 +261,12 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   }
 
   // 3) INDICAÇÃO — sinais explícitos
+  // 3.a) "colaborador" em QUALQUER campo textual (ex.: "Colaborador O2" em Origem/Fonte/Campanha).
+  //      Precede as regras de Inbound para não ser capturado pelo token `o2inc`.
+  const colaboradorHay = [tipo, origem, fonte, campanha].filter(Boolean).join(' | ');
+  if (containsAny(colaboradorHay, ['colaborador'])) {
+    return 'indicacao';
+  }
   if (
     containsAny(tipo, ['indicacao', 'cross-sell', 'cross sell', 'cliente', 'colaborador']) ||
     containsAny(origem, ['indicacao', 'cross-sell', 'cross sell', 'ex cliente', 'lead captado pelo', 'cliente'])
