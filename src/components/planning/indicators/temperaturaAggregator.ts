@@ -206,6 +206,8 @@ export function aggregateByTemperatura({
       if (anyRowIsLost(rows)) continue;
       // Exclui cards em standby (Contato futuro) — não são pipeline vivo
       if (isStandbyPhase((card as any).faseAtual)) continue;
+      // Aplica filtros externos (Closer / SDR / Origem)
+      if (cardFilter && !cardFilter(card, src.buLabel)) continue;
       if (card.temperatura) {
         const item = src.toDetail(card);
         buckets[card.temperatura as Temperatura].push({
