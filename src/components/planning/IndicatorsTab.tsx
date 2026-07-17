@@ -498,7 +498,57 @@ const IndicatorChartSection = ({ title, realizedLabel, realizedTotal, metaTotal,
   );
 };
 
+/**
+ * CollapsibleBlock — wrapper leve para tornar qualquer seção da aba
+ * Indicadores recolhível, com header clicável (chevron) por cima do conteúdo.
+ * Estado persistido em localStorage por `storageKey`.
+ */
+const CollapsibleBlock = ({
+  title,
+  storageKey,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  storageKey: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) => {
+  const [isOpen, setIsOpen] = useState(() => {
+    try {
+      const v = localStorage.getItem(`indicators-collapse:${storageKey}`);
+      if (v === null) return defaultOpen;
+      return v === '1';
+    } catch { return defaultOpen; }
+  });
+  const toggle = (v: boolean) => {
+    setIsOpen(v);
+    try { localStorage.setItem(`indicators-collapse:${storageKey}`, v ? '1' : '0'); } catch {}
+  };
+  return (
+    <Collapsible open={isOpen} onOpenChange={toggle} className="w-full">
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-3 py-2 rounded-md border border-border bg-card/40 hover:bg-muted/50 transition-colors mb-2"
+        >
+          <span className="text-sm font-semibold text-foreground">{title}</span>
+          {isOpen ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-4">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
 export function IndicatorsTab() {
+
   const currentYear = new Date().getFullYear();
   // Multi-selection state for BUs (all selected by default = "Consolidado")
   const [selectedBUs, setSelectedBUs] = useState<BUType[]>(['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia']);
