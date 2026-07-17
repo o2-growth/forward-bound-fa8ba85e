@@ -13,7 +13,7 @@ import ComercialPreview from "./pages/ComercialPreview";
 import DebugOrigens from "./pages/DebugOrigens";
 import DebugFunnelMetas from "./pages/DebugFunnelMetas";
 import DebugOutbound from "./pages/DebugOutbound";
-import DebugG4LivesCheck from "./pages/DebugG4LivesCheck";
+
 import NotFound from "./pages/NotFound";
 
 // Defaults agressivos pra evitar refetch desnecessário ao trocar de aba do
@@ -101,14 +101,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DebugOutbound />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/debug/g4-lives-check"
-              element={
-                <ProtectedRoute>
-                  <DebugG4LivesCheck />
                 </ProtectedRoute>
               }
             />
