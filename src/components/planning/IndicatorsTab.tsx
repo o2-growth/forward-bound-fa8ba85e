@@ -3683,7 +3683,7 @@ export function IndicatorsTab() {
         ))}
       </div>
 
-      {/* Temperatura dos Leads (respeita filtro de BU) */}
+      {/* Temperatura dos Leads (respeita filtros de BU, Closer, SDR e Origem) */}
       <TemperaturaSection
         modeloAtualAnalytics={modeloAtualAnalyticsRaw}
         franquiaAnalytics={franquiaAnalytics}
@@ -3693,7 +3693,22 @@ export function IndicatorsTab() {
         selectedBUs={selectedBUs}
         startDate={startDate}
         endDate={endDate}
+        cardFilter={(card, buLabel) => {
+          const closerVal = card?.closer ?? card?.responsible ?? card?.responsavel;
+          const sdrVal = card?.sdr ?? card?.responsavel;
+          if (!matchesCloserFilter(closerVal)) return false;
+          if (!matchesSdrFilter(sdrVal)) return false;
+          if (selectedOrigens.length > 0) {
+            if (buLabel === "Monetização") {
+              if (!selectedOrigens.includes('monetizacao' as any)) return false;
+            } else if (!matchesOrigemFilter(card)) {
+              return false;
+            }
+          }
+          return true;
+        }}
       />
+
 
       {/* Cenário de Caixa (Otimista / Realista) */}
       <CenarioCaixaSection
