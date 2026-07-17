@@ -498,8 +498,13 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
   const { effectiveSdrByCard, effectiveCloserByCard } = useMemo(() => {
     const sdrMap = new Map<string, string>();
     const closerMap = new Map<string, string>();
-    const allMovements = [...cards, ...(fullHistory.length > 0 ? fullHistory : [])];
-    const sorted = allMovements
+    // FIX cross-product: usa allMovementsUnfiltered (todas movimentações,
+    // independente do produto ATUAL). Cards que trocaram de produto no
+    // funil (ex.: Francisco Carlos: Franquia → Oxy Hacker) tinham SDR/
+    // Closer preenchidos em fases quando ainda eram do OUTRO produto;
+    // filtrar por `cards + fullHistory` (que já vêm filtrados por produto)
+    // perdia esses valores e a Venda aparecia sem SDR/Closer.
+    const sorted = allMovementsUnfiltered
       .slice()
       .sort((a, b) => a.dataEntrada.getTime() - b.dataEntrada.getTime());
     for (const mov of sorted) {
@@ -507,7 +512,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       if (mov.closer && mov.closer.trim()) closerMap.set(mov.id, mov.closer.trim());
     }
     return { effectiveSdrByCard: sdrMap, effectiveCloserByCard: closerMap };
-  }, [cards, fullHistory]);
+  }, [allMovementsUnfiltered]);
 
   const enrichCardWithEffectiveOwners = useMemo(() => {
     return (card: ExpansaoCard): ExpansaoCard => {
