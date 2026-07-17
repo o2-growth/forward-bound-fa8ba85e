@@ -498,7 +498,57 @@ const IndicatorChartSection = ({ title, realizedLabel, realizedTotal, metaTotal,
   );
 };
 
+/**
+ * CollapsibleBlock — wrapper leve para tornar qualquer seção da aba
+ * Indicadores recolhível, com header clicável (chevron) por cima do conteúdo.
+ * Estado persistido em localStorage por `storageKey`.
+ */
+const CollapsibleBlock = ({
+  title,
+  storageKey,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  storageKey: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) => {
+  const [isOpen, setIsOpen] = useState(() => {
+    try {
+      const v = localStorage.getItem(`indicators-collapse:${storageKey}`);
+      if (v === null) return defaultOpen;
+      return v === '1';
+    } catch { return defaultOpen; }
+  });
+  const toggle = (v: boolean) => {
+    setIsOpen(v);
+    try { localStorage.setItem(`indicators-collapse:${storageKey}`, v ? '1' : '0'); } catch {}
+  };
+  return (
+    <Collapsible open={isOpen} onOpenChange={toggle} className="w-full">
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-3 py-2 rounded-md border border-border bg-card/40 hover:bg-muted/50 transition-colors mb-2"
+        >
+          <span className="text-sm font-semibold text-foreground">{title}</span>
+          {isOpen ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-4">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
 export function IndicatorsTab() {
+
   const currentYear = new Date().getFullYear();
   // Multi-selection state for BUs (all selected by default = "Consolidado")
   const [selectedBUs, setSelectedBUs] = useState<BUType[]>(['modelo_atual', 'o2_tax', 'oxy_hacker', 'franquia']);
@@ -3677,6 +3727,7 @@ export function IndicatorsTab() {
       />
 
       {/* Comparativo por Closer (card dedicado, respeita Data + BU + filtros de SDR/Closer) */}
+      <CollapsibleBlock title="Comparativo por Closer" storageKey="comparativo-closer" defaultOpen={false}>
       <Card>
         <CardHeader>
           <CardTitle>Comparativo por Closer</CardTitle>
@@ -3700,8 +3751,10 @@ export function IndicatorsTab() {
           />
         </CardContent>
       </Card>
+      </CollapsibleBlock>
 
       {/* Rank de SDRs (vs metas absolutas, com rateio por dias úteis) */}
+      <CollapsibleBlock title="Rank SDRs (vs Meta)" storageKey="rank-sdrs" defaultOpen={false}>
       <Card>
         <CardHeader>
           <CardTitle>Rank SDRs (vs Meta)</CardTitle>
@@ -3720,8 +3773,10 @@ export function IndicatorsTab() {
           />
         </CardContent>
       </Card>
+      </CollapsibleBlock>
 
       {/* Rank de Closers (vs metas absolutas, com rateio por dias úteis) */}
+      <CollapsibleBlock title="Rank Closers (vs Meta)" storageKey="rank-closers" defaultOpen={false}>
       <Card>
         <CardHeader>
           <CardTitle>Rank Closers (vs Meta)</CardTitle>
@@ -3739,10 +3794,12 @@ export function IndicatorsTab() {
           />
         </CardContent>
       </Card>
+      </CollapsibleBlock>
 
       {/* Contratos por Faixa de Faturamento foi movido para dentro do RevenuePaceChart */}
 
       {/* Loss Analysis Section — lazy */}
+      <CollapsibleBlock title="Análise de Perdas" storageKey="loss-analysis" defaultOpen={false}>
       <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-48 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <LossAnalysisSection
         selectedBUs={selectedBUs}
@@ -3752,8 +3809,11 @@ export function IndicatorsTab() {
         franquiaAnalytics={franquiaAnalytics}
       />
       </Suspense>
+      </CollapsibleBlock>
+
 
       {/* Revenue Pace Chart */}
+      <CollapsibleBlock title="Faturamento — Pace vs Meta" storageKey="revenue-pace" defaultOpen={false}>
       {(() => {
         const today = new Date();
         const daysElapsed = Math.min(
@@ -3919,8 +3979,11 @@ export function IndicatorsTab() {
           </Suspense>
         );
       })()}
+      </CollapsibleBlock>
+
 
       {/* New Charts - MQLs, Leads and Funnel */}
+      <CollapsibleBlock title="MQLs, Leads e Funil Clicável" storageKey="mqls-leads-funil" defaultOpen={false}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-4">
           <LeadsMqlsStackedChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
@@ -3928,8 +3991,11 @@ export function IndicatorsTab() {
         </div>
         <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={effectiveSelectedClosers} selectedSDRs={effectiveSelectedSDRs} selectedOrigens={selectedOrigens} monetizacaoPropostaItems={isConsolidado ? getFilteredMonetizacaoItems('proposta') : undefined} monetizacaoVendaItems={isConsolidado ? getFilteredMonetizacaoItems('venda') : undefined} />
       </div>
+      </CollapsibleBlock>
+
 
       {/* Charts Section with View Mode Toggle */}
+      <CollapsibleBlock title="Gráficos de Indicadores" storageKey="graficos-indicadores" defaultOpen={false}>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-foreground">Gráficos de Indicadores</h3>
@@ -3971,8 +4037,10 @@ export function IndicatorsTab() {
           />
         ))}
       </div>
+      </CollapsibleBlock>
 
       {/* Revenue Charts - Barras Agrupadas + Dashboard — lazy */}
+      <CollapsibleBlock title="Comparativo de Faturamento (Barras Agrupadas)" storageKey="revenue-comparison" defaultOpen={false}>
       <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-72 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <RevenueChartComparison
         startDate={startDate}
@@ -3981,14 +4049,18 @@ export function IndicatorsTab() {
         selectedClosers={selectedClosers}
       />
       </Suspense>
+      </CollapsibleBlock>
 
       {/* Funnel Conversion by Revenue Tier Analysis — lazy */}
+      <CollapsibleBlock title="Conversão do Funil por Faixa de Faturamento" storageKey="funnel-by-tier" defaultOpen={false}>
       <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-72 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <FunnelConversionByTierWidget
         getItemsForIndicator={getItemsForIndicator}
         getItemsWithFullHistory={getItemsWithFullHistory}
       />
       </Suspense>
+      </CollapsibleBlock>
+
 
       {(isLoading || isLoadingExpansao || isLoadingO2Tax) && (
         <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
