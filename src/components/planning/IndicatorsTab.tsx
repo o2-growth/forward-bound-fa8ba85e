@@ -2399,6 +2399,7 @@ export function IndicatorsTab() {
           { key: 'company', label: 'Empresa' },
           { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
           { key: 'value', label: 'Valor Total', format: columnFormatters.currency },
+          { key: 'setup', label: 'Setup', format: columnFormatters.currency },
           { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
           { key: 'responsible', label: 'Closer' },
           { key: 'diasEmProposta', label: 'Dias em Proposta', format: columnFormatters.agingWithAlert },
