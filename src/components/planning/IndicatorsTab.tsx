@@ -3727,6 +3727,7 @@ export function IndicatorsTab() {
       />
 
       {/* Comparativo por Closer (card dedicado, respeita Data + BU + filtros de SDR/Closer) */}
+      <CollapsibleBlock title="Comparativo por Closer" storageKey="comparativo-closer" defaultOpen={false}>
       <Card>
         <CardHeader>
           <CardTitle>Comparativo por Closer</CardTitle>
@@ -3750,8 +3751,10 @@ export function IndicatorsTab() {
           />
         </CardContent>
       </Card>
+      </CollapsibleBlock>
 
       {/* Rank de SDRs (vs metas absolutas, com rateio por dias úteis) */}
+      <CollapsibleBlock title="Rank SDRs (vs Meta)" storageKey="rank-sdrs" defaultOpen={false}>
       <Card>
         <CardHeader>
           <CardTitle>Rank SDRs (vs Meta)</CardTitle>
@@ -3770,8 +3773,10 @@ export function IndicatorsTab() {
           />
         </CardContent>
       </Card>
+      </CollapsibleBlock>
 
       {/* Rank de Closers (vs metas absolutas, com rateio por dias úteis) */}
+      <CollapsibleBlock title="Rank Closers (vs Meta)" storageKey="rank-closers" defaultOpen={false}>
       <Card>
         <CardHeader>
           <CardTitle>Rank Closers (vs Meta)</CardTitle>
@@ -3789,10 +3794,12 @@ export function IndicatorsTab() {
           />
         </CardContent>
       </Card>
+      </CollapsibleBlock>
 
       {/* Contratos por Faixa de Faturamento foi movido para dentro do RevenuePaceChart */}
 
       {/* Loss Analysis Section — lazy */}
+      <CollapsibleBlock title="Análise de Perdas" storageKey="loss-analysis" defaultOpen={false}>
       <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-48 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <LossAnalysisSection
         selectedBUs={selectedBUs}
@@ -3802,6 +3809,8 @@ export function IndicatorsTab() {
         franquiaAnalytics={franquiaAnalytics}
       />
       </Suspense>
+      </CollapsibleBlock>
+
 
       {/* Revenue Pace Chart */}
       {(() => {
