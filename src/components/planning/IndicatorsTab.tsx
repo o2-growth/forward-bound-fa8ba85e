@@ -3995,6 +3995,7 @@ export function IndicatorsTab() {
 
 
       {/* Charts Section with View Mode Toggle */}
+      <CollapsibleBlock title="Gráficos de Indicadores" storageKey="graficos-indicadores" defaultOpen={false}>
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-foreground">Gráficos de Indicadores</h3>
@@ -4036,8 +4037,10 @@ export function IndicatorsTab() {
           />
         ))}
       </div>
+      </CollapsibleBlock>
 
       {/* Revenue Charts - Barras Agrupadas + Dashboard — lazy */}
+      <CollapsibleBlock title="Comparativo de Faturamento (Barras Agrupadas)" storageKey="revenue-comparison" defaultOpen={false}>
       <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-72 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <RevenueChartComparison
         startDate={startDate}
@@ -4046,14 +4049,18 @@ export function IndicatorsTab() {
         selectedClosers={selectedClosers}
       />
       </Suspense>
+      </CollapsibleBlock>
 
       {/* Funnel Conversion by Revenue Tier Analysis — lazy */}
+      <CollapsibleBlock title="Conversão do Funil por Faixa de Faturamento" storageKey="funnel-by-tier" defaultOpen={false}>
       <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-72 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
       <FunnelConversionByTierWidget
         getItemsForIndicator={getItemsForIndicator}
         getItemsWithFullHistory={getItemsWithFullHistory}
       />
       </Suspense>
+      </CollapsibleBlock>
+
 
       {(isLoading || isLoadingExpansao || isLoadingO2Tax) && (
         <div className="fixed inset-0 bg-background/50 flex items-center justify-center z-50">
