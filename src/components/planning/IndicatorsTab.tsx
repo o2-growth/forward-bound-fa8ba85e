@@ -3983,6 +3983,7 @@ export function IndicatorsTab() {
 
 
       {/* New Charts - MQLs, Leads and Funnel */}
+      <CollapsibleBlock title="MQLs, Leads e Funil Clicável" storageKey="mqls-leads-funil" defaultOpen={false}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="space-y-4">
           <LeadsMqlsStackedChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={selectedClosers} />
@@ -3990,6 +3991,8 @@ export function IndicatorsTab() {
         </div>
         <ClickableFunnelChart startDate={startDate} endDate={endDate} selectedBU={selectedBU} selectedBUs={selectedBUs} selectedClosers={effectiveSelectedClosers} selectedSDRs={effectiveSelectedSDRs} selectedOrigens={selectedOrigens} monetizacaoPropostaItems={isConsolidado ? getFilteredMonetizacaoItems('proposta') : undefined} monetizacaoVendaItems={isConsolidado ? getFilteredMonetizacaoItems('venda') : undefined} />
       </div>
+      </CollapsibleBlock>
+
 
       {/* Charts Section with View Mode Toggle */}
       <div className="space-y-4">
