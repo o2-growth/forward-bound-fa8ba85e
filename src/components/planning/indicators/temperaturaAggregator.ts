@@ -92,6 +92,11 @@ export interface AggregateInput {
    * Usado no Cenário de Caixa para mostrar todo o pipeline vivo.
    */
   includeAllOpenIgnoringPeriod?: boolean;
+  /**
+   * Predicado opcional aplicado a cada card antes de entrar em Quente/Morno/Frio.
+   * Usado para propagar filtros de Closer / SDR / Origem da aba Indicadores.
+   */
+  cardFilter?: (card: any, buLabel: BuLabel) => boolean;
 }
 
 export interface AggregateResult {
