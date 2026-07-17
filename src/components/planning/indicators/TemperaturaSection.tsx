@@ -41,6 +41,7 @@ export function TemperaturaSection(props: AggregateInput) {
       props.selectedBUs,
       props.startDate,
       props.endDate,
+      props.cardFilter,
     ],
   );
 
