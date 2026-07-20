@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { ExternalLink } from "lucide-react";
 import { DetailItem } from "./DetailSheet";
 import { normalizeTier, TIER_ORDER, INVESTMENT_TIER_ORDER } from "@/lib/revenueTiers";
 import { firstNameKey } from "@/hooks/useCloserAbsoluteMetas";
@@ -148,6 +150,40 @@ export function CloserPerformanceMatrix({
 
   const periodo = `${startDate.toLocaleDateString("pt-BR")} – ${endDate.toLocaleDateString("pt-BR")}`;
 
+  // ---- Drill-down state ----
+  type DrillKind = "rr" | "venda" | "elab";
+  type Drill = { kind: DrillKind; tier: string | null; closerKey: string | null };
+  const [drill, setDrill] = useState<Drill | null>(null);
+
+  const keyOf = (raw: string) => raw ? (firstNameKey(raw) || raw.toLowerCase()) : NONE_KEY;
+
+  const drillItems = useMemo<DetailItem[]>(() => {
+    if (!drill) return [];
+    const base = drill.kind === "rr" ? (itemsByIndicator["rr"] || [])
+      : drill.kind === "venda" ? (itemsByIndicator["venda"] || [])
+      : (itemsByIndicator["proposta"] || []).filter(it => (it.phase || "").toLowerCase().includes("elabora"));
+    return base.filter(it => {
+      const okTier = drill.tier == null || normalizeTier(it.revenueRange) === drill.tier;
+      const okCloser = drill.closerKey == null || keyOf((it.closer || "").trim()) === drill.closerKey;
+      return okTier && okCloser;
+    });
+  }, [drill, itemsByIndicator]);
+
+  const openDrill = (kind: DrillKind, count: number, tier: string | null, closerKey: string | null) => {
+    if (!count) return;
+    setDrill({ kind, tier, closerKey });
+  };
+
+  const closerLabel = (k: string | null) => {
+    if (!k) return "Equipe";
+    const c = closers.find(x => x.key === k);
+    return c?.display || "—";
+  };
+  const kindLabel = (k: DrillKind) => k === "rr" ? "Reuniões" : k === "venda" ? "Vendas" : "Em elaboração";
+
+  const clickableCls = "cursor-pointer hover:bg-primary/10 rounded transition-colors";
+
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
@@ -188,11 +224,17 @@ export function CloserPerformanceMatrix({
                       <span className="text-sm font-normal text-muted-foreground ml-1">conv.</span>
                     </div>
                     <div className="mt-2 text-xs text-muted-foreground flex gap-3 flex-wrap">
-                      <span>Reun. <b className="text-foreground">{totals[c.key].reu}</b></span>
-                      <span>Vendas <b className="text-foreground">{totals[c.key].ven}</b></span>
+                      <span>Reun. {totals[c.key].reu ? (
+                        <button type="button" className={`px-1 ${clickableCls} text-foreground font-semibold`} onClick={() => openDrill("rr", totals[c.key].reu, null, c.key)}>{totals[c.key].reu}</button>
+                      ) : <b className="text-foreground">0</b>}</span>
+                      <span>Vendas {totals[c.key].ven ? (
+                        <button type="button" className={`px-1 ${clickableCls} text-foreground font-semibold`} onClick={() => openDrill("venda", totals[c.key].ven, null, c.key)}>{totals[c.key].ven}</button>
+                      ) : <b className="text-foreground">0</b>}</span>
                     </div>
                     <div className="mt-1 text-[11px] text-muted-foreground">
-                      Em elaboração: <b className="text-foreground">{elab}</b>
+                      Em elaboração: {elab ? (
+                        <button type="button" className={`px-1 ${clickableCls} text-foreground font-semibold`} onClick={() => openDrill("elab", elab, null, c.key)}>{elab}</button>
+                      ) : <b className="text-foreground">0</b>}
                       {projConv !== null && (
                         <> (viraria <b className="text-foreground">{fmtPct(projConv)}</b> se fechados)</>
                       )}
@@ -239,8 +281,18 @@ export function CloserPerformanceMatrix({
                           const p = pct(cell.ven, cell.reu);
                           return (
                             <>
-                              <td key={`${t}-${c.key}-r`} className="text-right px-2 py-2 border-l">{cell.reu || <span className="text-muted-foreground/40">—</span>}</td>
-                              <td key={`${t}-${c.key}-v`} className="text-right px-2 py-2">{cell.reu ? cell.ven : <span className="text-muted-foreground/40">—</span>}</td>
+                              <td key={`${t}-${c.key}-r`} className="text-right px-2 py-2 border-l">
+                                {cell.reu ? (
+                                  <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("rr", cell.reu, t, c.key)} title="Ver cards">{cell.reu}</button>
+                                ) : <span className="text-muted-foreground/40">—</span>}
+                              </td>
+                              <td key={`${t}-${c.key}-v`} className="text-right px-2 py-2">
+                                {cell.reu ? (
+                                  cell.ven ? (
+                                    <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("venda", cell.ven, t, c.key)} title="Ver cards">{cell.ven}</button>
+                                  ) : cell.ven
+                                ) : <span className="text-muted-foreground/40">—</span>}
+                              </td>
                               <td key={`${t}-${c.key}-p`} className="text-right px-2 py-2">
                                 {cell.reu ? (
                                   <span className="inline-flex items-center gap-1.5 justify-end">
@@ -260,8 +312,18 @@ export function CloserPerformanceMatrix({
                           const p = pct(cell.ven, cell.reu);
                           return (
                             <>
-                              <td className="text-right px-2 py-2 border-l">{cell.reu || <span className="text-muted-foreground/40">—</span>}</td>
-                              <td className="text-right px-2 py-2">{cell.reu ? cell.ven : <span className="text-muted-foreground/40">—</span>}</td>
+                              <td className="text-right px-2 py-2 border-l">
+                                {cell.reu ? (
+                                  <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("rr", cell.reu, t, null)} title="Ver cards">{cell.reu}</button>
+                                ) : <span className="text-muted-foreground/40">—</span>}
+                              </td>
+                              <td className="text-right px-2 py-2">
+                                {cell.reu ? (
+                                  cell.ven ? (
+                                    <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("venda", cell.ven, t, null)} title="Ver cards">{cell.ven}</button>
+                                  ) : cell.ven
+                                ) : <span className="text-muted-foreground/40">—</span>}
+                              </td>
                               <td className="text-right px-2 py-2">
                                 {cell.reu ? (
                                   <span className="inline-flex items-center gap-1.5 justify-end">
@@ -285,8 +347,16 @@ export function CloserPerformanceMatrix({
                         const p = pct(cell.ven, cell.reu);
                         return (
                           <>
-                            <td key={`tot-${c.key}-r`} className="text-right px-2 py-2.5 border-l">{cell.reu}</td>
-                            <td key={`tot-${c.key}-v`} className="text-right px-2 py-2.5">{cell.ven}</td>
+                            <td key={`tot-${c.key}-r`} className="text-right px-2 py-2.5 border-l">
+                              {cell.reu ? (
+                                <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("rr", cell.reu, null, c.key)} title="Ver cards">{cell.reu}</button>
+                              ) : cell.reu}
+                            </td>
+                            <td key={`tot-${c.key}-v`} className="text-right px-2 py-2.5">
+                              {cell.ven ? (
+                                <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("venda", cell.ven, null, c.key)} title="Ver cards">{cell.ven}</button>
+                              ) : cell.ven}
+                            </td>
                             <td key={`tot-${c.key}-p`} className="text-right px-2 py-2.5">
                               <span className="inline-flex items-center gap-1.5 justify-end">
                                 <span className="inline-block w-8 h-1.5 rounded bg-muted overflow-hidden">
@@ -298,8 +368,16 @@ export function CloserPerformanceMatrix({
                           </>
                         );
                       })}
-                      <td className="text-right px-2 py-2.5 border-l">{teamTotal.reu}</td>
-                      <td className="text-right px-2 py-2.5">{teamTotal.ven}</td>
+                      <td className="text-right px-2 py-2.5 border-l">
+                        {teamTotal.reu ? (
+                          <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("rr", teamTotal.reu, null, null)} title="Ver cards">{teamTotal.reu}</button>
+                        ) : teamTotal.reu}
+                      </td>
+                      <td className="text-right px-2 py-2.5">
+                        {teamTotal.ven ? (
+                          <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("venda", teamTotal.ven, null, null)} title="Ver cards">{teamTotal.ven}</button>
+                        ) : teamTotal.ven}
+                      </td>
                       <td className="text-right px-2 py-2.5">
                         <span className="inline-flex items-center gap-1.5 justify-end">
                           <span className="inline-block w-8 h-1.5 rounded bg-muted overflow-hidden">
@@ -312,6 +390,7 @@ export function CloserPerformanceMatrix({
                   </tbody>
                 </table>
               </div>
+
             </div>
 
             {/* Contratos em elaboração */}
@@ -355,6 +434,56 @@ export function CloserPerformanceMatrix({
           </>
         )}
       </DialogContent>
+
+      {/* Drill-down: cards por trás de cada célula */}
+      <Sheet open={!!drill} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+          {drill && (
+            <>
+              <SheetHeader>
+                <SheetTitle>
+                  {kindLabel(drill.kind)}
+                  {drill.tier && <> · {drill.tier}</>}
+                  {" · "}{closerLabel(drill.closerKey)}
+                  <span className="ml-2 text-muted-foreground font-normal">({drillItems.length})</span>
+                </SheetTitle>
+                <SheetDescription>{periodo}</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 divide-y">
+                {drillItems.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-6 text-center">Nenhum card.</div>
+                ) : drillItems.map((it) => {
+                  const pipefyUrl = `https://app.pipefy.com/open-cards/${it.id}`;
+                  const dateStr = it.date ? new Date(it.date).toLocaleDateString("pt-BR") : "—";
+                  return (
+                    <div key={it.id} className="py-2.5 text-sm flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{it.company || it.name || "—"}</div>
+                        <div className="text-xs text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                          <span>{normalizeTier(it.revenueRange)}</span>
+                          <span>· Closer: {(it.closer || "").trim() || "Sem Closer"}</span>
+                          {it.sdr && <span>· SDR: {it.sdr}</span>}
+                          <span>· {dateStr}</span>
+                        </div>
+                      </div>
+                      <a
+                        href={pipefyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        title="Abrir no Pipefy"
+                      >
+                        Pipefy <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </Dialog>
   );
 }
+
