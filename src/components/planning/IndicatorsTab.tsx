@@ -2202,6 +2202,7 @@ export function IndicatorsTab() {
           { key: 'canal', label: 'Canal' },
           { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
           { key: 'date', label: 'Data', format: columnFormatters.date },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
         ]);
         const itemsWithCanal = items.map(i => ({
           ...i,
@@ -2336,6 +2337,7 @@ export function IndicatorsTab() {
           { key: 'diasComoMQL', label: 'Dias como MQL', format: columnFormatters.diasAteAgendar },
           { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
           { key: 'date', label: 'Data', format: columnFormatters.date },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
         ]);
         setDetailSheetItems(itemsWithCalcs);
         setDetailSheetFilterCriteria([
@@ -2700,6 +2702,7 @@ export function IndicatorsTab() {
           { key: 'company', label: 'Empresa' },
           { key: 'canal', label: 'Canal' },
           { key: 'dataAssinatura', label: 'Data Assinatura', format: columnFormatters.date },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
           { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
           { key: 'setup', label: 'Setup', format: columnFormatters.currency },
           { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
@@ -2764,6 +2767,7 @@ export function IndicatorsTab() {
       { key: 'product', label: 'Produto', format: columnFormatters.product },
       { key: 'company', label: 'Empresa/Contato' },
       { key: 'date', label: 'Data', format: columnFormatters.date },
+      { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       { key: 'duration', label: 'Tempo na Fase', format: columnFormatters.duration },
     ];
 
@@ -3210,6 +3214,7 @@ export function IndicatorsTab() {
         { key: 'sla', label: 'Tempo SLA', format: columnFormatters.slaWithStatus },
         { key: 'responsible', label: 'SDR' },
         { key: 'date', label: 'Data', format: columnFormatters.date },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       ]);
       // Sort by SLA descending (worst first = coaching)
       setDetailSheetItems(tentativasCards.sort((a, b) => (b.sla || 0) - (a.sla || 0)));
@@ -3286,6 +3291,7 @@ export function IndicatorsTab() {
         { key: 'value', label: 'Total', format: columnFormatters.currency },
         { key: 'percentualTotal', label: '% do Fat.', format: columnFormatters.percentualTotal },
         { key: 'responsible', label: 'Closer' },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.value || 0) - (a.value || 0)));
       setDetailSheetFilterCriteria([]);
@@ -3357,6 +3363,7 @@ export function IndicatorsTab() {
         { key: 'value', label: 'Total Contrato', format: columnFormatters.currency },
         { key: 'responsible', label: 'Closer' },
         { key: 'date', label: 'Data', format: columnFormatters.date },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.mrr || 0) - (a.mrr || 0)));
       setDetailSheetFilterCriteria([]);
@@ -3418,6 +3425,7 @@ export function IndicatorsTab() {
         { key: 'value', label: 'Total Contrato', format: columnFormatters.currency },
         { key: 'responsible', label: 'Closer' },
         { key: 'date', label: 'Data', format: columnFormatters.date },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.setup || 0) - (a.setup || 0)));
       setDetailSheetFilterCriteria([]);
@@ -3479,6 +3487,7 @@ export function IndicatorsTab() {
         { key: 'value', label: 'Total Contrato', format: columnFormatters.currency },
         { key: 'responsible', label: 'Closer' },
         { key: 'date', label: 'Data', format: columnFormatters.date },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.pontual || 0) - (a.pontual || 0)));
       setDetailSheetFilterCriteria([]);
