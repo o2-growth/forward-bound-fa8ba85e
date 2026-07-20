@@ -150,6 +150,40 @@ export function CloserPerformanceMatrix({
 
   const periodo = `${startDate.toLocaleDateString("pt-BR")} – ${endDate.toLocaleDateString("pt-BR")}`;
 
+  // ---- Drill-down state ----
+  type DrillKind = "rr" | "venda" | "elab";
+  type Drill = { kind: DrillKind; tier: string | null; closerKey: string | null };
+  const [drill, setDrill] = useState<Drill | null>(null);
+
+  const keyOf = (raw: string) => raw ? (firstNameKey(raw) || raw.toLowerCase()) : NONE_KEY;
+
+  const drillItems = useMemo<DetailItem[]>(() => {
+    if (!drill) return [];
+    const base = drill.kind === "rr" ? (itemsByIndicator["rr"] || [])
+      : drill.kind === "venda" ? (itemsByIndicator["venda"] || [])
+      : (itemsByIndicator["proposta"] || []).filter(it => (it.phase || "").toLowerCase().includes("elabora"));
+    return base.filter(it => {
+      const okTier = drill.tier == null || normalizeTier(it.revenueRange) === drill.tier;
+      const okCloser = drill.closerKey == null || keyOf((it.closer || "").trim()) === drill.closerKey;
+      return okTier && okCloser;
+    });
+  }, [drill, itemsByIndicator]);
+
+  const openDrill = (kind: DrillKind, count: number, tier: string | null, closerKey: string | null) => {
+    if (!count) return;
+    setDrill({ kind, tier, closerKey });
+  };
+
+  const closerLabel = (k: string | null) => {
+    if (!k) return "Equipe";
+    const c = closers.find(x => x.key === k);
+    return c?.display || "—";
+  };
+  const kindLabel = (k: DrillKind) => k === "rr" ? "Reuniões" : k === "venda" ? "Vendas" : "Em elaboração";
+
+  const clickableCls = "cursor-pointer hover:bg-primary/10 rounded transition-colors";
+
+
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
