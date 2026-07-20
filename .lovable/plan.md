@@ -1,29 +1,44 @@
-# Separar "Captação de Recursos" de "Assessoria Financeira"
+# Drill-down "Performance de Closers por Faixa" no Rank Closers
 
-## Causa raiz
+Cria um modal que abre ao clicar em qualquer linha do card **Rank Closers (vs Meta)** em Indicadores › Comercial, reproduzindo o layout do HTML enviado com dados reais do dashboard (respeitando os filtros ativos de BU, período, SDR, etc.).
 
-Em `src/lib/productClassifier.ts` (linha 68), a regra `if (n.includes('assessoria'))` captura **qualquer** produto com a palavra "assessoria", incluindo "Assessoria de Captação de Recursos". Resultado: clientes como **Spa Med** aparecem no dashboard como *Assessoria Financeira*, quando no Pipefy o produto real é *Assessoria de Captação de Recursos*.
+## Arquivos
 
-## O que fazer
+### 1. `src/components/planning/indicators/CloserPerformanceMatrix.tsx` (novo)
+Modal (`Dialog` do shadcn) com o layout de referência:
+- **KPI tiles** (um por closer): total de Reuniões, Vendas, % Conversão, contratos em elaboração.
+- **Tabela matriz** — linhas = faixas de faturamento (normalizadas via `normalizeTier` de `src/lib/revenueTiers.ts`), colunas agrupadas por closer + coluna "Equipe" com Reuniões / Vendas / % Fechamento e mini barra de progresso.
+- **Bloco "Contratos em elaboração"** — lista cards da fase `Contrato em elaboração` (já mapeada em `useModeloAtualAnalytics` / `useO2TaxAnalytics`) por closer, com projeção do "se todos fecharem".
+- Rodapé com critérios (Reunião = card em Reuniões Realizadas; Venda = Ganho + Contrato assinado; Contrato em elaboração exibido separado).
 
-### 1. `src/lib/productClassifier.ts`
-- Adicionar `'Captação de Recursos'` ao tipo `ProductCategory` e ao array `PRODUCT_CATEGORIES` (posição antes de Assessoria Financeira).
-- Em `classifyProduto`, **antes** da regra de `assessoria`, adicionar:
-  - `if (n.includes('captacao'))  return 'Captação de Recursos';`
-  - (a normalização `norm()` já remove acentos, então "captação" → "captacao")
-- Estreitar a regra de Assessoria Financeira para exigir explicitamente `n.includes('financeira')` (ou padrão `assessoria financeira`) — evita futuros falsos positivos de outras "assessorias".
+Props: `open`, `onClose`, `itemsByIndicator` (o mesmo já usado em `PersonRanking`), `elaboracaoItems` (novo — ver item 3), `highlightCloser?: string` para dar destaque visual quando o usuário clicou numa linha específica.
 
-### 2. `src/components/planning/indicators/DetailSheet.tsx` (linha ~310)
-- Adicionar cor de badge para `'Captação de Recursos'` (ex.: `bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200`) para exibição consistente com as demais categorias.
+Cálculo interno:
+- `reunioes[closer][tier]` = itens de `itemsByIndicator['rr']` no período, agrupados por `firstNameKey(item.closer)` × `normalizeTier(item.revenueRange)`.
+- `vendas[closer][tier]` = itens de `itemsByIndicator['venda']` (mesma lógica).
+- `%` = vendas ÷ reuniões (— quando reuniões = 0).
+- Totais por closer, por faixa e geral.
 
-## O que NÃO muda
+### 2. `src/components/planning/indicators/PersonRanking.tsx` (editar)
+- Adicionar prop opcional `onRowClick?: (closerName: string) => void`.
+- Quando `role === 'closer'` e `onRowClick` existir, tornar a `<tr>` clicável (`cursor-pointer`) e disparar o callback.
+- Sem mudanças no cálculo existente.
 
-- Nenhuma lógica de `useJornadaData.ts` referente a `temAssessoriaFinanceira` / pipe dedicado de Assessoria Financeira — o pipe `pipefy_moviment_assessoria_financeira` continua marcando somente quem realmente é da Assessoria Financeira (já usa string exata na fonte).
-- Filtros de BU, MRR, metas e cálculos monetários — só o **rótulo** do produto muda.
-- Nenhuma migração de banco necessária.
+### 3. `src/components/planning/IndicatorsTab.tsx` (editar)
+Nas duas ocorrências do `<PersonRanking role="closer" …>` (Rank Closers em Comercial):
+- Estado local `closerDrillOpen` + `closerDrillHighlight`.
+- Passar `onRowClick={(name) => { setCloserDrillHighlight(name); setCloserDrillOpen(true); }}`.
+- Renderizar `<CloserPerformanceMatrix open={…} onClose={…} itemsByIndicator={…} elaboracaoItems={…} highlightCloser={…} />`.
+- `elaboracaoItems`: extrair da mesma agregação que já monta `itemsByIndicator`, filtrando cards cuja fase atual seja "Contrato em elaboração" (fase já existente nos hooks Modelo Atual / O2 TAX).
+
+## Fora de escopo
+
+- Nada em `useModeloAtualAnalytics` / `useO2TaxAnalytics` / banco: reutiliza `itemsByIndicator` já calculado.
+- Sem alteração no card SDR nem em outras abas.
+- Sem endpoint novo, sem migração.
 
 ## Validação
 
-- Recarregar Indicadores › drill-down do cliente Spa Med → coluna Produto deve mostrar **Captação de Recursos**.
-- Filtro de Produto na aba NPS / Jornada deve listar "Captação de Recursos" como opção independente.
-- Clientes que hoje aparecem corretamente como Assessoria Financeira (via pipe dedicado) devem continuar como Assessoria Financeira.
+- Filtrar consolidado → abrir Rank Closers → clicar em qualquer linha → modal deve abrir com números coerentes: soma da coluna "Equipe" deve bater com o total de RR e Vendas dos gauges do topo.
+- Trocar filtro para uma BU específica → totais no modal devem refletir só aquela BU.
+- Fechar e reabrir → estado limpo.
