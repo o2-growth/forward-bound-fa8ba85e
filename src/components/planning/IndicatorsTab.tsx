@@ -2202,6 +2202,7 @@ export function IndicatorsTab() {
           { key: 'canal', label: 'Canal' },
           { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
           { key: 'date', label: 'Data', format: columnFormatters.date },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
         ]);
         const itemsWithCanal = items.map(i => ({
           ...i,
