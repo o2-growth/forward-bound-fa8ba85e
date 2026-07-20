@@ -37,6 +37,8 @@ interface PersonRankingProps {
   endDate: Date;
   /** BUs filtradas (usado para somar metas de SDR por BU). */
   selectedBUs: string[];
+  /** Se fornecido, cada linha vira clicável e dispara com o nome de exibição. */
+  onRowClick?: (displayName: string) => void;
 }
 
 function getPersonName(item: DetailItem, role: Role): { display: string; group: string } {
@@ -109,7 +111,7 @@ function sumProrated(monthly: Record<string, number>, factors: MonthFactor[]): n
   return total;
 }
 
-export function PersonRanking({ role, itemsByIndicator, startDate, endDate, selectedBUs }: PersonRankingProps) {
+export function PersonRanking({ role, itemsByIndicator, startDate, endDate, selectedBUs, onRowClick }: PersonRankingProps) {
   const roleLabel = role === 'sdr' ? 'SDR' : 'Closer';
   const sdrMetasHook = useSdrMetas();
   const closerAbsHook = useCloserAbsoluteMetas();
@@ -229,7 +231,12 @@ export function PersonRanking({ role, itemsByIndicator, startDate, endDate, sele
               : pos === 3 ? 'bg-orange-600/20 text-orange-700 dark:text-orange-300 border-orange-600/40'
               : 'bg-muted/40 text-muted-foreground border-muted-foreground/20';
             return (
-              <tr key={r.display} className="border-b last:border-b-0 hover:bg-muted/20">
+              <tr
+                key={r.display}
+                onClick={onRowClick ? () => onRowClick(r.display) : undefined}
+                className={`border-b last:border-b-0 hover:bg-muted/20 ${onRowClick ? "cursor-pointer" : ""}`}
+                title={onRowClick ? "Clique para ver performance por faixa de faturamento" : undefined}
+              >
                 <td className="px-2 py-2">
                   <Badge variant="outline" className={posColor}>{pos}º</Badge>
                 </td>

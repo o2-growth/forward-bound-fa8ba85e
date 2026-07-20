@@ -56,6 +56,7 @@ const RevenuePaceChart = lazy(() => import("./indicators/RevenuePaceChart").then
 
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
+import { CloserPerformanceMatrix } from "./indicators/CloserPerformanceMatrix";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
 import { aggregateByTemperatura } from "./indicators/temperaturaAggregator";
 
@@ -563,6 +564,8 @@ export function IndicatorsTab() {
   const [viewMode, setViewMode] = useState<ViewMode>('daily');
   const [cardInvestigatorOpen, setCardInvestigatorOpen] = useState(false);
   const [commercialPaceOpen, setCommercialPaceOpen] = useState(false);
+  const [closerMatrixOpen, setCloserMatrixOpen] = useState(false);
+  const [closerMatrixHighlight, setCloserMatrixHighlight] = useState<string | undefined>(undefined);
 
   // Handle date change from DateRangePickerGA
   const handleDateRangeChange = (start: Date, end: Date) => {
@@ -3806,10 +3809,23 @@ export function IndicatorsTab() {
             startDate={startDate}
             endDate={endDate}
             selectedBUs={selectedBUs}
+            onRowClick={(name) => { setCloserMatrixHighlight(name); setCloserMatrixOpen(true); }}
           />
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Clique em uma linha para ver a matriz de conversão por faixa de faturamento.
+          </p>
         </CardContent>
       </Card>
       </CollapsibleBlock>
+
+      <CloserPerformanceMatrix
+        open={closerMatrixOpen}
+        onClose={() => setCloserMatrixOpen(false)}
+        itemsByIndicator={itemsByIndicator}
+        startDate={startDate}
+        endDate={endDate}
+        highlightCloser={closerMatrixHighlight}
+      />
 
       {/* Contratos por Faixa de Faturamento foi movido para dentro do RevenuePaceChart */}
 
