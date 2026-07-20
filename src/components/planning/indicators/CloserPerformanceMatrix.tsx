@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { ExternalLink } from "lucide-react";
 import { DetailItem } from "./DetailSheet";
 import { normalizeTier, TIER_ORDER, INVESTMENT_TIER_ORDER } from "@/lib/revenueTiers";
 import { firstNameKey } from "@/hooks/useCloserAbsoluteMetas";
