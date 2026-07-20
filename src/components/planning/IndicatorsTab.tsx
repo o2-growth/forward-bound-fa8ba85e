@@ -2767,6 +2767,7 @@ export function IndicatorsTab() {
       { key: 'product', label: 'Produto', format: columnFormatters.product },
       { key: 'company', label: 'Empresa/Contato' },
       { key: 'date', label: 'Data', format: columnFormatters.date },
+      { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       { key: 'duration', label: 'Tempo na Fase', format: columnFormatters.duration },
     ];
 
