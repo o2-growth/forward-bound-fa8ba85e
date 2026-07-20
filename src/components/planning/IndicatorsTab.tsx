@@ -3362,6 +3362,7 @@ export function IndicatorsTab() {
         { key: 'value', label: 'Total Contrato', format: columnFormatters.currency },
         { key: 'responsible', label: 'Closer' },
         { key: 'date', label: 'Data', format: columnFormatters.date },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.mrr || 0) - (a.mrr || 0)));
       setDetailSheetFilterCriteria([]);
