@@ -37,21 +37,19 @@ function fmtPct(v: number): string {
 export function CloserPerformanceMatrix({
   open, onClose, itemsByIndicator, startDate, endDate, highlightCloser,
 }: Props) {
-  const startTime = startDate.getTime();
-  const endTime = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999).getTime();
-
   const data = useMemo(() => {
+    // Items already filtered upstream (BU/closer/SDR/origem/período) — não refiltrar aqui.
     const reunioes = itemsByIndicator["rr"] || [];
     const vendas = itemsByIndicator["venda"] || [];
     const propostas = itemsByIndicator["proposta"] || [];
 
-    // 1) Descobrir closers ativos (com pelo menos 1 reunião OU venda no período)
-    const closerMap = new Map<string, string>(); // key -> display
+    // 1) Closers ativos (com pelo menos 1 reunião OU venda). Sem Closer vira balde próprio.
+    const closerMap = new Map<string, string>();
+    let hasNoCloser = false;
     const bump = (arr: DetailItem[]) => {
       for (const it of arr) {
-        if (!inRange(it.date, startTime, endTime)) continue;
         const raw = (it.closer || "").trim();
-        if (!raw) continue;
+        if (!raw) { hasNoCloser = true; continue; }
         const k = firstNameKey(raw) || raw.toLowerCase();
         const prev = closerMap.get(k);
         if (!prev || raw.length > prev.length) closerMap.set(k, raw);
@@ -62,14 +60,12 @@ export function CloserPerformanceMatrix({
     const closers = Array.from(closerMap.entries())
       .map(([key, display]) => ({ key, display }))
       .sort((a, b) => a.display.localeCompare(b.display));
+    if (hasNoCloser) closers.push({ key: NONE_KEY, display: NONE_DISPLAY });
 
-    // 2) Descobrir faixas usadas
+    // 2) Faixas usadas
     const tierSet = new Set<string>();
     const addTiers = (arr: DetailItem[]) => {
-      for (const it of arr) {
-        if (!inRange(it.date, startTime, endTime)) continue;
-        tierSet.add(normalizeTier(it.revenueRange));
-      }
+      for (const it of arr) tierSet.add(normalizeTier(it.revenueRange));
     };
     addTiers(reunioes); addTiers(vendas);
 
@@ -79,24 +75,21 @@ export function CloserPerformanceMatrix({
     }
     if (tierSet.has("Não informado")) orderedTiers.push("Não informado");
 
-    // 3) Matriz [tier][closerKey] = {reu, ven}
+    // 3) Matriz
     type Cell = { reu: number; ven: number };
     const matrix: Record<string, Record<string, Cell>> = {};
     for (const t of orderedTiers) {
       matrix[t] = {};
       for (const c of closers) matrix[t][c.key] = { reu: 0, ven: 0 };
     }
+    const keyOf = (raw: string) => raw ? (firstNameKey(raw) || raw.toLowerCase()) : NONE_KEY;
     for (const it of reunioes) {
-      if (!inRange(it.date, startTime, endTime)) continue;
-      const raw = (it.closer || "").trim(); if (!raw) continue;
-      const k = firstNameKey(raw) || raw.toLowerCase();
+      const k = keyOf((it.closer || "").trim());
       const t = normalizeTier(it.revenueRange);
       if (matrix[t]?.[k]) matrix[t][k].reu++;
     }
     for (const it of vendas) {
-      if (!inRange(it.date, startTime, endTime)) continue;
-      const raw = (it.closer || "").trim(); if (!raw) continue;
-      const k = firstNameKey(raw) || raw.toLowerCase();
+      const k = keyOf((it.closer || "").trim());
       const t = normalizeTier(it.revenueRange);
       if (matrix[t]?.[k]) matrix[t][k].ven++;
     }
@@ -120,7 +113,7 @@ export function CloserPerformanceMatrix({
       if (seen.has(it.id)) continue;
       seen.add(it.id);
       const raw = (it.closer || "").trim();
-      const k = raw ? (firstNameKey(raw) || raw.toLowerCase()) : "__none__";
+      const k = keyOf(raw);
       if (!elabByCloser[k]) elabByCloser[k] = [];
       elabByCloser[k].push(it);
     }
@@ -138,8 +131,14 @@ export function CloserPerformanceMatrix({
     const teamTotal: Cell = { reu: 0, ven: 0 };
     for (const c of closers) { teamTotal.reu += totals[c.key].reu; teamTotal.ven += totals[c.key].ven; }
 
+    if (typeof window !== "undefined") {
+      // Diagnóstico: total de reuniões que a matriz enxerga (deve bater com o acelerômetro RR)
+      // eslint-disable-next-line no-console
+      console.debug("[CloserMatrix] reuniões=", reunioes.length, "vendas=", vendas.length, "semCloser=", (reunioes.filter(r => !(r.closer || "").trim())).length);
+    }
+
     return { closers, tiers: orderedTiers, matrix, totals, elabByCloser, teamByTier, teamTotal };
-  }, [itemsByIndicator, startTime, endTime]);
+  }, [itemsByIndicator]);
 
   const { closers, tiers, matrix, totals, elabByCloser, teamByTier, teamTotal } = data;
 
