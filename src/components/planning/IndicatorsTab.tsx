@@ -3290,6 +3290,7 @@ export function IndicatorsTab() {
         { key: 'value', label: 'Total', format: columnFormatters.currency },
         { key: 'percentualTotal', label: '% do Fat.', format: columnFormatters.percentualTotal },
         { key: 'responsible', label: 'Closer' },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       ]);
       setDetailSheetItems(itemsWithPct.sort((a, b) => (b.value || 0) - (a.value || 0)));
       setDetailSheetFilterCriteria([]);
