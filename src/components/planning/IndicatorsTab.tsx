@@ -3213,6 +3213,7 @@ export function IndicatorsTab() {
         { key: 'sla', label: 'Tempo SLA', format: columnFormatters.slaWithStatus },
         { key: 'responsible', label: 'SDR' },
         { key: 'date', label: 'Data', format: columnFormatters.date },
+        { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
       ]);
       // Sort by SLA descending (worst first = coaching)
       setDetailSheetItems(tentativasCards.sort((a, b) => (b.sla || 0) - (a.sla || 0)));
