@@ -1,44 +1,21 @@
-# Drill-down "Performance de Closers por Faixa" no Rank Closers
+## Revisão da hipótese
 
-Cria um modal que abre ao clicar em qualquer linha do card **Rank Closers (vs Meta)** em Indicadores › Comercial, reproduzindo o layout do HTML enviado com dados reais do dashboard (respeitando os filtros ativos de BU, período, SDR, etc.).
+Você tem razão — se só há 5 sem Closer, o gap (79 vs 59 = 20) não vem daí. O que realmente acontece é que **o acelerômetro e a matriz usam fontes diferentes**:
 
-## Arquivos
+- **Acelerômetro RR** = `getQtyForPeriod('rr')` dos hooks agregadores por BU (`useModeloAtualMetas`, `useO2TaxMetas`, etc.). Esses hooks contam movimentações por período com regras próprias (dedup mensal por card+fase, cohort de mês, etc.).
+- **Matriz nova** = `itemsByIndicator["rr"]`, que é a lista de drill-down (`getDetailItemsWithFullHistory` / `getItemsForIndicator`). Essa lista pode:
+  1. Excluir cards sem Closer (5 casos confirmados);
+  2. Filtrar por `inRange(item.date, ...)` usando o timestamp do item, enquanto o agregador usa o mês da movimentação;
+  3. Não incluir BU cujo hook não expõe drill-down completo (ex.: Franquia/OxyHacker via analytics separado);
+  4. Aplicar `matchesOrigemFilter` diferente do que o acelerômetro aplica.
 
-### 1. `src/components/planning/indicators/CloserPerformanceMatrix.tsx` (novo)
-Modal (`Dialog` do shadcn) com o layout de referência:
-- **KPI tiles** (um por closer): total de Reuniões, Vendas, % Conversão, contratos em elaboração.
-- **Tabela matriz** — linhas = faixas de faturamento (normalizadas via `normalizeTier` de `src/lib/revenueTiers.ts`), colunas agrupadas por closer + coluna "Equipe" com Reuniões / Vendas / % Fechamento e mini barra de progresso.
-- **Bloco "Contratos em elaboração"** — lista cards da fase `Contrato em elaboração` (já mapeada em `useModeloAtualAnalytics` / `useO2TaxAnalytics`) por closer, com projeção do "se todos fecharem".
-- Rodapé com critérios (Reunião = card em Reuniões Realizadas; Venda = Ganho + Contrato assinado; Contrato em elaboração exibido separado).
+Ou seja, o número correto de "reuniões realizadas no período" é o do acelerômetro (79). A matriz precisa consumir a mesma fonte.
 
-Props: `open`, `onClose`, `itemsByIndicator` (o mesmo já usado em `PersonRanking`), `elaboracaoItems` (novo — ver item 3), `highlightCloser?: string` para dar destaque visual quando o usuário clicou numa linha específica.
+## Plano de correção
 
-Cálculo interno:
-- `reunioes[closer][tier]` = itens de `itemsByIndicator['rr']` no período, agrupados por `firstNameKey(item.closer)` × `normalizeTier(item.revenueRange)`.
-- `vendas[closer][tier]` = itens de `itemsByIndicator['venda']` (mesma lógica).
-- `%` = vendas ÷ reuniões (— quando reuniões = 0).
-- Totais por closer, por faixa e geral.
+1. **Diagnóstico rápido (sem alterar UI):** adicionar um `console.debug` temporário em `CloserPerformanceMatrix.tsx` listando `id`, `closer`, `date`, `bu` de cada reunião contada, para confirmar quais 20 estão faltando (sem Closer × fora do range × BU ausente). Remover depois.
+2. **Unificar fonte:** em `IndicatorsTab.tsx`, no ponto onde abrimos a matriz, passar a mesma lista que alimenta o acelerômetro (usar `getItemsForIndicator('rr')` sem o filtro de `inRange` extra, já que o hook já aplica período), e o mesmo para `venda` e `proposta`. Remover o `inRange` interno da matriz — deixar o filtro de período apenas na origem.
+3. **Sem Closer:** adicionar coluna "Sem Closer" só se houver ao menos 1 item nessa condição, para que o Total da matriz **bata exatamente com o acelerômetro (79)**.
+4. **Validação:** abrir a matriz com os mesmos filtros do print e conferir Total Equipe = 79 reuniões. Se ainda divergir, o log do passo 1 mostra qual filtro está eliminando os cards e ajusto pontualmente.
 
-### 2. `src/components/planning/indicators/PersonRanking.tsx` (editar)
-- Adicionar prop opcional `onRowClick?: (closerName: string) => void`.
-- Quando `role === 'closer'` e `onRowClick` existir, tornar a `<tr>` clicável (`cursor-pointer`) e disparar o callback.
-- Sem mudanças no cálculo existente.
-
-### 3. `src/components/planning/IndicatorsTab.tsx` (editar)
-Nas duas ocorrências do `<PersonRanking role="closer" …>` (Rank Closers em Comercial):
-- Estado local `closerDrillOpen` + `closerDrillHighlight`.
-- Passar `onRowClick={(name) => { setCloserDrillHighlight(name); setCloserDrillOpen(true); }}`.
-- Renderizar `<CloserPerformanceMatrix open={…} onClose={…} itemsByIndicator={…} elaboracaoItems={…} highlightCloser={…} />`.
-- `elaboracaoItems`: extrair da mesma agregação que já monta `itemsByIndicator`, filtrando cards cuja fase atual seja "Contrato em elaboração" (fase já existente nos hooks Modelo Atual / O2 TAX).
-
-## Fora de escopo
-
-- Nada em `useModeloAtualAnalytics` / `useO2TaxAnalytics` / banco: reutiliza `itemsByIndicator` já calculado.
-- Sem alteração no card SDR nem em outras abas.
-- Sem endpoint novo, sem migração.
-
-## Validação
-
-- Filtrar consolidado → abrir Rank Closers → clicar em qualquer linha → modal deve abrir com números coerentes: soma da coluna "Equipe" deve bater com o total de RR e Vendas dos gauges do topo.
-- Trocar filtro para uma BU específica → totais no modal devem refletir só aquela BU.
-- Fechar e reabrir → estado limpo.
+Nenhuma alteração nos agregadores nem no acelerômetro — só na matriz e na forma de alimentá-la.
