@@ -1,21 +1,34 @@
-## Revisão da hipótese
+## Objetivo
 
-Você tem razão — se só há 5 sem Closer, o gap (79 vs 59 = 20) não vem daí. O que realmente acontece é que **o acelerômetro e a matriz usam fontes diferentes**:
+Tornar cada número da matriz clicável para abrir a lista de cards por trás daquela célula, com link direto para o Pipefy.
 
-- **Acelerômetro RR** = `getQtyForPeriod('rr')` dos hooks agregadores por BU (`useModeloAtualMetas`, `useO2TaxMetas`, etc.). Esses hooks contam movimentações por período com regras próprias (dedup mensal por card+fase, cohort de mês, etc.).
-- **Matriz nova** = `itemsByIndicator["rr"]`, que é a lista de drill-down (`getDetailItemsWithFullHistory` / `getItemsForIndicator`). Essa lista pode:
-  1. Excluir cards sem Closer (5 casos confirmados);
-  2. Filtrar por `inRange(item.date, ...)` usando o timestamp do item, enquanto o agregador usa o mês da movimentação;
-  3. Não incluir BU cujo hook não expõe drill-down completo (ex.: Franquia/OxyHacker via analytics separado);
-  4. Aplicar `matchesOrigemFilter` diferente do que o acelerômetro aplica.
+## Escopo
 
-Ou seja, o número correto de "reuniões realizadas no período" é o do acelerômetro (79). A matriz precisa consumir a mesma fonte.
+1. **Células clicáveis** em `CloserPerformanceMatrix.tsx`:
+   - Reuniões, Vendas e "Em elaboração" — por linha (faixa) × coluna (closer), inclusive coluna "Sem Closer" e linha "Equipe/Total".
+   - Cursor pointer + hover destacado quando `count > 0`.
 
-## Plano de correção
+2. **Drill-down**: painel lateral (Sheet) dentro do próprio modal listando os cards filtrados. Cada card exibe:
+   - Empresa/Nome
+   - Faixa de faturamento
+   - Closer (ou "Sem Closer")
+   - SDR
+   - Data
+   - Valor (MRR/Setup/Pontual quando aplicável)
+   - **Botão "Abrir no Pipefy"** usando `it.id` no padrão `https://app.pipefy.com/open-cards/{id}` (mesmo esquema já usado no dashboard — memória `Deep Linking Config`).
 
-1. **Diagnóstico rápido (sem alterar UI):** adicionar um `console.debug` temporário em `CloserPerformanceMatrix.tsx` listando `id`, `closer`, `date`, `bu` de cada reunião contada, para confirmar quais 20 estão faltando (sem Closer × fora do range × BU ausente). Remover depois.
-2. **Unificar fonte:** em `IndicatorsTab.tsx`, no ponto onde abrimos a matriz, passar a mesma lista que alimenta o acelerômetro (usar `getItemsForIndicator('rr')` sem o filtro de `inRange` extra, já que o hook já aplica período), e o mesmo para `venda` e `proposta`. Remover o `inRange` interno da matriz — deixar o filtro de período apenas na origem.
-3. **Sem Closer:** adicionar coluna "Sem Closer" só se houver ao menos 1 item nessa condição, para que o Total da matriz **bata exatamente com o acelerômetro (79)**.
-4. **Validação:** abrir a matriz com os mesmos filtros do print e conferir Total Equipe = 79 reuniões. Se ainda divergir, o log do passo 1 mostra qual filtro está eliminando os cards e ajusto pontualmente.
+3. **Filtragem interna**: no clique da célula, filtra `reunioes`/`vendas`/`propostas` do próprio `useMemo` por:
+   - `normalizeTier(item.revenueRange) === tier` (ou "Total" = sem filtro de faixa)
+   - `keyOf(item.closer) === closerKey` (ou "Equipe" = sem filtro de closer)
+   - Para elaboração: mesma lógica sobre `propostas` já com `phase.includes("elabora")`.
 
-Nenhuma alteração nos agregadores nem no acelerômetro — só na matriz e na forma de alimentá-la.
+4. **UX**: título do painel ex.: *"Reuniões · R$ 200k–350k · Bruna (7)"*. Botão de fechar volta pra matriz sem perder o estado.
+
+## Fora de escopo
+
+- Nenhuma mudança em hooks de analytics, agregadores ou acelerômetro.
+- Nenhuma mudança em outras telas.
+
+## Validação
+
+Clicar em "18" da linha "Sem Closer" (exemplo) deve abrir a lista com 18 cards, cada um com botão que abre a URL do Pipefy em nova aba.
