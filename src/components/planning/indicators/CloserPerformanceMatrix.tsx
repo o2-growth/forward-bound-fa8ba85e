@@ -21,11 +21,8 @@ const CLOSER_COLORS = [
 ];
 function closerColor(idx: number) { return CLOSER_COLORS[idx % CLOSER_COLORS.length]; }
 
-function inRange(iso: string | undefined, s: number, e: number): boolean {
-  if (!iso) return false;
-  const t = new Date(iso).getTime();
-  return t >= s && t <= e;
-}
+const NONE_KEY = "__none__";
+const NONE_DISPLAY = "Sem Closer";
 
 function pct(n: number, d: number): number {
   if (!d) return 0;
