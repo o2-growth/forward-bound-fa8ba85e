@@ -308,6 +308,7 @@ export const columnFormatters = {
       // Novas categorias de produto (Modelo Atual via pipefy_db_clientes)
       'OXY': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
       'Assessoria Financeira': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
+      'Captação de Recursos': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
       'BPO': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
       'Diagnóstico Estratégico': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
       'Setup': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',

@@ -24,6 +24,7 @@ export type ProductCategory =
   | 'CaaS'
   | 'OXY'
   | 'Assessoria Financeira'
+  | 'Captação de Recursos'
   | 'BPO'
   | 'Diagnóstico Estratégico'
   | 'Setup'
@@ -36,6 +37,7 @@ export const PRODUCT_CATEGORIES: ProductCategory[] = [
   'CaaS',
   'OXY',
   'Assessoria Financeira',
+  'Captação de Recursos',
   'BPO',
   'Diagnóstico Estratégico',
   'Setup',
@@ -65,7 +67,8 @@ export function classifyProduto(produtosRaw: string | null | undefined): Product
   // Ordem importa: CFOaaS captura "Setup, CFOaaS" antes de cair em Setup
   if (n.includes('cfoaas')) return 'CaaS';
   if (n.includes('oxy')) return 'OXY';
-  if (n.includes('assessoria')) return 'Assessoria Financeira';
+  if (n.includes('captacao')) return 'Captação de Recursos';
+  if (n.includes('assessoria') && n.includes('financeira')) return 'Assessoria Financeira';
   if (n.includes('bpo')) return 'BPO';
   if (n.includes('diagnostico')) return 'Diagnóstico Estratégico';
   if (n.includes('turnaround')) return 'Turnaround';
