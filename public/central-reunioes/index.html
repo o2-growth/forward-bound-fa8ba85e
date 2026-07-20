@@ -835,7 +835,9 @@ const SUPABASE_URL = window.__SUPABASE_URL__ || '';
 const SUPABASE_ANON_KEY = window.__SUPABASE_ANON_KEY__ || '';
 const AUTH_TOKEN = window.__SUPABASE_TOKEN__ || SUPABASE_ANON_KEY || '';
 const SYNC_URL = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/central-reunioes-sync` : null;
-/* Sem SYNC_URL (aberto fora do dash, ex.: file://) => modo LOCAL, sem sync remoto. */
+const PIPEFY_URL = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1/central-reunioes-pull` : null;
+/* Sem SYNC_URL (aberto fora do dash, ex.: file://) => modo LOCAL, sem sync remoto.
+   PIPEFY_URL = fonte read-only do Pipefy (base). SYNC_URL = overrides locais (status/cadSent/obs) + reuniões avulsas do SDR. */
 const SYNC_HEADERS = {
   'Content-Type': 'application/json',
   'Authorization': `Bearer ${AUTH_TOKEN}`,
@@ -2111,31 +2113,82 @@ function mergeMeetings(localArr,remoteArr){
   return dedupMeetings(Array.from(byId.values()));                      // remove duplicatas por conteúdo
 }
 function sigOf(arr){return (arr||[]).map(m=>[m.id,m._m||0,m.status,m.data,m.hora,m.obs,m.empresa,m.contato,m.email,m.pipefy,m.sdr,m.exNoshow?1:0,m.foiRemarcada?1:0,m.deleted?1:0].join('~')).sort().join('|');}
+
+/* --- Merge Pipefy (base, read-only) x overrides locais (central-reunioes-sync) ---
+   Pipefy sempre vence: empresa, contato, email, fone, closer, sdr, pipefy (URL do card).
+   Override local sempre vence: status, cadSent, obs, _m.
+   Híbrido (data/hora): Pipefy vence, exceto se o override marcou a reunião como remarcada (foiRemarcada). */
+let pipefyIds=new Set(); // ids que vieram do Pipefy na última leitura (usado pra taguear no push)
+function mergePipefyOverride(pf,ov){
+  if(!ov)return pf;
+  const merged=Object.assign({},pf);
+  ['status','cadSent','obs','_m'].forEach(f=>{if(ov[f]!==undefined)merged[f]=ov[f];});
+  if(ov.foiRemarcada){
+    if(ov.data!==undefined)merged.data=ov.data;
+    if(ov.hora!==undefined)merged.hora=ov.hora;
+  }
+  merged.foiRemarcada=ov.foiRemarcada;
+  merged.exNoshow=ov.exNoshow!==undefined?ov.exNoshow:pf.exNoshow;
+  if(ov.deleted)merged.deleted=ov.deleted;
+  return merged;
+}
+function combinePipefyAndOverrides(pipefyArr,overrideArr){
+  const byId=new Map(),overrideMap=new Map();
+  (overrideArr||[]).forEach(m=>{if(m&&m.id)overrideMap.set(m.id,m);});
+  let mescladas=0;
+  (pipefyArr||[]).forEach(pf=>{
+    if(!pf||!pf.id)return;
+    const ov=overrideMap.get(pf.id);
+    if(ov){byId.set(pf.id,mergePipefyOverride(pf,ov));mescladas++;overrideMap.delete(pf.id);}
+    else byId.set(pf.id,pf);
+  });
+  overrideMap.forEach((m,id)=>byId.set(id,m)); // sobras = reuniões avulsas do SDR (só existem localmente) → mantém como estão
+  return {combined:Array.from(byId.values()),mescladas};
+}
+
 async function syncPull(){
   if(!SYNC_URL){setSync('local');return;} // sem SUPABASE_URL/token injetado => modo offline
   try{
-    const r=await fetch(SYNC_URL,{cache:'no-store',headers:SYNC_HEADERS});if(!r.ok){setSync('off');return;}
-    const j=await r.json();if(!j.ok){setSync('off');return;}syncOn=true;setSync('ok');
-    if(j.data&&Array.isArray(j.data.meetings)){
-      if(document.querySelector('.overlay.open'))return;              // não atropela edição aberta
-      const remote=j.data.meetings; syncRev=Math.max(syncRev,j.data.rev||0);
-      const localAll=(state.meetings||[]).concat(state.tombstones||[]);
-      const merged=mergeMeetings(localAll,remote);                    // une vivos + exclusões dos dois lados
-      const active=merged.filter(m=>!m.deleted), tombs=merged.filter(m=>m.deleted);
-      if(sigOf(active)!==sigOf(state.meetings)){                      // a mescla mudou o que vejo → aplica
-        applyingRemote=true;state.meetings=active;state.tombstones=tombs;
-        localStorage.setItem(STORE,JSON.stringify(state.meetings));
-        localStorage.setItem(STORE+'_tomb',JSON.stringify(state.tombstones));render();applyingRemote=false;
-      }else{state.tombstones=tombs;localStorage.setItem(STORE+'_tomb',JSON.stringify(tombs));}
-      if(sigOf(merged)!==sigOf(remote)){syncPush();}                  // tenho algo (incl. exclusão) que o servidor não tem → converge
-    }else if(!j.data){syncPush();}                                    // banco vazio → inicializa com este aparelho
+    let remote,rev=0;
+    if(PIPEFY_URL){
+      const [pr,or_]=await Promise.all([
+        fetch(PIPEFY_URL,{cache:'no-store',headers:SYNC_HEADERS}).catch(()=>null),
+        fetch(SYNC_URL,{cache:'no-store',headers:SYNC_HEADERS}).catch(()=>null)
+      ]);
+      let pipefyMeetings=[],overrideMeetings=[],overrideRev=0;
+      if(pr&&pr.ok){const pj=await pr.json().catch(()=>null);if(pj){if(pj.data&&Array.isArray(pj.data.meetings))pipefyMeetings=pj.data.meetings;else if(Array.isArray(pj.meetings))pipefyMeetings=pj.meetings;}}
+      if(or_&&or_.ok){const oj=await or_.json().catch(()=>null);if(oj&&oj.data&&Array.isArray(oj.data.meetings)){overrideMeetings=oj.data.meetings;overrideRev=oj.data.rev||0;}}
+      if(!pr||!pr.ok){setSync('off');return;} // Pipefy indisponível → não aplica dados parciais
+      pipefyIds=new Set(pipefyMeetings.map(m=>m.id));
+      const {combined,mescladas}=combinePipefyAndOverrides(pipefyMeetings,overrideMeetings);
+      remote=combined;rev=overrideRev;
+      console.info(`[Central] Sync from Pipefy: ${pipefyMeetings.length} meetings, overrides locais: ${overrideMeetings.length}, mescladas: ${mescladas}`);
+      syncOn=true;setSync('ok');
+    }else{
+      const r=await fetch(SYNC_URL,{cache:'no-store',headers:SYNC_HEADERS});if(!r.ok){setSync('off');return;}
+      const j=await r.json();if(!j.ok){setSync('off');return;}syncOn=true;setSync('ok');
+      if(!(j.data&&Array.isArray(j.data.meetings))){if(!j.data){syncPush();}return;} // banco vazio → inicializa com este aparelho
+      remote=j.data.meetings;rev=j.data.rev||0;
+    }
+    if(document.querySelector('.overlay.open'))return;              // não atropela edição aberta
+    syncRev=Math.max(syncRev,rev||0);
+    const localAll=(state.meetings||[]).concat(state.tombstones||[]);
+    const merged=mergeMeetings(localAll,remote);                    // une vivos + exclusões dos dois lados
+    const active=merged.filter(m=>!m.deleted), tombs=merged.filter(m=>m.deleted);
+    if(sigOf(active)!==sigOf(state.meetings)){                      // a mescla mudou o que vejo → aplica
+      applyingRemote=true;state.meetings=active;state.tombstones=tombs;
+      localStorage.setItem(STORE,JSON.stringify(state.meetings));
+      localStorage.setItem(STORE+'_tomb',JSON.stringify(state.tombstones));render();applyingRemote=false;
+    }else{state.tombstones=tombs;localStorage.setItem(STORE+'_tomb',JSON.stringify(tombs));}
+    if(!PIPEFY_URL&&sigOf(merged)!==sigOf(remote)){syncPush();}     // convergência automática só no modo legado (sem Pipefy)
   }catch(e){setSync('off');}
 }
 function schedulePush(){if(applyingRemote||!syncOn)return;clearTimeout(pushTimer);pushTimer=setTimeout(syncPush,700);}
 async function syncPush(){
   if(!SYNC_URL){setSync('local');return;} // sem SUPABASE_URL/token injetado => modo offline
   try{setSync('saving');const rev=Date.now();syncRev=Math.max(syncRev,rev);
-    const payload=(state.meetings||[]).concat(state.tombstones||[]); // envia vivos + marcas de exclusão
+    const payload=(state.meetings||[]).concat(state.tombstones||[])  // envia vivos + marcas de exclusão
+      .map(m=>Object.assign({},m,pipefyIds.has(m.id)?{_fromPipefy:true,_override:false}:{_override:true,_fromPipefy:false})); // marca origem pro merge saber quem vence
     await fetch(SYNC_URL,{method:'POST',headers:SYNC_HEADERS,body:JSON.stringify({meetings:payload,rev})});
     syncOn=true;setSync('ok');}catch(e){setSync('off');}
 }
