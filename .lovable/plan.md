@@ -1,32 +1,29 @@
-# Classificar "Colaborador O2" como Indicação
+# Separar "Captação de Recursos" de "Assessoria Financeira"
 
-## Problema
-No `classifyLeadSource` (src/lib/leadSource.ts), o token `colaborador` só é reconhecido quando aparece em `tipoOrigem`. Quando o SDR escreve "Colaborador O2" (ou variações) em **Origem do lead**, **Fonte** ou **Campanha**, o card cai em **Sem origem** — e pior: como o texto contém "o2", pode ser capturado pela regra de Inbound (`o2inc`) e virar Inbound erroneamente.
+## Causa raiz
 
-## Mudança
-Único arquivo: `src/lib/leadSource.ts`.
+Em `src/lib/productClassifier.ts` (linha 68), a regra `if (n.includes('assessoria'))` captura **qualquer** produto com a palavra "assessoria", incluindo "Assessoria de Captação de Recursos". Resultado: clientes como **Spa Med** aparecem no dashboard como *Assessoria Financeira*, quando no Pipefy o produto real é *Assessoria de Captação de Recursos*.
 
-Adicionar, **antes** das regras de Inbound (passo 4), um bloco novo:
+## O que fazer
 
-```ts
-// 3.5) INDICAÇÃO — "colaborador" em qualquer campo textual (ex.: "Colaborador O2")
-const colaboradorHay = [tipo, origem, fonte, campanha].filter(Boolean).join(' | ');
-if (containsAny(colaboradorHay, ['colaborador'])) {
-  return 'indicacao';
-}
-```
+### 1. `src/lib/productClassifier.ts`
+- Adicionar `'Captação de Recursos'` ao tipo `ProductCategory` e ao array `PRODUCT_CATEGORIES` (posição antes de Assessoria Financeira).
+- Em `classifyProduto`, **antes** da regra de `assessoria`, adicionar:
+  - `if (n.includes('captacao'))  return 'Captação de Recursos';`
+  - (a normalização `norm()` já remove acentos, então "captação" → "captacao")
+- Estreitar a regra de Assessoria Financeira para exigir explicitamente `n.includes('financeira')` (ou padrão `assessoria financeira`) — evita futuros falsos positivos de outras "assessorias".
 
-Isso garante:
-- `tipoOrigem = "Indicação colaborador"` → indicação (já funcionava, continua)
-- `origemLead = "Colaborador O2"` → indicação (novo)
-- `fonte = "colaborador_o2"` → indicação (novo)
-- `campanha = "colaborador"` → indicação (novo)
+### 2. `src/components/planning/indicators/DetailSheet.tsx` (linha ~310)
+- Adicionar cor de badge para `'Captação de Recursos'` (ex.: `bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200`) para exibição consistente com as demais categorias.
 
-E precede a regra que hoje mandaria "colaborador o2" para Inbound via token `o2inc`.
+## O que NÃO muda
 
-## Escopo / segurança
-- Nenhuma outra regra alterada: Franquia/Oxy → Inbound, Monetização, GSC → Outbound, placeholders Meta → Inbound, eventos G4, tudo intacto.
-- Sem mudança de UI, sem mudança de hooks.
+- Nenhuma lógica de `useJornadaData.ts` referente a `temAssessoriaFinanceira` / pipe dedicado de Assessoria Financeira — o pipe `pipefy_moviment_assessoria_financeira` continua marcando somente quem realmente é da Assessoria Financeira (já usa string exata na fonte).
+- Filtros de BU, MRR, metas e cálculos monetários — só o **rótulo** do produto muda.
+- Nenhuma migração de banco necessária.
 
 ## Validação
-Após build: abrir **Indicadores → Canal = Indicação** e conferir que cards com "Colaborador O2" agora aparecem lá; conferir que somem de "Sem origem" e não estão em Inbound.
+
+- Recarregar Indicadores › drill-down do cliente Spa Med → coluna Produto deve mostrar **Captação de Recursos**.
+- Filtro de Produto na aba NPS / Jornada deve listar "Captação de Recursos" como opção independente.
+- Clientes que hoje aparecem corretamente como Assessoria Financeira (via pipe dedicado) devem continuar como Assessoria Financeira.
