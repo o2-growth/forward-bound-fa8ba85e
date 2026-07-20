@@ -434,6 +434,56 @@ export function CloserPerformanceMatrix({
           </>
         )}
       </DialogContent>
+
+      {/* Drill-down: cards por trás de cada célula */}
+      <Sheet open={!!drill} onOpenChange={(o) => { if (!o) setDrill(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+          {drill && (
+            <>
+              <SheetHeader>
+                <SheetTitle>
+                  {kindLabel(drill.kind)}
+                  {drill.tier && <> · {drill.tier}</>}
+                  {" · "}{closerLabel(drill.closerKey)}
+                  <span className="ml-2 text-muted-foreground font-normal">({drillItems.length})</span>
+                </SheetTitle>
+                <SheetDescription>{periodo}</SheetDescription>
+              </SheetHeader>
+              <div className="mt-4 divide-y">
+                {drillItems.length === 0 ? (
+                  <div className="text-sm text-muted-foreground py-6 text-center">Nenhum card.</div>
+                ) : drillItems.map((it) => {
+                  const pipefyUrl = `https://app.pipefy.com/open-cards/${it.id}`;
+                  const dateStr = it.date ? new Date(it.date).toLocaleDateString("pt-BR") : "—";
+                  return (
+                    <div key={it.id} className="py-2.5 text-sm flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{it.company || it.name || "—"}</div>
+                        <div className="text-xs text-muted-foreground flex flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
+                          <span>{normalizeTier(it.revenueRange)}</span>
+                          <span>· Closer: {(it.closer || "").trim() || "Sem Closer"}</span>
+                          {it.sdr && <span>· SDR: {it.sdr}</span>}
+                          <span>· {dateStr}</span>
+                        </div>
+                      </div>
+                      <a
+                        href={pipefyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        title="Abrir no Pipefy"
+                      >
+                        Pipefy <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
     </Dialog>
   );
 }
+
