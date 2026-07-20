@@ -224,11 +224,17 @@ export function CloserPerformanceMatrix({
                       <span className="text-sm font-normal text-muted-foreground ml-1">conv.</span>
                     </div>
                     <div className="mt-2 text-xs text-muted-foreground flex gap-3 flex-wrap">
-                      <span>Reun. <b className="text-foreground">{totals[c.key].reu}</b></span>
-                      <span>Vendas <b className="text-foreground">{totals[c.key].ven}</b></span>
+                      <span>Reun. {totals[c.key].reu ? (
+                        <button type="button" className={`px-1 ${clickableCls} text-foreground font-semibold`} onClick={() => openDrill("rr", totals[c.key].reu, null, c.key)}>{totals[c.key].reu}</button>
+                      ) : <b className="text-foreground">0</b>}</span>
+                      <span>Vendas {totals[c.key].ven ? (
+                        <button type="button" className={`px-1 ${clickableCls} text-foreground font-semibold`} onClick={() => openDrill("venda", totals[c.key].ven, null, c.key)}>{totals[c.key].ven}</button>
+                      ) : <b className="text-foreground">0</b>}</span>
                     </div>
                     <div className="mt-1 text-[11px] text-muted-foreground">
-                      Em elaboração: <b className="text-foreground">{elab}</b>
+                      Em elaboração: {elab ? (
+                        <button type="button" className={`px-1 ${clickableCls} text-foreground font-semibold`} onClick={() => openDrill("elab", elab, null, c.key)}>{elab}</button>
+                      ) : <b className="text-foreground">0</b>}
                       {projConv !== null && (
                         <> (viraria <b className="text-foreground">{fmtPct(projConv)}</b> se fechados)</>
                       )}
