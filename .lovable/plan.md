@@ -1,34 +1,26 @@
-## Objetivo
+## Causa raiz confirmada
 
-Tornar cada número da matriz clicável para abrir a lista de cards por trás daquela célula, com link direto para o Pipefy.
+Banco e Pipefy estão corretos. Card `1403404371` (e demais Expansão) têm `Closer responsável` preenchido em todas as movimentações (verificado via `pipefy_cards_movements_expansao`).
 
-## Escopo
+O problema está em `src/hooks/useExpansaoMetas.ts`, função `getDetailItemsForIndicator` (linhas 426–480): ela devolve itens com `closer: ''` e `responsible: ''` fixos — não lê nem propaga o Closer/SDR do banco.
 
-1. **Células clicáveis** em `CloserPerformanceMatrix.tsx`:
-   - Reuniões, Vendas e "Em elaboração" — por linha (faixa) × coluna (closer), inclusive coluna "Sem Closer" e linha "Equipe/Total".
-   - Cursor pointer + hover destacado quando `count > 0`.
+Em `IndicatorsTab.tsx`, quando não há filtro de closer/SDR/origem ativo, o `getItemsForIndicator` usa justamente esse `getExpansaoDetailItems`. Como `itemsByIndicator` alimenta a `CloserPerformanceMatrix`, todo card de Franquia/Oxy Hacker chega com closer vazio e cai em "Sem Closer". Nada a ver com Bruna nem com fallback.
 
-2. **Drill-down**: painel lateral (Sheet) dentro do próprio modal listando os cards filtrados. Cada card exibe:
-   - Empresa/Nome
-   - Faixa de faturamento
-   - Closer (ou "Sem Closer")
-   - SDR
-   - Data
-   - Valor (MRR/Setup/Pontual quando aplicável)
-   - **Botão "Abrir no Pipefy"** usando `it.id` no padrão `https://app.pipefy.com/open-cards/{id}` (mesmo esquema já usado no dashboard — memória `Deep Linking Config`).
+## Correção (sem fallback, sem hardcode)
 
-3. **Filtragem interna**: no clique da célula, filtra `reunioes`/`vendas`/`propostas` do próprio `useMemo` por:
-   - `normalizeTier(item.revenueRange) === tier` (ou "Total" = sem filtro de faixa)
-   - `keyOf(item.closer) === closerKey` (ou "Equipe" = sem filtro de closer)
-   - Para elaboração: mesma lógica sobre `propostas` já com `phase.includes("elabora")`.
+Popular closer/SDR reais nos itens do caminho "sem filtro" usando os dados que os hooks de analytics já buscam do banco.
 
-4. **UX**: título do painel ex.: *"Reuniões · R$ 200k–350k · Bruna (7)"*. Botão de fechar volta pra matriz sem perder o estado.
+**Arquivo:** `src/components/planning/IndicatorsTab.tsx`, dentro de `getItemsForIndicator`.
 
-## Fora de escopo
+1. Nos blocos de Franquia e Oxy Hacker, no ramo `else` (sem filtro), após obter `franquiaItems` / `oxyItems` do `getExpansaoDetailItems`/`getOxyHackerDetailItems`, montar um `Map<id, { closer, sdr, responsible }>` a partir de `franquiaAnalytics.cards` / `oxyHackerAnalytics.cards` (esses `cards` já vêm com `Closer responsável` e `SDR responsável` do banco).
+2. Fazer `.map` nos itens injetando `closer`, `sdr` e `responsible` quando o `id` bate no Map. Se um item não estiver no Map (raro, ex.: item veio de meta sem card correspondente), mantém como está.
+3. Nada muda em contagens, valores, gauges ou no ramo "com filtro".
 
-- Nenhuma mudança em hooks de analytics, agregadores ou acelerômetro.
-- Nenhuma mudança em outras telas.
+Escopo total: ~15 linhas em 1 arquivo. Zero mudança em hooks, banco ou lógica de metas.
 
 ## Validação
 
-Clicar em "18" da linha "Sem Closer" (exemplo) deve abrir a lista com 18 cards, cada um com botão que abre a URL do Pipefy em nova aba.
+- Abrir matriz de closers em Consolidado, sem nenhum filtro: cards de Franquia/Oxy Hacker aparecem sob o closer real do banco (Bruna Patricio Mota, etc.), não mais em "Sem Closer".
+- Card `1403404371` deve aparecer na coluna Bruna, faixa correspondente.
+- Totais do acelerômetro seguem batendo com a matriz (nenhuma contagem foi alterada).
+- Modelo Atual e O2 TAX seguem idênticos.
