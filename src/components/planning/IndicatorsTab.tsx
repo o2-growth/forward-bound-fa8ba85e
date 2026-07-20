@@ -2337,6 +2337,7 @@ export function IndicatorsTab() {
           { key: 'diasComoMQL', label: 'Dias como MQL', format: columnFormatters.diasAteAgendar },
           { key: 'revenueRange', label: 'Faixa Faturamento', format: columnFormatters.revenueRange },
           { key: 'date', label: 'Data', format: columnFormatters.date },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
         ]);
         setDetailSheetItems(itemsWithCalcs);
         setDetailSheetFilterCriteria([
