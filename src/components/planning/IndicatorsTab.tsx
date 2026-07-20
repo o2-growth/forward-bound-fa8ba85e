@@ -2702,6 +2702,7 @@ export function IndicatorsTab() {
           { key: 'company', label: 'Empresa' },
           { key: 'canal', label: 'Canal' },
           { key: 'dataAssinatura', label: 'Data Assinatura', format: columnFormatters.date },
+          { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
           { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
           { key: 'setup', label: 'Setup', format: columnFormatters.currency },
           { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
