@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export type TabKey = 'context' | 'goals' | 'monthly' | 'media' | 'marketing' | 'structure' | 'admin' | 'indicators' | 'marketing_indicators' | 'nps' | 'financial' | 'jornada' | 'cs' | 'g4';
+export type TabKey = 'context' | 'goals' | 'monthly' | 'media' | 'marketing' | 'structure' | 'admin' | 'indicators' | 'marketing_indicators' | 'nps' | 'financial' | 'jornada' | 'cs' | 'g4' | 'central';
 
 export function useUserPermissions(userId: string | undefined) {
   const { data: permissions, isLoading: permissionsLoading } = useQuery({
@@ -44,7 +44,7 @@ export function useUserPermissions(userId: string | undefined) {
   const isCfo = roleInfo?.isCfo ?? false;
 
   // Admins have access to all tabs
-  const allAdminTabs: TabKey[] = ['context', 'goals', 'monthly', 'media', 'indicators', 'cs', 'financial', 'marketing', 'structure', 'admin', 'g4'];
+  const allAdminTabs: TabKey[] = ['context', 'goals', 'monthly', 'media', 'indicators', 'cs', 'financial', 'marketing', 'structure', 'admin', 'g4', 'central'];
   
   // CFOs only see the Operação (cs) tab — fully locked
   if (isCfo && !isAdmin) {

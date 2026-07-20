@@ -18,7 +18,8 @@ import { MediaMetasProvider } from "@/contexts/MediaMetasContext";
 import { FinancialTab } from "@/components/planning/FinancialTab";
 import { JornadaTab } from "@/components/planning/JornadaTab";
 import { CustomerSuccessTab } from "@/components/planning/CustomerSuccessTab";
-import { Calendar, BarChart3, LineChart, Megaphone, Lightbulb, Users, Settings, LogOut, User, Loader2, EyeOff, Eye, Activity, DollarSign, Route, HeartHandshake } from "lucide-react";
+import CentralReunioes from "@/pages/CentralReunioes";
+import { Calendar, BarChart3, LineChart, Megaphone, Lightbulb, Users, Settings, LogOut, User, Loader2, EyeOff, Eye, Activity, DollarSign, Route, HeartHandshake, CalendarClock } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { O2Logo } from "@/components/O2Logo";
 import { Separator } from "@/components/ui/separator";
@@ -34,6 +35,7 @@ const TAB_CONFIG: { key: TabKey; label: string; icon: React.ComponentType<{ clas
   { key: 'financial', label: 'Financeiro', icon: DollarSign },
   { key: 'marketing', label: 'Marketing', icon: Lightbulb },
   { key: 'structure', label: 'Estrutura', icon: Users },
+  { key: 'central', label: 'Central de Reuniões', icon: CalendarClock },
   { key: 'admin', label: 'Admin', icon: Settings },
 ];
 
@@ -183,6 +185,10 @@ export default function Planning2026() {
 
               <TabsContent value="structure" className="mt-0">
                 <StructureTab />
+              </TabsContent>
+
+              <TabsContent value="central" className="mt-0">
+                <CentralReunioes />
               </TabsContent>
 
 
