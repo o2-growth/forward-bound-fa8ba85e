@@ -56,6 +56,7 @@ const RevenuePaceChart = lazy(() => import("./indicators/RevenuePaceChart").then
 
 import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } from "./indicators/WeeklyComparison";
 import { PersonRanking } from "./indicators/PersonRanking";
+import { CloserPerformanceMatrix } from "./indicators/CloserPerformanceMatrix";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
 import { aggregateByTemperatura } from "./indicators/temperaturaAggregator";
 
