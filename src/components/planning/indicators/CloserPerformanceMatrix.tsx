@@ -275,8 +275,18 @@ export function CloserPerformanceMatrix({
                           const p = pct(cell.ven, cell.reu);
                           return (
                             <>
-                              <td key={`${t}-${c.key}-r`} className="text-right px-2 py-2 border-l">{cell.reu || <span className="text-muted-foreground/40">—</span>}</td>
-                              <td key={`${t}-${c.key}-v`} className="text-right px-2 py-2">{cell.reu ? cell.ven : <span className="text-muted-foreground/40">—</span>}</td>
+                              <td key={`${t}-${c.key}-r`} className="text-right px-2 py-2 border-l">
+                                {cell.reu ? (
+                                  <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("rr", cell.reu, t, c.key)} title="Ver cards">{cell.reu}</button>
+                                ) : <span className="text-muted-foreground/40">—</span>}
+                              </td>
+                              <td key={`${t}-${c.key}-v`} className="text-right px-2 py-2">
+                                {cell.reu ? (
+                                  cell.ven ? (
+                                    <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("venda", cell.ven, t, c.key)} title="Ver cards">{cell.ven}</button>
+                                  ) : cell.ven
+                                ) : <span className="text-muted-foreground/40">—</span>}
+                              </td>
                               <td key={`${t}-${c.key}-p`} className="text-right px-2 py-2">
                                 {cell.reu ? (
                                   <span className="inline-flex items-center gap-1.5 justify-end">
@@ -296,8 +306,18 @@ export function CloserPerformanceMatrix({
                           const p = pct(cell.ven, cell.reu);
                           return (
                             <>
-                              <td className="text-right px-2 py-2 border-l">{cell.reu || <span className="text-muted-foreground/40">—</span>}</td>
-                              <td className="text-right px-2 py-2">{cell.reu ? cell.ven : <span className="text-muted-foreground/40">—</span>}</td>
+                              <td className="text-right px-2 py-2 border-l">
+                                {cell.reu ? (
+                                  <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("rr", cell.reu, t, null)} title="Ver cards">{cell.reu}</button>
+                                ) : <span className="text-muted-foreground/40">—</span>}
+                              </td>
+                              <td className="text-right px-2 py-2">
+                                {cell.reu ? (
+                                  cell.ven ? (
+                                    <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("venda", cell.ven, t, null)} title="Ver cards">{cell.ven}</button>
+                                  ) : cell.ven
+                                ) : <span className="text-muted-foreground/40">—</span>}
+                              </td>
                               <td className="text-right px-2 py-2">
                                 {cell.reu ? (
                                   <span className="inline-flex items-center gap-1.5 justify-end">
@@ -321,8 +341,16 @@ export function CloserPerformanceMatrix({
                         const p = pct(cell.ven, cell.reu);
                         return (
                           <>
-                            <td key={`tot-${c.key}-r`} className="text-right px-2 py-2.5 border-l">{cell.reu}</td>
-                            <td key={`tot-${c.key}-v`} className="text-right px-2 py-2.5">{cell.ven}</td>
+                            <td key={`tot-${c.key}-r`} className="text-right px-2 py-2.5 border-l">
+                              {cell.reu ? (
+                                <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("rr", cell.reu, null, c.key)} title="Ver cards">{cell.reu}</button>
+                              ) : cell.reu}
+                            </td>
+                            <td key={`tot-${c.key}-v`} className="text-right px-2 py-2.5">
+                              {cell.ven ? (
+                                <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("venda", cell.ven, null, c.key)} title="Ver cards">{cell.ven}</button>
+                              ) : cell.ven}
+                            </td>
                             <td key={`tot-${c.key}-p`} className="text-right px-2 py-2.5">
                               <span className="inline-flex items-center gap-1.5 justify-end">
                                 <span className="inline-block w-8 h-1.5 rounded bg-muted overflow-hidden">
@@ -334,8 +362,16 @@ export function CloserPerformanceMatrix({
                           </>
                         );
                       })}
-                      <td className="text-right px-2 py-2.5 border-l">{teamTotal.reu}</td>
-                      <td className="text-right px-2 py-2.5">{teamTotal.ven}</td>
+                      <td className="text-right px-2 py-2.5 border-l">
+                        {teamTotal.reu ? (
+                          <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("rr", teamTotal.reu, null, null)} title="Ver cards">{teamTotal.reu}</button>
+                        ) : teamTotal.reu}
+                      </td>
+                      <td className="text-right px-2 py-2.5">
+                        {teamTotal.ven ? (
+                          <button type="button" className={`px-1.5 ${clickableCls}`} onClick={() => openDrill("venda", teamTotal.ven, null, null)} title="Ver cards">{teamTotal.ven}</button>
+                        ) : teamTotal.ven}
+                      </td>
                       <td className="text-right px-2 py-2.5">
                         <span className="inline-flex items-center gap-1.5 justify-end">
                           <span className="inline-block w-8 h-1.5 rounded bg-muted overflow-hidden">
@@ -348,6 +384,7 @@ export function CloserPerformanceMatrix({
                   </tbody>
                 </table>
               </div>
+
             </div>
 
             {/* Contratos em elaboração */}
