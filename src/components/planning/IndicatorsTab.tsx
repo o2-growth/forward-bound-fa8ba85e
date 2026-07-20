@@ -1914,8 +1914,24 @@ export function IndicatorsTab() {
         } else {
           // No filters → use metas hook (same source as gauges)
           const franquiaItems = getExpansaoDetailItems(indicatorKey as ExpansaoIndicator, startDate, endDate);
-          items = [...items, ...franquiaItems];
+          // Enriquecer com Closer/SDR reais do banco (o hook de metas devolve strings vazias).
+          const ownersById = new Map<string, { closer?: string; sdr?: string }>();
+          for (const c of franquiaAnalytics.cards || []) {
+            ownersById.set(String(c.id), { closer: c.closer || undefined, sdr: c.sdr || undefined });
+          }
+          const enriched = franquiaItems.map(it => {
+            const o = ownersById.get(String(it.id));
+            if (!o) return it;
+            return {
+              ...it,
+              closer: it.closer || o.closer || '',
+              sdr: it.sdr || o.sdr || '',
+              responsible: it.responsible || o.closer || o.sdr || '',
+            };
+          });
+          items = [...items, ...enriched];
         }
+
       }
     }
 
