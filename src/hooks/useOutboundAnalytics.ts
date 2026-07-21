@@ -174,7 +174,9 @@ export function useOutboundAnalytics(startDate: Date, endDate: Date) {
       }
       const rows: any[] = resp?.data || [];
       // Filtra cards de teste (título "teste", "123" etc + allowlist de IDs)
-      const cards = rows.map(parseOutboundRow).filter((c) => !isJunkCard(c));
+      const cards = rows
+        .map(parseOutboundRow)
+        .filter((c) => !isJunkCard(c) && !MANUAL_EXCLUDED_CARD_IDS.has(c.id));
       console.log(`[useOutboundAnalytics] Loaded ${cards.length} outbound movements (após filtro de teste)`);
       return { cards };
     },
