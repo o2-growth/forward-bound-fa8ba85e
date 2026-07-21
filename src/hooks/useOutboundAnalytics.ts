@@ -11,6 +11,13 @@ import { isJunkCard } from "./useModeloAtualMetas";
 // são prospecção ativa do Matheus, independente do que vendedor_respons_vel diga).
 const OUTBOUND_FIXED_SDR = "Matheus Staruck dos Reis";
 
+// Cards removidos manualmente das métricas (duplicidades pai/filho movidas
+// para Ganho por engano). O card GSC "filho" 1413062107 (Modelo Atual/CFOs)
+// permanece contando; o "pai" no Outbound é excluído.
+const MANUAL_EXCLUDED_CARD_IDS = new Set<string>([
+  "1341215587", // GSC — duplicidade pai/filho, mantendo 1413062107 nas vendas
+]);
+
 // Mapeamento das fases do pipe outbound para o funil padrão.
 // NO-SHOW e Contato futuro: decisões do user em 28/05/2026:
 //   - NO-SHOW → ignorado (não conta no funil; reunião que não rolou ≠ RR)
