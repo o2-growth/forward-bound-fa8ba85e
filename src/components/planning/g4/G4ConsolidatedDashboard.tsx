@@ -553,6 +553,13 @@ export function G4ConsolidatedDashboard() {
   const [kind, setKind] = useState<KindFilter>("todos");
   const [range, setRange] = useState<RangeFilter>("all");
 
+  // Drill-down state
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillTitle, setDrillTitle] = useState("");
+  const [drillDesc, setDrillDesc] = useState("");
+  const [drillItems, setDrillItems] = useState<DetailItem[]>([]);
+  const [drillMode, setDrillMode] = useState<"basic" | "money" | "lost">("basic");
+
   const allGroups = useMemo(() => (data ? buildGroups(data.leads) : []), [data]);
 
   const groups = useMemo(() => {
