@@ -601,6 +601,83 @@ export function G4ConsolidatedDashboard() {
       return next;
     });
 
+  // ─── drill-down helpers ───
+  const cardIdFromUrl = (url: string | null): string => {
+    if (!url) return "";
+    const m = url.match(/open-cards\/(\d+)/);
+    return m ? m[1] : "";
+  };
+  const leadsToItems = (leads: G4RealLead[]): DetailItem[] =>
+    leads.map((l, i) => ({
+      id: cardIdFromUrl(l.pipefyUrl) || `${l.email ?? "no-email"}-${i}`,
+      name: l.nome ?? "—",
+      company: l.empresa ?? "—",
+      phase: l.faseAtual ?? "—",
+      closer: l.closer ?? "—",
+      sdr: l.sdr ?? "—",
+      revenueRange: l.faixa ?? undefined,
+      mrr: l.valorMRR ?? undefined,
+      setup: l.valorSetup ?? undefined,
+      pontual: l.valorPontual ?? undefined,
+      total: l.tcv ?? undefined,
+      reason: l.motivoPerda ?? undefined,
+    }));
+
+  type Mode = "all" | "mql" | "contato" | "quente" | "ganho" | "perdido";
+  const filterLeads = (leads: G4RealLead[], mode: Mode): G4RealLead[] => {
+    switch (mode) {
+      case "mql": return leads.filter((l) => isMqlByFaturamento(l.faixa));
+      case "contato": return leads.filter((l) => isInContact(l.faseAtual));
+      case "quente": return leads.filter((l) => l.temperatura === "Quente");
+      case "ganho": return leads.filter((l) => isWon(l.faseAtual));
+      case "perdido": return leads.filter((l) => isLost(l.faseAtual));
+      default: return leads;
+    }
+  };
+
+  const openDrill = (title: string, mode: Mode, groupsSubset: LiveGroup[], desc?: string) => {
+    // Dedup leads across groups by email
+    const seen = new Set<string>();
+    const merged: G4RealLead[] = [];
+    for (const g of groupsSubset) {
+      for (const l of g.leads) {
+        const k = (l.email ?? l.nome ?? "").toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        merged.push(l);
+      }
+    }
+    const filtered = filterLeads(merged, mode);
+    setDrillTitle(title);
+    setDrillDesc(desc ?? `${filtered.length} registro(s) — dados vindos de g4-metrics (leads G4 + Pipefy).`);
+    setDrillMode(mode === "ganho" ? "money" : mode === "perdido" ? "lost" : "basic");
+    setDrillItems(leadsToItems(filtered));
+    setDrillOpen(true);
+  };
+
+  const drillColumns = useMemo(() => {
+    const base = [
+      { key: "company" as const, label: "Empresa" },
+      { key: "name" as const, label: "Contato" },
+      { key: "phase" as const, label: "Fase Atual", format: columnFormatters.phase },
+      { key: "closer" as const, label: "Closer" },
+      { key: "revenueRange" as const, label: "Faixa" },
+    ];
+    if (drillMode === "money") {
+      return [
+        ...base,
+        { key: "mrr" as const, label: "MRR", format: columnFormatters.currency },
+        { key: "setup" as const, label: "Setup", format: columnFormatters.currency },
+        { key: "pontual" as const, label: "Pontual", format: columnFormatters.currency },
+        { key: "total" as const, label: "TCV", format: columnFormatters.currency },
+      ];
+    }
+    if (drillMode === "lost") {
+      return [...base, { key: "reason" as const, label: "Motivo", format: columnFormatters.reason }];
+    }
+    return base;
+  }, [drillMode]);
+
   const FilterPill = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
     <button
       onClick={onClick}
