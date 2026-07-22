@@ -13,6 +13,7 @@ import ComercialPreview from "./pages/ComercialPreview";
 import DebugOrigens from "./pages/DebugOrigens";
 import DebugFunnelMetas from "./pages/DebugFunnelMetas";
 import DebugOutbound from "./pages/DebugOutbound";
+import PublicG4Dashboard from "./pages/PublicG4Dashboard";
 
 import NotFound from "./pages/NotFound";
 
