@@ -405,7 +405,18 @@ function LostReasonsBar({ groups }: { groups: LiveGroup[] }) {
           <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" horizontal={false} />
           <XAxis type="number" tick={{ fontSize: 10 }} />
           <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={140} />
-          <Tooltip contentStyle={{ fontSize: 11 }} />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--popover))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              color: "hsl(var(--popover-foreground))",
+              fontSize: "12px",
+            }}
+            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+            labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
+            cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+          />
           <Bar dataKey="value" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
