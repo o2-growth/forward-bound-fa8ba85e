@@ -49,6 +49,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/dash-g4" element={<PublicG4Dashboard />} />
             <Route
               path="/"
               element={
