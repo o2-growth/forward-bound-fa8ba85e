@@ -27,7 +27,7 @@ export function parseEventDate(name: string): Date | null {
     const y = dmyDash[3].length === 2 ? 2000 + Number(dmyDash[3]) : Number(dmyDash[3]);
     return new Date(y, Number(dmyDash[2]) - 1, Number(dmyDash[1]));
   }
-  const dm = name.match(/(\d{1,2})\/(\d{1,2})(?!\d)/);
+  const dm = name.match(/(\d{1,2})[\/-](\d{1,2})(?!\d)/);
   if (dm) return new Date(2026, Number(dm[2]) - 1, Number(dm[1]));
   const dMon = name.match(/(\d{1,2})[-\s](jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/i);
   if (dMon) return new Date(2026, MONTHS_PT[dMon[2].toLowerCase()], Number(dMon[1]));
