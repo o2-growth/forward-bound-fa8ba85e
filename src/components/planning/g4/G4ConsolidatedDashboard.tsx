@@ -54,13 +54,13 @@ const isTerminal = (fase: string | null) => {
 const isInContact = (fase: string | null) => {
   const n = normalize(fase);
   if (!n) return false;
+  // Blacklist: leads parados em "G4 Tools" não são atendimento comercial
+  if (n.includes("g4 tools") || n.includes("g4tools")) return false;
   if (IN_CONTACT_EXACT.has(n)) return true;
-  // G4 usa variações — reconhecer por substring normalizada
   if (n.includes("tentativa") && n.includes("contato")) return true;
   if (n.includes("contato") && n.includes("g4")) return true;
   if (n.includes("qualifica") && n.includes("g4")) return true;
   if (n.includes("reuniao") && (n.includes("marcada") || n.includes("realizada"))) return true;
-  // Fallback: qualquer lead ativo (não terminal e não ganho) do G4 conta como em contato
   if (!isTerminal(fase)) return true;
   return false;
 };
