@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { useG4RealMetrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
 import { fmt, fmtInt } from "@/components/planning/ceo/ceoShared";
+import { DetailSheet, columnFormatters, type DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { cn } from "@/lib/utils";
 
 // ─────────── helpers ───────────
