@@ -1,21 +1,12 @@
 ## Problema
-Os tooltips do Recharts nos gráficos do G4 Consolidated Dashboard (Motivos de Perda, Barras por Evento, Pie de Temperatura) estão usando o `contentStyle` padrão do Recharts — fundo branco com texto claro/vermelho — ficando ilegíveis no tema escuro (conforme screenshot: "Orçamento incompatível / value : 2" quase invisível).
+No tooltip do gráfico "Motivos de perda · Top 6", aparece literalmente `value : 2` porque o `<Bar dataKey="value" />` não tem `name` definido, então o Recharts usa a chave crua "value" como legenda do item. Os números (1, 2) são reais — são as contagens de leads perdidos por motivo (base pequena) — mas o rótulo confunde.
 
 ## Ajuste
-Em `src/components/planning/g4/G4ConsolidatedDashboard.tsx`, padronizar os 3 `<Tooltip />` (linhas 285, 311, 388) usando os tokens semânticos do design system (mesmo padrão do `LossReasonsBar.tsx`):
+Em `src/components/planning/g4/G4ConsolidatedDashboard.tsx`, no `LostReasonsBar`:
 
-```tsx
-<Tooltip
-  contentStyle={{
-    backgroundColor: "hsl(var(--popover))",
-    border: "1px solid hsl(var(--border))",
-    borderRadius: "8px",
-    color: "hsl(var(--popover-foreground))",
-    fontSize: "12px",
-  }}
-  itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-  labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
-/>
-```
+1. Dar `name="Perdidos"` ao `<Bar />` para o tooltip mostrar `Perdidos : 2` em vez de `value : 2`.
+2. Adicionar `formatter` no `<Tooltip />` para exibir `"{n} perdido(s)"` e usar o próprio motivo (categoria do eixo Y) como título.
 
-Isso garante contraste correto em light e dark mode, sem alterar dados nem lógica.
+Aplicar tratamento equivalente no `EventsBarChart` (garantir que Leads/MQL/Ganho já têm nomes — já têm, mas confirmar o formatter fica consistente).
+
+Sem mudança de dados nem de lógica de agregação.
