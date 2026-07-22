@@ -128,7 +128,8 @@ Deno.serve(async (req) => {
                  l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer,
                  COALESCE(l.pipefy_url, 'https://app.pipefy.com/open-cards/' || p.card_id) AS pipefy_url,
                  COALESCE(p.faixa, d.faixa) AS faixa,
-                 p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe
+                 p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe,
+                 p.labels_raw, p.motivo_perda
           FROM g4_leads_360 l
           LEFT JOIN pipe p ON p.email = l.email
           LEFT JOIN diag_faixa d ON d.email = l.email
