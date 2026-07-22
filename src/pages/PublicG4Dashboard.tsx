@@ -96,7 +96,7 @@ export default function PublicG4Dashboard() {
     <div className="min-h-screen bg-background">
       <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <O2Logo height={32} />
-        <Button variant="ghost" size Bahrain="sm" onClick={handleLogout}>
+        <Button variant="ghost" size="sm" onClick={handleLogout}>
           <LogOut className="h-4 w-4 mr-2" />
           Sair
         </Button>
