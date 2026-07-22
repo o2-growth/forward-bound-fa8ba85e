@@ -283,6 +283,15 @@ function TemperaturePie({ groups }: { groups: LiveGroup[] }) {
             ))}
           </Pie>
           <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--popover))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              color: "hsl(var(--popover-foreground))",
+              fontSize: "12px",
+            }}
+            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+            labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
             formatter={(v: number, n: string) =>
               [`${fmtInt(v)} (${total ? Math.round((v / total) * 100) : 0}%)`, n]
             }
