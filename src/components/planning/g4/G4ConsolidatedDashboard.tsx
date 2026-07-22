@@ -241,6 +241,8 @@ function ClickCell({
       </button>
     </td>
   );
+}
+
 
 function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
