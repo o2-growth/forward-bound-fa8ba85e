@@ -416,8 +416,9 @@ function LostReasonsBar({ groups }: { groups: LiveGroup[] }) {
             itemStyle={{ color: "hsl(var(--popover-foreground))" }}
             labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
             cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+            formatter={(v: number) => [`${fmtInt(v)} perdido${v === 1 ? "" : "s"}`, "Total"]}
           />
-          <Bar dataKey="value" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
+          <Bar dataKey="value" name="Perdidos" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
