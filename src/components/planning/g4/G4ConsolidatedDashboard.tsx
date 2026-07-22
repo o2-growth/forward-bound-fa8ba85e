@@ -48,6 +48,16 @@ const IN_CONTACT = new Set([
   "reunioes realizadas",
 ]);
 const isInContact = (fase: string | null) => IN_CONTACT.has(normalize(fase));
+
+// MQL = faturamento mensal >= R$ 200k, inferido pelo campo `faixa`
+const MQL_FAIXAS = new Set([
+  "entre r$ 200 mil e r$ 350 mil",
+  "entre r$ 350 mil e r$ 500 mil",
+  "entre r$ 500 mil e r$ 1 milhao",
+  "entre r$ 1 milhao e r$ 5 milhoes",
+  "acima de r$ 5 milhoes",
+]);
+const isMqlByFaturamento = (faixa: string | null) => MQL_FAIXAS.has(normalize(faixa));
 const isLive = (name: string) => /live/i.test(name);
 
 // Try to parse a date from the live name for sorting/filtering.
@@ -126,7 +136,7 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
       kind: isLive(live) ? "live" : "evento",
       leads: uniq,
       inscritos: uniq.length,
-      mqls: uniq.filter((l) => l.levantouMao).length,
+      mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
       emContato: uniq.filter((l) => isInContact(l.faseAtual)).length,
       quentes: uniq.filter((l) => l.temperatura === "Quente").length,
       fechados: won.length,
@@ -633,7 +643,7 @@ export function G4ConsolidatedDashboard() {
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users} />
-            <Kpi label="MQLs" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary" />
+            <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary" />
             <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle} />
             <Kpi label="Quentes" value={fmtInt(totals.quentes)} icon={Flame} tone="warning" />
             <Kpi label="Fechados" value={fmtInt(totals.fechados)} hint={`${closeRate}% close rate`} icon={Trophy} tone="success" />
