@@ -161,12 +161,14 @@ function Kpi({
   hint,
   icon: Icon,
   tone = "default",
+  onClick,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon: typeof Users;
   tone?: "default" | "primary" | "warning" | "success";
+  onClick?: () => void;
 }) {
   const toneCls =
     tone === "primary"
@@ -177,7 +179,13 @@ function Kpi({
       ? "text-emerald-600 dark:text-emerald-400"
       : "text-foreground";
   return (
-    <Card className="border-border/60">
+    <Card
+      className={cn(
+        "border-border/60",
+        onClick && "cursor-pointer hover:border-primary/60 hover:shadow-sm transition-all",
+      )}
+      onClick={onClick}
+    >
       <CardContent className="p-3">
         <div className="flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
