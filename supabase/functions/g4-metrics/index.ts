@@ -92,7 +92,9 @@ Deno.serve(async (req) => {
               "Entrada" AS data_entrada_pipe,
               "ID" AS card_id,
               "Labels" AS labels_raw,
-              "Motivo da perda" AS motivo_perda
+              "Motivo da perda" AS motivo_perda,
+              "Origem do lead" AS origem_lead,
+              "Tipo Origem Lead" AS tipo_origem_lead
             FROM pipefy_moviment_cfos
             WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
             ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
