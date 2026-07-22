@@ -377,9 +377,8 @@ export function G4ConsolidatedDashboard() {
                 {groups.map((g) => {
                   const isOpen = expanded.has(g.live);
                   return (
-                    <>
+                    <Fragment key={g.live}>
                       <tr
-                        key={g.live}
                         className="border-t hover:bg-muted/30 cursor-pointer"
                         onClick={() => toggle(g.live)}
                       >
@@ -406,13 +405,13 @@ export function G4ConsolidatedDashboard() {
                         <td className="px-2 py-2 text-right tabular-nums">{fmt(g.ticketMedio)}</td>
                       </tr>
                       {isOpen && (
-                        <tr key={`${g.live}-exp`}>
+                        <tr>
                           <td colSpan={13} className="p-0">
                             <ExpandedRow group={g} />
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })}
                 {groups.length > 0 && (
