@@ -942,6 +942,15 @@ export function G4ConsolidatedDashboard() {
           </Card>
         </>
       )}
+
+      <DetailSheet
+        open={drillOpen}
+        onOpenChange={setDrillOpen}
+        title={drillTitle}
+        description={drillDesc}
+        items={drillItems}
+        columns={drillColumns}
+      />
     </div>
   );
 }
