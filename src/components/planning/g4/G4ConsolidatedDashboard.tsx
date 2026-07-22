@@ -207,6 +207,41 @@ function MoneyCard({ label, value }: { label: string; value: number }) {
   );
 }
 
+function ClickCell({
+  onClick,
+  tone,
+  children,
+}: {
+  onClick: () => void;
+  tone?: "warning" | "success" | "destructive";
+  children: React.ReactNode;
+}) {
+  const toneCls =
+    tone === "warning"
+      ? "text-orange-600 dark:text-orange-400"
+      : tone === "success"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "destructive"
+      ? "text-destructive"
+      : "";
+  return (
+    <td className="px-2 py-2 text-right tabular-nums">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={cn(
+          "hover:underline decoration-dotted underline-offset-2 hover:text-primary transition-colors",
+          toneCls,
+        )}
+      >
+        {children}
+      </button>
+    </td>
+  );
+
 function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <div className="mb-2">
