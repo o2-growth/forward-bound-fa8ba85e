@@ -23,11 +23,7 @@ import { DetailSheet, columnFormatters, type DetailItem } from "@/components/pla
 import { cn } from "@/lib/utils";
 
 // ─────────── helpers ───────────
-const LIVE_CANONICAL_MAP: Record<string, string> = {
-  "Live - G4 - 20-mai": "Live G4 - 20/05/2026",
-  "Live - G4 - 21-mai": "Live G4 - 21/05/2026",
-};
-const canonLive = (s: string): string => LIVE_CANONICAL_MAP[s] ?? s;
+import { canonLive, parseEventDate as parseEventDateShared } from "./canonLive";
 
 const normalize = (s: unknown) =>
   String(s ?? "")
