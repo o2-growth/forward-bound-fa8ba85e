@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2, Lock, LogOut } from "lucide-react";
 import { O2Logo } from "@/components/O2Logo";
-import G4ConsolidatedDashboard from "@/components/planning/g4/G4ConsolidatedDashboard";
+import { G4ConsolidatedDashboard } from "@/components/planning/g4/G4ConsolidatedDashboard";
 
 // SHA-256 hash of the shared password. To change, run:
 //   echo -n "nova-senha" | sha256sum
