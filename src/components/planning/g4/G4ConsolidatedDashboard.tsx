@@ -283,6 +283,15 @@ function TemperaturePie({ groups }: { groups: LiveGroup[] }) {
             ))}
           </Pie>
           <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--popover))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              color: "hsl(var(--popover-foreground))",
+              fontSize: "12px",
+            }}
+            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+            labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
             formatter={(v: number, n: string) =>
               [`${fmtInt(v)} (${total ? Math.round((v / total) * 100) : 0}%)`, n]
             }
@@ -308,7 +317,18 @@ function EventsBarChart({ groups }: { groups: LiveGroup[] }) {
           <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={50} />
           <YAxis tick={{ fontSize: 10 }} />
-          <Tooltip contentStyle={{ fontSize: 11 }} />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--popover))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              color: "hsl(var(--popover-foreground))",
+              fontSize: "12px",
+            }}
+            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+            labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
+            cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+          />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <Bar dataKey="Leads" fill="hsl(var(--primary) / 0.35)" radius={[4, 4, 0, 0]} />
           <Bar dataKey="MQL" fill="hsl(var(--primary) / 0.7)" radius={[4, 4, 0, 0]} />
@@ -385,7 +405,18 @@ function LostReasonsBar({ groups }: { groups: LiveGroup[] }) {
           <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" horizontal={false} />
           <XAxis type="number" tick={{ fontSize: 10 }} />
           <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={140} />
-          <Tooltip contentStyle={{ fontSize: 11 }} />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: "hsl(var(--popover))",
+              border: "1px solid hsl(var(--border))",
+              borderRadius: "8px",
+              color: "hsl(var(--popover-foreground))",
+              fontSize: "12px",
+            }}
+            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+            labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
+            cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+          />
           <Bar dataKey="value" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
         </BarChart>
       </ResponsiveContainer>
