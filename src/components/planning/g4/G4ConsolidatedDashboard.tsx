@@ -859,22 +859,18 @@ export function G4ConsolidatedDashboard() {
                                 {g.live}
                               </div>
                             </td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmtInt(g.inscritos)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmtInt(g.mqls)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmtInt(g.emContato)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums text-orange-600 dark:text-orange-400">
-                              {fmtInt(g.quentes)}
-                            </td>
-                            <td className="px-2 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                              {fmtInt(g.fechados)}
-                            </td>
+                            <ClickCell onClick={() => openDrill(`Leads · ${g.live}`, "all", [g])}>{fmtInt(g.inscritos)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`MQLs · ${g.live}`, "mql", [g])}>{fmtInt(g.mqls)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Em contato · ${g.live}`, "contato", [g])}>{fmtInt(g.emContato)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Quentes · ${g.live}`, "quente", [g])} tone="warning">{fmtInt(g.quentes)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])} tone="success">{fmtInt(g.fechados)}</ClickCell>
                             <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{conv}%</td>
-                            <td className="px-2 py-2 text-right tabular-nums text-destructive">{fmtInt(g.perdidos)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.mrr)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.setup)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.pontual)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.tcv)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.ticketMedio)}</td>
+                            <ClickCell onClick={() => openDrill(`Perdidos · ${g.live}`, "perdido", [g])} tone="destructive">{fmtInt(g.perdidos)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.mrr)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.setup)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.pontual)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.tcv)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.ticketMedio)}</ClickCell>
                           </tr>
                           {isOpen && (
                             <tr>
