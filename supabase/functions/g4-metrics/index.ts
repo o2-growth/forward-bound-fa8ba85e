@@ -184,6 +184,22 @@ Deno.serve(async (req) => {
     };
 
     const nowMs = Date.now();
+    const parseTemperatura = (raw: unknown): "Quente" | "Morno" | "Frio" | null => {
+      if (raw == null) return null;
+      let str = String(raw).trim();
+      if (!str || str === "[]") return null;
+      if (str.startsWith("[")) {
+        try {
+          const arr = JSON.parse(str);
+          if (Array.isArray(arr) && arr.length > 0) str = String(arr[0]).trim();
+        } catch { /* keep raw */ }
+      }
+      const norm = str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (norm.startsWith("quente")) return "Quente";
+      if (norm.startsWith("morn")) return "Morno";
+      if (norm.startsWith("fri")) return "Frio";
+      return null;
+    };
     const leads = (leadRows as Array<Record<string, unknown>>).map((r) => {
       const valorMRR = r.valor_mrr != null ? Number(r.valor_mrr) : null;
       const valorSetup = r.valor_setup != null ? Number(r.valor_setup) : null;
@@ -219,6 +235,8 @@ Deno.serve(async (req) => {
         sdr: (r.sdr as string | null) ?? null,
         dataEntradaPipe,
         diasNoPipe,
+        temperatura: parseTemperatura(r.labels_raw),
+        motivoPerda: (r.motivo_perda as string | null) ?? null,
       };
     });
 
