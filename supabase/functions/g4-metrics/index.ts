@@ -92,7 +92,9 @@ Deno.serve(async (req) => {
               "Entrada" AS data_entrada_pipe,
               "ID" AS card_id,
               "Labels" AS labels_raw,
-              "Motivo da perda" AS motivo_perda
+              "Motivo da perda" AS motivo_perda,
+              "Origem do lead" AS origem_lead,
+              "Tipo Origem Lead" AS tipo_origem_lead
             FROM pipefy_moviment_cfos
             WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
             ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
@@ -129,7 +131,7 @@ Deno.serve(async (req) => {
                  COALESCE(l.pipefy_url, 'https://app.pipefy.com/open-cards/' || p.card_id) AS pipefy_url,
                  COALESCE(p.faixa, d.faixa) AS faixa,
                  p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe,
-                 p.labels_raw, p.motivo_perda
+                 p.labels_raw, p.motivo_perda, p.origem_lead, p.tipo_origem_lead
           FROM g4_leads_360 l
           LEFT JOIN pipe p ON p.email = l.email
           LEFT JOIN diag_faixa d ON d.email = l.email
@@ -237,6 +239,8 @@ Deno.serve(async (req) => {
         diasNoPipe,
         temperatura: parseTemperatura(r.labels_raw),
         motivoPerda: (r.motivo_perda as string | null) ?? null,
+        origemLead: (r.origem_lead as string | null) ?? null,
+        tipoOrigemLead: (r.tipo_origem_lead as string | null) ?? null,
       };
     });
 

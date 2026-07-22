@@ -99,9 +99,41 @@ interface LiveGroup {
   lostLeads: G4RealLead[];
 }
 
+// Regra de atribuição G4: exclui leads cuja origem no Pipefy é claramente não-G4
+// (Colaborador O2 / Indicação / Outbound / Relacionamento), a menos que haja
+// sinal G4 real no próprio lead (levantou mão, presença, diagnóstico, ou
+// origem mencionando G4/Live/Aula Traction).
+const NON_G4_ORIGIN_TOKENS = [
+  "colaborador",
+  "indicac",
+  "indicaç",
+  "outbound",
+  "prospec",
+  "relacionamento",
+  "networking",
+];
+export function isG4Attributed(l: G4RealLead): boolean {
+  const origem = normalize(`${l.origemLead ?? ""} ${l.tipoOrigemLead ?? ""}`);
+  // Whitelist por sinal G4 forte no próprio lead
+  const hasG4Signal =
+    l.levantouMao ||
+    l.presenteAlgumaLive ||
+    l.fezDiagnostico ||
+    origem.includes("g4") ||
+    origem.includes("live") ||
+    origem.includes("aula traction") ||
+    origem.includes("traction");
+  if (hasG4Signal) return true;
+  // Blacklist por origem não-G4
+  if (origem && NON_G4_ORIGIN_TOKENS.some((t) => origem.includes(t))) return false;
+  // Sem sinal e sem blacklist: mantém (comportamento atual)
+  return true;
+}
+
 function buildGroups(leads: G4RealLead[]): LiveGroup[] {
+  const filtered = leads.filter(isG4Attributed);
   const byLive = new Map<string, G4RealLead[]>();
-  for (const lead of leads) {
+  for (const lead of filtered) {
     for (const rawLive of lead.lives) {
       const live = canonLive(rawLive);
       if (!byLive.has(live)) byLive.set(live, []);
@@ -637,6 +669,10 @@ export function G4ConsolidatedDashboard() {
   const [drillMode, setDrillMode] = useState<"basic" | "money" | "lost">("basic");
 
   const allGroups = useMemo(() => (data ? buildGroups(data.leads) : []), [data]);
+  const excludedByOrigin = useMemo(
+    () => (data ? data.leads.filter((l) => !isG4Attributed(l)).length : 0),
+    [data],
+  );
 
   const groups = useMemo(() => {
     const now = Date.now();
@@ -804,6 +840,7 @@ export function G4ConsolidatedDashboard() {
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users}
+              hint={excludedByOrigin > 0 ? `${excludedByOrigin} excluídos por origem não-G4` : undefined}
               onClick={() => openDrill("Leads G4 · Consolidado", "all", groups)} />
             <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary"
               onClick={() => openDrill("MQLs · Faturamento ≥ R$ 200k/mês", "mql", groups)} />

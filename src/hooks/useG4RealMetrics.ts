@@ -24,6 +24,8 @@ export type G4RealLead = {
   diasNoPipe: number | null;
   temperatura: "Quente" | "Morno" | "Frio" | null;
   motivoPerda: string | null;
+  origemLead?: string | null;
+  tipoOrigemLead?: string | null;
 };
 
 export type G4RealFunilRow = {
