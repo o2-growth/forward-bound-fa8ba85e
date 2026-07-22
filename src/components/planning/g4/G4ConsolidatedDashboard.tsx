@@ -669,6 +669,10 @@ export function G4ConsolidatedDashboard() {
   const [drillMode, setDrillMode] = useState<"basic" | "money" | "lost">("basic");
 
   const allGroups = useMemo(() => (data ? buildGroups(data.leads) : []), [data]);
+  const excludedByOrigin = useMemo(
+    () => (data ? data.leads.filter((l) => !isG4Attributed(l)).length : 0),
+    [data],
+  );
 
   const groups = useMemo(() => {
     const now = Date.now();
