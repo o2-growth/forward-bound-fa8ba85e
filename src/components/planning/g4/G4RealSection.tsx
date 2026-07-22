@@ -41,13 +41,9 @@ import { buildPipefyUrl } from "./pipefy";
 const MAIO_LIVE = "Live G4 - 20-21/05/2026";
 
 // ── Canonicalização de rótulos de lives ──────────────────────────────────
-// A fonte externa tem variações do mesmo evento (ex.: "Live - G4 - 20-mai"
-// vs "Live G4 - 20/05/2026"). Consolidamos aqui no rótulo canônico.
-const LIVE_CANONICAL_MAP: Record<string, string> = {
-  "Live - G4 - 20-mai": "Live G4 - 20/05/2026",
-  "Live - G4 - 21-mai": "Live G4 - 21/05/2026",
-};
-const canonLive = (s: string): string => LIVE_CANONICAL_MAP[s] ?? s;
+// Consolidamos variações do mesmo evento (ex.: "Live - G4 02/07" vs
+// "Live G4 - 02/07/2026") num único rótulo. Ver ./canonLive.
+import { canonLive } from "./canonLive";
 
 // ── Presentes medidos manualmente (contagem no Zoom durante a live) ──────
 // A fonte externa não exporta presença; esses números foram contados ao vivo.
