@@ -888,12 +888,6 @@ export function G4ConsolidatedDashboard() {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <SectionTitle title="Temperatura dos leads" />
-                <TemperaturePie groups={groups} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
                 <SectionTitle title="Motivos de perda · Top 6" />
                 <LostReasonsBar groups={groups} />
               </CardContent>
