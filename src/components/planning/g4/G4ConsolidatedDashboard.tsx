@@ -48,6 +48,16 @@ const IN_CONTACT = new Set([
   "reunioes realizadas",
 ]);
 const isInContact = (fase: string | null) => IN_CONTACT.has(normalize(fase));
+
+// MQL = faturamento mensal >= R$ 200k, inferido pelo campo `faixa`
+const MQL_FAIXAS = new Set([
+  "entre r$ 200 mil e r$ 350 mil",
+  "entre r$ 350 mil e r$ 500 mil",
+  "entre r$ 500 mil e r$ 1 milhao",
+  "entre r$ 1 milhao e r$ 5 milhoes",
+  "acima de r$ 5 milhoes",
+]);
+const isMqlByFaturamento = (faixa: string | null) => MQL_FAIXAS.has(normalize(faixa));
 const isLive = (name: string) => /live/i.test(name);
 
 // Try to parse a date from the live name for sorting/filtering.
