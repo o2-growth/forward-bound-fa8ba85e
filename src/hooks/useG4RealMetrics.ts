@@ -22,6 +22,8 @@ export type G4RealLead = {
   sdr: string | null;
   dataEntradaPipe: string | null;
   diasNoPipe: number | null;
+  temperatura: "Quente" | "Morno" | "Frio" | null;
+  motivoPerda: string | null;
 };
 
 export type G4RealFunilRow = {
