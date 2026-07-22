@@ -1,19 +1,8 @@
 import { Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { G4RealSection } from "./g4/G4RealSection";
+import { G4ConsolidatedDashboard } from "./g4/G4ConsolidatedDashboard";
 
-/**
- * G4Tab — Dashboard da parceria G4 Educação.
- *
- * Após limpeza, o painel expõe apenas a visão "Reais" (fonte externa:
- * inscritos + presença + levantada de mão + diagnóstico + Pipe).
- *
- * As antigas sub-abas (Overview / Lives / Eventos / Seller) foram removidas
- * porque dependiam de classificação heurística (origemLead/paginaOrigem) e
- * de custos ainda não calibrados — produziam números não confiáveis.
- * Quando o Pipefy expuser `origemLead = "G4 SELLER"` e os custos reais
- * dos eventos forem cadastrados, reintroduziremos as frentes.
- */
 export function G4Tab() {
   return (
     <div className="space-y-6">
@@ -34,7 +23,9 @@ export function G4Tab() {
         </div>
       </div>
 
+      <G4ConsolidatedDashboard />
       <G4RealSection />
     </div>
   );
 }
+

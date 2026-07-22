@@ -90,7 +90,9 @@ Deno.serve(async (req) => {
               COALESCE("Valor Pontual", 0)::float8 AS valor_pontual,
               "SDR responsável" AS sdr,
               "Entrada" AS data_entrada_pipe,
-              "ID" AS card_id
+              "ID" AS card_id,
+              "Labels" AS labels_raw,
+              "Motivo da perda" AS motivo_perda
             FROM pipefy_moviment_cfos
             WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
             ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
@@ -126,7 +128,8 @@ Deno.serve(async (req) => {
                  l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer,
                  COALESCE(l.pipefy_url, 'https://app.pipefy.com/open-cards/' || p.card_id) AS pipefy_url,
                  COALESCE(p.faixa, d.faixa) AS faixa,
-                 p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe
+                 p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe,
+                 p.labels_raw, p.motivo_perda
           FROM g4_leads_360 l
           LEFT JOIN pipe p ON p.email = l.email
           LEFT JOIN diag_faixa d ON d.email = l.email
@@ -181,6 +184,22 @@ Deno.serve(async (req) => {
     };
 
     const nowMs = Date.now();
+    const parseTemperatura = (raw: unknown): "Quente" | "Morno" | "Frio" | null => {
+      if (raw == null) return null;
+      let str = String(raw).trim();
+      if (!str || str === "[]") return null;
+      if (str.startsWith("[")) {
+        try {
+          const arr = JSON.parse(str);
+          if (Array.isArray(arr) && arr.length > 0) str = String(arr[0]).trim();
+        } catch { /* keep raw */ }
+      }
+      const norm = str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      if (norm.startsWith("quente")) return "Quente";
+      if (norm.startsWith("morn")) return "Morno";
+      if (norm.startsWith("fri")) return "Frio";
+      return null;
+    };
     const leads = (leadRows as Array<Record<string, unknown>>).map((r) => {
       const valorMRR = r.valor_mrr != null ? Number(r.valor_mrr) : null;
       const valorSetup = r.valor_setup != null ? Number(r.valor_setup) : null;
@@ -216,6 +235,8 @@ Deno.serve(async (req) => {
         sdr: (r.sdr as string | null) ?? null,
         dataEntradaPipe,
         diasNoPipe,
+        temperatura: parseTemperatura(r.labels_raw),
+        motivoPerda: (r.motivo_perda as string | null) ?? null,
       };
     });
 
