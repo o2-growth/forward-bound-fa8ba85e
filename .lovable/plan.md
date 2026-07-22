@@ -1,55 +1,51 @@
+
 ## Objetivo
 
-Adicionar, no painel G4 (`G4Tab`), um novo bloco "Dashboard Consolidado" onde cada **linha = uma data de live/evento**, com todas as métricas do funil, temperatura, perdas e valores — consumindo a mesma fonte que já usamos hoje (`g4-metrics`).
+Refazer o `G4ConsolidatedDashboard` para ter o mesmo padrão visual do Indicadores Comercial: KPIs no topo, gráficos comparativos, e depois tabela detalhada por live/evento com drill-down. Hoje é só uma tabela crua — vamos evoluir para uma visão macro→micro de verdade.
 
-## Escopo
+## Estrutura nova (top → bottom)
 
-- Fonte: `supabase/functions/g4-metrics` (Pipefy Modelo Atual join com `g4_inscritos` / `g4_diagnostico` / `g4_leads_360`).
-- Agrupamento: uma linha por data. Cada live/evento vira uma linha só (usando o `LIVE_CANONICAL_MAP` já existente para dedup de rótulos como "Live - G4 - 20-mai" ↔ "Live G4 - 20/05/2026").
-- Todos os leads exibidos são os que vieram por aquela live/evento (`lead.lives.includes(live)`), independente do pipe onde estejam hoje.
+**1. Header com filtros**
+- Toggle: `Todos` | `Lives` | `Eventos`
+- Range de datas (dropdown: Últimos 30d / 90d / Todo período)
 
-## O que aparece por linha (colunas expansíveis)
+**2. Faixa de KPIs consolidados (7 cards)**
+Cards no mesmo estilo do Indicadores Comercial (título pequeno + número grande + delta opcional):
+- Total Leads
+- MQLs (com % conversão sobre Leads)
+- Em Contato
+- Quentes (destaque laranja)
+- Fechados (destaque verde + % close rate)
+- TCV total
+- Ticket médio
 
-Colapsado (visão de tabela):
-- Data / Live ou Evento
-- Leads (inscritos) · MQLs (levantaram a mão)
-- Em contato (fases pré-proposta: `Tentativas de contato`, `Reunião marcada`, `Reunião realizada`)
-- Quentes (Temperatura = Quente)
-- Fechados (fase = `Ganho`)
-- Perdidos (fase começa com `Perdido` / `Perda`)
-- MRR · Setup · Pontual · TCV · Ticket médio das vendas
+**3. Grid de gráficos (2 colunas)**
+Usando `recharts` (já no projeto):
+- **Funil consolidado**: FunnelChart com Leads → MQL → Em contato → Quente → Ganho
+- **Barras por live/evento**: BarChart empilhado (Leads / MQL / Ganho) ordenado por data
+- **Pizza de temperatura**: Quente / Morno / Frio / Sem tag consolidado
+- **Barras de motivo de perda**: top 6 motivos horizontais
 
-Expandido (drill-down por linha, tabs):
-- **Por fase**: contagem por `faseAtual` (todas as fases que aparecerem naqueles leads)
-- **Temperatura**: Quente / Morno / Frio (campo Temperatura do Pipefy)
-- **Perdidos**: lista + agrupamento por `motivoPerda`
-- **Vendas**: tabela com empresa, closer, MRR, Setup, Pontual, TCV, link Pipefy
-- **Ticket médio**: Setup + (MRR × 1) + Pontual, calculado só sobre os `Ganho` da linha
+**4. Ranking de eventos (mini-tabela compacta)**
+Top 5 lives/eventos por Fechados e por TCV, lado a lado — visão rápida do que performou.
 
-## Fórmulas
+**5. Tabela detalhada (visão micro atual)**
+Mantém a tabela expansível atual, mas:
+- Header sticky
+- Linha destacada quando `fechados > 0`
+- Coluna extra: **Conv%** (Fechados / Leads)
+- Drill-down expandido igual está hoje (fases / temperatura / perdidos / vendas)
 
-- Ticket médio = média de `(setup + mrr + pontual)` entre os cards `Ganho` da live/evento (mesma fórmula usada em Indicadores Comercial).
-- TCV = `mrr × 12 + setup + pontual` (padrão do projeto).
-- "Em contato" = fases pré-proposta listadas acima; ajustável se você quiser incluir/excluir alguma.
-- Perdidos = qualquer card cuja `faseAtual` normalizada comece com `perdido` ou `perda` (mesma regra de `temperaturaAggregator`).
+## Detalhes técnicos
 
-## Ajustes técnicos
+- Componente único `G4ConsolidatedDashboard.tsx` reescrito, mantendo `buildGroups`, `ExpandedRow`, `LeadsTable`, `MoneyCard`.
+- Novos sub-componentes internos: `KpiStrip`, `ConsolidatedFunnel`, `EventsBarChart`, `TemperaturePie`, `LostReasonsBar`, `TopRanking`.
+- Filtro Live/Evento por regex no nome (`live` vs resto = evento).
+- Cores via tokens semânticos (`--primary`, `--destructive`, `--chart-*`) — sem hex hardcoded.
+- Reutiliza `fmt`, `fmtInt` de `ceoShared`.
+- Sem mudança em edge function nem hook — todos os dados já vêm de `useG4RealMetrics`.
 
-1. **`supabase/functions/g4-metrics/index.ts`**: incluir na resposta de cada lead os campos `temperatura` e `motivoPerda` (hoje só temos `faseAtual`). Adicionar leitura desses dois campos do `pipefy_moviment_cfos` na CTE `pipe` e propagar no `SELECT` final. Tipagem correspondente em `useG4RealMetrics.ts`.
-2. **Novo componente `G4ConsolidatedDashboard.tsx`** em `src/components/planning/g4/`:
-   - Consome `useG4RealMetrics` (mesmo hook, cache compartilhado).
-   - Agrupa `data.leads` por live canônica.
-   - Tabela principal + linha expansível com as tabs descritas.
-   - Usa `CollapsibleBlock` para fechar/abrir o bloco inteiro (padrão do restante do dashboard).
-3. **`G4Tab.tsx`**: acrescentar o novo `<G4ConsolidatedDashboard />` acima do `<G4RealSection />` (mantém o funil visual atual, que é bom para leitura rápida).
-4. Nenhum outro componente/lógica é tocado. Sem migrations. Sem mudança de rota.
+## Arquivos afetados
 
-## Fora do escopo
-
-- Não altero `G4RealSection` (funil por live continua igual).
-- Não crio novas fontes: uso o join Pipefy × g4_* já existente.
-- Não separo eventos e lives em blocos distintos — tudo cronológico numa única tabela, conforme sua escolha.
-
-## Entregável
-
-Novo bloco no painel G4 com uma tabela consolidada de todas as lives/eventos, expansível por linha, mostrando funil, fases, temperatura, perdas com motivo, vendas e valores.
+- `src/components/planning/g4/G4ConsolidatedDashboard.tsx` — reescrito
+- (nada mais)
