@@ -99,6 +99,18 @@ interface LiveGroup {
   lostLeads: G4RealLead[];
 }
 
+// Exclusões manuais G4 por card ID do Pipefy (extraído da pipefyUrl).
+// Cards aqui NÃO contam no dashboard G4, independentemente de sinais de G4.
+const MANUAL_EXCLUDED_G4_CARD_IDS = new Set<string>([
+  "1317180165", // Ediouro — não fechou pelas lives/eventos G4
+]);
+
+function extractPipefyCardId(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const m = url.match(/\/(\d{6,})(?:[/?#]|$)/);
+  return m ? m[1] : null;
+}
+
 // Regra de atribuição G4: exclui leads cuja origem no Pipefy é claramente não-G4
 // (Colaborador O2 / Indicação / Outbound / Relacionamento), a menos que haja
 // sinal G4 real no próprio lead (levantou mão, presença, diagnóstico, ou
@@ -113,6 +125,10 @@ const NON_G4_ORIGIN_TOKENS = [
   "networking",
 ];
 export function isG4Attributed(l: G4RealLead): boolean {
+  // Exclusão manual sempre vence
+  const cardId = extractPipefyCardId(l.pipefyUrl);
+  if (cardId && MANUAL_EXCLUDED_G4_CARD_IDS.has(cardId)) return false;
+
   const origem = normalize(`${l.origemLead ?? ""} ${l.tipoOrigemLead ?? ""}`);
   // Whitelist por sinal G4 forte no próprio lead
   const hasG4Signal =
