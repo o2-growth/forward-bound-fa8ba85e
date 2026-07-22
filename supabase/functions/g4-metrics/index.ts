@@ -90,7 +90,9 @@ Deno.serve(async (req) => {
               COALESCE("Valor Pontual", 0)::float8 AS valor_pontual,
               "SDR responsável" AS sdr,
               "Entrada" AS data_entrada_pipe,
-              "ID" AS card_id
+              "ID" AS card_id,
+              "Labels" AS labels_raw,
+              "Motivo da perda" AS motivo_perda
             FROM pipefy_moviment_cfos
             WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
             ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
