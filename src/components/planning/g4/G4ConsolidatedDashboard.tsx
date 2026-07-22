@@ -99,9 +99,41 @@ interface LiveGroup {
   lostLeads: G4RealLead[];
 }
 
+// Regra de atribuição G4: exclui leads cuja origem no Pipefy é claramente não-G4
+// (Colaborador O2 / Indicação / Outbound / Relacionamento), a menos que haja
+// sinal G4 real no próprio lead (levantou mão, presença, diagnóstico, ou
+// origem mencionando G4/Live/Aula Traction).
+const NON_G4_ORIGIN_TOKENS = [
+  "colaborador",
+  "indicac",
+  "indicaç",
+  "outbound",
+  "prospec",
+  "relacionamento",
+  "networking",
+];
+export function isG4Attributed(l: G4RealLead): boolean {
+  const origem = normalize(`${l.origemLead ?? ""} ${l.tipoOrigemLead ?? ""}`);
+  // Whitelist por sinal G4 forte no próprio lead
+  const hasG4Signal =
+    l.levantouMao ||
+    l.presenteAlgumaLive ||
+    l.fezDiagnostico ||
+    origem.includes("g4") ||
+    origem.includes("live") ||
+    origem.includes("aula traction") ||
+    origem.includes("traction");
+  if (hasG4Signal) return true;
+  // Blacklist por origem não-G4
+  if (origem && NON_G4_ORIGIN_TOKENS.some((t) => origem.includes(t))) return false;
+  // Sem sinal e sem blacklist: mantém (comportamento atual)
+  return true;
+}
+
 function buildGroups(leads: G4RealLead[]): LiveGroup[] {
+  const filtered = leads.filter(isG4Attributed);
   const byLive = new Map<string, G4RealLead[]>();
-  for (const lead of leads) {
+  for (const lead of filtered) {
     for (const rawLive of lead.lives) {
       const live = canonLive(rawLive);
       if (!byLive.has(live)) byLive.set(live, []);
