@@ -643,7 +643,7 @@ export function G4ConsolidatedDashboard() {
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users} />
-            <Kpi label="MQLs" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary" />
+            <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary" />
             <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle} />
             <Kpi label="Quentes" value={fmtInt(totals.quentes)} icon={Flame} tone="warning" />
             <Kpi label="Fechados" value={fmtInt(totals.fechados)} hint={`${closeRate}% close rate`} icon={Trophy} tone="success" />
