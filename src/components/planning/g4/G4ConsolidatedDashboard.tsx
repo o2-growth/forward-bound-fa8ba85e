@@ -37,14 +37,33 @@ const isLost = (fase: string | null) => {
   return n.startsWith("perdido") || n.startsWith("perda");
 };
 const isWon = (fase: string | null) => normalize(fase) === "ganho";
-const IN_CONTACT = new Set([
+const IN_CONTACT_EXACT = new Set([
   "tentativas de contato",
   "reuniao marcada",
   "reunioes marcadas",
   "reuniao realizada",
   "reunioes realizadas",
 ]);
-const isInContact = (fase: string | null) => IN_CONTACT.has(normalize(fase));
+// Fases terminais: não contam como "em contato" (nem no fallback de ativo)
+const TERMINAL_PHASES_TOKENS = ["ganho", "perdido", "perda", "arquivad", "contrato assinado", "onboarding", "em operacao", "operacao recorrente", "cancelad"];
+const isTerminal = (fase: string | null) => {
+  const n = normalize(fase);
+  if (!n) return true;
+  return TERMINAL_PHASES_TOKENS.some((t) => n.includes(t));
+};
+const isInContact = (fase: string | null) => {
+  const n = normalize(fase);
+  if (!n) return false;
+  if (IN_CONTACT_EXACT.has(n)) return true;
+  // G4 usa variações — reconhecer por substring normalizada
+  if (n.includes("tentativa") && n.includes("contato")) return true;
+  if (n.includes("contato") && n.includes("g4")) return true;
+  if (n.includes("qualifica") && n.includes("g4")) return true;
+  if (n.includes("reuniao") && (n.includes("marcada") || n.includes("realizada"))) return true;
+  // Fallback: qualquer lead ativo (não terminal e não ganho) do G4 conta como em contato
+  if (!isTerminal(fase)) return true;
+  return false;
+};
 
 // MQL = faturamento mensal >= R$ 200k, inferido pelo campo `faixa`
 const MQL_FAIXAS = new Set([
