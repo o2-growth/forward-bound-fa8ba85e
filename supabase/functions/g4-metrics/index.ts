@@ -239,6 +239,8 @@ Deno.serve(async (req) => {
         diasNoPipe,
         temperatura: parseTemperatura(r.labels_raw),
         motivoPerda: (r.motivo_perda as string | null) ?? null,
+        origemLead: (r.origem_lead as string | null) ?? null,
+        tipoOrigemLead: (r.tipo_origem_lead as string | null) ?? null,
       };
     });
 
