@@ -1,22 +1,47 @@
 
 ## Mudança
 
-Redefinir **MQL** no `G4ConsolidatedDashboard` para alinhar com o critério comercial de Modelo Atual: **faturamento mensal ≥ R$ 200 mil**, usando o campo `faixa` já disponível no lead (vem do diagnóstico ou do Pipefy via `g4-metrics`).
+Tornar todos os KPIs e métricas do `G4ConsolidatedDashboard` clicáveis, abrindo drill-down no mesmo padrão do Indicadores Comercial (`DetailSheet`), com tabela de leads, fase atual, empresa, contato, closer e link do Pipefy.
 
-Regra: lead é MQL se `faixa` estiver em uma destas categorias:
-- `Entre R$ 200 mil e R$ 350 mil`
-- `Entre R$ 350 mil e R$ 500 mil`
-- `Entre R$ 500 mil e R$ 1 milhão`
-- `Entre R$ 1 milhão e R$ 5 milhões`
-- `Acima de R$ 5 milhões`
+## Escopo dos clicáveis
 
-Leads sem `faixa` preenchida (nunca fizeram diagnóstico nem entraram no pipe) → **não** contam como MQL.
+**Faixa de KPIs (topo, consolidado global):**
+- Leads → todos os leads
+- MQLs ≥ R$ 200k → leads com faixa ≥ 200k
+- Em contato → leads em fases de contato
+- Quentes → temperatura Quente
+- Fechados → fase Ganho (com colunas monetárias)
+- TCV → mesma lista de Fechados
+- Ticket médio → mesma lista de Fechados
 
-## Aplicação
+**Tabela detalhada (por live/evento):**
+- Cada célula numérica (Leads, MQLs, Em contato, Quentes, Fechados, Perdidos) vira clicável, abrindo drill-down filtrado pela live daquela linha
+- Clicar na coluna "Live / Evento" continua expandindo inline (como hoje)
+
+**Cards de motivo de perda no drill-down inline:**
+- Cada motivo abre lista dos leads perdidos com aquele motivo
+
+## Estrutura do drill-down
+
+Reutilizar `DetailSheet` de `indicators/DetailSheet.tsx` com colunas:
+- Empresa
+- Contato (nome)
+- Fase Atual
+- Closer
+- Faixa faturamento
+- (para Fechados/TCV) MRR, Setup, Pontual, TCV
+- (para Perdidos) Motivo
+- Link Pipefy
+
+Cada `DetailItem` mapeado de `G4RealLead` com `pipefyUrl` renderizado como ícone de link externo (já suportado pela coluna `name`/`company` da `DetailSheet` via formatter, ou adiciono coluna dedicada de ação).
+
+## Arquivos
 
 - `src/components/planning/g4/G4ConsolidatedDashboard.tsx`
-  - Novo helper `isMqlByFaturamento(faixa)`.
-  - `buildGroups` passa a usar essa regra em `mqls`.
-  - Ajustar rótulo do KPI para `MQLs (≥ R$ 200k/mês)` e o hint `X% dos leads`.
+  - State para controlar sheet (`open`, `title`, `items`, `columns`)
+  - Helper `openDrill(title, leads, mode)` onde mode = `all | mql | contato | quente | ganho | perdido`
+  - Envolver KPIs em `<button>` acessível
+  - Envolver células numéricas da tabela em `<button>` (evitando conflito com o toggle de expandir a linha — clique na célula não propaga)
+  - Manter drill-down inline atual (expandir linha) intacto
 
-Não altero a definição em `G4RealSection` nem no `LiveDetailDialog` — muda só no dashboard consolidado, que é o escopo desta pergunta.
+Sem mudanças em edge function, hook ou outros componentes.

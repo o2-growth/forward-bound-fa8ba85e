@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { useG4RealMetrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
 import { fmt, fmtInt } from "@/components/planning/ceo/ceoShared";
+import { DetailSheet, columnFormatters, type DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { cn } from "@/lib/utils";
 
 // ─────────── helpers ───────────
@@ -160,12 +161,14 @@ function Kpi({
   hint,
   icon: Icon,
   tone = "default",
+  onClick,
 }: {
   label: string;
   value: string;
   hint?: string;
   icon: typeof Users;
   tone?: "default" | "primary" | "warning" | "success";
+  onClick?: () => void;
 }) {
   const toneCls =
     tone === "primary"
@@ -176,7 +179,13 @@ function Kpi({
       ? "text-emerald-600 dark:text-emerald-400"
       : "text-foreground";
   return (
-    <Card className="border-border/60">
+    <Card
+      className={cn(
+        "border-border/60",
+        onClick && "cursor-pointer hover:border-primary/60 hover:shadow-sm transition-all",
+      )}
+      onClick={onClick}
+    >
       <CardContent className="p-3">
         <div className="flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
@@ -197,6 +206,43 @@ function MoneyCard({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
+
+function ClickCell({
+  onClick,
+  tone,
+  children,
+}: {
+  onClick: () => void;
+  tone?: "warning" | "success" | "destructive";
+  children: React.ReactNode;
+}) {
+  const toneCls =
+    tone === "warning"
+      ? "text-orange-600 dark:text-orange-400"
+      : tone === "success"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : tone === "destructive"
+      ? "text-destructive"
+      : "";
+  return (
+    <td className="px-2 py-2 text-right tabular-nums">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        className={cn(
+          "hover:underline decoration-dotted underline-offset-2 hover:text-primary transition-colors",
+          toneCls,
+        )}
+      >
+        {children}
+      </button>
+    </td>
+  );
+}
+
 
 function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
@@ -552,6 +598,13 @@ export function G4ConsolidatedDashboard() {
   const [kind, setKind] = useState<KindFilter>("todos");
   const [range, setRange] = useState<RangeFilter>("all");
 
+  // Drill-down state
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillTitle, setDrillTitle] = useState("");
+  const [drillDesc, setDrillDesc] = useState("");
+  const [drillItems, setDrillItems] = useState<DetailItem[]>([]);
+  const [drillMode, setDrillMode] = useState<"basic" | "money" | "lost">("basic");
+
   const allGroups = useMemo(() => (data ? buildGroups(data.leads) : []), [data]);
 
   const groups = useMemo(() => {
@@ -592,6 +645,83 @@ export function G4ConsolidatedDashboard() {
       next.has(live) ? next.delete(live) : next.add(live);
       return next;
     });
+
+  // ─── drill-down helpers ───
+  const cardIdFromUrl = (url: string | null): string => {
+    if (!url) return "";
+    const m = url.match(/open-cards\/(\d+)/);
+    return m ? m[1] : "";
+  };
+  const leadsToItems = (leads: G4RealLead[]): DetailItem[] =>
+    leads.map((l, i) => ({
+      id: cardIdFromUrl(l.pipefyUrl) || `${l.email ?? "no-email"}-${i}`,
+      name: l.nome ?? "—",
+      company: l.empresa ?? "—",
+      phase: l.faseAtual ?? "—",
+      closer: l.closer ?? "—",
+      sdr: l.sdr ?? "—",
+      revenueRange: l.faixa ?? undefined,
+      mrr: l.valorMRR ?? undefined,
+      setup: l.valorSetup ?? undefined,
+      pontual: l.valorPontual ?? undefined,
+      total: l.tcv ?? undefined,
+      reason: l.motivoPerda ?? undefined,
+    }));
+
+  type Mode = "all" | "mql" | "contato" | "quente" | "ganho" | "perdido";
+  const filterLeads = (leads: G4RealLead[], mode: Mode): G4RealLead[] => {
+    switch (mode) {
+      case "mql": return leads.filter((l) => isMqlByFaturamento(l.faixa));
+      case "contato": return leads.filter((l) => isInContact(l.faseAtual));
+      case "quente": return leads.filter((l) => l.temperatura === "Quente");
+      case "ganho": return leads.filter((l) => isWon(l.faseAtual));
+      case "perdido": return leads.filter((l) => isLost(l.faseAtual));
+      default: return leads;
+    }
+  };
+
+  const openDrill = (title: string, mode: Mode, groupsSubset: LiveGroup[], desc?: string) => {
+    // Dedup leads across groups by email
+    const seen = new Set<string>();
+    const merged: G4RealLead[] = [];
+    for (const g of groupsSubset) {
+      for (const l of g.leads) {
+        const k = (l.email ?? l.nome ?? "").toLowerCase();
+        if (seen.has(k)) continue;
+        seen.add(k);
+        merged.push(l);
+      }
+    }
+    const filtered = filterLeads(merged, mode);
+    setDrillTitle(title);
+    setDrillDesc(desc ?? `${filtered.length} registro(s) — dados vindos de g4-metrics (leads G4 + Pipefy).`);
+    setDrillMode(mode === "ganho" ? "money" : mode === "perdido" ? "lost" : "basic");
+    setDrillItems(leadsToItems(filtered));
+    setDrillOpen(true);
+  };
+
+  const drillColumns = useMemo(() => {
+    const base = [
+      { key: "company" as const, label: "Empresa" },
+      { key: "name" as const, label: "Contato" },
+      { key: "phase" as const, label: "Fase Atual", format: columnFormatters.phase },
+      { key: "closer" as const, label: "Closer" },
+      { key: "revenueRange" as const, label: "Faixa" },
+    ];
+    if (drillMode === "money") {
+      return [
+        ...base,
+        { key: "mrr" as const, label: "MRR", format: columnFormatters.currency },
+        { key: "setup" as const, label: "Setup", format: columnFormatters.currency },
+        { key: "pontual" as const, label: "Pontual", format: columnFormatters.currency },
+        { key: "total" as const, label: "TCV", format: columnFormatters.currency },
+      ];
+    }
+    if (drillMode === "lost") {
+      return [...base, { key: "reason" as const, label: "Motivo", format: columnFormatters.reason }];
+    }
+    return base;
+  }, [drillMode]);
 
   const FilterPill = ({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) => (
     <button
@@ -642,13 +772,20 @@ export function G4ConsolidatedDashboard() {
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-            <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users} />
-            <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary" />
-            <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle} />
-            <Kpi label="Quentes" value={fmtInt(totals.quentes)} icon={Flame} tone="warning" />
-            <Kpi label="Fechados" value={fmtInt(totals.fechados)} hint={`${closeRate}% close rate`} icon={Trophy} tone="success" />
-            <Kpi label="TCV" value={fmt(totals.tcv)} icon={DollarSign} tone="success" />
-            <Kpi label="Ticket médio" value={fmt(ticketMedioGeral)} icon={Ticket} />
+            <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users}
+              onClick={() => openDrill("Leads G4 · Consolidado", "all", groups)} />
+            <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary"
+              onClick={() => openDrill("MQLs · Faturamento ≥ R$ 200k/mês", "mql", groups)} />
+            <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle}
+              onClick={() => openDrill("Leads em contato", "contato", groups)} />
+            <Kpi label="Quentes" value={fmtInt(totals.quentes)} icon={Flame} tone="warning"
+              onClick={() => openDrill("Leads Quentes", "quente", groups)} />
+            <Kpi label="Fechados" value={fmtInt(totals.fechados)} hint={`${closeRate}% close rate`} icon={Trophy} tone="success"
+              onClick={() => openDrill("Vendas fechadas · Consolidado", "ganho", groups)} />
+            <Kpi label="TCV" value={fmt(totals.tcv)} icon={DollarSign} tone="success"
+              onClick={() => openDrill("TCV · Vendas fechadas", "ganho", groups)} />
+            <Kpi label="Ticket médio" value={fmt(ticketMedioGeral)} icon={Ticket}
+              onClick={() => openDrill("Ticket médio · Vendas fechadas", "ganho", groups)} />
           </div>
 
           {/* Charts grid */}
@@ -759,22 +896,18 @@ export function G4ConsolidatedDashboard() {
                                 {g.live}
                               </div>
                             </td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmtInt(g.inscritos)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmtInt(g.mqls)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmtInt(g.emContato)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums text-orange-600 dark:text-orange-400">
-                              {fmtInt(g.quentes)}
-                            </td>
-                            <td className="px-2 py-2 text-right tabular-nums text-emerald-600 dark:text-emerald-400">
-                              {fmtInt(g.fechados)}
-                            </td>
+                            <ClickCell onClick={() => openDrill(`Leads · ${g.live}`, "all", [g])}>{fmtInt(g.inscritos)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`MQLs · ${g.live}`, "mql", [g])}>{fmtInt(g.mqls)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Em contato · ${g.live}`, "contato", [g])}>{fmtInt(g.emContato)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Quentes · ${g.live}`, "quente", [g])} tone="warning">{fmtInt(g.quentes)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])} tone="success">{fmtInt(g.fechados)}</ClickCell>
                             <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{conv}%</td>
-                            <td className="px-2 py-2 text-right tabular-nums text-destructive">{fmtInt(g.perdidos)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.mrr)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.setup)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.pontual)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.tcv)}</td>
-                            <td className="px-2 py-2 text-right tabular-nums">{fmt(g.ticketMedio)}</td>
+                            <ClickCell onClick={() => openDrill(`Perdidos · ${g.live}`, "perdido", [g])} tone="destructive">{fmtInt(g.perdidos)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.mrr)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.setup)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.pontual)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.tcv)}</ClickCell>
+                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.ticketMedio)}</ClickCell>
                           </tr>
                           {isOpen && (
                             <tr>
@@ -809,6 +942,15 @@ export function G4ConsolidatedDashboard() {
           </Card>
         </>
       )}
+
+      <DetailSheet
+        open={drillOpen}
+        onOpenChange={setDrillOpen}
+        title={drillTitle}
+        description={drillDesc}
+        items={drillItems}
+        columns={drillColumns}
+      />
     </div>
   );
 }
