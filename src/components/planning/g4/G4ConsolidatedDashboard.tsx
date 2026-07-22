@@ -58,23 +58,7 @@ const isMqlByFaturamento = (faixa: string | null) => MQL_FAIXAS.has(normalize(fa
 const isLive = (name: string) => /live/i.test(name);
 
 // Try to parse a date from the live name for sorting/filtering.
-// Accepts "Live G4 - 20/05/2026", "Live - G4 - 20-mai", "17/06", etc.
-const MONTHS_PT: Record<string, number> = {
-  jan: 0, fev: 1, mar: 2, abr: 3, mai: 4, jun: 5,
-  jul: 6, ago: 7, set: 8, out: 9, nov: 10, dez: 11,
-};
-function parseEventDate(name: string): Date | null {
-  const dmy = name.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-  if (dmy) {
-    const y = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
-    return new Date(y, Number(dmy[2]) - 1, Number(dmy[1]));
-  }
-  const dm = name.match(/(\d{1,2})\/(\d{1,2})/);
-  if (dm) return new Date(2026, Number(dm[2]) - 1, Number(dm[1]));
-  const dMon = name.match(/(\d{1,2})[-\s](jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/i);
-  if (dMon) return new Date(2026, MONTHS_PT[dMon[2].toLowerCase()], Number(dMon[1]));
-  return null;
-}
+const parseEventDate = parseEventDateShared;
 
 interface LiveGroup {
   live: string;
