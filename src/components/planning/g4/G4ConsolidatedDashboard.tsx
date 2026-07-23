@@ -37,6 +37,23 @@ const isLost = (fase: string | null) => {
   return n.startsWith("perdido") || n.startsWith("perda");
 };
 const isWon = (fase: string | null) => normalize(fase) === "ganho";
+
+// Whitelist oficial de vendas G4 (relatório Finders Fee — Excel).
+// Só e-mails desta lista contam como venda no dashboard G4, mesmo que o card
+// esteja "Ganho" no Pipefy e associado a uma live/evento.
+const G4_SALES_WHITELIST_EMAILS = new Set<string>([
+  "vanderson@martinelli.ind.br",
+  "sidney@petromarcomercial.com.br",
+  "joaopaulo@jpprojetos.com",
+  "fabrizio.mazza@discabos.com.br",
+  "tamara@importadorapatagonia.com.br",
+  "tchauentrega@gmail.com",
+  "yurijosect@gmail.com",
+  "administrativo@lotuslogistica.com",
+  "andre.silva@invenzi.com",
+]);
+const isG4Sale = (l: G4RealLead): boolean =>
+  isWon(l.faseAtual) && G4_SALES_WHITELIST_EMAILS.has((l.email ?? "").toLowerCase());
 const IN_CONTACT_EXACT = new Set([
   "tentativas de contato",
   "reuniao marcada",
@@ -129,6 +146,9 @@ export function isG4Attributed(l: G4RealLead): boolean {
   const cardId = extractPipefyCardId(l.pipefyUrl);
   if (cardId && MANUAL_EXCLUDED_G4_CARD_IDS.has(cardId)) return false;
 
+  // Whitelist Finders Fee: sempre atribui ao G4
+  if (G4_SALES_WHITELIST_EMAILS.has((l.email ?? "").toLowerCase())) return true;
+
   const origem = normalize(`${l.origemLead ?? ""} ${l.tipoOrigemLead ?? ""}`);
   // Whitelist por sinal G4 forte no próprio lead
   const hasG4Signal =
@@ -150,7 +170,11 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
   const filtered = leads.filter(isG4Attributed);
   const byLive = new Map<string, G4RealLead[]>();
   for (const lead of filtered) {
-    for (const rawLive of lead.lives) {
+    // Whitelist de vendas sem live associada cai no bucket "Finders Fee".
+    const lives = lead.lives.length > 0
+      ? lead.lives
+      : (isG4Sale(lead) ? ["G4 - Finders Fee (fora das lives)"] : []);
+    for (const rawLive of lives) {
       const live = canonLive(rawLive);
       if (!byLive.has(live)) byLive.set(live, []);
       byLive.get(live)!.push(lead);
@@ -165,7 +189,7 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
       seen.add(k);
       return true;
     });
-    const won = uniq.filter((l) => isWon(l.faseAtual));
+    const won = uniq.filter(isG4Sale);
     const lost = uniq.filter((l) => isLost(l.faseAtual));
     let mrr = 0, setup = 0, pontual = 0, tcv = 0;
     for (const w of won) {
@@ -757,7 +781,7 @@ export function G4ConsolidatedDashboard() {
       case "mql": return leads.filter((l) => isMqlByFaturamento(l.faixa));
       case "contato": return leads.filter((l) => isInContact(l.faseAtual));
       case "quente": return leads.filter((l) => l.temperatura === "Quente");
-      case "ganho": return leads.filter((l) => isWon(l.faseAtual));
+      case "ganho": return leads.filter(isG4Sale);
       case "perdido": return leads.filter((l) => isLost(l.faseAtual));
       default: return leads;
     }
