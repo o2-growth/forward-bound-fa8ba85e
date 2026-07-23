@@ -37,6 +37,23 @@ const isLost = (fase: string | null) => {
   return n.startsWith("perdido") || n.startsWith("perda");
 };
 const isWon = (fase: string | null) => normalize(fase) === "ganho";
+
+// Whitelist oficial de vendas G4 (relatório Finders Fee — Excel).
+// Só e-mails desta lista contam como venda no dashboard G4, mesmo que o card
+// esteja "Ganho" no Pipefy e associado a uma live/evento.
+const G4_SALES_WHITELIST_EMAILS = new Set<string>([
+  "vanderson@martinelli.ind.br",
+  "sidney@petromarcomercial.com.br",
+  "joaopaulo@jpprojetos.com",
+  "fabrizio.mazza@discabos.com.br",
+  "tamara@importadorapatagonia.com.br",
+  "tchauentrega@gmail.com",
+  "yurijosect@gmail.com",
+  "administrativo@lotuslogistica.com",
+  "andre.silva@invenzi.com",
+]);
+const isG4Sale = (l: G4RealLead): boolean =>
+  isWon(l.faseAtual) && G4_SALES_WHITELIST_EMAILS.has((l.email ?? "").toLowerCase());
 const IN_CONTACT_EXACT = new Set([
   "tentativas de contato",
   "reuniao marcada",
