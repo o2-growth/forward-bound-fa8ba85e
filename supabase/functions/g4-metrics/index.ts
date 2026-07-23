@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
             FALSE AS fez_diagnostico,
             TRUE  AS no_pipe,
             pf."Fase Atual" AS fase_atual,
-            pf."Closer" AS closer,
+            pf."Closer responsável" AS closer,
             'https://app.pipefy.com/open-cards/' || pf."ID" AS pipefy_url,
             pf."Faixa de faturamento mensal" AS faixa,
             COALESCE(pf."Valor MRR", 0)::float8 AS valor_mrr,
