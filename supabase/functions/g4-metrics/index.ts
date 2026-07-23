@@ -56,10 +56,6 @@ Deno.serve(async (req) => {
               'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
               'demo@exemplo.com','teste_nao_atender@gmail.com'
             )
-            AND (i.nome IS NULL OR (
-              i.nome NOT ILIKE '%teste%' AND i.nome NOT ILIKE '%nao atender%'
-              AND i.nome NOT ILIKE '%não atender%'
-            ))
             AND i.live <> 'Raio-X de Margens - G4'
           GROUP BY i.live ORDER BY i.live
         `,
