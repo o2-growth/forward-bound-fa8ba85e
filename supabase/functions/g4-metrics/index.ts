@@ -190,7 +190,22 @@ Deno.serve(async (req) => {
           FROM g4_leads_360 l
           LEFT JOIN pipe p ON p.email = l.email
           LEFT JOIN diag_faixa d ON d.email = l.email
-          WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%@o2inc.com.br'
+          WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%test@%'
+            AND l.email NOT ILIKE '%@test.%' AND l.email NOT ILIKE '%exemplo.com%'
+            AND l.email NOT ILIKE '%@o2inc.com.br'
+            AND l.email NOT ILIKE '%nao_atender%' AND l.email NOT ILIKE '%naoatender%'
+            AND l.email NOT ILIKE '%no-reply%' AND l.email NOT ILIKE '%noreply%'
+            AND l.email NOT IN (
+              'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+              'demo@exemplo.com','teste_nao_atender@gmail.com'
+            )
+            AND (l.nome IS NULL OR (
+              l.nome NOT ILIKE '%teste%' AND l.nome NOT ILIKE '%nao atender%'
+              AND l.nome NOT ILIKE '%não atender%' AND l.nome NOT ILIKE '%TESTE ERP%'
+            ))
+            AND (l.empresa IS NULL OR (
+              l.empresa NOT ILIKE '%teste%' AND l.empresa NOT ILIKE '%TESTE ERP%'
+            ))
 
           UNION ALL
 
