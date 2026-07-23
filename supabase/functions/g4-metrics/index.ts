@@ -136,11 +136,55 @@ Deno.serve(async (req) => {
           LEFT JOIN pipe p ON p.email = l.email
           LEFT JOIN diag_faixa d ON d.email = l.email
           WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%@o2inc.com.br'
-          ORDER BY l.levantou_mao DESC, l.fez_diagnostico DESC, l.no_pipe DESC
 
+          UNION ALL
+
+          -- Whitelist Finders Fee: e-mails de venda G4 que não estão em g4_leads_360.
+          -- Puxamos direto do Pipefy para que apareçam no drill-down de vendas.
+          SELECT
+            COALESCE(pf."Nome", pf."Título") AS nome,
+            pf."Empresa" AS empresa,
+            lower(pf."E-mail") AS email,
+            ARRAY['G4 - Finders Fee (fora das lives)']::text[] AS lives,
+            FALSE AS presente_alguma_live,
+            FALSE AS levantou_mao,
+            NULL::text AS live_da_mao,
+            FALSE AS fez_diagnostico,
+            TRUE  AS no_pipe,
+            pf."Fase Atual" AS fase_atual,
+            pf."Closer" AS closer,
+            'https://app.pipefy.com/open-cards/' || pf."ID" AS pipefy_url,
+            pf."Faixa de faturamento mensal" AS faixa,
+            COALESCE(pf."Valor MRR", 0)::float8 AS valor_mrr,
+            COALESCE(pf."Valor Setup", 0)::float8 AS valor_setup,
+            COALESCE(pf."Valor Pontual", 0)::float8 AS valor_pontual,
+            pf."SDR responsável" AS sdr,
+            pf."Entrada" AS data_entrada_pipe,
+            pf."Labels" AS labels_raw,
+            pf."Motivo da perda" AS motivo_perda,
+            pf."Origem do lead" AS origem_lead,
+            pf."Tipo Origem Lead" AS tipo_origem_lead
+          FROM (
+            SELECT DISTINCT ON (lower("E-mail")) *
+            FROM pipefy_moviment_cfos
+            WHERE lower("E-mail") IN (
+              'vanderson@martinelli.ind.br',
+              'sidney@petromarcomercial.com.br',
+              'tamara@importadorapatagonia.com.br',
+              'administrativo@lotuslogistica.com',
+              'andre.silva@invenzi.com'
+            )
+            ORDER BY lower("E-mail"),
+                     CASE WHEN "Fase Atual" = 'Ganho' THEN 0 ELSE 1 END,
+                     "Entrada" DESC NULLS LAST
+          ) pf
+          WHERE NOT EXISTS (
+            SELECT 1 FROM g4_leads_360 gl WHERE gl.email = lower(pf."E-mail")
+          )
         `,
       ],
     );
+
 
     const funil = (funilRows as Array<Record<string, unknown>>).map((r) => {
       const live = String(r.live);
