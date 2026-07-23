@@ -167,7 +167,11 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
   const filtered = leads.filter(isG4Attributed);
   const byLive = new Map<string, G4RealLead[]>();
   for (const lead of filtered) {
-    for (const rawLive of lead.lives) {
+    // Whitelist de vendas sem live associada cai no bucket "Finders Fee".
+    const lives = lead.lives.length > 0
+      ? lead.lives
+      : (isG4Sale(lead) ? ["G4 - Finders Fee (fora das lives)"] : []);
+    for (const rawLive of lives) {
       const live = canonLive(rawLive);
       if (!byLive.has(live)) byLive.set(live, []);
       byLive.get(live)!.push(lead);
