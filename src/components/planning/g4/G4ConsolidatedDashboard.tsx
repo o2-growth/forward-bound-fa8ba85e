@@ -182,7 +182,7 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
       seen.add(k);
       return true;
     });
-    const won = uniq.filter((l) => isWon(l.faseAtual));
+    const won = uniq.filter(isG4Sale);
     const lost = uniq.filter((l) => isLost(l.faseAtual));
     let mrr = 0, setup = 0, pontual = 0, tcv = 0;
     for (const w of won) {
