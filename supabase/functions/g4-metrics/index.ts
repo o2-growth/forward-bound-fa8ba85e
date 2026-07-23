@@ -47,29 +47,64 @@ Deno.serve(async (req) => {
             FROM pipefy_moviment_cfos WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
             ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
           ) p ON p.email=i.email
-          WHERE i.email NOT ILIKE '%teste%' AND i.email NOT ILIKE '%exemplo.com%'
+          WHERE i.email NOT ILIKE '%teste%' AND i.email NOT ILIKE '%test@%'
+            AND i.email NOT ILIKE '%@test.%' AND i.email NOT ILIKE '%exemplo.com%'
             AND i.email NOT ILIKE '%@o2inc.com.br'
-            AND i.email NOT IN ('dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com','demo@exemplo.com')
+            AND i.email NOT ILIKE '%nao_atender%' AND i.email NOT ILIKE '%naoatender%'
+            AND i.email NOT ILIKE '%no-reply%' AND i.email NOT ILIKE '%noreply%'
+            AND i.email NOT IN (
+              'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+              'demo@exemplo.com','teste_nao_atender@gmail.com'
+            )
             AND i.live <> 'Raio-X de Margens - G4'
           GROUP BY i.live ORDER BY i.live
         `,
         sql /* diagnóstico por live */`
           SELECT live, COUNT(DISTINCT email) AS diagnosticos
           FROM g4_diagnostico
-          WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%exemplo.com%'
+          WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%test@%'
+            AND email NOT ILIKE '%@test.%' AND email NOT ILIKE '%exemplo.com%'
             AND email NOT ILIKE '%@o2inc.com.br'
-            AND email NOT IN ('dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com','demo@exemplo.com')
+            AND email NOT ILIKE '%nao_atender%' AND email NOT ILIKE '%naoatender%'
+            AND email NOT ILIKE '%no-reply%' AND email NOT ILIKE '%noreply%'
+            AND email NOT IN (
+              'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+              'demo@exemplo.com','teste_nao_atender@gmail.com'
+            )
             AND (live IS NULL OR live <> 'Raio-X de Margens - G4')
           GROUP BY live ORDER BY live
         `,
         sql /* KPIs topo */`
           SELECT
             (SELECT COUNT(DISTINCT email) FROM g4_inscritos
-              WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%@o2inc.com.br'
+              WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%test@%'
+                AND email NOT ILIKE '%@test.%' AND email NOT ILIKE '%exemplo.com%'
+                AND email NOT ILIKE '%@o2inc.com.br'
+                AND email NOT ILIKE '%nao_atender%' AND email NOT ILIKE '%naoatender%'
+                AND email NOT ILIKE '%no-reply%' AND email NOT ILIKE '%noreply%'
+                AND email NOT IN (
+                  'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+                  'demo@exemplo.com','teste_nao_atender@gmail.com'
+                )
                 AND live <> 'Raio-X de Margens - G4') AS total_leads,
 
-            (SELECT COUNT(*) FROM g4_levantadas_mao) AS levantaram_mao,
-            (SELECT COUNT(DISTINCT email) FROM g4_diagnostico) AS diagnosticos
+            (SELECT COUNT(*) FROM g4_levantadas_mao
+              WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%exemplo.com%'
+                AND email NOT ILIKE '%@o2inc.com.br'
+                AND email NOT ILIKE '%nao_atender%' AND email NOT ILIKE '%naoatender%'
+                AND email NOT IN (
+                  'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+                  'demo@exemplo.com','teste_nao_atender@gmail.com'
+                )) AS levantaram_mao,
+
+            (SELECT COUNT(DISTINCT email) FROM g4_diagnostico
+              WHERE email NOT ILIKE '%teste%' AND email NOT ILIKE '%exemplo.com%'
+                AND email NOT ILIKE '%@o2inc.com.br'
+                AND email NOT ILIKE '%nao_atender%' AND email NOT ILIKE '%naoatender%'
+                AND email NOT IN (
+                  'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+                  'demo@exemplo.com','teste_nao_atender@gmail.com'
+                )) AS diagnosticos
         `,
         sql /* faturamento */`
           SELECT COALESCE(SUM(v),0)::float8 AS faturamento FROM (
@@ -78,6 +113,26 @@ Deno.serve(async (req) => {
             FROM pipefy_moviment_cfos c
             JOIN g4_inscritos i ON i.email = lower(c."E-mail")
             WHERE c."Fase Atual" = 'Ganho'
+              AND lower(c."E-mail") NOT ILIKE '%teste%'
+              AND lower(c."E-mail") NOT ILIKE '%exemplo.com%'
+              AND lower(c."E-mail") NOT ILIKE '%@o2inc.com.br'
+              AND lower(c."E-mail") NOT ILIKE '%nao_atender%'
+              AND lower(c."E-mail") NOT ILIKE '%naoatender%'
+              AND lower(c."E-mail") NOT IN (
+                'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+                'demo@exemplo.com','teste_nao_atender@gmail.com'
+              )
+              AND (c."Nome" IS NULL OR (
+                c."Nome" NOT ILIKE '%teste%' AND c."Nome" NOT ILIKE '%nao atender%'
+                AND c."Nome" NOT ILIKE '%não atender%'
+              ))
+              AND (c."Empresa" IS NULL OR (
+                c."Empresa" NOT ILIKE '%teste%' AND c."Empresa" NOT ILIKE '%TESTE ERP%'
+              ))
+              AND (c."Título" IS NULL OR (
+                c."Título" NOT ILIKE '%teste%' AND c."Título" NOT ILIKE '%TESTE ERP%'
+                AND c."Título" NOT ILIKE '%nao atender%' AND c."Título" NOT ILIKE '%não atender%'
+              ))
           ) t
         `,
         sql /* leads 360 enriquecido com Pipefy + faixa via diagnóstico */`
@@ -135,7 +190,22 @@ Deno.serve(async (req) => {
           FROM g4_leads_360 l
           LEFT JOIN pipe p ON p.email = l.email
           LEFT JOIN diag_faixa d ON d.email = l.email
-          WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%@o2inc.com.br'
+          WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%test@%'
+            AND l.email NOT ILIKE '%@test.%' AND l.email NOT ILIKE '%exemplo.com%'
+            AND l.email NOT ILIKE '%@o2inc.com.br'
+            AND l.email NOT ILIKE '%nao_atender%' AND l.email NOT ILIKE '%naoatender%'
+            AND l.email NOT ILIKE '%no-reply%' AND l.email NOT ILIKE '%noreply%'
+            AND l.email NOT IN (
+              'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+              'demo@exemplo.com','teste_nao_atender@gmail.com'
+            )
+            AND (l.nome IS NULL OR (
+              l.nome NOT ILIKE '%teste%' AND l.nome NOT ILIKE '%nao atender%'
+              AND l.nome NOT ILIKE '%não atender%' AND l.nome NOT ILIKE '%TESTE ERP%'
+            ))
+            AND (l.empresa IS NULL OR (
+              l.empresa NOT ILIKE '%teste%' AND l.empresa NOT ILIKE '%TESTE ERP%'
+            ))
 
           UNION ALL
 
