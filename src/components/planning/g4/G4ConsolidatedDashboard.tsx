@@ -146,6 +146,9 @@ export function isG4Attributed(l: G4RealLead): boolean {
   const cardId = extractPipefyCardId(l.pipefyUrl);
   if (cardId && MANUAL_EXCLUDED_G4_CARD_IDS.has(cardId)) return false;
 
+  // Whitelist Finders Fee: sempre atribui ao G4
+  if (G4_SALES_WHITELIST_EMAILS.has((l.email ?? "").toLowerCase())) return true;
+
   const origem = normalize(`${l.origemLead ?? ""} ${l.tipoOrigemLead ?? ""}`);
   // Whitelist por sinal G4 forte no próprio lead
   const hasG4Signal =
