@@ -86,10 +86,6 @@ Deno.serve(async (req) => {
                   'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
                   'demo@exemplo.com','teste_nao_atender@gmail.com'
                 )
-                AND (nome IS NULL OR (
-                  nome NOT ILIKE '%teste%' AND nome NOT ILIKE '%nao atender%'
-                  AND nome NOT ILIKE '%não atender%'
-                ))
                 AND live <> 'Raio-X de Margens - G4') AS total_leads,
 
             (SELECT COUNT(*) FROM g4_levantadas_mao
