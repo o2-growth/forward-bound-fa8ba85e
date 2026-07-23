@@ -141,7 +141,29 @@ const NON_G4_ORIGIN_TOKENS = [
   "relacionamento",
   "networking",
 ];
+const TEST_EMAIL_PATTERNS = [
+  "teste", "test@", "@test.", "exemplo.com", "@o2inc.com.br",
+  "nao_atender", "naoatender", "no-reply", "noreply",
+];
+const TEST_NAME_PATTERNS = ["teste", "nao atender", "não atender", "teste erp"];
+const TEST_EMAIL_EXACT = new Set([
+  "dudarovani@gmail.com","jv241004@gmail.com","voce@empresa.com",
+  "demo@exemplo.com","teste_nao_atender@gmail.com",
+]);
+export function isTestG4Lead(l: G4RealLead): boolean {
+  const email = (l.email ?? "").toLowerCase();
+  if (!email) return false;
+  if (TEST_EMAIL_EXACT.has(email)) return true;
+  if (TEST_EMAIL_PATTERNS.some((p) => email.includes(p))) return true;
+  const nome = (l.nome ?? "").toLowerCase();
+  const empresa = (l.empresa ?? "").toLowerCase();
+  if (nome && TEST_NAME_PATTERNS.some((p) => nome.includes(p))) return true;
+  if (empresa && TEST_NAME_PATTERNS.some((p) => empresa.includes(p))) return true;
+  return false;
+}
 export function isG4Attributed(l: G4RealLead): boolean {
+  // Testes nunca entram
+  if (isTestG4Lead(l)) return false;
   // Exclusão manual sempre vence
   const cardId = extractPipefyCardId(l.pipefyUrl);
   if (cardId && MANUAL_EXCLUDED_G4_CARD_IDS.has(cardId)) return false;
