@@ -774,7 +774,7 @@ export function G4ConsolidatedDashboard() {
       case "mql": return leads.filter((l) => isMqlByFaturamento(l.faixa));
       case "contato": return leads.filter((l) => isInContact(l.faseAtual));
       case "quente": return leads.filter((l) => l.temperatura === "Quente");
-      case "ganho": return leads.filter((l) => isWon(l.faseAtual));
+      case "ganho": return leads.filter(isG4Sale);
       case "perdido": return leads.filter((l) => isLost(l.faseAtual));
       default: return leads;
     }
