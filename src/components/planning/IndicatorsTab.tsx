@@ -58,6 +58,8 @@ import { WeeklyComparison, SdrBreakdown, SdrBreakdownWeekly, getWeeksInRange } f
 import { PersonRanking } from "./indicators/PersonRanking";
 import { CloserPerformanceMatrix } from "./indicators/CloserPerformanceMatrix";
 import { TemperaturaSection } from "./indicators/TemperaturaSection";
+import { LeadsByPhaseSection } from "./indicators/LeadsByPhaseSection";
+
 import { aggregateByTemperatura } from "./indicators/temperaturaAggregator";
 
 import { CenarioCaixaSection } from "./indicators/CenarioCaixaSection";
