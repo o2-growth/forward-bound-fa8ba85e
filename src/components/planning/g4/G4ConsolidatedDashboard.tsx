@@ -977,7 +977,7 @@ export function G4ConsolidatedDashboard() {
     </button>
   );
 
-  // 6 células de métrica (Leads, MQLs, Em contato, Quentes, Vendas, TCV) — todas abrem drill.
+  // 12 células de métrica (Leads → Ticket médio), cada número abre o drill filtrado.
   const rowMetricCells = (m: RowMetrics, drillGroups: LiveGroup[], label: string) => (
     <>
       <ClickCell onClick={() => openDrill(`Leads · ${label}`, "all", drillGroups)}>{fmtInt(m.inscritos)}</ClickCell>
@@ -985,8 +985,13 @@ export function G4ConsolidatedDashboard() {
       <ClickCell onClick={() => openDrill(`Em contato · ${label}`, "contato", drillGroups)}>{fmtInt(m.emContato)}</ClickCell>
       <ClickCell onClick={() => openDrill(`Quentes · ${label}`, "quente", drillGroups)} tone="warning">{fmtInt(m.quentes)}</ClickCell>
       <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)} tone="success">{fmtInt(m.fechados)}</ClickCell>
+      <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{m.conv.toFixed(1)}%</td>
+      <ClickCell onClick={() => openDrill(`Perdidos · ${label}`, "perdido", drillGroups)} tone="destructive">{fmtInt(m.perdidos)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.mrr)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.setup)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.pontual)}</ClickCell>
       <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.tcv)}</ClickCell>
-
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.ticketMedio)}</ClickCell>
     </>
   );
 
@@ -1026,7 +1031,7 @@ export function G4ConsolidatedDashboard() {
         </tr>
         {hasData && open && drillGroup && (
           <tr>
-            <td colSpan={8} className="p-0">
+            <td colSpan={14} className="p-0">
               <ExpandedRow group={drillGroup} />
             </td>
           </tr>
@@ -1121,9 +1126,14 @@ export function G4ConsolidatedDashboard() {
                       <th className="px-2 py-2 text-right">MQLs</th>
                       <th className="px-2 py-2 text-right">Em contato</th>
                       <th className="px-2 py-2 text-right">Quentes</th>
-                      <th className="px-2 py-2 text-right">Vendas</th>
+                      <th className="px-2 py-2 text-right">Fechados</th>
+                      <th className="px-2 py-2 text-right">Conv%</th>
+                      <th className="px-2 py-2 text-right">Perdidos</th>
+                      <th className="px-2 py-2 text-right">MRR</th>
+                      <th className="px-2 py-2 text-right">Setup</th>
+                      <th className="px-2 py-2 text-right">Pontual</th>
                       <th className="px-2 py-2 text-right">TCV</th>
-
+                      <th className="px-2 py-2 text-right">Ticket médio</th>
                     </tr>
                   </thead>
                   <tbody>
