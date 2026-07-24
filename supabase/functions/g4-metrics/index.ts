@@ -411,6 +411,15 @@ Deno.serve(async (req) => {
         motivoPerda: (r.motivo_perda as string | null) ?? null,
         origemLead: (r.origem_lead as string | null) ?? null,
         tipoOrigemLead: (r.tipo_origem_lead as string | null) ?? null,
+        cardId: r.card_id != null ? String(r.card_id) : null,
+        isGanho: r.is_ganho == null ? null : Boolean(r.is_ganho),
+        dataGanho: r.data_ganho ? new Date(r.data_ganho as string).toISOString() : null,
+        vendaAtribuivelLive: r.venda_atribuivel_live == null ? null : Boolean(r.venda_atribuivel_live),
+        primeiraLiveData: r.primeira_live_data ? new Date(r.primeira_live_data as string).toISOString() : null,
+        nLives: r.n_lives != null ? Number(r.n_lives) : null,
+        livesAssistiu: (r.lives_assistiu as string[] | null) ?? null,
+        livesMao: (r.lives_mao as string[] | null) ?? null,
+        livesDiagnostico: (r.lives_diagnostico as string[] | null) ?? null,
       };
     });
 
