@@ -228,7 +228,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
           // MQL: cards que passaram por "Lead" ou "MQL" E tem investimento qualificado (>= R$ 54k)
           if (movement.fase === 'Lead' || movement.fase === 'MQL') {
             const inv = cardInvestimento.get(movement.id) || null;
-            if (isOxyHackerMqlQualified(inv)) {
+            if (isOxyHackerMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
               uniqueCards.add(movement.id);
             }
           }
@@ -273,7 +273,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
         } else if (indicator === 'mql') {
           if (movement.fase === 'Lead' || movement.fase === 'MQL') {
             const inv = cardInvestimento.get(movement.id) || null;
-            if (isOxyHackerMqlQualified(inv)) {
+            if (isOxyHackerMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
               shouldCount = true;
             }
           }
@@ -365,7 +365,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
           } else if (indicator === 'mql') {
             if (movement.fase === 'Lead' || movement.fase === 'MQL') {
               const inv = cardInvestimento.get(movement.id) || null;
-              if (isOxyHackerMqlQualified(inv)) {
+              if (isOxyHackerMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
                 uniqueCards.add(movement.id);
               }
             }
@@ -446,7 +446,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
       } else if (indicator === 'mql') {
         if (movement.fase === 'Lead' || movement.fase === 'MQL') {
           const inv = cardInvestimento.get(movement.id) || null;
-          matches = isOxyHackerMqlQualified(inv);
+          matches = isOxyHackerMqlQualified(inv) && !excludedMqlCardIds.has(movement.id);
         }
       } else {
         matches = movementIndicator === indicator;
