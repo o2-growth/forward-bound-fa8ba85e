@@ -200,6 +200,13 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
   const isCurrentProduct = (id: string) =>
     (currentProdutoByCard.get(id)?.produto || '') === 'Franquia';
 
+  // Cards excluídos da contagem de MQL — motivos padrão (Duplicado, Pessoa
+  // física, Não é demanda real, Buscando parceria, Quer soluções, Não é MQL,
+  // Email/Telefone Inválido). Baseado no motivo mais recente do card.
+  const excludedMqlCardIds = data?.movements
+    ? buildExcludedMqlCardIds(data.movements.map((m) => ({ id: m.id, motivoPerda: m.motivoPerda || undefined, dataEntrada: m.dataEntrada })))
+    : new Set<string>();
+
 
 
   // Get total qty for a specific indicator and date range
