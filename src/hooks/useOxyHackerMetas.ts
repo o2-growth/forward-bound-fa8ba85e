@@ -195,6 +195,12 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
   const isCurrentProduct = (id: string) =>
     (currentProdutoByCard.get(id)?.produto || '') === 'Oxy Hacker';
 
+  // Cards excluídos da contagem de MQL — motivos padrão (Duplicado, Pessoa
+  // física, Não é demanda real, etc.). Baseado no motivo mais recente do card.
+  const excludedMqlCardIds = data?.movements
+    ? buildExcludedMqlCardIds(data.movements.map((m) => ({ id: m.id, motivoPerda: m.motivoPerda || undefined, dataEntrada: m.dataEntrada })))
+    : new Set<string>();
+
 
   const getQtyForPeriod = (indicator: OxyHackerIndicator, start?: Date, end?: Date): number => {
     if (!data?.movements || data.movements.length === 0) return 0;
