@@ -266,6 +266,7 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
     gclid: row['gclid'] || undefined,
     motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
     faseAtual: row['Fase Atual'] || row['fase_atual'] || undefined,
+    email: row['E-mail'] || row['Email'] || row['email'] || undefined,
     produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
     valoresExtras: {
       valorMRR,
