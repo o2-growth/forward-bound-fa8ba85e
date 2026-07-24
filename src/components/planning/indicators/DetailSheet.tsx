@@ -10,6 +10,8 @@ import { ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRigh
 import { KpiCardsRow } from "./KpiCardsRow";
 import { KpiItem } from "./KpiCard";
 import { DrillDownCharts, ChartConfig } from "./DrillDownCharts";
+import { isJunkCard } from "@/hooks/useModeloAtualMetas";
+
 
 type SortDirection = 'none' | 'desc' | 'asc';
 
