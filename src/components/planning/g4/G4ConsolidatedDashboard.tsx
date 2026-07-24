@@ -833,16 +833,30 @@ export function G4ConsolidatedDashboard() {
   const groups = useMemo(() => {
     const fromT = dateRange ? dateRange.from.getTime() : null;
     const toT = dateRange ? dateRange.to.getTime() : null;
-    return allGroups.filter((g) => {
-      if (kind !== "todos" && g.kind !== kind) return false;
-      if (fromT !== null && toT !== null) {
-        if (!g.date) return includeUndated;
-        const t = g.date.getTime();
-        if (t < fromT || t > toT) return false;
+    const inRange = (ms: number) => (fromT === null || toT === null) || (ms >= fromT && ms <= toT);
+    const out: LiveGroup[] = [];
+    for (const g of allGroups) {
+      if (kind !== "todos" && g.kind !== kind) continue;
+      if (fromT === null) { out.push(g); continue; }
+      if (g.date) {
+        if (inRange(g.date.getTime())) out.push(g);
+        continue;
       }
-      return true;
-    });
+      // Grupo sem data de live/evento (ex.: Finders Fee): filtra leads por
+      // data de criação do card no Pipefy (fallback).
+      const kept: G4RealLead[] = [];
+      let hadUndated = false;
+      for (const l of g.leads) {
+        const created = l.dataEntradaPipe ? new Date(l.dataEntradaPipe).getTime() : NaN;
+        if (!Number.isFinite(created)) { hadUndated = true; continue; }
+        if (inRange(created)) kept.push(l);
+      }
+      if (kept.length > 0) out.push(computeGroup(g.live, kept));
+      else if (includeUndated && hadUndated) out.push(g);
+    }
+    return out;
   }, [allGroups, kind, dateRange, includeUndated]);
+
 
 
   const totals = useMemo(() => {
