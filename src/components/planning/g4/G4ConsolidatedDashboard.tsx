@@ -1096,7 +1096,10 @@ export function G4ConsolidatedDashboard() {
               onDateChange={(from, to) => setDateRange({ from, to })}
             />
             {dateRange !== null && (
-              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <label
+                className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                title="Leads em grupos sem data de live (ex.: Finders Fee) são filtrados pela data de criação do card no Pipefy. Marque para incluir também os que não têm nem data de criação."
+              >
                 <input
                   type="checkbox"
                   checked={includeUndated}
@@ -1106,6 +1109,7 @@ export function G4ConsolidatedDashboard() {
                 Incluir sem data
               </label>
             )}
+
           </div>
 
         </CardContent>
