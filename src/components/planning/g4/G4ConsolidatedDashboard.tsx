@@ -1108,7 +1108,9 @@ export function G4ConsolidatedDashboard() {
             <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle}
               onClick={() => openDrill("Leads em contato", "contato", groups)} />
             <Kpi label="Quentes" value={fmtInt(totals.quentes)} icon={Flame} tone="warning"
+              hint={totals.quentes === 0 ? "Sem tag Quente ativa no Pipefy" : undefined}
               onClick={() => openDrill("Leads Quentes", "quente", groups)} />
+
             <Kpi label="Fechados" value={fmtInt(totals.fechados)} hint={`${closeRate}% close rate`} icon={Trophy} tone="success"
               onClick={() => openDrill("Vendas fechadas · Consolidado", "ganho", groups)} />
             <Kpi label="TCV" value={fmt(totals.tcv)} icon={DollarSign} tone="success"
