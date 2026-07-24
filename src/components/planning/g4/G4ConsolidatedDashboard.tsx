@@ -39,8 +39,14 @@ const G4_SALES_WHITELIST_EMAILS = new Set<string>([
   "administrativo@lotuslogistica.com",
   "andre.silva@invenzi.com",
 ]);
-const isG4Sale = (l: G4RealLead): boolean =>
-  isWon(l.faseAtual) && G4_SALES_WHITELIST_EMAILS.has((l.email ?? "").toLowerCase());
+// Uma venda é atribuída ao G4 quando:
+//  - a base externa já marcou (venda_atribuivel_live = true e is_ganho), OU
+//  - o card está "Ganho" e o e-mail está na whitelist Finders Fee (fallback).
+const isG4Sale = (l: G4RealLead): boolean => {
+  if (l.isGanho && l.vendaAtribuivelLive) return true;
+  if (isWon(l.faseAtual) && G4_SALES_WHITELIST_EMAILS.has((l.email ?? "").toLowerCase())) return true;
+  return false;
+};
 const IN_CONTACT_EXACT = new Set([
   "tentativas de contato",
   "reuniao marcada",
@@ -152,10 +158,12 @@ export function isTestG4Lead(l: G4RealLead): boolean {
 export function isG4Attributed(l: G4RealLead): boolean {
   // Testes nunca entram
   if (isTestG4Lead(l)) return false;
-  // Exclusão manual sempre vence
-  const cardId = extractPipefyCardId(l.pipefyUrl);
+  // Exclusão manual sempre vence (usa cardId direto do lead se existir)
+  const cardId = l.cardId ?? extractPipefyCardId(l.pipefyUrl);
   if (cardId && MANUAL_EXCLUDED_G4_CARD_IDS.has(cardId)) return false;
 
+  // Vendas atribuídas pela base externa sempre entram
+  if (l.vendaAtribuivelLive) return true;
   // Whitelist Finders Fee: sempre atribui ao G4
   if (G4_SALES_WHITELIST_EMAILS.has((l.email ?? "").toLowerCase())) return true;
 

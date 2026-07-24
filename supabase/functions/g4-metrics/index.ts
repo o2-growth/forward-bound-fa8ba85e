@@ -35,18 +35,22 @@ Deno.serve(async (req) => {
     const [funilRows, diagRows, kpiRows, fatRows, leadRows] = await Promise.all(
       [
         sql /* funil por live */`
+          WITH won_by_live AS (
+            SELECT unnest(COALESCE(l.lives_assistiu, l.lives)) AS live,
+                   l.email
+            FROM g4_leads_360 l
+            WHERE l.is_ganho = TRUE
+              AND l.venda_atribuivel_live = TRUE
+              AND l.email IS NOT NULL
+          )
           SELECT i.live,
             COUNT(DISTINCT i.email) AS inscritos,
             COUNT(DISTINCT i.email) FILTER (WHERE i.presente) AS presentes,
             COUNT(DISTINCT lm.email) AS levantaram_mao,
-            COUNT(DISTINCT p.email) FILTER (WHERE p.fase_atual='Ganho') AS vendas
+            COUNT(DISTINCT w.email) FILTER (WHERE w.live = i.live) AS vendas
           FROM g4_inscritos i
           LEFT JOIN g4_levantadas_mao lm ON lm.email=i.email AND lm.live=i.live
-          LEFT JOIN (
-            SELECT DISTINCT ON (lower("E-mail")) lower("E-mail") AS email, "Fase Atual" AS fase_atual
-            FROM pipefy_moviment_cfos WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
-            ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
-          ) p ON p.email=i.email
+          LEFT JOIN won_by_live w ON w.live = i.live AND w.email = i.email
           WHERE i.email NOT ILIKE '%teste%' AND i.email NOT ILIKE '%test@%'
             AND i.email NOT ILIKE '%@test.%' AND i.email NOT ILIKE '%exemplo.com%'
             AND i.email NOT ILIKE '%@o2inc.com.br'
@@ -59,6 +63,7 @@ Deno.serve(async (req) => {
             AND i.live <> 'Raio-X de Margens - G4'
           GROUP BY i.live ORDER BY i.live
         `,
+
         sql /* diagnóstico por live */`
           SELECT live, COUNT(DISTINCT email) AS diagnosticos
           FROM g4_diagnostico
@@ -136,8 +141,9 @@ Deno.serve(async (req) => {
           ) t
         `,
         sql /* leads 360 enriquecido com Pipefy + faixa via diagnóstico */`
-          WITH pipe AS (
-            SELECT DISTINCT ON (lower("E-mail"))
+          WITH pipe_by_card AS (
+            SELECT DISTINCT ON ("ID"::text)
+              "ID"::text AS card_id_txt,
               lower("E-mail") AS email,
               "Faixa de faturamento mensal" AS faixa,
               COALESCE("Valor MRR", 0)::float8 AS valor_mrr,
@@ -145,7 +151,24 @@ Deno.serve(async (req) => {
               COALESCE("Valor Pontual", 0)::float8 AS valor_pontual,
               "SDR responsável" AS sdr,
               "Entrada" AS data_entrada_pipe,
-              "ID" AS card_id,
+              "Labels" AS labels_raw,
+              "Motivo da perda" AS motivo_perda,
+              "Origem do lead" AS origem_lead,
+              "Tipo Origem Lead" AS tipo_origem_lead
+            FROM pipefy_moviment_cfos
+            WHERE "ID" IS NOT NULL
+            ORDER BY "ID"::text, "Entrada" DESC NULLS LAST
+          ),
+          pipe_by_email AS (
+            SELECT DISTINCT ON (lower("E-mail"))
+              lower("E-mail") AS email,
+              "ID"::text AS card_id_txt,
+              "Faixa de faturamento mensal" AS faixa,
+              COALESCE("Valor MRR", 0)::float8 AS valor_mrr,
+              COALESCE("Valor Setup", 0)::float8 AS valor_setup,
+              COALESCE("Valor Pontual", 0)::float8 AS valor_pontual,
+              "SDR responsável" AS sdr,
+              "Entrada" AS data_entrada_pipe,
               "Labels" AS labels_raw,
               "Motivo da perda" AS motivo_perda,
               "Origem do lead" AS origem_lead,
@@ -183,22 +206,45 @@ Deno.serve(async (req) => {
                  l.presente_alguma_live, l.levantou_mao,
                  CASE WHEN l.live_da_mao = 'Raio-X de Margens - G4' THEN NULL ELSE l.live_da_mao END AS live_da_mao,
                  l.fez_diagnostico, l.no_pipe, l.fase_atual, l.closer,
-                 COALESCE(l.pipefy_url, 'https://app.pipefy.com/open-cards/' || p.card_id) AS pipefy_url,
-                 COALESCE(p.faixa, d.faixa) AS faixa,
-                 p.valor_mrr, p.valor_setup, p.valor_pontual, p.sdr, p.data_entrada_pipe,
-                 p.labels_raw, p.motivo_perda, p.origem_lead, p.tipo_origem_lead
+                 l.card_id::text AS card_id,
+                 l.is_ganho,
+                 l.data_ganho,
+                 l.venda_atribuivel_live,
+                 l.primeira_live_data,
+                 l.n_lives,
+                 l.lives_assistiu,
+                 l.lives_mao,
+                 l.lives_diagnostico,
+                 COALESCE(
+                   l.pipefy_url,
+                   'https://app.pipefy.com/open-cards/' || COALESCE(l.card_id::text, pbc.card_id_txt, pbe.card_id_txt)
+                 ) AS pipefy_url,
+                 COALESCE(pbc.faixa, pbe.faixa, d.faixa) AS faixa,
+                 -- Preferir valores materializados em g4_leads_360; fallback para Pipefy
+                 COALESCE(l.valor_mrr, pbc.valor_mrr, pbe.valor_mrr) AS valor_mrr,
+                 COALESCE(l.valor_setup, pbc.valor_setup, pbe.valor_setup) AS valor_setup,
+                 COALESCE(pbc.valor_pontual, pbe.valor_pontual) AS valor_pontual,
+                 COALESCE(pbc.sdr, pbe.sdr) AS sdr,
+                 COALESCE(pbc.data_entrada_pipe, pbe.data_entrada_pipe) AS data_entrada_pipe,
+                 COALESCE(pbc.labels_raw, pbe.labels_raw) AS labels_raw,
+                 COALESCE(pbc.motivo_perda, pbe.motivo_perda) AS motivo_perda,
+                 COALESCE(pbc.origem_lead, pbe.origem_lead) AS origem_lead,
+                 COALESCE(pbc.tipo_origem_lead, pbe.tipo_origem_lead) AS tipo_origem_lead
           FROM g4_leads_360 l
-          LEFT JOIN pipe p ON p.email = l.email
-          LEFT JOIN diag_faixa d ON d.email = l.email
-          WHERE l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%test@%'
-            AND l.email NOT ILIKE '%@test.%' AND l.email NOT ILIKE '%exemplo.com%'
-            AND l.email NOT ILIKE '%@o2inc.com.br'
-            AND l.email NOT ILIKE '%nao_atender%' AND l.email NOT ILIKE '%naoatender%'
-            AND l.email NOT ILIKE '%no-reply%' AND l.email NOT ILIKE '%noreply%'
-            AND l.email NOT IN (
-              'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
-              'demo@exemplo.com','teste_nao_atender@gmail.com'
-            )
+          LEFT JOIN pipe_by_card  pbc ON pbc.card_id_txt = l.card_id::text
+          LEFT JOIN pipe_by_email pbe ON pbe.email = l.email
+          LEFT JOIN diag_faixa    d   ON d.email = l.email
+          WHERE (l.email IS NULL OR (
+              l.email NOT ILIKE '%teste%' AND l.email NOT ILIKE '%test@%'
+              AND l.email NOT ILIKE '%@test.%' AND l.email NOT ILIKE '%exemplo.com%'
+              AND l.email NOT ILIKE '%@o2inc.com.br'
+              AND l.email NOT ILIKE '%nao_atender%' AND l.email NOT ILIKE '%naoatender%'
+              AND l.email NOT ILIKE '%no-reply%' AND l.email NOT ILIKE '%noreply%'
+              AND l.email NOT IN (
+                'dudarovani@gmail.com','jv241004@gmail.com','voce@empresa.com',
+                'demo@exemplo.com','teste_nao_atender@gmail.com'
+              )
+            ))
             AND (l.nome IS NULL OR (
               l.nome NOT ILIKE '%teste%' AND l.nome NOT ILIKE '%nao atender%'
               AND l.nome NOT ILIKE '%não atender%' AND l.nome NOT ILIKE '%TESTE ERP%'
@@ -223,6 +269,15 @@ Deno.serve(async (req) => {
             TRUE  AS no_pipe,
             pf."Fase Atual" AS fase_atual,
             pf."Closer responsável" AS closer,
+            pf."ID"::text AS card_id,
+            (pf."Fase Atual" = 'Ganho') AS is_ganho,
+            NULL::date AS data_ganho,
+            TRUE AS venda_atribuivel_live,
+            NULL::date AS primeira_live_data,
+            0::int AS n_lives,
+            NULL::text[] AS lives_assistiu,
+            NULL::text[] AS lives_mao,
+            NULL::text[] AS lives_diagnostico,
             'https://app.pipefy.com/open-cards/' || pf."ID" AS pipefy_url,
             pf."Faixa de faturamento mensal" AS faixa,
             COALESCE(pf."Valor MRR", 0)::float8 AS valor_mrr,
@@ -252,6 +307,7 @@ Deno.serve(async (req) => {
             SELECT 1 FROM g4_leads_360 gl WHERE gl.email = lower(pf."E-mail")
           )
         `,
+
       ],
     );
 
@@ -355,6 +411,15 @@ Deno.serve(async (req) => {
         motivoPerda: (r.motivo_perda as string | null) ?? null,
         origemLead: (r.origem_lead as string | null) ?? null,
         tipoOrigemLead: (r.tipo_origem_lead as string | null) ?? null,
+        cardId: r.card_id != null ? String(r.card_id) : null,
+        isGanho: r.is_ganho == null ? null : Boolean(r.is_ganho),
+        dataGanho: r.data_ganho ? new Date(r.data_ganho as string).toISOString() : null,
+        vendaAtribuivelLive: r.venda_atribuivel_live == null ? null : Boolean(r.venda_atribuivel_live),
+        primeiraLiveData: r.primeira_live_data ? new Date(r.primeira_live_data as string).toISOString() : null,
+        nLives: r.n_lives != null ? Number(r.n_lives) : null,
+        livesAssistiu: (r.lives_assistiu as string[] | null) ?? null,
+        livesMao: (r.lives_mao as string[] | null) ?? null,
+        livesDiagnostico: (r.lives_diagnostico as string[] | null) ?? null,
       };
     });
 
