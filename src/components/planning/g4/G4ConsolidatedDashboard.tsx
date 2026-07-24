@@ -232,7 +232,7 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
       inscritos: uniq.length,
       mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
       emContato: uniq.filter((l) => isInContact(l.faseAtual)).length,
-      quentes: uniq.filter((l) => l.temperatura === "Quente").length,
+      quentes: uniq.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
       fechados: won.length,
       perdidos: lost.length,
       mrr, setup, pontual, tcv,
@@ -440,7 +440,7 @@ function mergeGroups(list: LiveGroup[], label: string): LiveGroup {
     inscritos: leads.length,
     mqls: leads.filter((l) => isMqlByFaturamento(l.faixa)).length,
     emContato: leads.filter((l) => isInContact(l.faseAtual)).length,
-    quentes: leads.filter((l) => l.temperatura === "Quente").length,
+    quentes: leads.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
     fechados: won.length,
     perdidos: lost.length,
     mrr, setup, pontual, tcv,
@@ -570,6 +570,7 @@ function ExpandedRow({ group }: { group: LiveGroup }) {
   const tempCounts = useMemo(() => {
     const m = { Quente: 0, Morno: 0, Frio: 0, "Sem tag": 0 } as Record<string, number>;
     for (const l of group.leads) {
+      if (l.temperatura === "Quente" && (isG4Sale(l) || isWon(l.faseAtual))) continue;
       if (l.temperatura) m[l.temperatura]++;
       else m["Sem tag"]++;
     }
@@ -825,7 +826,7 @@ export function G4ConsolidatedDashboard() {
     switch (mode) {
       case "mql": return leads.filter((l) => isMqlByFaturamento(l.faixa));
       case "contato": return leads.filter((l) => isInContact(l.faseAtual));
-      case "quente": return leads.filter((l) => l.temperatura === "Quente");
+      case "quente": return leads.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual));
       case "ganho": return leads.filter(isG4Sale);
       case "perdido": return leads.filter((l) => isLost(l.faseAtual));
       default: return leads;
