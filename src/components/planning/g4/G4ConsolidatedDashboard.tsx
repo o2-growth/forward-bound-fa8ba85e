@@ -233,6 +233,48 @@ function pickClosestLive(lives: string[], dataGanho?: string | null): string[] {
   return [best];
 }
 
+function computeGroup(live: string, list: G4RealLead[]): LiveGroup {
+  const seen = new Set<string>();
+  const uniq = list.filter((l) => {
+    const k = (l.email ?? l.nome ?? "").toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+  const won = uniq.filter(isG4Sale);
+  const lost = uniq.filter((l) => isLost(l.faseAtual));
+  let mrr = 0, setup = 0, pontual = 0, tcv = 0;
+  for (const w of won) {
+    mrr += w.valorMRR ?? 0;
+    setup += w.valorSetup ?? 0;
+    pontual += w.valorPontual ?? 0;
+    tcv += w.tcv ?? 0;
+  }
+  const ticketSum = won.reduce(
+    (a, w) => a + (w.valorSetup ?? 0) + (w.valorMRR ?? 0) + (w.valorPontual ?? 0),
+    0,
+  );
+  const cls = classifyG4Event(live);
+  return {
+    live,
+    date: parseEventDate(live),
+    kind: cls.categoria === "Live" ? "live" : "evento",
+    categoria: cls.categoria,
+    subcategoria: cls.subcategoria,
+    leads: uniq,
+    inscritos: uniq.length,
+    mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
+    emContato: uniq.filter((l) => isInContact(l.faseAtual)).length,
+    quentes: uniq.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
+    fechados: won.length,
+    perdidos: lost.length,
+    mrr, setup, pontual, tcv,
+    ticketMedio: won.length ? ticketSum / won.length : 0,
+    wonLeads: won,
+    lostLeads: lost,
+  };
+}
+
 function buildGroups(leads: G4RealLead[]): LiveGroup[] {
   const filtered = leads.filter(isG4Attributed);
   const byLive = new Map<string, G4RealLead[]>();
@@ -253,51 +295,14 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
   }
   const groups: LiveGroup[] = [];
   for (const [live, list] of byLive.entries()) {
-    const seen = new Set<string>();
-    const uniq = list.filter((l) => {
-      const k = (l.email ?? l.nome ?? "").toLowerCase();
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-    const won = uniq.filter(isG4Sale);
-    const lost = uniq.filter((l) => isLost(l.faseAtual));
-    let mrr = 0, setup = 0, pontual = 0, tcv = 0;
-    for (const w of won) {
-      mrr += w.valorMRR ?? 0;
-      setup += w.valorSetup ?? 0;
-      pontual += w.valorPontual ?? 0;
-      tcv += w.tcv ?? 0;
-    }
-    const ticketSum = won.reduce(
-      (a, w) => a + (w.valorSetup ?? 0) + (w.valorMRR ?? 0) + (w.valorPontual ?? 0),
-      0,
-    );
-    const cls = classifyG4Event(live);
-    groups.push({
-      live,
-      date: parseEventDate(live),
-      kind: cls.categoria === "Live" ? "live" : "evento",
-      categoria: cls.categoria,
-      subcategoria: cls.subcategoria,
-      leads: uniq,
-      inscritos: uniq.length,
-      mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
-      emContato: uniq.filter((l) => isInContact(l.faseAtual)).length,
-      quentes: uniq.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
-      fechados: won.length,
-      perdidos: lost.length,
-      mrr, setup, pontual, tcv,
-      ticketMedio: won.length ? ticketSum / won.length : 0,
-      wonLeads: won,
-      lostLeads: lost,
-    });
+    groups.push(computeGroup(live, list));
   }
   return groups.sort((a, b) => {
     if (a.date && b.date) return a.date.getTime() - b.date.getTime();
     return a.live.localeCompare(b.live);
   });
 }
+
 
 // ─────────── Árvore de categorias (Live › Palestras › Eventos) ───────────
 interface Agg {
@@ -828,16 +833,30 @@ export function G4ConsolidatedDashboard() {
   const groups = useMemo(() => {
     const fromT = dateRange ? dateRange.from.getTime() : null;
     const toT = dateRange ? dateRange.to.getTime() : null;
-    return allGroups.filter((g) => {
-      if (kind !== "todos" && g.kind !== kind) return false;
-      if (fromT !== null && toT !== null) {
-        if (!g.date) return includeUndated;
-        const t = g.date.getTime();
-        if (t < fromT || t > toT) return false;
+    const inRange = (ms: number) => (fromT === null || toT === null) || (ms >= fromT && ms <= toT);
+    const out: LiveGroup[] = [];
+    for (const g of allGroups) {
+      if (kind !== "todos" && g.kind !== kind) continue;
+      if (fromT === null) { out.push(g); continue; }
+      if (g.date) {
+        if (inRange(g.date.getTime())) out.push(g);
+        continue;
       }
-      return true;
-    });
+      // Grupo sem data de live/evento (ex.: Finders Fee): filtra leads por
+      // data de criação do card no Pipefy (fallback).
+      const kept: G4RealLead[] = [];
+      let hadUndated = false;
+      for (const l of g.leads) {
+        const created = l.dataEntradaPipe ? new Date(l.dataEntradaPipe).getTime() : NaN;
+        if (!Number.isFinite(created)) { hadUndated = true; continue; }
+        if (inRange(created)) kept.push(l);
+      }
+      if (kept.length > 0) out.push(computeGroup(g.live, kept));
+      else if (includeUndated && hadUndated) out.push(g);
+    }
+    return out;
   }, [allGroups, kind, dateRange, includeUndated]);
+
 
 
   const totals = useMemo(() => {
@@ -1077,7 +1096,10 @@ export function G4ConsolidatedDashboard() {
               onDateChange={(from, to) => setDateRange({ from, to })}
             />
             {dateRange !== null && (
-              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              <label
+                className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                title="Leads em grupos sem data de live (ex.: Finders Fee) são filtrados pela data de criação do card no Pipefy. Marque para incluir também os que não têm nem data de criação."
+              >
                 <input
                   type="checkbox"
                   checked={includeUndated}
@@ -1087,6 +1109,7 @@ export function G4ConsolidatedDashboard() {
                 Incluir sem data
               </label>
             )}
+
           </div>
 
         </CardContent>
