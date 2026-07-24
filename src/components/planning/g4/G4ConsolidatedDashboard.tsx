@@ -440,7 +440,7 @@ function mergeGroups(list: LiveGroup[], label: string): LiveGroup {
     inscritos: leads.length,
     mqls: leads.filter((l) => isMqlByFaturamento(l.faixa)).length,
     emContato: leads.filter((l) => isInContact(l.faseAtual)).length,
-    quentes: leads.filter((l) => l.temperatura === "Quente").length,
+    quentes: leads.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
     fechados: won.length,
     perdidos: lost.length,
     mrr, setup, pontual, tcv,
