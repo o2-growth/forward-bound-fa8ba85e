@@ -1025,7 +1025,7 @@ export function G4ConsolidatedDashboard() {
         </tr>
         {hasData && open && drillGroup && (
           <tr>
-            <td colSpan={14} className="p-0">
+            <td colSpan={8} className="p-0">
               <ExpandedRow group={drillGroup} />
             </td>
           </tr>
