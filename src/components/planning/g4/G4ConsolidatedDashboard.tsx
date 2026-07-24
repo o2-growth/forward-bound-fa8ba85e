@@ -570,6 +570,7 @@ function ExpandedRow({ group }: { group: LiveGroup }) {
   const tempCounts = useMemo(() => {
     const m = { Quente: 0, Morno: 0, Frio: 0, "Sem tag": 0 } as Record<string, number>;
     for (const l of group.leads) {
+      if (l.temperatura === "Quente" && (isG4Sale(l) || isWon(l.faseAtual))) continue;
       if (l.temperatura) m[l.temperatura]++;
       else m["Sem tag"]++;
     }
