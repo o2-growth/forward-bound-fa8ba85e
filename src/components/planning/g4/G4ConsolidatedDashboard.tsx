@@ -1007,7 +1007,8 @@ export function G4ConsolidatedDashboard() {
     const drillGroup =
       item.groups.length === 1 ? item.groups[0] : hasData ? mergeGroups(item.groups, item.label) : null;
     const badgeLabel =
-      catLabel === "Live" ? "LIVE" : catLabel === "Palestras" ? "TALK" : catLabel === "Seller" ? "SELLER" : "EVENTO";
+      catLabel === "Live" ? "LIVE" : catLabel === "Palestras" ? "TALK" : "EVENTO";
+
     return (
       <Fragment key={item.key}>
         <tr
