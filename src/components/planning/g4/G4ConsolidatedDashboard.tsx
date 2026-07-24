@@ -786,21 +786,34 @@ export function G4ConsolidatedDashboard() {
   }, [allGroups, kind, range]);
 
   const totals = useMemo(() => {
-    const acc = { inscritos: 0, mqls: 0, emContato: 0, quentes: 0, fechados: 0, perdidos: 0, mrr: 0, setup: 0, pontual: 0, tcv: 0 };
+    // Deduplica leads por email/nome ao longo de todos os groups visíveis
+    // para que os KPIs batam com os drill-downs (que também deduplicam).
+    const seen = new Set<string>();
+    const uniq: G4RealLead[] = [];
     for (const g of groups) {
-      acc.inscritos += g.inscritos;
-      acc.mqls += g.mqls;
-      acc.emContato += g.emContato;
-      acc.quentes += g.quentes;
-      acc.fechados += g.fechados;
-      acc.perdidos += g.perdidos;
-      acc.mrr += g.mrr;
-      acc.setup += g.setup;
-      acc.pontual += g.pontual;
-      acc.tcv += g.tcv;
+      for (const l of g.leads) {
+        const k = (l.email ?? l.nome ?? "").toLowerCase();
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        uniq.push(l);
+      }
     }
+    const won = uniq.filter(isG4Sale);
+    const acc = {
+      inscritos: uniq.length,
+      mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
+      emContato: uniq.filter((l) => isInContact(l.faseAtual)).length,
+      quentes: uniq.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
+      fechados: won.length,
+      perdidos: uniq.filter((l) => isLost(l.faseAtual)).length,
+      mrr: won.reduce((a, w) => a + (w.valorMRR ?? 0), 0),
+      setup: won.reduce((a, w) => a + (w.valorSetup ?? 0), 0),
+      pontual: won.reduce((a, w) => a + (w.valorPontual ?? 0), 0),
+      tcv: won.reduce((a, w) => a + (w.tcv ?? 0), 0),
+    };
     return acc;
   }, [groups]);
+
 
   const tree = useMemo(() => buildTree(groups), [groups]);
   // Chaves de categoria/subcategoria (não inclui itens folha, que abrem o drill).
