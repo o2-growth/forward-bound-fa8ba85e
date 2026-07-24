@@ -1059,19 +1059,36 @@ export function G4ConsolidatedDashboard() {
               Indicadores e consolidado por categoria (Live · Palestras · Eventos), com drill-down por fase, temperatura, perdas e vendas.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex gap-1">
               <FilterPill label="Todos" active={kind === "todos"} onClick={() => setKind("todos")} />
               <FilterPill label="Lives" active={kind === "live"} onClick={() => setKind("live")} />
               <FilterPill label="Eventos" active={kind === "evento"} onClick={() => setKind("evento")} />
             </div>
             <div className="w-px h-5 bg-border" />
-            <div className="flex gap-1">
-              <FilterPill label="30d" active={range === "30"} onClick={() => setRange("30")} />
-              <FilterPill label="90d" active={range === "90"} onClick={() => setRange("90")} />
-              <FilterPill label="Tudo" active={range === "all"} onClick={() => setRange("all")} />
-            </div>
+            <FilterPill
+              label="Tudo"
+              active={dateRange === null}
+              onClick={() => setDateRange(null)}
+            />
+            <DateRangePickerGA
+              startDate={dateRange?.from ?? new Date(2026, 0, 1)}
+              endDate={dateRange?.to ?? new Date()}
+              onDateChange={(from, to) => setDateRange({ from, to })}
+            />
+            {dateRange !== null && (
+              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={includeUndated}
+                  onChange={(e) => setIncludeUndated(e.target.checked)}
+                  className="h-3 w-3"
+                />
+                Incluir sem data
+              </label>
+            )}
           </div>
+
         </CardContent>
       </Card>
 
