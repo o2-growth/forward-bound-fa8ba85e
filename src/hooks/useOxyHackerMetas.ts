@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
-import { isJunkCard } from "./useModeloAtualMetas";
+import { isJunkCard, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
 
 export type OxyHackerIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -21,6 +21,7 @@ interface OxyHackerMovement {
   taxaFranquia: number | null; // Taxa de franquia (R$ 54.000 para Oxy Hacker)
   investimentoDisponivel: string | null;
   produto: string;
+  motivoPerda: string | null;
 }
 
 // MQL Expansão Oxy Hacker: investimento disponível >= R$ 15k
@@ -154,6 +155,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
           taxaFranquia: row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : null,
           investimentoDisponivel: row['Investimento disponível'] || null,
           produto,
+          motivoPerda: row['Motivo da perda'] || row['Motivo de perda'] || row['Motivo Perda'] || null,
         };
         
         movements.push(movement);
@@ -193,6 +195,12 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
   const isCurrentProduct = (id: string) =>
     (currentProdutoByCard.get(id)?.produto || '') === 'Oxy Hacker';
 
+  // Cards excluídos da contagem de MQL — motivos padrão (Duplicado, Pessoa
+  // física, Não é demanda real, etc.). Baseado no motivo mais recente do card.
+  const excludedMqlCardIds = data?.movements
+    ? buildExcludedMqlCardIds(data.movements.map((m) => ({ id: m.id, motivoPerda: m.motivoPerda || undefined, dataEntrada: m.dataEntrada })))
+    : new Set<string>();
+
 
   const getQtyForPeriod = (indicator: OxyHackerIndicator, start?: Date, end?: Date): number => {
     if (!data?.movements || data.movements.length === 0) return 0;
@@ -220,7 +228,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
           // MQL: cards que passaram por "Lead" ou "MQL" E tem investimento qualificado (>= R$ 54k)
           if (movement.fase === 'Lead' || movement.fase === 'MQL') {
             const inv = cardInvestimento.get(movement.id) || null;
-            if (isOxyHackerMqlQualified(inv)) {
+            if (isOxyHackerMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
               uniqueCards.add(movement.id);
             }
           }
@@ -265,7 +273,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
         } else if (indicator === 'mql') {
           if (movement.fase === 'Lead' || movement.fase === 'MQL') {
             const inv = cardInvestimento.get(movement.id) || null;
-            if (isOxyHackerMqlQualified(inv)) {
+            if (isOxyHackerMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
               shouldCount = true;
             }
           }
@@ -357,7 +365,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
           } else if (indicator === 'mql') {
             if (movement.fase === 'Lead' || movement.fase === 'MQL') {
               const inv = cardInvestimento.get(movement.id) || null;
-              if (isOxyHackerMqlQualified(inv)) {
+              if (isOxyHackerMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
                 uniqueCards.add(movement.id);
               }
             }
@@ -438,7 +446,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
       } else if (indicator === 'mql') {
         if (movement.fase === 'Lead' || movement.fase === 'MQL') {
           const inv = cardInvestimento.get(movement.id) || null;
-          matches = isOxyHackerMqlQualified(inv);
+          matches = isOxyHackerMqlQualified(inv) && !excludedMqlCardIds.has(movement.id);
         }
       } else {
         matches = movementIndicator === indicator;

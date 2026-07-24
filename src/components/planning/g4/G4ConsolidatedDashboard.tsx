@@ -117,6 +117,29 @@ const MANUAL_EXCLUDED_G4_CARD_IDS = new Set<string>([
   "1317180165", // Ediouro — não fechou pelas lives/eventos G4
 ]);
 
+// Overrides manuais de valores G4 quando o card no Pipefy está com valor errado
+// (ex.: erro de digitação de escala). Chave = email em lowercase.
+// Aplicado antes de agrupar/somar KPIs e antes da tabela/drill-down.
+const G4_MANUAL_VALUE_OVERRIDES: Record<
+  string,
+  { mrr?: number; setup?: number; pontual?: number }
+> = {
+  // Martinelli Industria (card 1303731824) — Pipefy digitou 7,5702 / 21.
+  "vanderson@martinelli.ind.br": { mrr: 7570.2, setup: 21000 },
+};
+
+function applyG4ValueOverride(lead: G4RealLead): G4RealLead {
+  const email = (lead.email ?? "").toLowerCase();
+  const ov = email ? G4_MANUAL_VALUE_OVERRIDES[email] : undefined;
+  if (!ov) return lead;
+  const mrr = ov.mrr ?? lead.valorMRR ?? 0;
+  const setup = ov.setup ?? lead.valorSetup ?? 0;
+  const pontual = ov.pontual ?? lead.valorPontual ?? 0;
+  // Recalcula TCV = (MRR * 12) + Setup + Pontual para manter coerência.
+  const tcv = mrr * 12 + setup + pontual;
+  return { ...lead, valorMRR: mrr, valorSetup: setup, valorPontual: pontual, tcv };
+}
+
 function extractPipefyCardId(url: string | null | undefined): string | null {
   if (!url) return null;
   const m = url.match(/\/(\d{6,})(?:[/?#]|$)/);
@@ -769,10 +792,15 @@ export function G4ConsolidatedDashboard() {
   const [drillItems, setDrillItems] = useState<DetailItem[]>([]);
   const [drillMode, setDrillMode] = useState<"basic" | "money" | "lost">("basic");
 
-  const allGroups = useMemo(() => (data ? buildGroups(data.leads) : []), [data]);
-  const excludedByOrigin = useMemo(
-    () => (data ? data.leads.filter((l) => !isG4Attributed(l)).length : 0),
+  // Aplica overrides manuais (Martinelli etc.) uma vez, antes de tudo.
+  const overriddenLeads = useMemo(
+    () => (data ? data.leads.map(applyG4ValueOverride) : []),
     [data],
+  );
+  const allGroups = useMemo(() => buildGroups(overriddenLeads), [overriddenLeads]);
+  const excludedByOrigin = useMemo(
+    () => overriddenLeads.filter((l) => !isG4Attributed(l)).length,
+    [overriddenLeads],
   );
 
   const groups = useMemo(() => {

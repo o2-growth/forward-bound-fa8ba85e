@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
-import { isJunkCard } from "./useModeloAtualMetas";
+import { isJunkCard, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
 import { sumMrrFields } from "@/lib/mrrFields";
 
 export type ExpansaoIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
@@ -21,6 +21,7 @@ interface ExpansaoMovement {
   taxaFranquia: number | null; // Taxa de franquia (R$ 140.000 para Franquia)
   investimentoDisponivel: string | null;
   produto: string;
+  motivoPerda: string | null;
 }
 
 // MQL Expansão Franquia: investimento disponível >= R$ 15k
@@ -150,6 +151,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           ),
           investimentoDisponivel: row['Investimento disponível'] || row['Investimento Disponivel'] || null,
           produto,
+          motivoPerda: row['Motivo da perda'] || row['Motivo de perda'] || row['Motivo Perda'] || null,
         };
 
         // Override de Valor Pontual fixo (Alexandre Correa, Jean Morbis)
@@ -198,6 +200,13 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
   const isCurrentProduct = (id: string) =>
     (currentProdutoByCard.get(id)?.produto || '') === 'Franquia';
 
+  // Cards excluídos da contagem de MQL — motivos padrão (Duplicado, Pessoa
+  // física, Não é demanda real, Buscando parceria, Quer soluções, Não é MQL,
+  // Email/Telefone Inválido). Baseado no motivo mais recente do card.
+  const excludedMqlCardIds = data?.movements
+    ? buildExcludedMqlCardIds(data.movements.map((m) => ({ id: m.id, motivoPerda: m.motivoPerda || undefined, dataEntrada: m.dataEntrada })))
+    : new Set<string>();
+
 
 
   // Get total qty for a specific indicator and date range
@@ -228,7 +237,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           // MQL: cards em fase "Lead" ou "MQL" com investimento qualificado (>= R$ 140k)
           if (movement.fase === 'Lead' || movement.fase === 'MQL') {
             const inv = cardInvestimento.get(movement.id) || null;
-            if (isFranquiaMqlQualified(inv)) {
+            if (isFranquiaMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
               uniqueCards.add(movement.id);
             }
           }
@@ -273,7 +282,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         } else if (indicator === 'mql') {
           if (movement.fase === 'Lead' || movement.fase === 'MQL') {
             const inv = cardInvestimento.get(movement.id) || null;
-            if (isFranquiaMqlQualified(inv)) {
+            if (isFranquiaMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
               shouldCount = true;
             }
           }
@@ -365,7 +374,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           } else if (indicator === 'mql') {
             if (movement.fase === 'Lead' || movement.fase === 'MQL') {
               const inv = cardInvestimento.get(movement.id) || null;
-              if (isFranquiaMqlQualified(inv)) {
+              if (isFranquiaMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
                 uniqueCards.add(movement.id);
               }
             }
@@ -447,7 +456,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       } else if (indicator === 'mql') {
         if (movement.fase === 'Lead' || movement.fase === 'MQL') {
           const inv = cardInvestimento.get(movement.id) || null;
-          matches = isFranquiaMqlQualified(inv);
+          matches = isFranquiaMqlQualified(inv) && !excludedMqlCardIds.has(movement.id);
         }
       } else {
         matches = movementIndicator === indicator;

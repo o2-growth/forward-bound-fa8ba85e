@@ -1,37 +1,63 @@
-## Problema
+## O que vamos fazer
 
-Os KPIs do topo do `/dash-g4` (Leads, MQLs, Em contato, Quentes, Fechados, TCV, Ticket médio) e a linha de **Total** da tabela consolidada divergem dos drill-downs. Exemplo relatado: 5 Quentes no card → 3 ao abrir; 11 Fechados no card → 9 ao abrir (9 é o correto).
+Dois ajustes independentes:
 
-## Causa raiz
+### 1. Corrigir valores do Martinelli no dashboard G4
+O card 1303731824 no Pipefy está com valores errados (MRR R$ 7,5702 / Setup R$ 21). Como não conseguimos editar o Pipefy daqui, aplicaremos um **override manual** no dashboard `/dash-g4` para exibir os valores corretos:
+- **MRR: R$ 7.570,20**
+- **Setup: R$ 21.000,00**
 
-Em `src/components/planning/g4/G4ConsolidatedDashboard.tsx`:
+O override entra no mesmo padrão que já usamos hoje (`MANUAL_EXCLUDED_G4_CARD_IDS`, whitelist de Finders Fee). Criaremos um novo `G4_MANUAL_VALUE_OVERRIDES` (map por email) que sobrescreve `mrr` e `setup` dos leads Ganho antes de somar KPIs e antes de renderizar a tabela.
 
-- `totals` (linha 788) é calculado somando os contadores de cada `LiveGroup` do array `groups`. Um mesmo lead que participou de mais de uma live é contado uma vez em cada grupo → **inflate**.
-- A linha de **Total** da tabela (linhas 1137-1138) usa o mesmo `totals` inflado.
-- Os drill-downs usam `mergeGroups` (linha 440), que deduplica leads por e-mail antes de contar — por isso o número do drill é o correto.
-- O fix anterior (`pickClosestLive`) só deduplica leads **ganhos** dentro de `buildGroups`; leads em outros estados (Quentes, MQLs, Em contato, Perdidos) continuam duplicados entre grupos. E mesmo para ganhos, existem casos em que `pickClosestLive` não colapsa (ex.: lead sem `dataGanho` claro ou grupos sintéticos).
+Arquivo tocado: `src/components/planning/g4/G4ConsolidatedDashboard.tsx`.
 
-## Correção
+### 2. Limpar MQLs duplicados e cards de teste dos funis Oxy Hacker e Franquia
 
-Substituir o cálculo de `totals` para deduplicar leads por e-mail/nome ao longo de todos os `groups` visíveis, usando exatamente a mesma lógica do `mergeGroups`:
+**Diagnóstico confirmado pela investigação read-only:**
 
-1. Percorrer `groups`, acumular leads únicos numa `Map` chaveada por `email || nome` (lowercase).
-2. Derivar todos os agregados a partir desse conjunto único:
-   - `inscritos` = tamanho do conjunto
-   - `mqls` = filtro `isMqlByFaturamento(faixa)`
-   - `emContato` = filtro `isInContact(faseAtual)`
-   - `quentes` = `temperatura === "Quente" && !isG4Sale(l) && !isWon(faseAtual)`
-   - `fechados` = filtro `isG4Sale(l)`
-   - `perdidos` = filtro `isLost(faseAtual)`
-   - `mrr/setup/pontual/tcv` = soma somente sobre os `fechados`
-3. Manter `groups` como está para a árvore/tabela por categoria (a granularidade por live continua fazendo sentido lá — cada célula da linha da live representa o que aconteceu naquela live).
-4. Atualizar a linha **Total** da tabela consolidada (linhas 1137-1138 e demais colunas dessa linha) para usar os novos `totals` deduplicados — o que já acontecerá automaticamente ao trocar o `useMemo`.
+Franquia e Oxy Hacker rodam por dois caminhos distintos (ambos alimentam a UI):
 
-Nada mais muda: drill-downs, células por live e árvore por categoria continuam com o mesmo comportamento atual.
+- **`useExpansaoAnalytics.ts`** (drill-downs e cards de indicadores) — já filtra cards de teste (`isJunkCard`) e já exclui `motivoPerda = "Duplicado"` para MQL, mas:
+  - Só considera "Duplicado" (1 motivo), enquanto Modelo Atual exclui **7 motivos** (`MQL_EXCLUDED_LOSS_REASONS`).
+  - Exclusão do "Duplicado" só afeta o count de MQL — não cascateia para RM/RR/Proposta/Venda (permite um card duplicado seguir contando nas fases seguintes).
+  - Usa o *primeiro* `motivoPerda` encontrado no histórico; não considera se foi revertido depois. Modelo Atual usa o mais recente.
 
-## Verificação
+- **`useExpansaoMetas.ts`** e **`useOxyHackerMetas.ts`** (gauges de meta, gráficos empilhados, funil por período, Growth, Marketing, CEO) — filtram cards de teste, mas **não têm nenhuma exclusão de motivo de perda**. MQLs duplicados/perdidos por motivo inválido contam integralmente aqui.
 
-Após aplicar, comparar no `/dash-g4`:
-- KPI "Fechados" deve bater com o drill-down "Vendas fechadas · Consolidado" (esperado: 9).
-- KPI "Quentes" deve bater com o drill-down "Leads Quentes" (esperado: 3 no exemplo relatado).
-- Linha Total da tabela deve refletir os mesmos números dos KPIs.
+**O que faremos:**
+
+1. **Padronizar a lista de motivos excluídos** compartilhando `MQL_EXCLUDED_LOSS_REASONS` de `useModeloAtualMetas.ts` (importar; não duplicar) nos três hooks: `useExpansaoAnalytics.ts`, `useExpansaoMetas.ts`, `useOxyHackerMetas.ts`.
+
+2. **Em `useExpansaoAnalytics.ts`:**
+   - Substituir `duplicadoCardIds` (só "Duplicado") por `excludedMqlCardIds` construído com a mesma lógica do Modelo Atual (`buildExcludedMqlCardIds` — pega o `motivoPerda` do movimento mais recente por card).
+   - Aplicar essa exclusão **também nas fases downstream** (rm, rr, proposta, venda) — do jeito que Modelo Atual faz — para não deixar um card "Duplicado"/"Fora de ICP" seguir contando depois do MQL.
+
+3. **Em `useExpansaoMetas.ts` e `useOxyHackerMetas.ts`:**
+   - Construir `excludedMqlCardIds` (mesmo método) a partir das linhas carregadas.
+   - Descontar esses IDs do count de MQL e das fases seguintes.
+   - Manter `isJunkCard` já existente (nada a mudar em testes — já estão cobertos por título/ID).
+
+4. **Alinhar deduplicação de MQL por card** (`useExpansaoAnalytics.ts`):
+   - Hoje MQL dedup usa apenas um `Set` de cardIds no loop atual, sem cruzar meses — o que pode contar um card ≥2 vezes quando ele entra em "Lead" e depois em "MQL" no mesmo mês. Vamos usar o `monthlyFirstEntries` (mesmo dict já criado para outras fases) para MQL também, garantindo **1 count por card por mês** para a fase MQL.
+
+**Fora de escopo desta rodada** (não pedidos pelo usuário; se quiser depois, faço em outra rodada):
+- Adicionar `@o2inc.com.br` à lista global de junk (hoje só existe no G4).
+- Refatorar os 3 hooks para compartilhar mais código (redução de duplicação de qualificação MQL).
+
+## Detalhes técnicos
+
+**Arquivos editados**
+- `src/components/planning/g4/G4ConsolidatedDashboard.tsx` — adicionar `G4_MANUAL_VALUE_OVERRIDES` e aplicar após o carregamento dos leads.
+- `src/hooks/useExpansaoAnalytics.ts` — importar `MQL_EXCLUDED_LOSS_REASONS` e `buildExcludedMqlCardIds` (ou re-implementar localmente com mesma assinatura), substituir `duplicadoCardIds`, propagar exclusão para rm/rr/proposta/venda, usar `monthlyFirstEntries` para MQL.
+- `src/hooks/useExpansaoMetas.ts` — mesma exclusão MQL + cascata.
+- `src/hooks/useOxyHackerMetas.ts` — mesma exclusão MQL + cascata.
+
+**Lista `MQL_EXCLUDED_LOSS_REASONS` de referência** (`useModeloAtualMetas.ts:44-49`):
+Duplicado; Pessoa física, fora do ICP; Não é uma demanda real; Buscando parceria; Quer soluções para cliente; Não é MQL, mas entrou como MQL; Email/Telefone Inválido.
+
+**Comportamento pós-mudança**
+- Componentes que consomem esses hooks vão devolver counts menores de MQL/RM/RR/Proposta/Venda para Oxy Hacker e Franquia (esperado — é o objetivo). Metas em `funnel_metas` continuam intocadas.
+- Nenhuma alteração em schema, migrations, edge functions ou dados.
+
+**Riscos**
+- Se algum lead legítimo estiver marcado com um dos 7 motivos por engano no Pipefy, ele deixa de contar. Reversão: remover o motivo no Pipefy ou remover o motivo da lista.
