@@ -172,13 +172,16 @@ const TEST_EMAIL_EXACT = new Set([
 ]);
 export function isTestG4Lead(l: G4RealLead): boolean {
   const email = (l.email ?? "").toLowerCase();
-  if (!email) return false;
-  if (TEST_EMAIL_EXACT.has(email)) return true;
-  if (TEST_EMAIL_PATTERNS.some((p) => email.includes(p))) return true;
   const nome = (l.nome ?? "").toLowerCase();
   const empresa = (l.empresa ?? "").toLowerCase();
+  if (email) {
+    if (TEST_EMAIL_EXACT.has(email)) return true;
+    if (TEST_EMAIL_PATTERNS.some((p) => email.includes(p))) return true;
+  }
   if (nome && TEST_NAME_PATTERNS.some((p) => nome.includes(p))) return true;
   if (empresa && TEST_NAME_PATTERNS.some((p) => empresa.includes(p))) return true;
+  // Delegação para o detector global de junk (cobre "testeg4", "testejv", "testenormal1", etc.)
+  if (isJunkCard({ titulo: l.nome, empresa: l.empresa, email: l.email })) return true;
   return false;
 }
 export function isG4Attributed(l: G4RealLead): boolean {
