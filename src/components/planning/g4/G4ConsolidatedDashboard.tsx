@@ -343,6 +343,7 @@ const SCAFFOLD: ScaffoldCat[] = [
     ],
   },
   { categoria: "Eventos", subs: [] },
+  { categoria: "Seller", subs: [] },
 ];
 
 // Monta a árvore a partir do esqueleto fixo e encaixa os grupos reais.
@@ -444,6 +445,7 @@ const CAT_BADGE: Record<G4Categoria, string> = {
   Live: "border-primary/40 text-primary",
   Palestras: "border-violet-500/40 text-violet-600 dark:text-violet-400",
   Eventos: "border-orange-500/40 text-orange-600 dark:text-orange-400",
+  Seller: "border-sky-500/40 text-sky-600 dark:text-sky-400",
 };
 
 // ─────────── UI atoms ───────────
@@ -904,7 +906,8 @@ export function G4ConsolidatedDashboard() {
     const padLeft = indent >= 2 ? "pl-12" : "pl-8";
     const drillGroup =
       item.groups.length === 1 ? item.groups[0] : hasData ? mergeGroups(item.groups, item.label) : null;
-    const badgeLabel = catLabel === "Live" ? "LIVE" : catLabel === "Palestras" ? "TALK" : "EVENTO";
+    const badgeLabel =
+      catLabel === "Live" ? "LIVE" : catLabel === "Palestras" ? "TALK" : catLabel === "Seller" ? "SELLER" : "EVENTO";
     return (
       <Fragment key={item.key}>
         <tr
