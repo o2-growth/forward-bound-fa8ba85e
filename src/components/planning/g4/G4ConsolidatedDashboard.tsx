@@ -792,10 +792,15 @@ export function G4ConsolidatedDashboard() {
   const [drillItems, setDrillItems] = useState<DetailItem[]>([]);
   const [drillMode, setDrillMode] = useState<"basic" | "money" | "lost">("basic");
 
-  const allGroups = useMemo(() => (data ? buildGroups(data.leads) : []), [data]);
-  const excludedByOrigin = useMemo(
-    () => (data ? data.leads.filter((l) => !isG4Attributed(l)).length : 0),
+  // Aplica overrides manuais (Martinelli etc.) uma vez, antes de tudo.
+  const overriddenLeads = useMemo(
+    () => (data ? data.leads.map(applyG4ValueOverride) : []),
     [data],
+  );
+  const allGroups = useMemo(() => buildGroups(overriddenLeads), [overriddenLeads]);
+  const excludedByOrigin = useMemo(
+    () => overriddenLeads.filter((l) => !isG4Attributed(l)).length,
+    [overriddenLeads],
   );
 
   const groups = useMemo(() => {
