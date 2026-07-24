@@ -314,17 +314,35 @@ const emptyAgg = (): Agg => ({
   inscritos: 0, mqls: 0, emContato: 0, quentes: 0, fechados: 0,
   perdidos: 0, mrr: 0, setup: 0, pontual: 0, tcv: 0,
 });
-function addToAgg(a: Agg, g: LiveGroup) {
-  a.inscritos += g.inscritos;
-  a.mqls += g.mqls;
-  a.emContato += g.emContato;
-  a.quentes += g.quentes;
-  a.fechados += g.fechados;
-  a.perdidos += g.perdidos;
-  a.mrr += g.mrr;
-  a.setup += g.setup;
-  a.pontual += g.pontual;
-  a.tcv += g.tcv;
+// Agregação de um conjunto de LiveGroups DEDUPLICANDO leads por email/nome
+// (um lead que aparece em várias lives conta 1x no total da categoria).
+// Vendas G4 já são atribuídas a UMA única live via pickClosestLive, então
+// somamos os valores monetários apenas dos leads únicos marcados como ganho.
+function aggFromGroups(list: LiveGroup[]): Agg {
+  const seen = new Set<string>();
+  const uniq: G4RealLead[] = [];
+  for (const g of list) {
+    for (const l of g.leads) {
+      const k = (l.email ?? l.nome ?? "").toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      uniq.push(l);
+    }
+  }
+  const won = uniq.filter(isG4Sale);
+  const lost = uniq.filter((l) => isLost(l.faseAtual));
+  return {
+    inscritos: uniq.length,
+    mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
+    emContato: uniq.filter((l) => isInContact(l.faseAtual)).length,
+    quentes: uniq.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
+    fechados: won.length,
+    perdidos: lost.length,
+    mrr: won.reduce((a, w) => a + (w.valorMRR ?? 0), 0),
+    setup: won.reduce((a, w) => a + (w.valorSetup ?? 0), 0),
+    pontual: won.reduce((a, w) => a + (w.valorPontual ?? 0), 0),
+    tcv: won.reduce((a, w) => a + (w.tcv ?? 0), 0),
+  };
 }
 const aggTicket = (a: Agg) => (a.fechados ? (a.mrr + a.setup + a.pontual) / a.fechados : 0);
 const aggConv = (a: Agg) => (a.inscritos ? (a.fechados / a.inscritos) * 100 : 0);
@@ -349,11 +367,6 @@ const aggMetrics = (a: Agg): RowMetrics => ({
   conv: aggConv(a), perdidos: a.perdidos, mrr: a.mrr, setup: a.setup, pontual: a.pontual, tcv: a.tcv, ticketMedio: aggTicket(a),
 });
 
-const groupAgg = (g: LiveGroup): Agg => {
-  const a = emptyAgg();
-  addToAgg(a, g);
-  return a;
-};
 
 interface ItemNode {
   kind: "item";
