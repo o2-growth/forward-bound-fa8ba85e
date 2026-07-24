@@ -60,7 +60,28 @@ const TEST_CARD_IDS = new Set([
   '1308003007', // Empresa Teste
   '1320175421', // teste duda
   '1342531906', // G4 (card de teste - Abril/26)
+  '1405505427', // Grupo Longuini - blacklist manual (movido pra Perdido, contava em RM/RR)
 ]);
+
+// E-mails / padrões que indicam card de teste (aplicado além do título).
+const TEST_EMAIL_PATTERNS: RegExp[] = [
+  /nao[_\s-]?atender/i,
+  /^no[_\s-]?reply@/i,
+  /@example\./i,
+  /@test\./i,
+  /^teste?[_.-]/i,
+];
+const TEST_EMAIL_LITERALS = new Set([
+  'teste_nao_atender@gmail.com',
+  'demo@exemplo.com',
+]);
+export function isTestEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const e = String(email).trim().toLowerCase();
+  if (!e) return false;
+  if (TEST_EMAIL_LITERALS.has(e)) return true;
+  return TEST_EMAIL_PATTERNS.some((p) => p.test(e));
+}
 
 export function isTestCard(id?: string): boolean {
   if (!id) return false;
