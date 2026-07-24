@@ -4,26 +4,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from "recharts";
 import { useG4RealMetrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
 import { fmt, fmtInt } from "@/components/planning/ceo/ceoShared";
 import { DetailSheet, columnFormatters, type DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { cn } from "@/lib/utils";
 
 // ─────────── helpers ───────────
-import { canonLive, parseEventDate as parseEventDateShared } from "./canonLive";
+import { canonLive, parseEventDate as parseEventDateShared, classifyG4Event, type G4Categoria } from "./canonLive";
 
 const normalize = (s: unknown) =>
   String(s ?? "")
@@ -91,7 +78,6 @@ const MQL_FAIXAS = new Set([
   "acima de r$ 5 milhoes",
 ]);
 const isMqlByFaturamento = (faixa: string | null) => MQL_FAIXAS.has(normalize(faixa));
-const isLive = (name: string) => /live/i.test(name);
 
 // Try to parse a date from the live name for sorting/filtering.
 const parseEventDate = parseEventDateShared;
@@ -100,6 +86,8 @@ interface LiveGroup {
   live: string;
   date: Date | null;
   kind: "live" | "evento";
+  categoria: G4Categoria;
+  subcategoria: string | null;
   leads: G4RealLead[];
   inscritos: number;
   mqls: number;
@@ -224,10 +212,13 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
       (a, w) => a + (w.valorSetup ?? 0) + (w.valorMRR ?? 0) + (w.valorPontual ?? 0),
       0,
     );
+    const cls = classifyG4Event(live);
     groups.push({
       live,
       date: parseEventDate(live),
-      kind: isLive(live) ? "live" : "evento",
+      kind: cls.categoria === "Live" ? "live" : "evento",
+      categoria: cls.categoria,
+      subcategoria: cls.subcategoria,
       leads: uniq,
       inscritos: uniq.length,
       mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
@@ -246,6 +237,123 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
     return a.live.localeCompare(b.live);
   });
 }
+
+// ─────────── Árvore de categorias (Live › Palestras › Eventos) ───────────
+interface Agg {
+  inscritos: number;
+  mqls: number;
+  emContato: number;
+  quentes: number;
+  fechados: number;
+  perdidos: number;
+  mrr: number;
+  setup: number;
+  pontual: number;
+  tcv: number;
+}
+const emptyAgg = (): Agg => ({
+  inscritos: 0, mqls: 0, emContato: 0, quentes: 0, fechados: 0,
+  perdidos: 0, mrr: 0, setup: 0, pontual: 0, tcv: 0,
+});
+function addToAgg(a: Agg, g: LiveGroup) {
+  a.inscritos += g.inscritos;
+  a.mqls += g.mqls;
+  a.emContato += g.emContato;
+  a.quentes += g.quentes;
+  a.fechados += g.fechados;
+  a.perdidos += g.perdidos;
+  a.mrr += g.mrr;
+  a.setup += g.setup;
+  a.pontual += g.pontual;
+  a.tcv += g.tcv;
+}
+const aggTicket = (a: Agg) => (a.fechados ? (a.mrr + a.setup + a.pontual) / a.fechados : 0);
+const aggConv = (a: Agg) => (a.inscritos ? (a.fechados / a.inscritos) * 100 : 0);
+
+// Métricas normalizadas de uma linha da tabela (agregado de categoria/sub ou item folha).
+interface RowMetrics {
+  inscritos: number;
+  mqls: number;
+  emContato: number;
+  quentes: number;
+  fechados: number;
+  conv: number;
+  perdidos: number;
+  mrr: number;
+  setup: number;
+  pontual: number;
+  tcv: number;
+  ticketMedio: number;
+}
+const aggMetrics = (a: Agg): RowMetrics => ({
+  inscritos: a.inscritos, mqls: a.mqls, emContato: a.emContato, quentes: a.quentes, fechados: a.fechados,
+  conv: aggConv(a), perdidos: a.perdidos, mrr: a.mrr, setup: a.setup, pontual: a.pontual, tcv: a.tcv, ticketMedio: aggTicket(a),
+});
+const groupMetrics = (g: LiveGroup): RowMetrics => ({
+  inscritos: g.inscritos, mqls: g.mqls, emContato: g.emContato, quentes: g.quentes, fechados: g.fechados,
+  conv: g.inscritos ? (g.fechados / g.inscritos) * 100 : 0,
+  perdidos: g.perdidos, mrr: g.mrr, setup: g.setup, pontual: g.pontual, tcv: g.tcv, ticketMedio: g.ticketMedio,
+});
+
+interface ItemNode {
+  kind: "item";
+  key: string;
+  group: LiveGroup;
+}
+interface SubNode {
+  kind: "sub";
+  key: string;
+  label: string;
+  agg: Agg;
+  groups: LiveGroup[];
+  items: ItemNode[];
+}
+interface CatNode {
+  key: string;
+  label: G4Categoria;
+  agg: Agg;
+  groups: LiveGroup[];
+  children: Array<SubNode | ItemNode>;
+}
+
+const CATEGORY_ORDER: G4Categoria[] = ["Live", "Palestras", "Eventos"];
+
+// Agrupa os grupos (live/evento) na árvore de exibição. Categorias e
+// subcategorias sem itens simplesmente não aparecem (data-driven).
+function buildTree(groups: LiveGroup[]): CatNode[] {
+  const cats = new Map<G4Categoria, CatNode>();
+  for (const g of groups) {
+    let cat = cats.get(g.categoria);
+    if (!cat) {
+      cat = { key: `cat:${g.categoria}`, label: g.categoria, agg: emptyAgg(), groups: [], children: [] };
+      cats.set(g.categoria, cat);
+    }
+    addToAgg(cat.agg, g);
+    cat.groups.push(g);
+    const item: ItemNode = { kind: "item", key: `item:${g.live}`, group: g };
+    if (g.subcategoria) {
+      let sub = cat.children.find(
+        (c): c is SubNode => c.kind === "sub" && c.label === g.subcategoria,
+      );
+      if (!sub) {
+        sub = { kind: "sub", key: `sub:${g.categoria}:${g.subcategoria}`, label: g.subcategoria, agg: emptyAgg(), groups: [], items: [] };
+        cat.children.push(sub);
+      }
+      addToAgg(sub.agg, g);
+      sub.groups.push(g);
+      sub.items.push(item);
+    } else {
+      cat.children.push(item);
+    }
+  }
+  return CATEGORY_ORDER.filter((c) => cats.has(c)).map((c) => cats.get(c)!);
+}
+
+const CAT_BADGE: Record<G4Categoria, string> = {
+  Live: "border-primary/40 text-primary",
+  Palestras: "border-violet-500/40 text-violet-600 dark:text-violet-400",
+  Eventos: "border-orange-500/40 text-orange-600 dark:text-orange-400",
+};
 
 // ─────────── UI atoms ───────────
 function Kpi({
@@ -342,205 +450,6 @@ function SectionTitle({ title, subtitle }: { title: string; subtitle?: string })
     <div className="mb-2">
       <h5 className="text-xs font-semibold text-foreground">{title}</h5>
       {subtitle && <p className="text-[10px] text-muted-foreground">{subtitle}</p>}
-    </div>
-  );
-}
-
-// ─────────── Charts ───────────
-const TEMP_COLORS: Record<string, string> = {
-  Quente: "hsl(24 95% 53%)",
-  Morno: "hsl(45 93% 47%)",
-  Frio: "hsl(200 80% 55%)",
-  "Sem tag": "hsl(var(--muted-foreground))",
-};
-
-function TemperaturePie({ groups }: { groups: LiveGroup[] }) {
-  const data = useMemo(() => {
-    const acc: Record<string, number> = { Quente: 0, Morno: 0, Frio: 0, "Sem tag": 0 };
-    for (const g of groups) {
-      for (const l of g.leads) {
-        if (l.temperatura) acc[l.temperatura] = (acc[l.temperatura] ?? 0) + 1;
-        else acc["Sem tag"]++;
-      }
-    }
-    return Object.entries(acc).map(([name, value]) => ({ name, value }));
-  }, [groups]);
-  const total = data.reduce((a, d) => a + d.value, 0);
-  return (
-    <div className="h-56">
-      <ResponsiveContainer>
-        <PieChart>
-          <Pie data={data} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
-            {data.map((d) => (
-              <Cell key={d.name} fill={TEMP_COLORS[d.name]} />
-            ))}
-          </Pie>
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--popover))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "8px",
-              color: "hsl(var(--popover-foreground))",
-              fontSize: "12px",
-            }}
-            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-            labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
-            formatter={(v: number, n: string) =>
-              [`${fmtInt(v)} (${total ? Math.round((v / total) * 100) : 0}%)`, n]
-            }
-          />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function EventsBarChart({ groups }: { groups: LiveGroup[] }) {
-  const data = groups.map((g) => ({
-    name: g.live.replace(/Live G4 -\s*/i, "").slice(0, 14),
-    Leads: g.inscritos,
-    MQL: g.mqls,
-    Ganho: g.fechados,
-  }));
-  return (
-    <div className="h-56">
-      <ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 8 }}>
-          <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} angle={-20} textAnchor="end" height={50} />
-          <YAxis tick={{ fontSize: 10 }} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--popover))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "8px",
-              color: "hsl(var(--popover-foreground))",
-              fontSize: "12px",
-            }}
-            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-            labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
-            cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
-          />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
-          <Bar dataKey="Leads" fill="hsl(var(--primary) / 0.35)" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="MQL" fill="hsl(var(--primary) / 0.7)" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="Ganho" fill="hsl(142 71% 45%)" radius={[4, 4, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function FunnelBars({ totals }: { totals: { inscritos: number; mqls: number; emContato: number; quentes: number; fechados: number } }) {
-  const steps = [
-    { name: "Leads", value: totals.inscritos },
-    { name: "MQL", value: totals.mqls },
-    { name: "Em contato", value: totals.emContato },
-    { name: "Quente", value: totals.quentes },
-    { name: "Ganho", value: totals.fechados },
-  ];
-  const max = Math.max(...steps.map((s) => s.value), 1);
-  return (
-    <div className="space-y-1.5">
-      {steps.map((s, i) => {
-        const pct = (s.value / max) * 100;
-        const prev = i > 0 ? steps[i - 1].value : s.value;
-        const conv = prev ? Math.round((s.value / prev) * 100) : 100;
-        return (
-          <div key={s.name}>
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-0.5">
-              <span>{s.name}</span>
-              <span className="tabular-nums">
-                {fmtInt(s.value)} {i > 0 && <span className="text-muted-foreground/70">· {conv}%</span>}
-              </span>
-            </div>
-            <div className="h-6 rounded bg-muted/40 overflow-hidden">
-              <div
-                className="h-full rounded transition-all"
-                style={{
-                  width: `${pct}%`,
-                  background:
-                    i === steps.length - 1
-                      ? "hsl(142 71% 45%)"
-                      : i === steps.length - 2
-                      ? "hsl(24 95% 53%)"
-                      : "hsl(var(--primary))",
-                }}
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function LostReasonsBar({ groups }: { groups: LiveGroup[] }) {
-  const data = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const g of groups) {
-      for (const l of g.lostLeads) {
-        const key = l.motivoPerda?.trim() || "— sem motivo —";
-        m.set(key, (m.get(key) ?? 0) + 1);
-      }
-    }
-    return Array.from(m.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([name, value]) => ({ name: name.length > 32 ? name.slice(0, 30) + "…" : name, value }));
-  }, [groups]);
-  if (data.length === 0) return <p className="text-xs text-muted-foreground">Nenhum perdido no filtro atual.</p>;
-  return (
-    <div className="h-56">
-      <ResponsiveContainer>
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 4 }}>
-          <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize: 10 }} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={140} />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--popover))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "8px",
-              color: "hsl(var(--popover-foreground))",
-              fontSize: "12px",
-            }}
-            itemStyle={{ color: "hsl(var(--popover-foreground))" }}
-            labelStyle={{ color: "hsl(var(--popover-foreground))", fontWeight: 600 }}
-            cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
-            formatter={(v: number) => [`${fmtInt(v)} perdido${v === 1 ? "" : "s"}`, "Total"]}
-          />
-          <Bar dataKey="value" name="Perdidos" fill="hsl(var(--destructive))" radius={[0, 4, 4, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function TopRanking({ groups }: { groups: LiveGroup[] }) {
-  const topFechados = [...groups].sort((a, b) => b.fechados - a.fechados).slice(0, 5);
-  const topTcv = [...groups].sort((a, b) => b.tcv - a.tcv).slice(0, 5);
-  const Row = ({ label, val }: { label: string; val: string }) => (
-    <div className="flex items-center justify-between border-b last:border-b-0 py-1.5 text-xs">
-      <span className="truncate text-foreground">{label}</span>
-      <span className="tabular-nums font-medium text-foreground ml-2">{val}</span>
-    </div>
-  );
-  return (
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <SectionTitle title="Top 5 · Fechados" />
-        <div className="rounded-md border bg-background px-3">
-          {topFechados.map((g) => <Row key={g.live} label={g.live} val={fmtInt(g.fechados)} />)}
-        </div>
-      </div>
-      <div>
-        <SectionTitle title="Top 5 · TCV" />
-        <div className="rounded-md border bg-background px-3">
-          {topTcv.map((g) => <Row key={g.live} label={g.live} val={fmt(g.tcv)} />)}
-        </div>
-      </div>
     </div>
   );
 }
@@ -763,6 +672,18 @@ export function G4ConsolidatedDashboard() {
     return acc;
   }, [groups]);
 
+  const tree = useMemo(() => buildTree(groups), [groups]);
+  // Chaves de categoria/subcategoria (não inclui itens folha, que abrem o drill).
+  const expandableKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const cat of tree) {
+      keys.push(cat.key);
+      for (const ch of cat.children) if (ch.kind === "sub") keys.push(ch.key);
+    }
+    return keys;
+  }, [tree]);
+  const allOpen = expandableKeys.length > 0 && expandableKeys.every((k) => expanded.has(k));
+
   const ticketMedioGeral =
     totals.fechados > 0 ? (totals.mrr + totals.setup + totals.pontual) / totals.fechados : 0;
   const convMql = totals.inscritos ? Math.round((totals.mqls / totals.inscritos) * 100) : 0;
@@ -866,6 +787,67 @@ export function G4ConsolidatedDashboard() {
     </button>
   );
 
+  // 12 células de métrica (Leads → Ticket médio), cada número abre o drill filtrado.
+  const rowMetricCells = (m: RowMetrics, drillGroups: LiveGroup[], label: string) => (
+    <>
+      <ClickCell onClick={() => openDrill(`Leads · ${label}`, "all", drillGroups)}>{fmtInt(m.inscritos)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`MQLs · ${label}`, "mql", drillGroups)}>{fmtInt(m.mqls)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Em contato · ${label}`, "contato", drillGroups)}>{fmtInt(m.emContato)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Quentes · ${label}`, "quente", drillGroups)} tone="warning">{fmtInt(m.quentes)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)} tone="success">{fmtInt(m.fechados)}</ClickCell>
+      <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{m.conv.toFixed(1)}%</td>
+      <ClickCell onClick={() => openDrill(`Perdidos · ${label}`, "perdido", drillGroups)} tone="destructive">{fmtInt(m.perdidos)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.mrr)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.setup)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.pontual)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.tcv)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.ticketMedio)}</ClickCell>
+    </>
+  );
+
+  // Linha folha: uma live/evento individual. Clicar abre o drill de fases/temperatura/perdas/vendas.
+  const renderItemRow = (it: ItemNode, indent: number) => {
+    const g = it.group;
+    const open = expanded.has(it.key);
+    const padLeft = indent >= 2 ? "pl-12" : "pl-8";
+    return (
+      <Fragment key={it.key}>
+        <tr
+          className={cn("border-t hover:bg-muted/30 cursor-pointer", g.fechados > 0 && "bg-emerald-500/5")}
+          onClick={() => toggle(it.key)}
+        >
+          <td className="px-2 py-2">
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </td>
+          <td className={cn("px-2 py-2 text-foreground", padLeft)}>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[9px] px-1.5 py-0",
+                  g.kind === "live"
+                    ? "border-primary/40 text-primary"
+                    : "border-orange-500/40 text-orange-600 dark:text-orange-400",
+                )}
+              >
+                {g.kind === "live" ? "LIVE" : "EVENTO"}
+              </Badge>
+              {g.live}
+            </div>
+          </td>
+          {rowMetricCells(groupMetrics(g), [g], g.live)}
+        </tr>
+        {open && (
+          <tr>
+            <td colSpan={14} className="p-0">
+              <ExpandedRow group={g} />
+            </td>
+          </tr>
+        )}
+      </Fragment>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -874,7 +856,7 @@ export function G4ConsolidatedDashboard() {
           <div>
             <h4 className="text-sm font-semibold text-foreground">Dashboard Consolidado G4 · Live + Evento</h4>
             <p className="text-xs text-muted-foreground">
-              Visão macro com KPIs e gráficos, e micro por live/evento com drill-down por fase, temperatura, perdas e vendas.
+              Indicadores e consolidado por categoria (Live · Palestras · Eventos), com drill-down por fase, temperatura, perdas e vendas.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -918,53 +900,27 @@ export function G4ConsolidatedDashboard() {
               onClick={() => openDrill("Ticket médio · Vendas fechadas", "ganho", groups)} />
           </div>
 
-          {/* Charts grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <SectionTitle title="Funil consolidado" subtitle="Conversão etapa a etapa" />
-                <FunnelBars totals={totals} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <SectionTitle title="Volume por live/evento" subtitle="Leads · MQL · Ganho" />
-                <EventsBarChart groups={groups} />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <SectionTitle title="Motivos de perda · Top 6" />
-                <LostReasonsBar groups={groups} />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Rankings */}
-          <Card>
-            <CardContent className="p-4">
-              <TopRanking groups={groups} />
-            </CardContent>
-          </Card>
-
-          {/* Detailed table */}
+          {/* Tabela consolidada estilo DRE: Categoria › Subcategoria › item */}
           <Card>
             <CardContent className="p-0">
               <div className="flex items-center justify-between p-3 border-b">
                 <SectionTitle
-                  title="Detalhado por live/evento"
-                  subtitle="Clique em uma linha para abrir fases, temperatura, perdas e vendas"
+                  title="Consolidado por categoria"
+                  subtitle="Live · Palestras · Eventos — clique numa categoria para abrir os itens; clique num item para fases, temperatura, perdas e vendas"
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    setExpanded((prev) =>
-                      prev.size === groups.length ? new Set() : new Set(groups.map((g) => g.live)),
-                    )
+                    setExpanded((prev) => {
+                      const next = new Set(prev);
+                      if (allOpen) expandableKeys.forEach((k) => next.delete(k));
+                      else expandableKeys.forEach((k) => next.add(k));
+                      return next;
+                    })
                   }
                 >
-                  {expanded.size === groups.length ? "Recolher todos" : "Expandir todos"}
+                  {allOpen ? "Recolher todos" : "Expandir todos"}
                 </Button>
               </div>
 
@@ -973,7 +929,7 @@ export function G4ConsolidatedDashboard() {
                   <thead className="bg-muted/40 text-muted-foreground sticky top-0">
                     <tr>
                       <th className="px-2 py-2 text-left w-6" />
-                      <th className="px-2 py-2 text-left">Live / Evento</th>
+                      <th className="px-2 py-2 text-left">Categoria / Live / Evento</th>
                       <th className="px-2 py-2 text-right">Leads</th>
                       <th className="px-2 py-2 text-right">MQLs</th>
                       <th className="px-2 py-2 text-right">Em contato</th>
@@ -989,57 +945,51 @@ export function G4ConsolidatedDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {groups.map((g) => {
-                      const isOpen = expanded.has(g.live);
-                      const conv = g.inscritos ? ((g.fechados / g.inscritos) * 100).toFixed(1) : "0";
+                    {tree.map((cat) => {
+                      const catOpen = expanded.has(cat.key);
                       return (
-                        <Fragment key={g.live}>
+                        <Fragment key={cat.key}>
+                          {/* Nível 1 — Categoria (somatório de tudo abaixo) */}
                           <tr
-                            className={cn(
-                              "border-t hover:bg-muted/30 cursor-pointer",
-                              g.fechados > 0 && "bg-emerald-500/5",
-                            )}
-                            onClick={() => toggle(g.live)}
+                            className="border-t bg-muted/30 hover:bg-muted/50 cursor-pointer font-semibold"
+                            onClick={() => toggle(cat.key)}
                           >
                             <td className="px-2 py-2">
-                              {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              {catOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                             </td>
-                            <td className="px-2 py-2 font-medium text-foreground">
-                              <div className="flex items-center gap-2">
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "text-[9px] px-1.5 py-0",
-                                    g.kind === "live"
-                                      ? "border-primary/40 text-primary"
-                                      : "border-orange-500/40 text-orange-600 dark:text-orange-400",
-                                  )}
-                                >
-                                  {g.kind === "live" ? "LIVE" : "EVENTO"}
-                                </Badge>
-                                {g.live}
-                              </div>
+                            <td className="px-2 py-2 text-foreground">
+                              <Badge
+                                variant="outline"
+                                className={cn("text-[9px] px-1.5 py-0 uppercase tracking-wide", CAT_BADGE[cat.label])}
+                              >
+                                {cat.label}
+                              </Badge>
                             </td>
-                            <ClickCell onClick={() => openDrill(`Leads · ${g.live}`, "all", [g])}>{fmtInt(g.inscritos)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`MQLs · ${g.live}`, "mql", [g])}>{fmtInt(g.mqls)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`Em contato · ${g.live}`, "contato", [g])}>{fmtInt(g.emContato)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`Quentes · ${g.live}`, "quente", [g])} tone="warning">{fmtInt(g.quentes)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])} tone="success">{fmtInt(g.fechados)}</ClickCell>
-                            <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{conv}%</td>
-                            <ClickCell onClick={() => openDrill(`Perdidos · ${g.live}`, "perdido", [g])} tone="destructive">{fmtInt(g.perdidos)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.mrr)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.setup)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.pontual)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.tcv)}</ClickCell>
-                            <ClickCell onClick={() => openDrill(`Vendas · ${g.live}`, "ganho", [g])}>{fmt(g.ticketMedio)}</ClickCell>
+                            {rowMetricCells(aggMetrics(cat.agg), cat.groups, cat.label)}
                           </tr>
-                          {isOpen && (
-                            <tr>
-                              <td colSpan={14} className="p-0">
-                                <ExpandedRow group={g} />
-                              </td>
-                            </tr>
-                          )}
+
+                          {catOpen &&
+                            cat.children.map((child) => {
+                              if (child.kind === "item") return renderItemRow(child, 1);
+                              const subOpen = expanded.has(child.key);
+                              return (
+                                <Fragment key={child.key}>
+                                  {/* Nível 2 — Subcategoria (ex.: Talks) */}
+                                  <tr
+                                    className="border-t bg-muted/10 hover:bg-muted/30 cursor-pointer"
+                                    onClick={() => toggle(child.key)}
+                                  >
+                                    <td className="px-2 py-2 pl-4">
+                                      {subOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </td>
+                                    <td className="px-2 py-2 pl-4 font-medium text-foreground">{child.label}</td>
+                                    {rowMetricCells(aggMetrics(child.agg), child.groups, `${cat.label} · ${child.label}`)}
+                                  </tr>
+                                  {/* Nível 3 — itens individuais da subcategoria */}
+                                  {subOpen && child.items.map((it) => renderItemRow(it, 2))}
+                                </Fragment>
+                              );
+                            })}
                         </Fragment>
                       );
                     })}
