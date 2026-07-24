@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
-import { isJunkCard, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
+import { isJunkRow, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
 import { sumMrrFields } from "@/lib/mrrFields";
 
 export type ExpansaoIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
