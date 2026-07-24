@@ -7,7 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useG4RealMetrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
 import { fmt, fmtInt } from "@/components/planning/ceo/ceoShared";
 import { DetailSheet, columnFormatters, type DetailItem } from "@/components/planning/indicators/DetailSheet";
+import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
 import { cn } from "@/lib/utils";
+
 
 // ─────────── helpers ───────────
 import { canonLive, parseEventDate as parseEventDateShared, classifyG4Event, type G4Categoria } from "./canonLive";
@@ -799,13 +801,14 @@ function LeadsTable({
 
 // ─────────── Main ───────────
 type KindFilter = "todos" | "live" | "evento";
-type RangeFilter = "30" | "90" | "all";
 
 export function G4ConsolidatedDashboard() {
   const { data, isLoading } = useG4RealMetrics();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [kind, setKind] = useState<KindFilter>("todos");
-  const [range, setRange] = useState<RangeFilter>("all");
+  // Filtro de data: null = "Tudo" (default). Quando setado, filtra por g.date.
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [includeUndated, setIncludeUndated] = useState(true);
 
   // Drill-down state
   const [drillOpen, setDrillOpen] = useState(false);
@@ -823,14 +826,19 @@ export function G4ConsolidatedDashboard() {
 
 
   const groups = useMemo(() => {
-    const now = Date.now();
-    const cutoff = range === "30" ? now - 30 * 864e5 : range === "90" ? now - 90 * 864e5 : 0;
+    const fromT = dateRange ? dateRange.from.getTime() : null;
+    const toT = dateRange ? dateRange.to.getTime() : null;
     return allGroups.filter((g) => {
       if (kind !== "todos" && g.kind !== kind) return false;
-      if (cutoff && g.date && g.date.getTime() < cutoff) return false;
+      if (fromT !== null && toT !== null) {
+        if (!g.date) return includeUndated;
+        const t = g.date.getTime();
+        if (t < fromT || t > toT) return false;
+      }
       return true;
     });
-  }, [allGroups, kind, range]);
+  }, [allGroups, kind, dateRange, includeUndated]);
+
 
   const totals = useMemo(() => {
     // Deduplica leads por email/nome ao longo de todos os groups visíveis
@@ -985,7 +993,13 @@ export function G4ConsolidatedDashboard() {
       <ClickCell onClick={() => openDrill(`Em contato · ${label}`, "contato", drillGroups)}>{fmtInt(m.emContato)}</ClickCell>
       <ClickCell onClick={() => openDrill(`Quentes · ${label}`, "quente", drillGroups)} tone="warning">{fmtInt(m.quentes)}</ClickCell>
       <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)} tone="success">{fmtInt(m.fechados)}</ClickCell>
+      <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">{m.conv.toFixed(1)}%</td>
+      <ClickCell onClick={() => openDrill(`Perdidos · ${label}`, "perdido", drillGroups)} tone="destructive">{fmtInt(m.perdidos)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.mrr)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.setup)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.pontual)}</ClickCell>
       <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.tcv)}</ClickCell>
+      <ClickCell onClick={() => openDrill(`Vendas · ${label}`, "ganho", drillGroups)}>{fmt(m.ticketMedio)}</ClickCell>
     </>
   );
 
@@ -1025,7 +1039,7 @@ export function G4ConsolidatedDashboard() {
         </tr>
         {hasData && open && drillGroup && (
           <tr>
-            <td colSpan={8} className="p-0">
+            <td colSpan={14} className="p-0">
               <ExpandedRow group={drillGroup} />
             </td>
           </tr>
@@ -1045,19 +1059,36 @@ export function G4ConsolidatedDashboard() {
               Indicadores e consolidado por categoria (Live · Palestras · Eventos), com drill-down por fase, temperatura, perdas e vendas.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="flex gap-1">
               <FilterPill label="Todos" active={kind === "todos"} onClick={() => setKind("todos")} />
               <FilterPill label="Lives" active={kind === "live"} onClick={() => setKind("live")} />
               <FilterPill label="Eventos" active={kind === "evento"} onClick={() => setKind("evento")} />
             </div>
             <div className="w-px h-5 bg-border" />
-            <div className="flex gap-1">
-              <FilterPill label="30d" active={range === "30"} onClick={() => setRange("30")} />
-              <FilterPill label="90d" active={range === "90"} onClick={() => setRange("90")} />
-              <FilterPill label="Tudo" active={range === "all"} onClick={() => setRange("all")} />
-            </div>
+            <FilterPill
+              label="Tudo"
+              active={dateRange === null}
+              onClick={() => setDateRange(null)}
+            />
+            <DateRangePickerGA
+              startDate={dateRange?.from ?? new Date(2026, 0, 1)}
+              endDate={dateRange?.to ?? new Date()}
+              onDateChange={(from, to) => setDateRange({ from, to })}
+            />
+            {dateRange !== null && (
+              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={includeUndated}
+                  onChange={(e) => setIncludeUndated(e.target.checked)}
+                  className="h-3 w-3"
+                />
+                Incluir sem data
+              </label>
+            )}
           </div>
+
         </CardContent>
       </Card>
 
@@ -1077,7 +1108,9 @@ export function G4ConsolidatedDashboard() {
             <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle}
               onClick={() => openDrill("Leads em contato", "contato", groups)} />
             <Kpi label="Quentes" value={fmtInt(totals.quentes)} icon={Flame} tone="warning"
+              hint={totals.quentes === 0 ? "Sem tag Quente ativa no Pipefy" : undefined}
               onClick={() => openDrill("Leads Quentes", "quente", groups)} />
+
             <Kpi label="Fechados" value={fmtInt(totals.fechados)} hint={`${closeRate}% close rate`} icon={Trophy} tone="success"
               onClick={() => openDrill("Vendas fechadas · Consolidado", "ganho", groups)} />
             <Kpi label="TCV" value={fmt(totals.tcv)} icon={DollarSign} tone="success"
@@ -1120,8 +1153,14 @@ export function G4ConsolidatedDashboard() {
                       <th className="px-2 py-2 text-right">MQLs</th>
                       <th className="px-2 py-2 text-right">Em contato</th>
                       <th className="px-2 py-2 text-right">Quentes</th>
-                      <th className="px-2 py-2 text-right">Vendas</th>
+                      <th className="px-2 py-2 text-right">Fechados</th>
+                      <th className="px-2 py-2 text-right">Conv%</th>
+                      <th className="px-2 py-2 text-right">Perdidos</th>
+                      <th className="px-2 py-2 text-right">MRR</th>
+                      <th className="px-2 py-2 text-right">Setup</th>
+                      <th className="px-2 py-2 text-right">Pontual</th>
                       <th className="px-2 py-2 text-right">TCV</th>
+                      <th className="px-2 py-2 text-right">Ticket médio</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1185,9 +1224,14 @@ export function G4ConsolidatedDashboard() {
                       <td className="px-2 py-2 text-right tabular-nums">{fmtInt(totals.emContato)}</td>
                       <td className="px-2 py-2 text-right tabular-nums">{fmtInt(totals.quentes)}</td>
                       <td className="px-2 py-2 text-right tabular-nums">{fmtInt(totals.fechados)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">{closeRate}%</td>
+                      <td className="px-2 py-2 text-right tabular-nums">{fmtInt(totals.perdidos)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">{fmt(totals.mrr)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">{fmt(totals.setup)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">{fmt(totals.pontual)}</td>
                       <td className="px-2 py-2 text-right tabular-nums">{fmt(totals.tcv)}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">{fmt(ticketMedioGeral)}</td>
                     </tr>
-
                   </tbody>
                 </table>
               </div>
