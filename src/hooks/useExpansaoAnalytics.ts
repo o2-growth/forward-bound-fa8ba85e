@@ -570,7 +570,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
 
         for (const card of allMovements) {
           if (card.fase !== 'Lead' && card.fase !== 'MQL') continue;
-          if (duplicadoCardIds.has(card.id)) continue;
+          if (excludedMqlCardIds.has(card.id)) continue;
 
           const entryTime = card.dataEntrada.getTime();
           if (entryTime >= startTime && entryTime <= endTime) {
@@ -605,7 +605,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       // Enriquece com SDR/Closer efetivos do histórico (fix Expansão Lead/MQL)
       return result.map(enrichCardWithEffectiveOwners);
     };
-  }, [allMovementsUnfiltered, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners, currentProdutoByCard, duplicadoCardIds]);
+  }, [allMovementsUnfiltered, cardInvestimentoMap, monthlyFirstEntries, startTime, endTime, produto, enrichCardWithEffectiveOwners, currentProdutoByCard, excludedMqlCardIds]);
 
 
   // Helper function to convert ExpansaoCard to DetailItem
@@ -738,7 +738,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const mqlIds = new Set<string>();
     for (const card of allMovements) {
       if (card.fase !== 'Lead' && card.fase !== 'MQL') continue;
-      if (duplicadoCardIds.has(card.id)) continue;
+      if (excludedMqlCardIds.has(card.id)) continue;
       const entryTime = card.dataEntrada.getTime();
       if (entryTime >= startTime && entryTime <= endTime) {
         const inv = cardInvestimentoMap.get(card.id);
@@ -748,7 +748,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
       }
     }
     return mqlIds.size;
-  }, [cards, fullHistory, cardInvestimentoMap, startTime, endTime, produto, duplicadoCardIds]);
+  }, [cards, fullHistory, cardInvestimentoMap, startTime, endTime, produto, excludedMqlCardIds]);
 
   // Get lost deals: faseAtual=Perdido AND created during the period
   const getLostDeals = useMemo(() => {
