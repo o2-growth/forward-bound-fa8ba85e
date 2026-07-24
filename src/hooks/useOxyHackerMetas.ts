@@ -21,6 +21,7 @@ interface OxyHackerMovement {
   taxaFranquia: number | null; // Taxa de franquia (R$ 54.000 para Oxy Hacker)
   investimentoDisponivel: string | null;
   produto: string;
+  motivoPerda: string | null;
 }
 
 // MQL Expansão Oxy Hacker: investimento disponível >= R$ 15k
