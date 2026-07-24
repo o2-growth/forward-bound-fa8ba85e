@@ -185,14 +185,41 @@ export function isG4Attributed(l: G4RealLead): boolean {
   return true;
 }
 
+// Para vendas com múltiplas lives assistidas, atribui apenas à live mais próxima
+// da data de ganho (evita contar a mesma venda em várias lives).
+function pickClosestLive(lives: string[], dataGanho?: string | null): string[] {
+  if (lives.length <= 1) return lives;
+  const ganhoDate = dataGanho ? new Date(dataGanho) : null;
+  if (!ganhoDate || isNaN(ganhoDate.getTime())) {
+    // Sem data de ganho: usa a última live do array (mais recente registrada).
+    return [lives[lives.length - 1]];
+  }
+  const ganhoMs = ganhoDate.getTime();
+  let best = lives[0];
+  let bestDiff = Infinity;
+  for (const raw of lives) {
+    const d = parseEventDateShared(canonLive(raw));
+    const diff = d ? Math.abs(d.getTime() - ganhoMs) : Infinity;
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = raw;
+    }
+  }
+  return [best];
+}
+
 function buildGroups(leads: G4RealLead[]): LiveGroup[] {
   const filtered = leads.filter(isG4Attributed);
   const byLive = new Map<string, G4RealLead[]>();
   for (const lead of filtered) {
     // Whitelist de vendas sem live associada cai no bucket "Finders Fee".
-    const lives = lead.lives.length > 0
+    let lives = lead.lives.length > 0
       ? lead.lives
       : (isG4Sale(lead) ? ["G4 - Finders Fee (fora das lives)"] : []);
+    // Vendas só contam em UMA live (a mais próxima da data de ganho).
+    if (isG4Sale(lead) && lives.length > 1) {
+      lives = pickClosestLive(lives, lead.dataGanho);
+    }
     for (const rawLive of lives) {
       const live = canonLive(rawLive);
       if (!byLive.has(live)) byLive.set(live, []);
