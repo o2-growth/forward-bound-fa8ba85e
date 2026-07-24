@@ -415,10 +415,11 @@ const SCAFFOLD: ScaffoldCat[] = [
     ],
   },
   { categoria: "Eventos", subs: [] },
-  { categoria: "Seller", subs: [] },
 ];
 
 // Monta a árvore a partir do esqueleto fixo e encaixa os grupos reais.
+// Aggregates são calculados por dedupe de leads (não soma de contadores),
+// para que categoria/sub totalize leads únicos (um lead em 2 lives conta 1x).
 function buildTree(groups: LiveGroup[]): CatNode[] {
   const cats: CatNode[] = SCAFFOLD.map((sc) => ({
     key: `cat:${sc.categoria}`,
@@ -447,7 +448,6 @@ function buildTree(groups: LiveGroup[]): CatNode[] {
   for (const g of groups) {
     const cat = byName.get(g.categoria);
     if (!cat) continue; // categoria fora do esqueleto (não deve ocorrer)
-    addToAgg(cat.agg, g);
     cat.groups.push(g);
     if (g.subcategoria) {
       let sub = cat.subs.find((s) => s.label === g.subcategoria);
@@ -455,7 +455,6 @@ function buildTree(groups: LiveGroup[]): CatNode[] {
         sub = { kind: "sub", key: `sub:${g.categoria}:${g.subcategoria}`, label: g.subcategoria, agg: emptyAgg(), groups: [], items: [] };
         cat.subs.push(sub);
       }
-      addToAgg(sub.agg, g);
       sub.groups.push(g);
       const n = normalize(g.live);
       let item = sub.items.find((it) => it.match && it.match(n));
@@ -463,14 +462,24 @@ function buildTree(groups: LiveGroup[]): CatNode[] {
         item = { kind: "item", key: `item:${g.live}`, label: g.live, groups: [], agg: emptyAgg() };
         sub.items.push(item);
       }
-      addToAgg(item.agg, g);
       item.groups.push(g);
     } else {
-      cat.directItems.push({ kind: "item", key: `item:${g.live}`, label: g.live, groups: [g], agg: groupAgg(g) });
+      cat.directItems.push({ kind: "item", key: `item:${g.live}`, label: g.live, groups: [g], agg: emptyAgg() });
     }
+  }
+
+  // Calcula aggs após popular groups em cada nó (com dedupe por lead).
+  for (const cat of cats) {
+    cat.agg = aggFromGroups(cat.groups);
+    for (const sub of cat.subs) {
+      sub.agg = aggFromGroups(sub.groups);
+      for (const item of sub.items) item.agg = aggFromGroups(item.groups);
+    }
+    for (const item of cat.directItems) item.agg = aggFromGroups(item.groups);
   }
   return cats;
 }
+
 
 // LiveGroup sintético (soma dedup por email) para abrir o drill de um item que agrega vários eventos.
 function mergeGroups(list: LiveGroup[], label: string): LiveGroup {
