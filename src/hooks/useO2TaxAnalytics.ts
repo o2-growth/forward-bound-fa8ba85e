@@ -156,6 +156,7 @@ function parseRawCard(row: any): O2TaxCard {
     origemLead: row['Origem do lead'] || undefined,
     fonte: row['Fonte'] || undefined,
     campanha: row['Campanha'] || undefined,
+    email: row['E-mail'] || row['Email'] || undefined,
   };
 }
 
