@@ -526,8 +526,8 @@ const CAT_BADGE: Record<G4Categoria, string> = {
   Live: "border-primary/40 text-primary",
   Palestras: "border-violet-500/40 text-violet-600 dark:text-violet-400",
   Eventos: "border-orange-500/40 text-orange-600 dark:text-orange-400",
-  Seller: "border-sky-500/40 text-sky-600 dark:text-sky-400",
 };
+
 
 // ─────────── UI atoms ───────────
 function Kpi({
