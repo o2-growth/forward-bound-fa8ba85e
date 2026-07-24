@@ -232,7 +232,7 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
       inscritos: uniq.length,
       mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
       emContato: uniq.filter((l) => isInContact(l.faseAtual)).length,
-      quentes: uniq.filter((l) => l.temperatura === "Quente").length,
+      quentes: uniq.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
       fechados: won.length,
       perdidos: lost.length,
       mrr, setup, pontual, tcv,
