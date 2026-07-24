@@ -1,26 +1,28 @@
-## Diagnóstico do "Leads Total" divergente
+## Mudança na tabela "Consolidado por categoria" (dentro do expandível)
 
-**KPI "Leads: 1.720"** dedupa leads por e-mail/nome em todos os grupos visíveis (um lead que apareceu em 3 lives conta 1x).
+Hoje a tabela expandida "Consolidado por categoria" mostra 12 colunas numéricas: Leads, MQLs, Em contato, Quentes, Fechados, Conv%, Perdidos, MRR, Setup, Pontual, TCV, Ticket médio.
 
-**Tabela "Consolidado por categoria"** soma `inscritos` de cada `LiveGroup` sem dedupe entre grupos → um lead presente em 2 lives entra 2x na linha "LIVE", e mais uma vez se também estiver num evento. Por isso Live=1.804 + Palestras=47 + Eventos=17 já ultrapassa 1.720.
+Vamos deixar visível somente **6 colunas**, todas clicáveis, mantendo os drill-downs já existentes:
 
-Ou seja: o número certo é 1.720 (dedupado). As linhas da tabela é que estão inflando por dupla contagem.
+| Coluna | Drill-down |
+|---|---|
+| Leads | abre lista completa (tab "Todos") |
+| MQLs | abre tab "MQLs" |
+| Em contato | abre tab "Em contato" |
+| Quentes | abre tab "Quentes" |
+| Vendas | abre tab "Vendas" (fechados) |
+| TCV | abre tab "Vendas" (fechados) |
 
-## Mudanças
+Colunas removidas da tabela: Fechados (duplicava Vendas), Conv%, Perdidos, MRR, Setup, Pontual, Ticket médio. Esses números continuam disponíveis dentro do drill-down expandido de cada live/categoria (`ExpandedRow`), então nenhuma informação é perdida — só sai da visão consolidada.
 
-1. **Corrigir agregados da tabela (categoria / subcategoria / item)**
-   - Em `buildTree`, trocar `addToAgg` (soma numérica) por uma agregação baseada em conjuntos de leads deduplicados por e-mail/nome (`Set<string>` por nó), calculando `inscritos/mqls/emContato/quentes/fechados/perdidos` sobre esse conjunto único.
-   - Valores monetários (mrr, setup, pontual, tcv) também dedupados por lead ganho para evitar duplicar venda que apareceu em >1 live (as vendas G4 já são atribuídas a 1 live só via `pickClosestLive`, então na prática soma direta; ainda assim, a consolidação por lead único garante consistência).
-   - Resultado esperado: LIVE + PALESTRAS + EVENTOS ≤ Total, e Total ≡ KPI "Leads".
+Aplica-se aos 3 níveis da árvore: Categoria (Live/Palestras/Eventos), Subcategoria (Talks) e Item (live/evento individual).
 
-2. **Remover categoria "Seller"**
-   - Tirar `{ categoria: "Seller", subs: [] }` do `SCAFFOLD` em `G4ConsolidatedDashboard.tsx`.
-   - Confirmar em `canonLive.ts` que nada é classificado como `"Seller"` (se sim, remapear para `"Eventos"`).
+## Detalhes técnicos
 
-3. **Remover a frase "2 excluídos por origem não-G4"**
-   - Tirar o `hint={excludedByOrigin > 0 ? ... : undefined}` do KPI "Leads" (linha ~1059) e o `useMemo excludedByOrigin`.
+Arquivo único: `src/components/planning/g4/G4ConsolidatedDashboard.tsx`.
 
-## Fora do escopo
+1. `rowMetricCells` (linha ~981): reduzir para 6 `<ClickCell>` — Leads, MQLs, Em contato, Quentes, Vendas (`m.fechados` → drill "ganho"), TCV (`m.tcv` → drill "ganho"). Remover as demais células.
+2. `<thead>` da tabela (linhas ~1121-1137): reduzir para os 6 headers correspondentes + as 2 colunas fixas (chevron + "Categoria / Live / Evento").
+3. `colSpan={14}` da linha do `ExpandedRow` (linha ~1034 e outras ocorrências): ajustar para `colSpan={8}` (2 fixas + 6 métricas).
 
-- Não mexer nas somas do drill-down (já dedupam por conta própria).
-- Não mexer nas regras de atribuição G4, whitelist Finders Fee ou overrides de valor (Martinelli).
+Sem mudanças em `buildTree`, `Agg`, KPIs do topo, drill-downs ou dedupe — só a projeção visual da tabela.
