@@ -289,16 +289,20 @@ const aggMetrics = (a: Agg): RowMetrics => ({
   inscritos: a.inscritos, mqls: a.mqls, emContato: a.emContato, quentes: a.quentes, fechados: a.fechados,
   conv: aggConv(a), perdidos: a.perdidos, mrr: a.mrr, setup: a.setup, pontual: a.pontual, tcv: a.tcv, ticketMedio: aggTicket(a),
 });
-const groupMetrics = (g: LiveGroup): RowMetrics => ({
-  inscritos: g.inscritos, mqls: g.mqls, emContato: g.emContato, quentes: g.quentes, fechados: g.fechados,
-  conv: g.inscritos ? (g.fechados / g.inscritos) * 100 : 0,
-  perdidos: g.perdidos, mrr: g.mrr, setup: g.setup, pontual: g.pontual, tcv: g.tcv, ticketMedio: g.ticketMedio,
-});
+
+const groupAgg = (g: LiveGroup): Agg => {
+  const a = emptyAgg();
+  addToAgg(a, g);
+  return a;
+};
 
 interface ItemNode {
   kind: "item";
   key: string;
-  group: LiveGroup;
+  label: string;
+  groups: LiveGroup[]; // eventos reais que compõem o item (vazio = placeholder do esqueleto)
+  agg: Agg;
+  match?: (n: string) => boolean; // encaixa eventos futuros neste bucket fixo
 }
 interface SubNode {
   kind: "sub";
@@ -313,40 +317,127 @@ interface CatNode {
   label: G4Categoria;
   agg: Agg;
   groups: LiveGroup[];
-  children: Array<SubNode | ItemNode>;
+  subs: SubNode[];
+  directItems: ItemNode[]; // itens sem subcategoria (lives/eventos reais)
 }
 
-const CATEGORY_ORDER: G4Categoria[] = ["Live", "Palestras", "Eventos"];
+// Esqueleto fixo: estas categorias / subcategorias / itens aparecem SEMPRE,
+// mesmo zerados. Eventos reais (inclusive futuros) se encaixam pelos matchers.
+interface ScaffoldCat {
+  categoria: G4Categoria;
+  subs: { label: string; items: { label: string; match: (n: string) => boolean }[] }[];
+}
+const SCAFFOLD: ScaffoldCat[] = [
+  { categoria: "Live", subs: [] },
+  {
+    categoria: "Palestras",
+    subs: [
+      {
+        label: "Talks",
+        items: [
+          { label: "Talks SE", match: (n) => /\bse\b/.test(n) },
+          { label: "Talks Connect", match: (n) => n.includes("connect") },
+          { label: "Talks Traction", match: (n) => n.includes("traction") },
+        ],
+      },
+    ],
+  },
+  { categoria: "Eventos", subs: [] },
+];
 
-// Agrupa os grupos (live/evento) na árvore de exibição. Categorias e
-// subcategorias sem itens simplesmente não aparecem (data-driven).
+// Monta a árvore a partir do esqueleto fixo e encaixa os grupos reais.
 function buildTree(groups: LiveGroup[]): CatNode[] {
-  const cats = new Map<G4Categoria, CatNode>();
+  const cats: CatNode[] = SCAFFOLD.map((sc) => ({
+    key: `cat:${sc.categoria}`,
+    label: sc.categoria,
+    agg: emptyAgg(),
+    groups: [],
+    subs: sc.subs.map((ss) => ({
+      kind: "sub" as const,
+      key: `sub:${sc.categoria}:${ss.label}`,
+      label: ss.label,
+      agg: emptyAgg(),
+      groups: [],
+      items: ss.items.map((si) => ({
+        kind: "item" as const,
+        key: `item:${sc.categoria}:${ss.label}:${si.label}`,
+        label: si.label,
+        groups: [] as LiveGroup[],
+        agg: emptyAgg(),
+        match: si.match,
+      })),
+    })),
+    directItems: [],
+  }));
+  const byName = new Map(cats.map((c) => [c.label, c]));
+
   for (const g of groups) {
-    let cat = cats.get(g.categoria);
-    if (!cat) {
-      cat = { key: `cat:${g.categoria}`, label: g.categoria, agg: emptyAgg(), groups: [], children: [] };
-      cats.set(g.categoria, cat);
-    }
+    const cat = byName.get(g.categoria);
+    if (!cat) continue; // categoria fora do esqueleto (não deve ocorrer)
     addToAgg(cat.agg, g);
     cat.groups.push(g);
-    const item: ItemNode = { kind: "item", key: `item:${g.live}`, group: g };
     if (g.subcategoria) {
-      let sub = cat.children.find(
-        (c): c is SubNode => c.kind === "sub" && c.label === g.subcategoria,
-      );
+      let sub = cat.subs.find((s) => s.label === g.subcategoria);
       if (!sub) {
         sub = { kind: "sub", key: `sub:${g.categoria}:${g.subcategoria}`, label: g.subcategoria, agg: emptyAgg(), groups: [], items: [] };
-        cat.children.push(sub);
+        cat.subs.push(sub);
       }
       addToAgg(sub.agg, g);
       sub.groups.push(g);
-      sub.items.push(item);
+      const n = normalize(g.live);
+      let item = sub.items.find((it) => it.match && it.match(n));
+      if (!item) {
+        item = { kind: "item", key: `item:${g.live}`, label: g.live, groups: [], agg: emptyAgg() };
+        sub.items.push(item);
+      }
+      addToAgg(item.agg, g);
+      item.groups.push(g);
     } else {
-      cat.children.push(item);
+      cat.directItems.push({ kind: "item", key: `item:${g.live}`, label: g.live, groups: [g], agg: groupAgg(g) });
     }
   }
-  return CATEGORY_ORDER.filter((c) => cats.has(c)).map((c) => cats.get(c)!);
+  return cats;
+}
+
+// LiveGroup sintético (soma dedup por email) para abrir o drill de um item que agrega vários eventos.
+function mergeGroups(list: LiveGroup[], label: string): LiveGroup {
+  const seen = new Set<string>();
+  const leads: G4RealLead[] = [];
+  for (const g of list)
+    for (const l of g.leads) {
+      const k = (l.email ?? l.nome ?? "").toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      leads.push(l);
+    }
+  const won = leads.filter(isG4Sale);
+  const lost = leads.filter((l) => isLost(l.faseAtual));
+  let mrr = 0, setup = 0, pontual = 0, tcv = 0;
+  for (const w of won) {
+    mrr += w.valorMRR ?? 0;
+    setup += w.valorSetup ?? 0;
+    pontual += w.valorPontual ?? 0;
+    tcv += w.tcv ?? 0;
+  }
+  const ticketSum = won.reduce((a, w) => a + (w.valorSetup ?? 0) + (w.valorMRR ?? 0) + (w.valorPontual ?? 0), 0);
+  return {
+    live: label,
+    date: null,
+    kind: list[0]?.kind ?? "evento",
+    categoria: list[0]?.categoria ?? "Palestras",
+    subcategoria: list[0]?.subcategoria ?? null,
+    leads,
+    inscritos: leads.length,
+    mqls: leads.filter((l) => isMqlByFaturamento(l.faixa)).length,
+    emContato: leads.filter((l) => isInContact(l.faseAtual)).length,
+    quentes: leads.filter((l) => l.temperatura === "Quente").length,
+    fechados: won.length,
+    perdidos: lost.length,
+    mrr, setup, pontual, tcv,
+    ticketMedio: won.length ? ticketSum / won.length : 0,
+    wonLeads: won,
+    lostLeads: lost,
+  };
 }
 
 const CAT_BADGE: Record<G4Categoria, string> = {
@@ -678,7 +769,7 @@ export function G4ConsolidatedDashboard() {
     const keys: string[] = [];
     for (const cat of tree) {
       keys.push(cat.key);
-      for (const ch of cat.children) if (ch.kind === "sub") keys.push(ch.key);
+      for (const sub of cat.subs) keys.push(sub.key);
     }
     return keys;
   }, [tree]);
@@ -805,42 +896,42 @@ export function G4ConsolidatedDashboard() {
     </>
   );
 
-  // Linha folha: uma live/evento individual. Clicar abre o drill de fases/temperatura/perdas/vendas.
-  const renderItemRow = (it: ItemNode, indent: number) => {
-    const g = it.group;
-    const open = expanded.has(it.key);
+  // Linha folha: item (live/evento real, agregador de talks, ou placeholder vazio do esqueleto).
+  // Com dados → clicar abre o drill de fases/temperatura/perdas/vendas. Vazio → linha zerada, não clicável.
+  const renderItemRow = (item: ItemNode, catLabel: G4Categoria, indent: number) => {
+    const hasData = item.groups.length > 0;
+    const open = expanded.has(item.key);
     const padLeft = indent >= 2 ? "pl-12" : "pl-8";
+    const drillGroup =
+      item.groups.length === 1 ? item.groups[0] : hasData ? mergeGroups(item.groups, item.label) : null;
+    const badgeLabel = catLabel === "Live" ? "LIVE" : catLabel === "Palestras" ? "TALK" : "EVENTO";
     return (
-      <Fragment key={it.key}>
+      <Fragment key={item.key}>
         <tr
-          className={cn("border-t hover:bg-muted/30 cursor-pointer", g.fechados > 0 && "bg-emerald-500/5")}
-          onClick={() => toggle(it.key)}
+          className={cn(
+            "border-t",
+            hasData ? "hover:bg-muted/30 cursor-pointer" : "opacity-50",
+            item.agg.fechados > 0 && "bg-emerald-500/5",
+          )}
+          onClick={hasData ? () => toggle(item.key) : undefined}
         >
           <td className="px-2 py-2">
-            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            {hasData ? (open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />) : null}
           </td>
           <td className={cn("px-2 py-2 text-foreground", padLeft)}>
             <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-[9px] px-1.5 py-0",
-                  g.kind === "live"
-                    ? "border-primary/40 text-primary"
-                    : "border-orange-500/40 text-orange-600 dark:text-orange-400",
-                )}
-              >
-                {g.kind === "live" ? "LIVE" : "EVENTO"}
+              <Badge variant="outline" className={cn("text-[9px] px-1.5 py-0", CAT_BADGE[catLabel])}>
+                {badgeLabel}
               </Badge>
-              {g.live}
+              {item.label}
             </div>
           </td>
-          {rowMetricCells(groupMetrics(g), [g], g.live)}
+          {rowMetricCells(aggMetrics(item.agg), item.groups, item.label)}
         </tr>
-        {open && (
+        {hasData && open && drillGroup && (
           <tr>
             <td colSpan={14} className="p-0">
-              <ExpandedRow group={g} />
+              <ExpandedRow group={drillGroup} />
             </td>
           </tr>
         )}
@@ -968,28 +1059,32 @@ export function G4ConsolidatedDashboard() {
                             {rowMetricCells(aggMetrics(cat.agg), cat.groups, cat.label)}
                           </tr>
 
-                          {catOpen &&
-                            cat.children.map((child) => {
-                              if (child.kind === "item") return renderItemRow(child, 1);
-                              const subOpen = expanded.has(child.key);
-                              return (
-                                <Fragment key={child.key}>
-                                  {/* Nível 2 — Subcategoria (ex.: Talks) */}
-                                  <tr
-                                    className="border-t bg-muted/10 hover:bg-muted/30 cursor-pointer"
-                                    onClick={() => toggle(child.key)}
-                                  >
-                                    <td className="px-2 py-2 pl-4">
-                                      {subOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                    </td>
-                                    <td className="px-2 py-2 pl-4 font-medium text-foreground">{child.label}</td>
-                                    {rowMetricCells(aggMetrics(child.agg), child.groups, `${cat.label} · ${child.label}`)}
-                                  </tr>
-                                  {/* Nível 3 — itens individuais da subcategoria */}
-                                  {subOpen && child.items.map((it) => renderItemRow(it, 2))}
-                                </Fragment>
-                              );
-                            })}
+                          {catOpen && (
+                            <>
+                              {/* Nível 2 (direto) — itens sem subcategoria: lives / eventos reais */}
+                              {cat.directItems.map((it) => renderItemRow(it, cat.label, 1))}
+                              {/* Nível 2 — Subcategorias fixas (ex.: Talks) */}
+                              {cat.subs.map((sub) => {
+                                const subOpen = expanded.has(sub.key);
+                                return (
+                                  <Fragment key={sub.key}>
+                                    <tr
+                                      className="border-t bg-muted/10 hover:bg-muted/30 cursor-pointer"
+                                      onClick={() => toggle(sub.key)}
+                                    >
+                                      <td className="px-2 py-2 pl-4">
+                                        {subOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                      </td>
+                                      <td className="px-2 py-2 pl-4 font-medium text-foreground">{sub.label}</td>
+                                      {rowMetricCells(aggMetrics(sub.agg), sub.groups, `${cat.label} · ${sub.label}`)}
+                                    </tr>
+                                    {/* Nível 3 — itens da subcategoria (SE/Connect/Traction, mesmo zerados) */}
+                                    {subOpen && sub.items.map((it) => renderItemRow(it, cat.label, 2))}
+                                  </Fragment>
+                                );
+                              })}
+                            </>
+                          )}
                         </Fragment>
                       );
                     })}
