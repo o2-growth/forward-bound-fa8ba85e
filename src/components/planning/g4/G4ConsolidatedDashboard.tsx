@@ -820,10 +820,7 @@ export function G4ConsolidatedDashboard() {
     [data],
   );
   const allGroups = useMemo(() => buildGroups(overriddenLeads), [overriddenLeads]);
-  const excludedByOrigin = useMemo(
-    () => overriddenLeads.filter((l) => !isG4Attributed(l)).length,
-    [overriddenLeads],
-  );
+
 
   const groups = useMemo(() => {
     const now = Date.now();
