@@ -155,6 +155,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
           taxaFranquia: row['Taxa de franquia'] ? parseFloat(row['Taxa de franquia']) : null,
           investimentoDisponivel: row['Investimento disponível'] || null,
           produto,
+          motivoPerda: row['Motivo da perda'] || row['Motivo de perda'] || row['Motivo Perda'] || null,
         };
         
         movements.push(movement);
