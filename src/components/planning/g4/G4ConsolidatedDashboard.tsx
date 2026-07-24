@@ -9,6 +9,7 @@ import { fmt, fmtInt } from "@/components/planning/ceo/ceoShared";
 import { DetailSheet, columnFormatters, type DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
 import { cn } from "@/lib/utils";
+import { isJunkCard } from "@/hooks/useModeloAtualMetas";
 
 
 // ─────────── helpers ───────────
