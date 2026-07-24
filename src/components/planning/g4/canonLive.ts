@@ -86,10 +86,10 @@ export interface G4Classification {
 
 export function classifyG4Event(name: string): G4Classification {
   const n = normalize(name);
-  // Connect e Traction sempre entram em Palestras › Talks, mesmo que o nome
-  // contenha "live" ou "aula" (ex.: "Live G4 Connect", "G4-Aula-Traction-*").
+  // Traction tem subcategoria própria dentro de Palestras (separado de Talks/Connect).
+  if (n.includes("traction")) return { categoria: "Palestras", subcategoria: "Traction" };
+  // Connect entra em Palestras › Talks, mesmo que o nome contenha "live"/"aula".
   if (n.includes("connect")) return { categoria: "Palestras", subcategoria: "Talks" };
-  if (n.includes("traction")) return { categoria: "Palestras", subcategoria: "Talks" };
   if (n.includes("live")) return { categoria: "Live", subcategoria: null };
   if (n.includes("talk")) return { categoria: "Palestras", subcategoria: "Talks" };
   if (n.includes("palestra")) return { categoria: "Palestras", subcategoria: null };
