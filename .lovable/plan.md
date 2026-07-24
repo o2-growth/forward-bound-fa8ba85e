@@ -1,20 +1,35 @@
-## Problema
+## 1. Reclassificar Connect e Traction como Palestras
 
-A venda **Lotus Logística** (card Pipefy `1398290148`, Ganho em 15/07/2026, MRR R$ 14.455,50) não aparece nas vendas do `/dash-g4`.
+Hoje `classifyG4Event` (em `src/components/planning/g4/canonLive.ts`) coloca em **Live** qualquer nome que contenha "live" — então "Live G4 Connect", "Aula Traction", "G4 Tools Connect", "G4-Aula-Traction-*" caem na categoria Live.
 
-## Causa (verificada)
+Ajuste (uma única função):
 
-A whitelist Finders Fee usa `administrativo@lotuslogistica.com`, mas o e-mail real do card em `pipefy_moviment_cfos` é **`adm@lotuslogistica.com`** (tanto no campo "E-mail" quanto em "E-mail de quem assina"). Como não bate com nenhum e-mail da whitelist e provavelmente não tem `venda_atribuivel_live = true` em `g4_leads_360`, o `isG4Sale` retorna `false`.
+- Em `classifyG4Event`, testar `connect` e `traction` **antes** de "live":
+  - `connect` → `{ categoria: "Palestras", subcategoria: "Talks" }` (encaixa em `Talks Connect` do esqueleto).
+  - `traction` → `{ categoria: "Palestras", subcategoria: "Talks" }` (encaixa em `Talks Traction`).
 
-## Correção
+Nenhuma outra mudança é necessária: o esqueleto em `G4ConsolidatedDashboard.tsx` (linhas 342–353) já tem os buckets `Talks Connect` e `Talks Traction` prontos para receber esses grupos.
 
-Adicionar `adm@lotuslogistica.com` à whitelist Finders Fee em dois lugares (mantendo o e-mail antigo por segurança):
+## 2. Origem de cada venda (estado atual do /dash-g4)
 
-1. `src/components/planning/g4/G4ConsolidatedDashboard.tsx` — set `G4_SALES_WHITELIST_EMAILS`.
-2. `supabase/functions/g4-metrics/index.ts` — lista de e-mails no UNION da query de leads (linha ~296+). Redeployar a função.
+Levantei direto do endpoint `g4-metrics` (funil por live) — vendas atualmente contabilizadas:
 
-Sem essa segunda inclusão o backend não retornaria a Lotus caso ela ainda não estivesse em `g4_leads_360`.
+| Vendas | Evento / Live |
+|---|---|
+| 2 | Live G4 - 02/07/2026 |
+| 2 | G4 SCALE EXPERIENCE 25/06/2026 |
+| 1 | Live G4 - 20/05/2026 |
+| 1 | Live G4 - 21/05/2026 |
+| 1 | Live G4 - 21/07/2026 |
+| 1 | G4 - G.E Junho - 20/06/2026 |
+| 1 | Lotus Logística (bucket "G4 - Finders Fee (fora das lives)" — corrigido agora, aparece no próximo refresh) |
 
-## Validação
+Total = **9 vendas** (bate com a whitelist Finders Fee: Martinelli, Petromar, JP Projetos, Discabos, Importadora Patagônia, Tchau Entrega, Yuri Josect, Lotus, Invenzi).
 
-Após o deploy, conferir em `/dash-g4` que Lotus aparece nas vendas (bucket "G4 - Finders Fee (fora das lives)" se não houver live atribuída, ou dentro da live correspondente).
+Se quiser a lista nominal por cliente aparecer na UI dentro de cada card de live, é só clicar no número de **Fechados** na tabela do Dashboard Consolidado (drill-down já existente com Empresa, Contato, Fase, Closer, link do Pipefy).
+
+## Arquivos alterados
+
+- `src/components/planning/g4/canonLive.ts` — regra Connect/Traction em `classifyG4Event`.
+
+Sem mudança de backend.
