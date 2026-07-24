@@ -151,6 +151,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           ),
           investimentoDisponivel: row['Investimento disponível'] || row['Investimento Disponivel'] || null,
           produto,
+          motivoPerda: row['Motivo da perda'] || row['Motivo de perda'] || row['Motivo Perda'] || null,
         };
 
         // Override de Valor Pontual fixo (Alexandre Correa, Jean Morbis)
