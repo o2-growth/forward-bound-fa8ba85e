@@ -26,6 +26,15 @@ export type G4RealLead = {
   motivoPerda: string | null;
   origemLead?: string | null;
   tipoOrigemLead?: string | null;
+  cardId?: string | null;
+  isGanho?: boolean | null;
+  dataGanho?: string | null;
+  vendaAtribuivelLive?: boolean | null;
+  primeiraLiveData?: string | null;
+  nLives?: number | null;
+  livesAssistiu?: string[] | null;
+  livesMao?: string[] | null;
+  livesDiagnostico?: string[] | null;
 };
 
 export type G4RealFunilRow = {
