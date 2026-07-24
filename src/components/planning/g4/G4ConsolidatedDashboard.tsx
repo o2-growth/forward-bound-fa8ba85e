@@ -314,17 +314,35 @@ const emptyAgg = (): Agg => ({
   inscritos: 0, mqls: 0, emContato: 0, quentes: 0, fechados: 0,
   perdidos: 0, mrr: 0, setup: 0, pontual: 0, tcv: 0,
 });
-function addToAgg(a: Agg, g: LiveGroup) {
-  a.inscritos += g.inscritos;
-  a.mqls += g.mqls;
-  a.emContato += g.emContato;
-  a.quentes += g.quentes;
-  a.fechados += g.fechados;
-  a.perdidos += g.perdidos;
-  a.mrr += g.mrr;
-  a.setup += g.setup;
-  a.pontual += g.pontual;
-  a.tcv += g.tcv;
+// Agregação de um conjunto de LiveGroups DEDUPLICANDO leads por email/nome
+// (um lead que aparece em várias lives conta 1x no total da categoria).
+// Vendas G4 já são atribuídas a UMA única live via pickClosestLive, então
+// somamos os valores monetários apenas dos leads únicos marcados como ganho.
+function aggFromGroups(list: LiveGroup[]): Agg {
+  const seen = new Set<string>();
+  const uniq: G4RealLead[] = [];
+  for (const g of list) {
+    for (const l of g.leads) {
+      const k = (l.email ?? l.nome ?? "").toLowerCase();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      uniq.push(l);
+    }
+  }
+  const won = uniq.filter(isG4Sale);
+  const lost = uniq.filter((l) => isLost(l.faseAtual));
+  return {
+    inscritos: uniq.length,
+    mqls: uniq.filter((l) => isMqlByFaturamento(l.faixa)).length,
+    emContato: uniq.filter((l) => isInContact(l.faseAtual)).length,
+    quentes: uniq.filter((l) => l.temperatura === "Quente" && !isG4Sale(l) && !isWon(l.faseAtual)).length,
+    fechados: won.length,
+    perdidos: lost.length,
+    mrr: won.reduce((a, w) => a + (w.valorMRR ?? 0), 0),
+    setup: won.reduce((a, w) => a + (w.valorSetup ?? 0), 0),
+    pontual: won.reduce((a, w) => a + (w.valorPontual ?? 0), 0),
+    tcv: won.reduce((a, w) => a + (w.tcv ?? 0), 0),
+  };
 }
 const aggTicket = (a: Agg) => (a.fechados ? (a.mrr + a.setup + a.pontual) / a.fechados : 0);
 const aggConv = (a: Agg) => (a.inscritos ? (a.fechados / a.inscritos) * 100 : 0);
@@ -349,11 +367,6 @@ const aggMetrics = (a: Agg): RowMetrics => ({
   conv: aggConv(a), perdidos: a.perdidos, mrr: a.mrr, setup: a.setup, pontual: a.pontual, tcv: a.tcv, ticketMedio: aggTicket(a),
 });
 
-const groupAgg = (g: LiveGroup): Agg => {
-  const a = emptyAgg();
-  addToAgg(a, g);
-  return a;
-};
 
 interface ItemNode {
   kind: "item";
@@ -402,10 +415,11 @@ const SCAFFOLD: ScaffoldCat[] = [
     ],
   },
   { categoria: "Eventos", subs: [] },
-  { categoria: "Seller", subs: [] },
 ];
 
 // Monta a árvore a partir do esqueleto fixo e encaixa os grupos reais.
+// Aggregates são calculados por dedupe de leads (não soma de contadores),
+// para que categoria/sub totalize leads únicos (um lead em 2 lives conta 1x).
 function buildTree(groups: LiveGroup[]): CatNode[] {
   const cats: CatNode[] = SCAFFOLD.map((sc) => ({
     key: `cat:${sc.categoria}`,
@@ -434,7 +448,6 @@ function buildTree(groups: LiveGroup[]): CatNode[] {
   for (const g of groups) {
     const cat = byName.get(g.categoria);
     if (!cat) continue; // categoria fora do esqueleto (não deve ocorrer)
-    addToAgg(cat.agg, g);
     cat.groups.push(g);
     if (g.subcategoria) {
       let sub = cat.subs.find((s) => s.label === g.subcategoria);
@@ -442,7 +455,6 @@ function buildTree(groups: LiveGroup[]): CatNode[] {
         sub = { kind: "sub", key: `sub:${g.categoria}:${g.subcategoria}`, label: g.subcategoria, agg: emptyAgg(), groups: [], items: [] };
         cat.subs.push(sub);
       }
-      addToAgg(sub.agg, g);
       sub.groups.push(g);
       const n = normalize(g.live);
       let item = sub.items.find((it) => it.match && it.match(n));
@@ -450,14 +462,24 @@ function buildTree(groups: LiveGroup[]): CatNode[] {
         item = { kind: "item", key: `item:${g.live}`, label: g.live, groups: [], agg: emptyAgg() };
         sub.items.push(item);
       }
-      addToAgg(item.agg, g);
       item.groups.push(g);
     } else {
-      cat.directItems.push({ kind: "item", key: `item:${g.live}`, label: g.live, groups: [g], agg: groupAgg(g) });
+      cat.directItems.push({ kind: "item", key: `item:${g.live}`, label: g.live, groups: [g], agg: emptyAgg() });
     }
+  }
+
+  // Calcula aggs após popular groups em cada nó (com dedupe por lead).
+  for (const cat of cats) {
+    cat.agg = aggFromGroups(cat.groups);
+    for (const sub of cat.subs) {
+      sub.agg = aggFromGroups(sub.groups);
+      for (const item of sub.items) item.agg = aggFromGroups(item.groups);
+    }
+    for (const item of cat.directItems) item.agg = aggFromGroups(item.groups);
   }
   return cats;
 }
+
 
 // LiveGroup sintético (soma dedup por email) para abrir o drill de um item que agrega vários eventos.
 function mergeGroups(list: LiveGroup[], label: string): LiveGroup {
@@ -504,8 +526,8 @@ const CAT_BADGE: Record<G4Categoria, string> = {
   Live: "border-primary/40 text-primary",
   Palestras: "border-violet-500/40 text-violet-600 dark:text-violet-400",
   Eventos: "border-orange-500/40 text-orange-600 dark:text-orange-400",
-  Seller: "border-sky-500/40 text-sky-600 dark:text-sky-400",
 };
+
 
 // ─────────── UI atoms ───────────
 function Kpi({
@@ -798,10 +820,7 @@ export function G4ConsolidatedDashboard() {
     [data],
   );
   const allGroups = useMemo(() => buildGroups(overriddenLeads), [overriddenLeads]);
-  const excludedByOrigin = useMemo(
-    () => overriddenLeads.filter((l) => !isG4Attributed(l)).length,
-    [overriddenLeads],
-  );
+
 
   const groups = useMemo(() => {
     const now = Date.now();
@@ -985,7 +1004,8 @@ export function G4ConsolidatedDashboard() {
     const drillGroup =
       item.groups.length === 1 ? item.groups[0] : hasData ? mergeGroups(item.groups, item.label) : null;
     const badgeLabel =
-      catLabel === "Live" ? "LIVE" : catLabel === "Palestras" ? "TALK" : catLabel === "Seller" ? "SELLER" : "EVENTO";
+      catLabel === "Live" ? "LIVE" : catLabel === "Palestras" ? "TALK" : "EVENTO";
+
     return (
       <Fragment key={item.key}>
         <tr
@@ -1056,8 +1076,8 @@ export function G4ConsolidatedDashboard() {
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users}
-              hint={excludedByOrigin > 0 ? `${excludedByOrigin} excluídos por origem não-G4` : undefined}
               onClick={() => openDrill("Leads G4 · Consolidado", "all", groups)} />
+
             <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary"
               onClick={() => openDrill("MQLs · Faturamento ≥ R$ 200k/mês", "mql", groups)} />
             <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle}

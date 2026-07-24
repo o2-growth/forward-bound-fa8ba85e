@@ -77,7 +77,7 @@ export function canonLive(raw: string): string {
 // Categorias de topo do Dashboard Consolidado G4. A árvore é data-driven: só
 // aparecem categorias/subcategorias que tenham eventos. Novos eventos cadastrados
 // com "Talk"/"Palestra" no nome caem sozinhos em Palestras › Talks — sem tocar no código.
-export type G4Categoria = "Live" | "Palestras" | "Eventos" | "Seller";
+export type G4Categoria = "Live" | "Palestras" | "Eventos";
 
 export interface G4Classification {
   categoria: G4Categoria;
@@ -93,6 +93,6 @@ export function classifyG4Event(name: string): G4Classification {
   if (n.includes("live")) return { categoria: "Live", subcategoria: null };
   if (n.includes("talk")) return { categoria: "Palestras", subcategoria: "Talks" };
   if (n.includes("palestra")) return { categoria: "Palestras", subcategoria: null };
-  if (n.includes("seller")) return { categoria: "Seller", subcategoria: null };
   return { categoria: "Eventos", subcategoria: null };
+
 }
