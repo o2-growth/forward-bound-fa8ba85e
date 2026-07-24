@@ -37,6 +37,7 @@ const G4_SALES_WHITELIST_EMAILS = new Set<string>([
   "tchauentrega@gmail.com",
   "yurijosect@gmail.com",
   "administrativo@lotuslogistica.com",
+  "adm@lotuslogistica.com",
   "andre.silva@invenzi.com",
 ]);
 // Uma venda é atribuída ao G4 quando:

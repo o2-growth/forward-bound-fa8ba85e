@@ -297,6 +297,7 @@ Deno.serve(async (req) => {
               'sidney@petromarcomercial.com.br',
               'tamara@importadorapatagonia.com.br',
               'administrativo@lotuslogistica.com',
+              'adm@lotuslogistica.com',
               'andre.silva@invenzi.com'
             )
             ORDER BY lower("E-mail"),
