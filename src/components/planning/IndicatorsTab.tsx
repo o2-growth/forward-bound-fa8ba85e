@@ -750,20 +750,64 @@ export function IndicatorsTab() {
   // este objeto combinado — gauges, funilzinho, comparativo semanal, rank, etc.
   // Quando o filtro Origem = "Outbound", o classifier reconhece os cards pelo
   // tipoOrigem="Prospecção Ativa" + SDR=Matheus injetados em parseOutboundRow.
-  const modeloAtualAnalytics = useMemo(() => ({
-    ...modeloAtualAnalyticsRaw,
-    cards: [...modeloAtualAnalyticsRaw.cards, ...outboundAnalytics.cards],
-    isLoading: modeloAtualAnalyticsRaw.isLoading || outboundAnalytics.isLoading,
-    getCardsForIndicator: (ind: IndicatorType) => [
-      ...modeloAtualAnalyticsRaw.getCardsForIndicator(ind),
-      ...outboundAnalytics.getCardsForIndicator(ind),
-    ],
-    getDetailItemsForIndicator: (ind: IndicatorType) => [
-      ...modeloAtualAnalyticsRaw.getDetailItemsForIndicator(ind),
-      ...outboundAnalytics.getDetailItemsForIndicator(ind),
-    ],
-    // getDetailItemsWithFullHistory permanece do hook original (outbound não tem fullHistory).
-  }), [modeloAtualAnalyticsRaw, outboundAnalytics]);
+  const modeloAtualAnalytics = useMemo(() => {
+    // Dedup cross-source por id: mesmo card pode aparecer no banco de
+    // Modelo Atual (Inbound) e no banco de Outbound (ex.: GSC). Preferimos
+    // a versão com data de assinatura mais recente; empate → mantém a 1ª.
+    const dedupById = <T extends { id?: string; dataAssinatura?: Date | null; dataEntrada?: Date }>(
+      inboundArr: T[],
+      outboundArr: T[],
+      label: string,
+    ): T[] => {
+      const byId = new Map<string, T>();
+      const push = (c: T) => {
+        const id = c?.id ? String(c.id) : '';
+        if (!id) { byId.set(Math.random().toString(36), c); return; }
+        const existing = byId.get(id);
+        if (!existing) { byId.set(id, c); return; }
+        const ta = (c.dataAssinatura ?? c.dataEntrada)?.getTime?.() ?? 0;
+        const tb = (existing.dataAssinatura ?? existing.dataEntrada)?.getTime?.() ?? 0;
+        if (ta > tb) byId.set(id, c);
+      };
+      inboundArr.forEach(push);
+      outboundArr.forEach(push);
+      const out = Array.from(byId.values());
+      const total = inboundArr.length + outboundArr.length;
+      if (out.length !== total) {
+        // eslint-disable-next-line no-console
+        console.info(`[Indicators] dedup cross-BU ${label}: ${total} → ${out.length}`);
+      }
+      return out;
+    };
+
+    return {
+      ...modeloAtualAnalyticsRaw,
+      cards: dedupById(modeloAtualAnalyticsRaw.cards, outboundAnalytics.cards, 'cards'),
+      isLoading: modeloAtualAnalyticsRaw.isLoading || outboundAnalytics.isLoading,
+      getCardsForIndicator: (ind: IndicatorType) => dedupById(
+        modeloAtualAnalyticsRaw.getCardsForIndicator(ind),
+        outboundAnalytics.getCardsForIndicator(ind),
+        `cards[${ind}]`,
+      ),
+      getDetailItemsForIndicator: (ind: IndicatorType) => {
+        const inbound = modeloAtualAnalyticsRaw.getDetailItemsForIndicator(ind);
+        const outbound = outboundAnalytics.getDetailItemsForIndicator(ind);
+        const byId = new Map<string, typeof inbound[number]>();
+        [...inbound, ...outbound].forEach((it) => {
+          const id = it?.id ? String(it.id) : Math.random().toString(36);
+          if (!byId.has(id)) byId.set(id, it);
+        });
+        const merged = Array.from(byId.values());
+        const total = inbound.length + outbound.length;
+        if (merged.length !== total) {
+          // eslint-disable-next-line no-console
+          console.info(`[Indicators] dedup cross-BU items[${ind}]: ${total} → ${merged.length}`);
+        }
+        return merged;
+      },
+      // getDetailItemsWithFullHistory permanece do hook original (outbound não tem fullHistory).
+    };
+  }, [modeloAtualAnalyticsRaw, outboundAnalytics]);
   
   // Get funnelData from MediaMetasContext for dynamic metas
   const { funnelData, metasPorBU } = useMediaMetas();
