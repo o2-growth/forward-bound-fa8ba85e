@@ -31,6 +31,7 @@ export interface O2TaxCard {
   origemLead?: string;
   fonte?: string;
   campanha?: string;
+  email?: string;
 }
 
 // O2 TAX MQL qualifying tiers (>= R$ 500k)
