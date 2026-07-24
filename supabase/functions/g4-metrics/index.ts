@@ -35,18 +35,22 @@ Deno.serve(async (req) => {
     const [funilRows, diagRows, kpiRows, fatRows, leadRows] = await Promise.all(
       [
         sql /* funil por live */`
+          WITH won_by_live AS (
+            SELECT unnest(COALESCE(l.lives_assistiu, l.lives)) AS live,
+                   l.email
+            FROM g4_leads_360 l
+            WHERE l.is_ganho = TRUE
+              AND l.venda_atribuivel_live = TRUE
+              AND l.email IS NOT NULL
+          )
           SELECT i.live,
             COUNT(DISTINCT i.email) AS inscritos,
             COUNT(DISTINCT i.email) FILTER (WHERE i.presente) AS presentes,
             COUNT(DISTINCT lm.email) AS levantaram_mao,
-            COUNT(DISTINCT p.email) FILTER (WHERE p.fase_atual='Ganho') AS vendas
+            COUNT(DISTINCT w.email) FILTER (WHERE w.live = i.live) AS vendas
           FROM g4_inscritos i
           LEFT JOIN g4_levantadas_mao lm ON lm.email=i.email AND lm.live=i.live
-          LEFT JOIN (
-            SELECT DISTINCT ON (lower("E-mail")) lower("E-mail") AS email, "Fase Atual" AS fase_atual
-            FROM pipefy_moviment_cfos WHERE "E-mail" IS NOT NULL AND "E-mail" <> ''
-            ORDER BY lower("E-mail"), "Entrada" DESC NULLS LAST
-          ) p ON p.email=i.email
+          LEFT JOIN won_by_live w ON w.live = i.live AND w.email = i.email
           WHERE i.email NOT ILIKE '%teste%' AND i.email NOT ILIKE '%test@%'
             AND i.email NOT ILIKE '%@test.%' AND i.email NOT ILIKE '%exemplo.com%'
             AND i.email NOT ILIKE '%@o2inc.com.br'
@@ -59,6 +63,7 @@ Deno.serve(async (req) => {
             AND i.live <> 'Raio-X de Margens - G4'
           GROUP BY i.live ORDER BY i.live
         `,
+
         sql /* diagnóstico por live */`
           SELECT live, COUNT(DISTINCT email) AS diagnosticos
           FROM g4_diagnostico
