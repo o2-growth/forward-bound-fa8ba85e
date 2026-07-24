@@ -94,6 +94,7 @@ export function isTestCard(id?: string): boolean {
 // "asdf", "qwerty", "xxx" ou apenas dígitos sem sentido tipo "123", "1234".
 const TEST_TITLE_PATTERNS: RegExp[] = [
   /\bteste?s?\b/i,           // teste, testes, test
+  /^teste?s?[a-z0-9]/i,      // testeg4, testejv, testenormal1, test123 (colado)
   /\btesting\b/i,
   /\basdf?\b/i,               // asd, asdf
   /\bqwerty\b/i,
