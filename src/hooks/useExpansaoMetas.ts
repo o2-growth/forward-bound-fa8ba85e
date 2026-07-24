@@ -88,7 +88,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       const movements: ExpansaoMovement[] = [];
       
       for (const row of responseData.data) {
-        if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
+        if (isJunkRow(row)) continue;
         const produto = row['Produtos'] || '';
         
         
