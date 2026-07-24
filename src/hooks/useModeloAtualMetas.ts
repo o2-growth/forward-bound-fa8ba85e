@@ -134,6 +134,22 @@ export function isJunkCard(
   return isTestByTitle(card.titulo, card.empresa, card.nome, card.contato);
 }
 
+// Helper para linhas cruas do Pipefy (query-external-db): checa todos os campos
+// identificadores conhecidos numa tacada só, evitando brechas quando o texto
+// "teste" aparece apenas em Nome/Empresa/Contato mas não em Título.
+export function isJunkRow(row: any): boolean {
+  if (!row) return false;
+  return isJunkCard({
+    id: String(row.ID ?? row.id ?? ''),
+    titulo: String(row['Título'] ?? row['Titulo'] ?? row.titulo ?? ''),
+    nome: String(row['Nome'] ?? row.nome ?? ''),
+    empresa: String(row['Empresa'] ?? row.empresa ?? ''),
+    contato: String(row['Contato'] ?? row.contato ?? ''),
+    email: String(row['E-mail'] ?? row['Email'] ?? row.email ?? ''),
+  });
+}
+
+
 const NORMALIZED_EXCLUDED_REASONS = MQL_EXCLUDED_LOSS_REASONS.map(normalizeStr);
 
 // Verifica se o card deve ser excluído da contagem de MQL por motivo de perda

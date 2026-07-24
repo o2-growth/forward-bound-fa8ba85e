@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
-import { isJunkCard, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
+import { isJunkRow, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
 
 export type OxyHackerIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
 export type ChartGrouping = 'daily' | 'weekly' | 'monthly';
@@ -123,7 +123,7 @@ export function useOxyHackerMetas(startDate?: Date, endDate?: Date) {
       const movements: OxyHackerMovement[] = [];
       
       for (const row of allRows) {
-        if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || ''), email: String(row['E-mail'] || '') })) continue;
+        if (isJunkRow(row)) continue;
         const produto = row['Produtos'] || '';
         
         

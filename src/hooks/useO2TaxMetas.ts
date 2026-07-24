@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { eachDayOfInterval, eachMonthOfInterval, addDays, differenceInDays } from "date-fns";
 import { isO2TaxMqlQualified } from "@/hooks/useO2TaxAnalytics";
-import { isJunkCard } from "@/hooks/useModeloAtualMetas";
+import { isJunkRow } from "@/hooks/useModeloAtualMetas";
 import { sumMrrFields } from "@/lib/mrrFields";
 
 export type O2TaxIndicator = 'leads' | 'mql' | 'rm' | 'rr' | 'proposta' | 'venda';
@@ -69,7 +69,7 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
       const movements: O2TaxMovement[] = [];
       
       for (const row of responseData.data) {
-        if (isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') })) continue;
+        if (isJunkRow(row)) continue;
         const movement: O2TaxMovement = {
           id: String(row.ID),
           titulo: row['Título'] || '',
@@ -94,7 +94,7 @@ export function useO2TaxMetas(startDate?: Date, endDate?: Date) {
       });
       if (!mqlCreationError && mqlCreationData?.data) {
         mqlByCreation = mqlCreationData.data
-          .filter((row: any) => !isJunkCard({ id: String(row.ID || ''), titulo: String(row['Título'] || '') }))
+          .filter((row: any) => !isJunkRow(row))
           .map((row: any) => ({
             id: String(row.ID),
             titulo: row['Título'] || '',

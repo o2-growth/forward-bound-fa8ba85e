@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate, getForcedPontualValue } from "./dateUtils";
-import { isJunkCard, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
+import { isJunkRow, buildExcludedMqlCardIds } from "./useModeloAtualMetas";
 import { parseTemperatura } from "./useModeloAtualAnalytics";
 import { sumMrrFields } from "@/lib/mrrFields";
 
@@ -329,7 +329,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const seen = new Set<string>();
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
-      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || ''), email: String(row['E-mail'] || '') })) continue;
+      if (isJunkRow(row)) continue;
       const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
       if (seen.has(key)) continue;
       const parsed = parseRawCard(row, defaultTicket);
@@ -345,7 +345,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const rows = data?.historyRows || [];
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
-      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || ''), email: String(row['E-mail'] || '') })) continue;
+      if (isJunkRow(row)) continue;
       const parsed = parseRawCard(row, defaultTicket);
       if (parsed.produto !== produto) continue;
       out.push(parsed);
@@ -372,7 +372,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const seen = new Set<string>();
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
-      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || ''), email: String(row['E-mail'] || '') })) continue;
+      if (isJunkRow(row)) continue;
       const key = `${row['ID']}_${row['Fase']}_${row['Entrada']}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -408,7 +408,7 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     const seen = new Set<string>();
     const out: ExpansaoCard[] = [];
     for (const row of rows) {
-      if (isJunkCard({ id: String(row['ID'] || ''), titulo: String(row['Título'] || ''), email: String(row['E-mail'] || '') })) continue;
+      if (isJunkRow(row)) continue;
       const parsed = parseRawCard(row, defaultTicket);
       if (parsed.produto !== produto) continue;
       if (seen.has(parsed.id)) continue;

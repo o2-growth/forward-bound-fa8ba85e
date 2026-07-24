@@ -10,6 +10,8 @@ import { ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRigh
 import { KpiCardsRow } from "./KpiCardsRow";
 import { KpiItem } from "./KpiCard";
 import { DrillDownCharts, ChartConfig } from "./DrillDownCharts";
+import { isJunkCard } from "@/hooks/useModeloAtualMetas";
+
 
 type SortDirection = 'none' | 'desc' | 'asc';
 
@@ -103,12 +105,27 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
     });
   };
 
+  // Rede de segurança global: filtra qualquer card de teste que tenha escapado
+  // dos hooks upstream (por variação de campo/cache). Aplica-se a TODOS os
+  // drill-downs que passam por DetailSheet.
+  const cleanItems = useMemo(() => {
+    const before = items.length;
+    const filtered = items.filter(
+      (it) => !isJunkCard({ id: it.id, titulo: it.name, empresa: it.company, nome: it.name })
+    );
+    if (filtered.length !== before) {
+      console.log(`[junk] DetailSheet "${title}" bloqueou ${before - filtered.length} card(s) de teste`);
+    }
+    return filtered;
+  }, [items, title]);
+
   const sortedItems = useMemo(() => {
     if (!sortState.column || sortState.direction === 'none') {
-      return items;
+      return cleanItems;
     }
 
-    return [...items].sort((a, b) => {
+    return [...cleanItems].sort((a, b) => {
+
       const aVal = a[sortState.column!];
       const bVal = b[sortState.column!];
 
