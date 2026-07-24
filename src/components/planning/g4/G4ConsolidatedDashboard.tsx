@@ -158,10 +158,12 @@ export function isTestG4Lead(l: G4RealLead): boolean {
 export function isG4Attributed(l: G4RealLead): boolean {
   // Testes nunca entram
   if (isTestG4Lead(l)) return false;
-  // Exclusão manual sempre vence
-  const cardId = extractPipefyCardId(l.pipefyUrl);
+  // Exclusão manual sempre vence (usa cardId direto do lead se existir)
+  const cardId = l.cardId ?? extractPipefyCardId(l.pipefyUrl);
   if (cardId && MANUAL_EXCLUDED_G4_CARD_IDS.has(cardId)) return false;
 
+  // Vendas atribuídas pela base externa sempre entram
+  if (l.vendaAtribuivelLive) return true;
   // Whitelist Finders Fee: sempre atribui ao G4
   if (G4_SALES_WHITELIST_EMAILS.has((l.email ?? "").toLowerCase())) return true;
 
