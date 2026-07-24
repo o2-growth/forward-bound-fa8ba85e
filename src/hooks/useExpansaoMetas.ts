@@ -21,6 +21,7 @@ interface ExpansaoMovement {
   taxaFranquia: number | null; // Taxa de franquia (R$ 140.000 para Franquia)
   investimentoDisponivel: string | null;
   produto: string;
+  motivoPerda: string | null;
 }
 
 // MQL Expansão Franquia: investimento disponível >= R$ 15k
