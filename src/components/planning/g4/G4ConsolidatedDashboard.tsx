@@ -801,13 +801,14 @@ function LeadsTable({
 
 // ─────────── Main ───────────
 type KindFilter = "todos" | "live" | "evento";
-type RangeFilter = "30" | "90" | "all";
 
 export function G4ConsolidatedDashboard() {
   const { data, isLoading } = useG4RealMetrics();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [kind, setKind] = useState<KindFilter>("todos");
-  const [range, setRange] = useState<RangeFilter>("all");
+  // Filtro de data: null = "Tudo" (default). Quando setado, filtra por g.date.
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
+  const [includeUndated, setIncludeUndated] = useState(true);
 
   // Drill-down state
   const [drillOpen, setDrillOpen] = useState(false);
@@ -825,14 +826,19 @@ export function G4ConsolidatedDashboard() {
 
 
   const groups = useMemo(() => {
-    const now = Date.now();
-    const cutoff = range === "30" ? now - 30 * 864e5 : range === "90" ? now - 90 * 864e5 : 0;
+    const fromT = dateRange ? dateRange.from.getTime() : null;
+    const toT = dateRange ? dateRange.to.getTime() : null;
     return allGroups.filter((g) => {
       if (kind !== "todos" && g.kind !== kind) return false;
-      if (cutoff && g.date && g.date.getTime() < cutoff) return false;
+      if (fromT !== null && toT !== null) {
+        if (!g.date) return includeUndated;
+        const t = g.date.getTime();
+        if (t < fromT || t > toT) return false;
+      }
       return true;
     });
-  }, [allGroups, kind, range]);
+  }, [allGroups, kind, dateRange, includeUndated]);
+
 
   const totals = useMemo(() => {
     // Deduplica leads por email/nome ao longo de todos os groups visíveis
