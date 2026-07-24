@@ -1126,14 +1126,9 @@ export function G4ConsolidatedDashboard() {
                       <th className="px-2 py-2 text-right">MQLs</th>
                       <th className="px-2 py-2 text-right">Em contato</th>
                       <th className="px-2 py-2 text-right">Quentes</th>
-                      <th className="px-2 py-2 text-right">Fechados</th>
-                      <th className="px-2 py-2 text-right">Conv%</th>
-                      <th className="px-2 py-2 text-right">Perdidos</th>
-                      <th className="px-2 py-2 text-right">MRR</th>
-                      <th className="px-2 py-2 text-right">Setup</th>
-                      <th className="px-2 py-2 text-right">Pontual</th>
+                      <th className="px-2 py-2 text-right">Vendas</th>
                       <th className="px-2 py-2 text-right">TCV</th>
-                      <th className="px-2 py-2 text-right">Ticket médio</th>
+
                     </tr>
                   </thead>
                   <tbody>
