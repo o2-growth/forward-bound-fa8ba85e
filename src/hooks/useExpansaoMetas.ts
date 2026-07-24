@@ -237,7 +237,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           // MQL: cards em fase "Lead" ou "MQL" com investimento qualificado (>= R$ 140k)
           if (movement.fase === 'Lead' || movement.fase === 'MQL') {
             const inv = cardInvestimento.get(movement.id) || null;
-            if (isFranquiaMqlQualified(inv)) {
+            if (isFranquiaMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
               uniqueCards.add(movement.id);
             }
           }
@@ -282,7 +282,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
         } else if (indicator === 'mql') {
           if (movement.fase === 'Lead' || movement.fase === 'MQL') {
             const inv = cardInvestimento.get(movement.id) || null;
-            if (isFranquiaMqlQualified(inv)) {
+            if (isFranquiaMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
               shouldCount = true;
             }
           }
@@ -374,7 +374,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
           } else if (indicator === 'mql') {
             if (movement.fase === 'Lead' || movement.fase === 'MQL') {
               const inv = cardInvestimento.get(movement.id) || null;
-              if (isFranquiaMqlQualified(inv)) {
+              if (isFranquiaMqlQualified(inv) && !excludedMqlCardIds.has(movement.id)) {
                 uniqueCards.add(movement.id);
               }
             }
@@ -456,7 +456,7 @@ export function useExpansaoMetas(startDate?: Date, endDate?: Date) {
       } else if (indicator === 'mql') {
         if (movement.fase === 'Lead' || movement.fase === 'MQL') {
           const inv = cardInvestimento.get(movement.id) || null;
-          matches = isFranquiaMqlQualified(inv);
+          matches = isFranquiaMqlQualified(inv) && !excludedMqlCardIds.has(movement.id);
         }
       } else {
         matches = movementIndicator === indicator;
