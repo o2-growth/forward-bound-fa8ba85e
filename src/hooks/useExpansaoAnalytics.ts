@@ -464,21 +464,17 @@ export function useExpansaoAnalytics(startDate: Date, endDate: Date, produto: 'F
     return map;
   }, [allMovementsUnfiltered]);
 
-  // Cards com motivo de perda "Duplicado" — excluídos de MQL (Expansão).
-  // O motivo pode estar em qualquer linha do card (cards, fullHistory ou
-  // allMovementsUnfiltered), pois o parser filtra a fase 'Perdido'.
-  const duplicadoCardIds = useMemo(() => {
-    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
-    const ids = new Set<string>();
-    const scan = (arr: ExpansaoCard[]) => {
-      for (const c of arr) {
-        if (c.motivoPerda && norm(c.motivoPerda) === 'duplicado') ids.add(c.id);
-      }
-    };
-    scan(cards);
-    scan(fullHistory);
-    scan(allMovementsUnfiltered);
-    return ids;
+  // Cards excluídos da contagem de MQL (Expansão) — usa a MESMA lista de
+  // motivos do Modelo Atual: Duplicado, Pessoa física, Não é demanda real,
+  // Buscando parceria, Quer soluções para cliente, Não é MQL mas entrou como
+  // MQL, Email/Telefone Inválido. Considera o motivo mais recente do card.
+  const excludedMqlCardIds = useMemo(() => {
+    const all: ExpansaoCard[] = [
+      ...allMovementsUnfiltered,
+      ...fullHistory,
+      ...cards,
+    ];
+    return buildExcludedMqlCardIds(all);
   }, [cards, fullHistory, allMovementsUnfiltered]);
 
   // ============================================================
