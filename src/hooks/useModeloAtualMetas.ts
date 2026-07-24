@@ -125,10 +125,11 @@ export function isTestByTitle(...candidates: (string | undefined | null)[]): boo
 // Helper combinado: aceita card com id + candidatos de título/empresa/nome.
 // Substitui `isTestCard(id)` nos hooks — captura junk cards por qualquer via.
 export function isJunkCard(
-  card: { id?: string; titulo?: string; empresa?: string; nome?: string; contato?: string } | undefined | null
+  card: { id?: string; titulo?: string; empresa?: string; nome?: string; contato?: string; email?: string } | undefined | null
 ): boolean {
   if (!card) return false;
   if (isTestCard(card.id)) return true;
+  if (isTestEmail(card.email)) return true;
   return isTestByTitle(card.titulo, card.empresa, card.nome, card.contato);
 }
 
