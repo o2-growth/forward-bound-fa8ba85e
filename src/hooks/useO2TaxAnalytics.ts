@@ -31,6 +31,7 @@ export interface O2TaxCard {
   origemLead?: string;
   fonte?: string;
   campanha?: string;
+  email?: string;
 }
 
 // O2 TAX MQL qualifying tiers (>= R$ 500k)
@@ -155,6 +156,7 @@ function parseRawCard(row: any): O2TaxCard {
     origemLead: row['Origem do lead'] || undefined,
     fonte: row['Fonte'] || undefined,
     campanha: row['Campanha'] || undefined,
+    email: row['E-mail'] || row['Email'] || undefined,
   };
 }
 

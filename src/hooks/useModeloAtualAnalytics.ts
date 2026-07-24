@@ -44,6 +44,7 @@ export interface ModeloAtualCard {
   gclid?: string;
   motivoPerda?: string;
   faseAtual?: string;
+  email?: string;
   produto?: string; // Sub-produto vendido (campo "Produtos" do Pipefy)
   valoresExtras?: ProductValueFields; // Campos Valor_* brutos para inferência de produto
   temperatura?: 'Quente' | 'Morno' | 'Frio'; // Tag de prioridade do lead (Labels / Prioridade Lead)
@@ -266,6 +267,7 @@ function parseCardRow(row: Record<string, any>, skipPhaseFilter = false): Modelo
     gclid: row['gclid'] || undefined,
     motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || undefined,
     faseAtual: row['Fase Atual'] || row['fase_atual'] || undefined,
+    email: row['E-mail'] || row['Email'] || row['email'] || undefined,
     produto: (row['Produtos'] ? String(row['Produtos']).trim() : '') || undefined,
     valoresExtras: {
       valorMRR,
