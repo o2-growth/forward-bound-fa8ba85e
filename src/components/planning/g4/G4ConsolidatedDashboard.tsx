@@ -1076,8 +1076,8 @@ export function G4ConsolidatedDashboard() {
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users}
-              hint={excludedByOrigin > 0 ? `${excludedByOrigin} excluídos por origem não-G4` : undefined}
               onClick={() => openDrill("Leads G4 · Consolidado", "all", groups)} />
+
             <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary"
               onClick={() => openDrill("MQLs · Faturamento ≥ R$ 200k/mês", "mql", groups)} />
             <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle}
