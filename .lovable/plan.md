@@ -1,28 +1,11 @@
-## Mudança na tabela "Consolidado por categoria" (dentro do expandível)
+## Problema
 
-Hoje a tabela expandida "Consolidado por categoria" mostra 12 colunas numéricas: Leads, MQLs, Em contato, Quentes, Fechados, Conv%, Perdidos, MRR, Setup, Pontual, TCV, Ticket médio.
+Na tabela "Consolidado por categoria" a linha **Total** ainda mostra colunas extras fora do cabeçalho (Conv%, Perdidos, MRR, Setup, Pontual, TCV extra, Ticket médio) — visíveis no print como `0.5% · 85 · R$ 42.8k · R$ 147.9k · R$ 32.0k · R$ 693.3k · R$ 24.7k`.
 
-Vamos deixar visível somente **6 colunas**, todas clicáveis, mantendo os drill-downs já existentes:
+Essas métricas deveriam aparecer apenas dentro do drill-down (sheet expandível ao clicar), não na tabela principal.
 
-| Coluna | Drill-down |
-|---|---|
-| Leads | abre lista completa (tab "Todos") |
-| MQLs | abre tab "MQLs" |
-| Em contato | abre tab "Em contato" |
-| Quentes | abre tab "Quentes" |
-| Vendas | abre tab "Vendas" (fechados) |
-| TCV | abre tab "Vendas" (fechados) |
+## Alteração
 
-Colunas removidas da tabela: Fechados (duplicava Vendas), Conv%, Perdidos, MRR, Setup, Pontual, Ticket médio. Esses números continuam disponíveis dentro do drill-down expandido de cada live/categoria (`ExpandedRow`), então nenhuma informação é perdida — só sai da visão consolidada.
+Em `src/components/planning/g4/G4ConsolidatedDashboard.tsx`, linha ~1180-1195, ajustar a linha **Total** para conter apenas as 6 colunas visíveis no cabeçalho (Leads, MQLs, Em contato, Quentes, Vendas, TCV), removendo os `<td>` extras de Conv%, Perdidos, MRR, Setup, Pontual e Ticket médio.
 
-Aplica-se aos 3 níveis da árvore: Categoria (Live/Palestras/Eventos), Subcategoria (Talks) e Item (live/evento individual).
-
-## Detalhes técnicos
-
-Arquivo único: `src/components/planning/g4/G4ConsolidatedDashboard.tsx`.
-
-1. `rowMetricCells` (linha ~981): reduzir para 6 `<ClickCell>` — Leads, MQLs, Em contato, Quentes, Vendas (`m.fechados` → drill "ganho"), TCV (`m.tcv` → drill "ganho"). Remover as demais células.
-2. `<thead>` da tabela (linhas ~1121-1137): reduzir para os 6 headers correspondentes + as 2 colunas fixas (chevron + "Categoria / Live / Evento").
-3. `colSpan={14}` da linha do `ExpandedRow` (linha ~1034 e outras ocorrências): ajustar para `colSpan={8}` (2 fixas + 6 métricas).
-
-Sem mudanças em `buildTree`, `Agg`, KPIs do topo, drill-downs ou dedupe — só a projeção visual da tabela.
+Nada muda no drill-down — as métricas monetárias detalhadas continuam disponíveis lá dentro (via `DetailSheet`).

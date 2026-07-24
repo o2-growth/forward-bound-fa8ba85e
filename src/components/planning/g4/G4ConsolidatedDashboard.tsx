@@ -1185,14 +1185,9 @@ export function G4ConsolidatedDashboard() {
                       <td className="px-2 py-2 text-right tabular-nums">{fmtInt(totals.emContato)}</td>
                       <td className="px-2 py-2 text-right tabular-nums">{fmtInt(totals.quentes)}</td>
                       <td className="px-2 py-2 text-right tabular-nums">{fmtInt(totals.fechados)}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{closeRate}%</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{fmtInt(totals.perdidos)}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{fmt(totals.mrr)}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{fmt(totals.setup)}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{fmt(totals.pontual)}</td>
                       <td className="px-2 py-2 text-right tabular-nums">{fmt(totals.tcv)}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{fmt(ticketMedioGeral)}</td>
                     </tr>
+
                   </tbody>
                 </table>
               </div>
