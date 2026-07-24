@@ -7,7 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useG4RealMetrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
 import { fmt, fmtInt } from "@/components/planning/ceo/ceoShared";
 import { DetailSheet, columnFormatters, type DetailItem } from "@/components/planning/indicators/DetailSheet";
+import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
 import { cn } from "@/lib/utils";
+
 
 // ─────────── helpers ───────────
 import { canonLive, parseEventDate as parseEventDateShared, classifyG4Event, type G4Categoria } from "./canonLive";
