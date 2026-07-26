@@ -23,6 +23,7 @@ interface RevenuePaceChartProps {
   tierBreakdown?: TierBreakdownItem[];
   totalContratos?: number;
   totalContratosValor?: number;
+  onTierClick?: (tier: string) => void;
 }
 
 const formatCompactCurrency = (value: number): string => {
@@ -31,7 +32,7 @@ const formatCompactCurrency = (value: number): string => {
   return `R$ ${Math.round(value)}`;
 };
 
-export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData, tierBreakdown, totalContratos, totalContratosValor }: RevenuePaceChartProps) {
+export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData, tierBreakdown, totalContratos, totalContratosValor, onTierClick }: RevenuePaceChartProps) {
   const [isOpen, setIsOpen] = useState(true);
 
   const totalRealized = mrrBase + realized;
@@ -125,8 +126,15 @@ export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {tierBreakdown.map(t => {
                     const pct = (totalContratos && totalContratos > 0) ? Math.round((t.count / totalContratos) * 100) : 0;
+                    const clickable = !!onTierClick;
                     return (
-                      <div key={t.tier} className="border border-border rounded-lg p-3 space-y-2 bg-muted/30">
+                      <button
+                        key={t.tier}
+                        type="button"
+                        disabled={!clickable}
+                        onClick={(e) => { e.stopPropagation(); onTierClick?.(t.tier); }}
+                        className={`text-left border border-border rounded-lg p-3 space-y-2 bg-muted/30 transition-all ${clickable ? 'cursor-pointer hover:bg-muted/60 hover:border-primary/40 hover:shadow-sm' : ''}`}
+                      >
                         <div className="flex items-center gap-2">
                           <div className={`w-2.5 h-2.5 rounded-full ${t.colorClass}`} />
                           <span className="text-xs font-medium text-muted-foreground truncate">{t.tier}</span>
@@ -142,7 +150,7 @@ export function RevenuePaceChart({ realized, meta, mrrBase, isLoading, chartData
                         <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                           <div className={`h-full rounded-full ${t.colorClass}`} style={{ width: `${pct}%` }} />
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
