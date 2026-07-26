@@ -4108,6 +4108,86 @@ export function IndicatorsTab() {
         const totalContratos = vendaItems.length;
         const totalContratosValor = vendaItems.reduce((s, i) => s + (i.value || 0), 0);
 
+        const openTierDrilldown = (tier: string) => {
+          const matches = vendaItems.filter(item => {
+            const raw = item.revenueRange || 'Não informado';
+            const norm = TIER_NORM[raw] || raw;
+            return norm === tier;
+          });
+          const enriched = matches.map(item => {
+            const cicloVenda = (() => {
+              if (!item.dataAssinatura || !item.dataCriacao) return 0;
+              const ms = new Date(item.dataAssinatura).getTime() - new Date(item.dataCriacao).getTime();
+              return ms > 0 ? Math.floor(ms / 86_400_000) : 0;
+            })();
+            const itemTCV = ((item.mrr || 0) * 12) + (item.setup || 0) + (item.pontual || 0);
+            const itemFat = (item.mrr || 0) + (item.setup || 0) + (item.pontual || 0);
+            return {
+              ...item,
+              cicloVenda,
+              faturamento: itemFat,
+              value: itemTCV,
+              canal: LEAD_SOURCE_LABELS[classifyLeadSource({
+                id: (item as any).id ?? (item as any).cardId,
+                tipoOrigem: (item as any).tipoOrigem,
+                origemLead: (item as any).origemLead,
+                fonte: (item as any).fonte,
+                campanha: (item as any).campanha,
+                posicionamento: (item as any).posicionamento ?? (item as any).placement,
+                conjunto: (item as any).conjunto ?? (item as any).conjuntoGrupo ?? (item as any).adset,
+                sdr: (item as any).sdr,
+                produto: (item as any).produto ?? (item as any).product,
+                titulo: (item as any).titulo ?? (item as any).title ?? (item as any).name,
+                empresa: (item as any).empresa ?? (item as any).company,
+                bu: (item as any).bu,
+                tipoMovimentacao: (item as any).tipoMovimentacao || (item as any).tipo_de_movimenta_o || (item as any).tipo,
+              })],
+            };
+          });
+          const totMrr = enriched.reduce((s, i) => s + (i.mrr || 0), 0);
+          const totSetup = enriched.reduce((s, i) => s + (i.setup || 0), 0);
+          const totPontual = enriched.reduce((s, i) => s + (i.pontual || 0), 0);
+          const totTCV = enriched.reduce((s, i) => s + (i.value || 0), 0);
+          setDetailSheetExtraContent(null);
+          setDetailSheetTitle(`Contratos — Faixa: ${tier}`);
+          setDetailSheetDescription(
+            `${enriched.length} contratos | MRR: ${formatCompactCurrency(totMrr)} | Setup: ${formatCompactCurrency(totSetup)} | Pontual: ${formatCompactCurrency(totPontual)} | TCV: ${formatCompactCurrency(totTCV)}`
+          );
+          setDetailSheetKpis([
+            { icon: '📝', value: enriched.length, label: 'Contratos', highlight: 'neutral' },
+            { icon: '🔁', value: formatCompactCurrency(totMrr), label: 'MRR', highlight: 'neutral' },
+            { icon: '💵', value: formatCompactCurrency(totSetup), label: 'Setup', highlight: 'neutral' },
+            { icon: '⚡', value: formatCompactCurrency(totPontual), label: 'Pontual', highlight: 'neutral' },
+            { icon: '📊', value: formatCompactCurrency(totTCV), label: 'TCV', highlight: 'success' },
+          ]);
+          setDetailSheetCharts([]);
+          setDetailSheetColumns([
+            { key: 'product', label: 'Produto', format: columnFormatters.product },
+            { key: 'company', label: 'Empresa' },
+            { key: 'bu', label: 'BU' },
+            { key: 'canal', label: 'Canal' },
+            { key: 'dataAssinatura', label: 'Data Assinatura', format: columnFormatters.date },
+            { key: 'phase', label: 'Fase Atual', format: columnFormatters.phase },
+            { key: 'mrr', label: 'MRR', format: columnFormatters.currency },
+            { key: 'setup', label: 'Setup', format: columnFormatters.currency },
+            { key: 'pontual', label: 'Pontual', format: columnFormatters.currency },
+            { key: 'faturamento', label: 'Faturamento', format: columnFormatters.currency },
+            { key: 'value', label: 'TCV', format: columnFormatters.currency },
+            { key: 'sdr', label: 'SDR' },
+            { key: 'responsible', label: 'Closer' },
+          ]);
+          setDetailSheetItems(enriched.sort((a, b) => (b.value || 0) - (a.value || 0)));
+          setDetailSheetFilterCriteria([
+            { title: '▸ Faixa de Faturamento', items: [
+              `Faixa selecionada: ${tier}`,
+              'Origem: cards de venda (Ganho / Contrato assinado) no período',
+              'Faixa vem do campo "Faturamento" preenchido no card do Pipefy',
+            ]},
+            { title: '▸ Filtros ativos', items: buildActiveFilters() },
+          ]);
+          setDetailSheetOpen(true);
+        };
+
         return (
           <Suspense fallback={<Card className="bg-card border-border"><CardContent className="h-96 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></CardContent></Card>}>
           <RevenuePaceChart
@@ -4120,6 +4200,7 @@ export function IndicatorsTab() {
             tierBreakdown={tierBreakdown}
             totalContratos={totalContratos}
             totalContratosValor={totalContratosValor}
+            onTierClick={openTierDrilldown}
           />
           </Suspense>
         );
