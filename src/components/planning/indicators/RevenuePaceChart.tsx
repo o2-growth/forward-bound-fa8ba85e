@@ -23,6 +23,7 @@ interface RevenuePaceChartProps {
   tierBreakdown?: TierBreakdownItem[];
   totalContratos?: number;
   totalContratosValor?: number;
+  onTierClick?: (tier: string) => void;
 }
 
 const formatCompactCurrency = (value: number): string => {
