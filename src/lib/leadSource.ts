@@ -189,17 +189,28 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   }
 
   // 0.1) FRANQUIA + OXY HACKER — regra de negócio: todo card desses produtos
-  // é Inbound, independente de os campos de origem estarem preenchidos no Pipefy.
+  // é Inbound POR DEFAULT, a menos que haja sinal explícito de Evento/G4 nos
+  // campos de origem (aí Evento tem precedência — ver bloco 1 abaixo).
   // Checa `produto` E `bu` (DetailItem expõe só `bu`, não `produto`).
   const produto = norm(c.produto);
   const buNorm = norm(c.bu);
-  // Nota: `produto` aqui pode vir da categoria classificada (classifyProduto),
-  // que devolve 'OXY' para vendas Oxy Hacker feitas via pipe Modelo Atual.
-  // Tratamos 'oxy' como equivalente a Oxy Hacker para efeitos de origem.
-  if (
+  const isFranquiaOuOxy = (
     produto.includes('franquia') || produto.includes('oxy hacker') || produto === 'oxy' ||
     buNorm === 'franquia' || buNorm === 'oxy hacker'
-  ) return 'inbound';
+  );
+  if (isFranquiaOuOxy) {
+    const eventHay = [norm(c.tipoOrigem), norm(c.origemLead), norm(c.fonte), norm(c.campanha)]
+      .filter(Boolean).join(' | ');
+    const EVENT_TOKENS_EARLY = [
+      'g4', 'summit', 'talkshow', 'talk show', '4am', 'evento',
+      'imersao', 'presencial', 'webinar', 'palestra', 'workshop', 'speaker',
+      'live g4', 'traction', 'connect',
+    ];
+    if (containsAny(eventHay, EVENT_TOKENS_EARLY)) {
+      return 'evento';
+    }
+    return 'inbound';
+  }
 
   // 0.15) META ADS placeholders não resolvidos ({{site_source_name}}, {{campaign.name}},
   // {{ad.name}}, {{adset.name}}, etc.) OU posicionamento típico de mídia paga
