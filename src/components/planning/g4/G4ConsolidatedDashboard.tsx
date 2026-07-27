@@ -1320,7 +1320,62 @@ export function G4ConsolidatedDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Seção à parte: vendas de Finders Fee (fora de lives/eventos) */}
+          {findersGroup && (
+            <Card>
+              <CardContent className="p-0">
+                <div className="p-3 border-b">
+                  <SectionTitle
+                    title="Finders Fee"
+                    subtitle="Vendas indicadas pelo G4 fora de lives/palestras/eventos — clique nos números para ver os registros"
+                  />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/40 text-muted-foreground">
+                      <tr>
+                        <th className="px-2 py-2 text-left w-6" />
+                        <th className="px-2 py-2 text-left">Origem</th>
+                        <th className="px-2 py-2 text-right">Leads</th>
+                        <th className="px-2 py-2 text-right">MQLs</th>
+                        <th className="px-2 py-2 text-right">Em contato</th>
+                        <th className="px-2 py-2 text-right">Quentes</th>
+                        <th className="px-2 py-2 text-right">Fechados</th>
+                        <th className="px-2 py-2 text-right">Conv%</th>
+                        <th className="px-2 py-2 text-right">Perdidos</th>
+                        <th className="px-2 py-2 text-right">MRR</th>
+                        <th className="px-2 py-2 text-right">Setup</th>
+                        <th className="px-2 py-2 text-right">Pontual</th>
+                        <th className="px-2 py-2 text-right">TCV</th>
+                        <th className="px-2 py-2 text-right">Ticket médio</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t">
+                        <td className="px-2 py-2" />
+                        <td className="px-2 py-2 text-foreground">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                              FINDERS FEE
+                            </Badge>
+                            Indicações G4
+                          </div>
+                        </td>
+                        {rowMetricCells(
+                          aggMetrics(aggFromGroups([findersGroup])),
+                          [findersGroup],
+                          "Finders Fee",
+                        )}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
+
       )}
 
       <DetailSheet
