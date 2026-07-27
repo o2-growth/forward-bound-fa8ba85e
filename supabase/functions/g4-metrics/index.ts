@@ -453,6 +453,10 @@ Deno.serve(async (req) => {
         lead.valorPontual = v.pontual;
         lead.tcv = v.mrr * 12 + v.setup + v.pontual;
         (lead as Record<string, unknown>).valoresFonte = "pipefy";
+        (lead as Record<string, unknown>).camposUsados = v.campos;
+        (lead as Record<string, unknown>).camposDescartados = v.camposDescartados;
+        (lead as Record<string, unknown>).camposNaoClassificados = v.camposNaoClassificados;
+
         faturamentoDelta += v.mrr + v.setup + v.pontual - antes;
       }
     }
