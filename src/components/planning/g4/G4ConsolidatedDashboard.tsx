@@ -858,7 +858,21 @@ type KindFilter = "todos" | "live" | "evento";
 
 export function G4ConsolidatedDashboard() {
   const { data, isLoading } = useG4RealMetrics();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const fresh = await refreshG4Metrics();
+      queryClient.setQueryData(["g4-real-metrics"], fresh);
+    } catch (e) {
+      console.error("Falha ao atualizar dados do G4", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
   const [kind, setKind] = useState<KindFilter>("todos");
   // Filtro de data: null = "Tudo" (default). Quando setado, filtra por g.date.
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
