@@ -581,16 +581,26 @@ async function fetchPipefyCardValues(
           const card = data[key];
           if (!card?.id) continue;
           const vals: CardValues = { mrr: 0, setup: 0, pontual: 0 };
+          // Deduplica por rótulo canônico: campos espelhados ("Valor Setup" vs
+          // "Valor - Setup *") contam uma única vez (mantém o maior valor).
+          const seen = new Map<string, { cat: keyof CardValues; amount: number }>();
           for (const f of card.fields ?? []) {
             const label = normalize(f.field?.label ?? f.name);
             if (!label || IGNORE_LABEL_RE.test(label)) continue;
             const amount = parseMoney(f.value);
             if (!amount) continue;
-            if (PONTUAL_LABEL_RE.test(label)) vals.pontual += amount;
-            else if (SETUP_LABEL_RE.test(label)) vals.setup += amount;
-            else if (MRR_LABEL_RE.test(label)) vals.mrr += amount;
+            let cat: keyof CardValues | null = null;
+            if (PONTUAL_LABEL_RE.test(label)) cat = "pontual";
+            else if (SETUP_LABEL_RE.test(label)) cat = "setup";
+            else if (MRR_LABEL_RE.test(label)) cat = "mrr";
+            if (!cat) continue;
+            const key = `${cat}:${canonicalLabelKey(label)}`;
+            const prev = seen.get(key);
+            if (!prev || amount > prev.amount) seen.set(key, { cat, amount });
           }
+          for (const { cat, amount } of seen.values()) vals[cat] += amount;
           out.set(String(card.id), vals);
+
         }
       } catch (err) {
         console.error("g4-metrics pipefy fetch falhou", err);
