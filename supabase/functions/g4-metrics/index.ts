@@ -584,23 +584,20 @@ async function computeMetrics(): Promise<Record<string, unknown>> {
     }
     kpis.faturamento = Math.max(0, kpis.faturamento + faturamentoDelta);
 
-    return json({
+    return {
       kpis,
       funil,
       diagnosticoPorLive,
       leads,
       generatedAt: new Date().toISOString(),
-    });
-
-  } catch (err) {
-    console.error("g4-metrics error", err);
-    return json({ error: (err as Error).message ?? "unknown error" }, 500);
+    };
   } finally {
     try {
       await sql.end({ timeout: 5 });
     } catch (_) { /* ignore */ }
   }
-});
+}
+
 
 function normalize(v: unknown): string {
   return String(v ?? "")
