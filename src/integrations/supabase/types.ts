@@ -1129,6 +1129,27 @@ export type Database = {
         }
         Relationships: []
       }
+      g4_metrics_cache: {
+        Row: {
+          generated_at: string
+          id: string
+          payload: Json
+          updated_at: string
+        }
+        Insert: {
+          generated_at?: string
+          id: string
+          payload: Json
+          updated_at?: string
+        }
+        Update: {
+          generated_at?: string
+          id?: string
+          payload?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       meta_ads_cache: {
         Row: {
           cache_key: string

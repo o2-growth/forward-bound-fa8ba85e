@@ -64,7 +64,10 @@ export type G4RealMetrics = {
 export function useG4RealMetrics() {
   return useQuery<G4RealMetrics>({
     queryKey: ["g4-real-metrics"],
-    staleTime: 60_000,
+    staleTime: 10 * 60_000,
+    gcTime: 60 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke<G4RealMetrics>(
         "g4-metrics",
@@ -79,3 +82,15 @@ export function useG4RealMetrics() {
     },
   });
 }
+
+/** Força o recálculo no servidor (ignora o cache) e devolve o payload novo. */
+export async function refreshG4Metrics(): Promise<G4RealMetrics> {
+  const { data, error } = await supabase.functions.invoke<G4RealMetrics>(
+    "g4-metrics?refresh=1",
+    { method: "GET" },
+  );
+  if (error) throw error;
+  if (!data) throw new Error("Sem dados da função g4-metrics");
+  return data;
+}
+

@@ -4,7 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useG4RealMetrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
+import { useQueryClient } from "@tanstack/react-query";
+import { useG4RealMetrics, refreshG4Metrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
+
 import { fmt, fmtInt } from "@/components/planning/ceo/ceoShared";
 import { DetailSheet, columnFormatters, type DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
@@ -858,7 +860,21 @@ type KindFilter = "todos" | "live" | "evento";
 
 export function G4ConsolidatedDashboard() {
   const { data, isLoading } = useG4RealMetrics();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const fresh = await refreshG4Metrics();
+      queryClient.setQueryData(["g4-real-metrics"], fresh);
+    } catch (e) {
+      console.error("Falha ao atualizar dados do G4", e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
   const [kind, setKind] = useState<KindFilter>("todos");
   // Filtro de data: null = "Tudo" (default). Quando setado, filtra por g.date.
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | null>(null);
@@ -1169,8 +1185,23 @@ export function G4ConsolidatedDashboard() {
                 Incluir sem data
               </label>
             )}
-
+            <div className="w-px h-5 bg-border" />
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-muted disabled:opacity-60"
+              title="Recalcula os dados direto do banco G4 e do Pipefy"
+            >
+              {refreshing ? "Atualizando…" : "Atualizar"}
+            </button>
+            {data?.generatedAt && (
+              <span className="text-[11px] text-muted-foreground">
+                dados de {new Date(data.generatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
           </div>
+
 
         </CardContent>
       </Card>
