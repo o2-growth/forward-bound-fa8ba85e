@@ -97,7 +97,7 @@ const parseEventDate = parseEventDateShared;
 interface LiveGroup {
   live: string;
   date: Date | null;
-  kind: "live" | "evento";
+  kind: "live" | "evento" | "finders";
   categoria: G4Categoria;
   subcategoria: string | null;
   leads: G4RealLead[];
@@ -300,11 +300,13 @@ function computeGroup(live: string, list: G4RealLead[]): LiveGroup {
     (a, w) => a + (w.valorSetup ?? 0) + (w.valorMRR ?? 0) + (w.valorPontual ?? 0),
     0,
   );
+  const isFinders = live === FINDERS_FEE_LABEL;
   const cls = classifyG4Event(live);
   return {
     live,
-    date: parseEventDate(live),
-    kind: cls.categoria === "Live" ? "live" : "evento",
+    date: isFinders ? null : parseEventDate(live),
+    // Finders Fee não é live nem evento: bucket próprio, fora dos filtros Live/Evento.
+    kind: isFinders ? "finders" : cls.categoria === "Live" ? "live" : "evento",
     categoria: cls.categoria,
     subcategoria: cls.subcategoria,
     leads: uniq,
