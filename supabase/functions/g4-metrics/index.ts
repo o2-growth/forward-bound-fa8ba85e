@@ -584,26 +584,57 @@ async function fetchPipefyCardValues(
         for (const key of Object.keys(data)) {
           const card = data[key];
           if (!card?.id) continue;
-          const vals: CardValues = { mrr: 0, setup: 0, pontual: 0 };
+          const vals: CardValues = {
+            mrr: 0,
+            setup: 0,
+            pontual: 0,
+            campos: [],
+            camposDescartados: [],
+            camposNaoClassificados: [],
+          };
           // Deduplica por rótulo canônico: campos espelhados ("Valor Setup" vs
           // "Valor - Setup *") contam uma única vez (mantém o maior valor).
-          const seen = new Map<string, { cat: keyof CardValues; amount: number }>();
+          const seen = new Map<string, CampoUsado>();
           for (const f of card.fields ?? []) {
             const label = normalize(f.field?.label ?? f.name);
             if (!label || IGNORE_LABEL_RE.test(label)) continue;
             const amount = parseMoney(f.value);
             if (!amount) continue;
-            let cat: keyof CardValues | null = null;
+            let cat: CampoUsado["cat"] | null = null;
             if (PONTUAL_LABEL_RE.test(label)) cat = "pontual";
             else if (SETUP_LABEL_RE.test(label)) cat = "setup";
             else if (MRR_LABEL_RE.test(label)) cat = "mrr";
-            if (!cat) continue;
+            if (!cat) {
+              if (MONEY_HINT_RE.test(label)) {
+                vals.camposNaoClassificados.push({ label, valor: amount });
+              }
+              continue;
+            }
             const key = `${cat}:${canonicalLabelKey(label)}`;
             const prev = seen.get(key);
-            if (!prev || amount > prev.amount) seen.set(key, { cat, amount });
+            if (!prev) {
+              seen.set(key, { label, cat, valor: amount });
+            } else if (amount > prev.valor) {
+              vals.camposDescartados.push(prev);
+              seen.set(key, { label, cat, valor: amount });
+            } else {
+              vals.camposDescartados.push({ label, cat, valor: amount });
+            }
           }
-          for (const { cat, amount } of seen.values()) vals[cat] += amount;
+          for (const campo of seen.values()) {
+            vals[campo.cat] += campo.valor;
+            vals.campos.push(campo);
+          }
+          if (vals.camposNaoClassificados.length > 0) {
+            console.warn(
+              "g4-metrics: campos monetários não classificados",
+              card.id,
+              JSON.stringify(vals.camposNaoClassificados),
+            );
+          }
           out.set(String(card.id), vals);
+
+
 
         }
       } catch (err) {
