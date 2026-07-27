@@ -936,14 +936,23 @@ export function G4ConsolidatedDashboard() {
     [allGroups, kind, applyDateFilter],
   );
 
-
+  // KPIs do topo: em "Todos" somam também o bucket Finders Fee.
+  const kpiGroups = useMemo(
+    () =>
+      applyDateFilter(
+        allGroups.filter((g) =>
+          kind === "todos" ? true : g.kind === kind,
+        ),
+      ),
+    [allGroups, kind, applyDateFilter],
+  );
 
   const totals = useMemo(() => {
     // Deduplica leads por email/nome ao longo de todos os groups visíveis
     // para que os KPIs batam com os drill-downs (que também deduplicam).
     const seen = new Set<string>();
     const uniq: G4RealLead[] = [];
-    for (const g of groups) {
+    for (const g of kpiGroups) {
       for (const l of g.leads) {
         const k = (l.email ?? l.nome ?? "").toLowerCase();
         if (!k || seen.has(k)) continue;
@@ -965,7 +974,7 @@ export function G4ConsolidatedDashboard() {
       tcv: won.reduce((a, w) => a + (w.tcv ?? 0), 0),
     };
     return acc;
-  }, [groups]);
+  }, [kpiGroups]);
 
 
   // Finders Fee é uma seção à parte: não entra na árvore nem nos KPIs de
@@ -1221,29 +1230,29 @@ export function G4ConsolidatedDashboard() {
 
       {isLoading ? (
         <div className="h-64 rounded-md border bg-muted/20 animate-pulse" />
-      ) : groups.length === 0 ? (
+      ) : kpiGroups.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Sem dados para os filtros selecionados.</CardContent></Card>
       ) : (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users}
-              onClick={() => openDrill("Leads G4 · Consolidado", "all", groups)} />
+              onClick={() => openDrill("Leads G4 · Consolidado", "all", kpiGroups)} />
 
             <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary"
-              onClick={() => openDrill("MQLs · Faturamento ≥ R$ 200k/mês", "mql", groups)} />
+              onClick={() => openDrill("MQLs · Faturamento ≥ R$ 200k/mês", "mql", kpiGroups)} />
             <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle}
-              onClick={() => openDrill("Leads em contato", "contato", groups)} />
+              onClick={() => openDrill("Leads em contato", "contato", kpiGroups)} />
             <Kpi label="Quentes" value={fmtInt(totals.quentes)} icon={Flame} tone="warning"
               hint={totals.quentes === 0 ? "Sem tag Quente ativa no Pipefy" : undefined}
-              onClick={() => openDrill("Leads Quentes", "quente", groups)} />
+              onClick={() => openDrill("Leads Quentes", "quente", kpiGroups)} />
 
             <Kpi label="Fechados" value={fmtInt(totals.fechados)} hint={`${closeRate}% close rate`} icon={Trophy} tone="success"
-              onClick={() => openDrill("Vendas fechadas · Consolidado", "ganho", groups)} />
+              onClick={() => openDrill("Vendas fechadas · Consolidado", "ganho", kpiGroups)} />
             <Kpi label="TCV" value={fmt(totals.tcv)} icon={DollarSign} tone="success"
-              onClick={() => openDrill("TCV · Vendas fechadas", "ganho", groups)} />
+              onClick={() => openDrill("TCV · Vendas fechadas", "ganho", kpiGroups)} />
             <Kpi label="Ticket médio" value={fmt(ticketMedioGeral)} icon={Ticket}
-              onClick={() => openDrill("Ticket médio · Vendas fechadas", "ganho", groups)} />
+              onClick={() => openDrill("Ticket médio · Vendas fechadas", "ganho", kpiGroups)} />
           </div>
 
           {/* Tabela consolidada estilo DRE: Categoria › Subcategoria › item */}
