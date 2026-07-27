@@ -519,6 +519,18 @@ const SETUP_LABEL_RE = /setup|implanta/;
 const PONTUAL_LABEL_RE = /pontual/;
 const IGNORE_LABEL_RE = /(educacao|parcela|quantidade|desconto|isentado|previsto|data|%)/;
 
+// Canonicaliza o rótulo para deduplicar campos espelhados no Pipefy
+// (ex.: "Valor - Setup *" e "Valor Setup" são o MESMO valor, não devem somar).
+function canonicalLabelKey(label: string): string {
+  return label
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t && !["valor", "valores", "de", "do", "da", "dos", "das", "total", "mensal", "r"].includes(t))
+    .sort()
+    .join("_");
+}
+
+
 // Busca os cards no Pipefy e soma todos os campos monetários por label.
 async function fetchPipefyCardValues(
   ids: string[],
