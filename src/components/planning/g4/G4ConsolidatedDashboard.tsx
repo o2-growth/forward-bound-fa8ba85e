@@ -571,7 +571,7 @@ function mergeGroups(list: LiveGroup[], label: string): LiveGroup {
   return {
     live: label,
     date: null,
-    kind: list[0]?.kind ?? "evento",
+    kind: list[0]?.kind ?? (list[0]?.categoria === "Live" ? "live" : list[0]?.categoria === "Palestras" ? "palestra" : "evento"),
     categoria: list[0]?.categoria ?? "Palestras",
     subcategoria: list[0]?.subcategoria ?? null,
     leads,
@@ -864,7 +864,7 @@ function LeadsTable({
 }
 
 // ─────────── Main ───────────
-type KindFilter = "todos" | "live" | "evento";
+type KindFilter = "todos" | "live" | "palestra" | "evento";
 
 export function G4ConsolidatedDashboard() {
   const { data, isLoading } = useG4RealMetrics();
@@ -1186,6 +1186,7 @@ export function G4ConsolidatedDashboard() {
             <div className="flex gap-1">
               <FilterPill label="Todos" active={kind === "todos"} onClick={() => setKind("todos")} />
               <FilterPill label="Lives" active={kind === "live"} onClick={() => setKind("live")} />
+              <FilterPill label="Palestras" active={kind === "palestra"} onClick={() => setKind("palestra")} />
               <FilterPill label="Eventos" active={kind === "evento"} onClick={() => setKind("evento")} />
             </div>
             <div className="w-px h-5 bg-border" />
