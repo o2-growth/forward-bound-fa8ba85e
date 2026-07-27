@@ -18,13 +18,6 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // Modo diagnóstico temporário: ?debugCard=123,456 devolve os campos brutos do Pipefy.
-  const reqUrl = new URL(req.url);
-  const debugCard = reqUrl.searchParams.get("debugCard");
-  if (debugCard) {
-    const ids = debugCard.split(",").map((s) => s.trim()).filter(Boolean);
-    return json({ debug: await fetchPipefyCardFieldsRaw(ids) });
-  }
 
 
 
