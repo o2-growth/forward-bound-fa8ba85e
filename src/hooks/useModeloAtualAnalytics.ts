@@ -307,10 +307,22 @@ function hydrateOpenCardsWithHistory(openCards: ModeloAtualCard[], historyCards:
 
   return openCards.map((card) => {
     const history = historyById.get(card.id) || [card];
-    const valorMRR = Math.max(card.valorMRR || 0, ...history.map((h) => h.valorMRR || 0));
-    const valorPontual = Math.max(card.valorPontual || 0, ...history.map((h) => h.valorPontual || 0));
-    const valorSetup = Math.max(card.valorSetup || 0, ...history.map((h) => h.valorSetup || 0));
-    const valorEducacao = Math.max(card.valorEducacao || 0, ...history.map((h) => h.valorEducacao || 0));
+    // Para cards já em "Contrato assinado", os valores do próprio card são a fonte
+    // de verdade (estrutura final da venda). NÃO hidratar via Math.max com movimentos
+    // antigos, senão valores de propostas anteriores (ex.: Diagnóstico R$ 14k) inflam
+    // o total mesmo quando a venda fechou com outra estrutura (MRR + Setup).
+    const faseAssinada = String(card.fase || '').toLowerCase().includes('contrato assinado')
+      || String(card.faseAtual || '').toLowerCase().includes('contrato assinado')
+      || String(card.faseAtual || '').toLowerCase() === 'ganho';
+    const pickBest = (current: number, key: 'valorMRR' | 'valorPontual' | 'valorSetup' | 'valorEducacao') => {
+      if (faseAssinada) return current || 0;
+      if ((current || 0) > 0) return current;
+      return Math.max(0, ...history.map((h) => (h[key] as number) || 0));
+    };
+    const valorMRR = pickBest(card.valorMRR || 0, 'valorMRR');
+    const valorPontual = pickBest(card.valorPontual || 0, 'valorPontual');
+    const valorSetup = pickBest(card.valorSetup || 0, 'valorSetup');
+    const valorEducacao = pickBest(card.valorEducacao || 0, 'valorEducacao');
     const valor = valorMRR + valorPontual + valorSetup;
 
     return {
