@@ -897,32 +897,44 @@ export function G4ConsolidatedDashboard() {
   const allGroups = useMemo(() => buildGroups(overriddenLeads), [overriddenLeads]);
 
 
-  const groups = useMemo(() => {
-    const fromT = dateRange ? dateRange.from.getTime() : null;
-    const toT = dateRange ? dateRange.to.getTime() : null;
-    const inRange = (ms: number) => (fromT === null || toT === null) || (ms >= fromT && ms <= toT);
-    const out: LiveGroup[] = [];
-    for (const g of allGroups) {
-      if (kind !== "todos" && g.kind !== kind) continue;
-      if (fromT === null) { out.push(g); continue; }
-      if (g.date) {
-        if (inRange(g.date.getTime())) out.push(g);
-        continue;
+  // Aplica só o filtro de data (grupos sem data usam dataEntradaPipe do lead).
+  const applyDateFilter = useCallback(
+    (list: LiveGroup[]) => {
+      const fromT = dateRange ? dateRange.from.getTime() : null;
+      const toT = dateRange ? dateRange.to.getTime() : null;
+      const inRange = (ms: number) => (fromT === null || toT === null) || (ms >= fromT && ms <= toT);
+      const out: LiveGroup[] = [];
+      for (const g of list) {
+        if (fromT === null) { out.push(g); continue; }
+        if (g.date) {
+          if (inRange(g.date.getTime())) out.push(g);
+          continue;
+        }
+        // Grupo sem data de live/evento (ex.: Finders Fee): filtra leads por
+        // data de criação do card no Pipefy (fallback).
+        const kept: G4RealLead[] = [];
+        let hadUndated = false;
+        for (const l of g.leads) {
+          const created = l.dataEntradaPipe ? new Date(l.dataEntradaPipe).getTime() : NaN;
+          if (!Number.isFinite(created)) { hadUndated = true; continue; }
+          if (inRange(created)) kept.push(l);
+        }
+        if (kept.length > 0) out.push(computeGroup(g.live, kept));
+        else if (includeUndated && hadUndated) out.push(g);
       }
-      // Grupo sem data de live/evento (ex.: Finders Fee): filtra leads por
-      // data de criação do card no Pipefy (fallback).
-      const kept: G4RealLead[] = [];
-      let hadUndated = false;
-      for (const l of g.leads) {
-        const created = l.dataEntradaPipe ? new Date(l.dataEntradaPipe).getTime() : NaN;
-        if (!Number.isFinite(created)) { hadUndated = true; continue; }
-        if (inRange(created)) kept.push(l);
-      }
-      if (kept.length > 0) out.push(computeGroup(g.live, kept));
-      else if (includeUndated && hadUndated) out.push(g);
-    }
-    return out;
-  }, [allGroups, kind, dateRange, includeUndated]);
+      return out;
+    },
+    [dateRange, includeUndated],
+  );
+
+  // Grupos de lives/eventos (Finders Fee é seção à parte e nunca entra aqui).
+  const groups = useMemo(
+    () =>
+      applyDateFilter(
+        allGroups.filter((g) => g.kind !== "finders" && (kind === "todos" || g.kind === kind)),
+      ),
+    [allGroups, kind, applyDateFilter],
+  );
 
 
 
