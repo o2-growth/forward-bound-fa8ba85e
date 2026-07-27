@@ -4,7 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useG4RealMetrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
+import { useQueryClient } from "@tanstack/react-query";
+import { useG4RealMetrics, refreshG4Metrics, type G4RealLead } from "@/hooks/useG4RealMetrics";
+
 import { fmt, fmtInt } from "@/components/planning/ceo/ceoShared";
 import { DetailSheet, columnFormatters, type DetailItem } from "@/components/planning/indicators/DetailSheet";
 import { DateRangePickerGA } from "@/components/planning/DateRangePickerGA";
