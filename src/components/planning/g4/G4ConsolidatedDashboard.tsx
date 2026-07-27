@@ -968,15 +968,14 @@ export function G4ConsolidatedDashboard() {
   }, [groups]);
 
 
-  // Finders Fee é uma seção à parte: sai da árvore Live/Palestras/Eventos.
+  // Finders Fee é uma seção à parte: não entra na árvore nem nos KPIs de
+  // Live/Evento. Respeita apenas o filtro de data.
   const findersGroup = useMemo(
-    () => groups.find((g) => g.live === FINDERS_FEE_LABEL) ?? null,
-    [groups],
+    () =>
+      applyDateFilter(allGroups.filter((g) => g.kind === "finders"))[0] ?? null,
+    [allGroups, applyDateFilter],
   );
-  const treeGroups = useMemo(
-    () => groups.filter((g) => g.live !== FINDERS_FEE_LABEL),
-    [groups],
-  );
+  const treeGroups = groups;
 
   const tree = useMemo(() => buildTree(treeGroups), [treeGroups]);
 
