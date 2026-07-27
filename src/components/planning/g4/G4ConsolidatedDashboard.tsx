@@ -1230,29 +1230,29 @@ export function G4ConsolidatedDashboard() {
 
       {isLoading ? (
         <div className="h-64 rounded-md border bg-muted/20 animate-pulse" />
-      ) : groups.length === 0 ? (
+      ) : kpiGroups.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Sem dados para os filtros selecionados.</CardContent></Card>
       ) : (
         <>
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
             <Kpi label="Leads" value={fmtInt(totals.inscritos)} icon={Users}
-              onClick={() => openDrill("Leads G4 · Consolidado", "all", groups)} />
+              onClick={() => openDrill("Leads G4 · Consolidado", "all", kpiGroups)} />
 
             <Kpi label="MQLs ≥ R$ 200k" value={fmtInt(totals.mqls)} hint={`${convMql}% dos leads`} icon={Target} tone="primary"
-              onClick={() => openDrill("MQLs · Faturamento ≥ R$ 200k/mês", "mql", groups)} />
+              onClick={() => openDrill("MQLs · Faturamento ≥ R$ 200k/mês", "mql", kpiGroups)} />
             <Kpi label="Em contato" value={fmtInt(totals.emContato)} icon={MessageCircle}
-              onClick={() => openDrill("Leads em contato", "contato", groups)} />
+              onClick={() => openDrill("Leads em contato", "contato", kpiGroups)} />
             <Kpi label="Quentes" value={fmtInt(totals.quentes)} icon={Flame} tone="warning"
               hint={totals.quentes === 0 ? "Sem tag Quente ativa no Pipefy" : undefined}
-              onClick={() => openDrill("Leads Quentes", "quente", groups)} />
+              onClick={() => openDrill("Leads Quentes", "quente", kpiGroups)} />
 
             <Kpi label="Fechados" value={fmtInt(totals.fechados)} hint={`${closeRate}% close rate`} icon={Trophy} tone="success"
-              onClick={() => openDrill("Vendas fechadas · Consolidado", "ganho", groups)} />
+              onClick={() => openDrill("Vendas fechadas · Consolidado", "ganho", kpiGroups)} />
             <Kpi label="TCV" value={fmt(totals.tcv)} icon={DollarSign} tone="success"
-              onClick={() => openDrill("TCV · Vendas fechadas", "ganho", groups)} />
+              onClick={() => openDrill("TCV · Vendas fechadas", "ganho", kpiGroups)} />
             <Kpi label="Ticket médio" value={fmt(ticketMedioGeral)} icon={Ticket}
-              onClick={() => openDrill("Ticket médio · Vendas fechadas", "ganho", groups)} />
+              onClick={() => openDrill("Ticket médio · Vendas fechadas", "ganho", kpiGroups)} />
           </div>
 
           {/* Tabela consolidada estilo DRE: Categoria › Subcategoria › item */}
