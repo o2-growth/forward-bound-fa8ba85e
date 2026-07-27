@@ -1169,8 +1169,23 @@ export function G4ConsolidatedDashboard() {
                 Incluir sem data
               </label>
             )}
-
+            <div className="w-px h-5 bg-border" />
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-[11px] px-2 py-1 rounded-md border border-border text-muted-foreground hover:bg-muted disabled:opacity-60"
+              title="Recalcula os dados direto do banco G4 e do Pipefy"
+            >
+              {refreshing ? "Atualizando…" : "Atualizar"}
+            </button>
+            {data?.generatedAt && (
+              <span className="text-[11px] text-muted-foreground">
+                dados de {new Date(data.generatedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
           </div>
+
 
         </CardContent>
       </Card>
