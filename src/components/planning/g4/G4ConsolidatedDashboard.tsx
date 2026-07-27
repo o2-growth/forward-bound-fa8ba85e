@@ -938,7 +938,18 @@ export function G4ConsolidatedDashboard() {
   }, [groups]);
 
 
-  const tree = useMemo(() => buildTree(groups), [groups]);
+  // Finders Fee é uma seção à parte: sai da árvore Live/Palestras/Eventos.
+  const findersGroup = useMemo(
+    () => groups.find((g) => g.live === FINDERS_FEE_LABEL) ?? null,
+    [groups],
+  );
+  const treeGroups = useMemo(
+    () => groups.filter((g) => g.live !== FINDERS_FEE_LABEL),
+    [groups],
+  );
+
+  const tree = useMemo(() => buildTree(treeGroups), [treeGroups]);
+
   // Chaves de categoria/subcategoria (não inclui itens folha, que abrem o drill).
   const expandableKeys = useMemo(() => {
     const keys: string[] = [];
