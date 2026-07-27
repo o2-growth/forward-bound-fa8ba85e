@@ -76,7 +76,7 @@ async function readCache(): Promise<
 async function writeCache(payload: Record<string, unknown>) {
   try {
     const { url, key } = supabaseAdmin();
-    await fetch(`${url}/rest/v1/g4_metrics_cache?on_conflict=id`, {
+    const res = await fetch(`${url}/rest/v1/g4_metrics_cache?on_conflict=id`, {
       method: "POST",
       headers: {
         apikey: key,
@@ -91,6 +91,12 @@ async function writeCache(payload: Record<string, unknown>) {
         updated_at: new Date().toISOString(),
       }),
     });
+    if (!res.ok) {
+      console.error("g4-metrics writeCache HTTP", res.status, await res.text());
+    } else {
+      console.log("g4-metrics cache gravado");
+    }
+
   } catch (e) {
     console.warn("g4-metrics writeCache falhou", e);
   }
