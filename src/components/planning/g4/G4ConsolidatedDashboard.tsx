@@ -214,6 +214,45 @@ export function isG4Attributed(l: G4RealLead): boolean {
   return true;
 }
 
+// Rótulos canônicos de buckets especiais.
+const FINDERS_FEE_LABEL = "G4 - Finders Fee (fora das lives)";
+const TALK_SE_LABEL = "Talk SE - 25/06/2026";
+
+// Atribuição manual de vendas a um evento específico (decisão comercial).
+// Sobrescreve TODAS as lives do lead — ele deixa de contar na live original.
+const G4_SALE_EVENT_OVERRIDE: { match: (l: G4RealLead) => boolean; group: string }[] = [
+  // Lotus, Stillus Home e Tchau Entrega vieram do Talk SE de 25/06.
+  {
+    group: TALK_SE_LABEL,
+    match: (l) => {
+      const email = (l.email ?? "").toLowerCase();
+      const who = normalize(`${l.empresa ?? ""} ${l.nome ?? ""}`);
+      return (
+        email.includes("lotuslogistica") ||
+        email === "tchauentrega@gmail.com" ||
+        who.includes("lotus logistica") ||
+        who.includes("stillus") ||
+        who.includes("tchau entrega")
+      );
+    },
+  },
+  // Petromar não veio de live: é Finders Fee.
+  {
+    group: FINDERS_FEE_LABEL,
+    match: (l) => {
+      const email = (l.email ?? "").toLowerCase();
+      const who = normalize(`${l.empresa ?? ""} ${l.nome ?? ""}`);
+      return email === "sidney@petromarcomercial.com.br" || who.includes("petromar");
+    },
+  },
+];
+
+function overrideSaleGroup(lead: G4RealLead): string | null {
+  if (!isG4Sale(lead)) return null;
+  for (const rule of G4_SALE_EVENT_OVERRIDE) if (rule.match(lead)) return rule.group;
+  return null;
+}
+
 // Para vendas com múltiplas lives assistidas, atribui apenas à live mais próxima
 // da data de ganho (evita contar a mesma venda em várias lives).
 function pickClosestLive(lives: string[], dataGanho?: string | null): string[] {
@@ -236,6 +275,7 @@ function pickClosestLive(lives: string[], dataGanho?: string | null): string[] {
   }
   return [best];
 }
+
 
 function computeGroup(live: string, list: G4RealLead[]): LiveGroup {
   const seen = new Set<string>();
@@ -283,20 +323,25 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
   const filtered = leads.filter(isG4Attributed);
   const byLive = new Map<string, G4RealLead[]>();
   for (const lead of filtered) {
+    // Atribuição manual (Talk SE / Finders Fee) vence qualquer live registrada.
+    const forced = overrideSaleGroup(lead);
     // Whitelist de vendas sem live associada cai no bucket "Finders Fee".
-    let lives = lead.lives.length > 0
-      ? lead.lives
-      : (isG4Sale(lead) ? ["G4 - Finders Fee (fora das lives)"] : []);
+    let lives = forced
+      ? [forced]
+      : lead.lives.length > 0
+        ? lead.lives
+        : (isG4Sale(lead) ? [FINDERS_FEE_LABEL] : []);
     // Vendas só contam em UMA live (a mais próxima da data de ganho).
-    if (isG4Sale(lead) && lives.length > 1) {
+    if (!forced && isG4Sale(lead) && lives.length > 1) {
       lives = pickClosestLive(lives, lead.dataGanho);
     }
     for (const rawLive of lives) {
-      const live = canonLive(rawLive);
+      const live = rawLive === FINDERS_FEE_LABEL ? rawLive : canonLive(rawLive);
       if (!byLive.has(live)) byLive.set(live, []);
       byLive.get(live)!.push(lead);
     }
   }
+
   const groups: LiveGroup[] = [];
   for (const [live, list] of byLive.entries()) {
     groups.push(computeGroup(live, list));
@@ -893,7 +938,18 @@ export function G4ConsolidatedDashboard() {
   }, [groups]);
 
 
-  const tree = useMemo(() => buildTree(groups), [groups]);
+  // Finders Fee é uma seção à parte: sai da árvore Live/Palestras/Eventos.
+  const findersGroup = useMemo(
+    () => groups.find((g) => g.live === FINDERS_FEE_LABEL) ?? null,
+    [groups],
+  );
+  const treeGroups = useMemo(
+    () => groups.filter((g) => g.live !== FINDERS_FEE_LABEL),
+    [groups],
+  );
+
+  const tree = useMemo(() => buildTree(treeGroups), [treeGroups]);
+
   // Chaves de categoria/subcategoria (não inclui itens folha, que abrem o drill).
   const expandableKeys = useMemo(() => {
     const keys: string[] = [];
@@ -1264,7 +1320,62 @@ export function G4ConsolidatedDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Seção à parte: vendas de Finders Fee (fora de lives/eventos) */}
+          {findersGroup && (
+            <Card>
+              <CardContent className="p-0">
+                <div className="p-3 border-b">
+                  <SectionTitle
+                    title="Finders Fee"
+                    subtitle="Vendas indicadas pelo G4 fora de lives/palestras/eventos — clique nos números para ver os registros"
+                  />
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/40 text-muted-foreground">
+                      <tr>
+                        <th className="px-2 py-2 text-left w-6" />
+                        <th className="px-2 py-2 text-left">Origem</th>
+                        <th className="px-2 py-2 text-right">Leads</th>
+                        <th className="px-2 py-2 text-right">MQLs</th>
+                        <th className="px-2 py-2 text-right">Em contato</th>
+                        <th className="px-2 py-2 text-right">Quentes</th>
+                        <th className="px-2 py-2 text-right">Fechados</th>
+                        <th className="px-2 py-2 text-right">Conv%</th>
+                        <th className="px-2 py-2 text-right">Perdidos</th>
+                        <th className="px-2 py-2 text-right">MRR</th>
+                        <th className="px-2 py-2 text-right">Setup</th>
+                        <th className="px-2 py-2 text-right">Pontual</th>
+                        <th className="px-2 py-2 text-right">TCV</th>
+                        <th className="px-2 py-2 text-right">Ticket médio</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="border-t">
+                        <td className="px-2 py-2" />
+                        <td className="px-2 py-2 text-foreground">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                              FINDERS FEE
+                            </Badge>
+                            Indicações G4
+                          </div>
+                        </td>
+                        {rowMetricCells(
+                          aggMetrics(aggFromGroups([findersGroup])),
+                          [findersGroup],
+                          "Finders Fee",
+                        )}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
+
       )}
 
       <DetailSheet
