@@ -97,7 +97,7 @@ const parseEventDate = parseEventDateShared;
 interface LiveGroup {
   live: string;
   date: Date | null;
-  kind: "live" | "evento" | "finders";
+  kind: "live" | "palestra" | "evento" | "finders";
   categoria: G4Categoria;
   subcategoria: string | null;
   leads: G4RealLead[];
@@ -306,7 +306,13 @@ function computeGroup(live: string, list: G4RealLead[]): LiveGroup {
     live,
     date: isFinders ? null : parseEventDate(live),
     // Finders Fee não é live nem evento: bucket próprio, fora dos filtros Live/Evento.
-    kind: isFinders ? "finders" : cls.categoria === "Live" ? "live" : "evento",
+    kind: isFinders
+      ? "finders"
+      : cls.categoria === "Live"
+        ? "live"
+        : cls.categoria === "Palestras"
+          ? "palestra"
+          : "evento",
     categoria: cls.categoria,
     subcategoria: cls.subcategoria,
     leads: uniq,
@@ -565,7 +571,7 @@ function mergeGroups(list: LiveGroup[], label: string): LiveGroup {
   return {
     live: label,
     date: null,
-    kind: list[0]?.kind ?? "evento",
+    kind: list[0]?.kind ?? (list[0]?.categoria === "Live" ? "live" : list[0]?.categoria === "Palestras" ? "palestra" : "evento"),
     categoria: list[0]?.categoria ?? "Palestras",
     subcategoria: list[0]?.subcategoria ?? null,
     leads,
@@ -858,7 +864,7 @@ function LeadsTable({
 }
 
 // ─────────── Main ───────────
-type KindFilter = "todos" | "live" | "evento";
+type KindFilter = "todos" | "live" | "palestra" | "evento";
 
 export function G4ConsolidatedDashboard() {
   const { data, isLoading } = useG4RealMetrics();
@@ -1180,6 +1186,7 @@ export function G4ConsolidatedDashboard() {
             <div className="flex gap-1">
               <FilterPill label="Todos" active={kind === "todos"} onClick={() => setKind("todos")} />
               <FilterPill label="Lives" active={kind === "live"} onClick={() => setKind("live")} />
+              <FilterPill label="Palestras" active={kind === "palestra"} onClick={() => setKind("palestra")} />
               <FilterPill label="Eventos" active={kind === "evento"} onClick={() => setKind("evento")} />
             </div>
             <div className="w-px h-5 bg-border" />
