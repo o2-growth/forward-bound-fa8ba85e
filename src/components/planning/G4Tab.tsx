@@ -1,6 +1,5 @@
 import { Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { G4RealSection } from "./g4/G4RealSection";
 import { G4ConsolidatedDashboard } from "./g4/G4ConsolidatedDashboard";
 
 export function G4Tab() {
@@ -18,14 +17,13 @@ export function G4Tab() {
             </Badge>
           </div>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Funil real das lives G4: inscritos → presentes → levantaram a mão → diagnóstico → pipe → venda.
+            Visão consolidada por categoria (lives, palestras, eventos): leads, MQLs, em contato,
+            quentes, fechados, perdidos e receita gerada.
           </p>
         </div>
       </div>
 
       <G4ConsolidatedDashboard />
-      <G4RealSection />
     </div>
   );
 }
-
