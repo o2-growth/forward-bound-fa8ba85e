@@ -974,7 +974,7 @@ export function G4ConsolidatedDashboard() {
       tcv: won.reduce((a, w) => a + (w.tcv ?? 0), 0),
     };
     return acc;
-  }, [groups]);
+  }, [kpiGroups]);
 
 
   // Finders Fee é uma seção à parte: não entra na árvore nem nos KPIs de
