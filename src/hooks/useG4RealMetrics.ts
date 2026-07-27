@@ -35,6 +35,9 @@ export type G4RealLead = {
   livesAssistiu?: string[] | null;
   livesMao?: string[] | null;
   livesDiagnostico?: string[] | null;
+  /** "pipefy" quando os valores do ganho vieram direto da API do Pipefy. */
+  valoresFonte?: "pipefy" | "espelho" | null;
+
 };
 
 export type G4RealFunilRow = {

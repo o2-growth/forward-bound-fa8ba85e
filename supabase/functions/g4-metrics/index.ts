@@ -424,6 +424,37 @@ Deno.serve(async (req) => {
       };
     });
 
+    // ===== Ganhos: valores vindos direto da API do Pipefy =====
+    // O banco espelho não traz todos os campos de MRR (ex.: card 1409285792 com
+    // "Valor MRR" nulo). Para os cards em Ganho buscamos o card no Pipefy e
+    // somamos TODOS os campos monetários por label.
+    const ganhoLeads = leads.filter(
+      (l) =>
+        l.cardId &&
+        (l.isGanho === true || normalize(l.faseAtual) === "ganho"),
+    );
+    const ganhoIds = [...new Set(ganhoLeads.map((l) => l.cardId as string))];
+    let faturamentoDelta = 0;
+    if (ganhoIds.length > 0) {
+      const pipefyValues = await fetchPipefyCardValues(ganhoIds);
+      for (const lead of ganhoLeads) {
+        const v = pipefyValues.get(lead.cardId as string);
+        if (!v) {
+          (lead as Record<string, unknown>).valoresFonte = "espelho";
+          continue;
+        }
+        const antes =
+          (lead.valorMRR ?? 0) + (lead.valorSetup ?? 0) + (lead.valorPontual ?? 0);
+        lead.valorMRR = v.mrr;
+        lead.valorSetup = v.setup;
+        lead.valorPontual = v.pontual;
+        lead.tcv = v.mrr * 12 + v.setup + v.pontual;
+        (lead as Record<string, unknown>).valoresFonte = "pipefy";
+        faturamentoDelta += v.mrr + v.setup + v.pontual - antes;
+      }
+    }
+    kpis.faturamento = Math.max(0, kpis.faturamento + faturamentoDelta);
+
     return json({
       kpis,
       funil,
@@ -431,6 +462,7 @@ Deno.serve(async (req) => {
       leads,
       generatedAt: new Date().toISOString(),
     });
+
   } catch (err) {
     console.error("g4-metrics error", err);
     return json({ error: (err as Error).message ?? "unknown error" }, 500);
@@ -440,6 +472,113 @@ Deno.serve(async (req) => {
     } catch (_) { /* ignore */ }
   }
 });
+
+function normalize(v: unknown): string {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function parseMoney(raw: unknown): number {
+  if (raw == null) return 0;
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
+  let s = String(raw).trim();
+  if (!s || s === "[]") return 0;
+  if (s.startsWith("[")) {
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr) && arr.length > 0) s = String(arr[0]);
+      else return 0;
+    } catch { /* keep raw */ }
+  }
+  s = s.replace(/[^0-9,.-]/g, "");
+  if (!s) return 0;
+  // 1.234,56 -> 1234.56 | 1234.56 -> 1234.56
+  if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g, "").replace(",", ".");
+  else s = s.replace(/,/g, "");
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+type CardValues = { mrr: number; setup: number; pontual: number };
+
+const MRR_LABEL_RE = /(mrr|cfoaas|cfo aas|oxy|turnaround|valuation|taxa de franquia)/;
+const SETUP_LABEL_RE = /setup|implanta/;
+const PONTUAL_LABEL_RE = /pontual/;
+const IGNORE_LABEL_RE = /(educacao|parcela|quantidade|desconto|isentado|previsto|data|%)/;
+
+// Busca os cards no Pipefy e soma todos os campos monetários por label.
+async function fetchPipefyCardValues(
+  ids: string[],
+): Promise<Map<string, CardValues>> {
+  const out = new Map<string, CardValues>();
+  const apiKey = (Deno.env.get("PIPEFY_API_KEY") || "").trim().replace(/^Bearer\s+/i, "");
+  if (!apiKey) {
+    console.warn("g4-metrics: PIPEFY_API_KEY ausente — mantendo valores do espelho");
+    return out;
+  }
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += 25) chunks.push(ids.slice(i, i + 25));
+
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      const query = `query { ${
+        chunk
+          .map(
+            (id, i) =>
+              `c${i}: card(id: ${JSON.stringify(id)}) { id fields { name value field { label } } }`,
+          )
+          .join(" ")
+      } }`;
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 20000);
+        const res = await fetch("https://api.pipefy.com/graphql", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ query }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          console.error("g4-metrics pipefy HTTP", res.status, await res.text());
+          return;
+        }
+        const body = await res.json();
+        if (body.errors?.length) {
+          console.error("g4-metrics pipefy errors", JSON.stringify(body.errors).slice(0, 500));
+        }
+        const data = body.data ?? {};
+        for (const key of Object.keys(data)) {
+          const card = data[key];
+          if (!card?.id) continue;
+          const vals: CardValues = { mrr: 0, setup: 0, pontual: 0 };
+          for (const f of card.fields ?? []) {
+            const label = normalize(f.field?.label ?? f.name);
+            if (!label || IGNORE_LABEL_RE.test(label)) continue;
+            const amount = parseMoney(f.value);
+            if (!amount) continue;
+            if (PONTUAL_LABEL_RE.test(label)) vals.pontual += amount;
+            else if (SETUP_LABEL_RE.test(label)) vals.setup += amount;
+            else if (MRR_LABEL_RE.test(label)) vals.mrr += amount;
+          }
+          out.set(String(card.id), vals);
+        }
+      } catch (err) {
+        console.error("g4-metrics pipefy fetch falhou", err);
+      }
+    }),
+  );
+
+  return out;
+}
+
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

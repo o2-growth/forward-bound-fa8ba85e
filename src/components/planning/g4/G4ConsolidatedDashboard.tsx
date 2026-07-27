@@ -123,13 +123,13 @@ const MANUAL_EXCLUDED_G4_CARD_IDS = new Set<string>([
 // Overrides manuais de valores G4 quando o card no Pipefy está com valor errado
 // (ex.: erro de digitação de escala). Chave = email em lowercase.
 // Aplicado antes de agrupar/somar KPIs e antes da tabela/drill-down.
+// Os ganhos agora vêm com valores lidos direto da API do Pipefy (g4-metrics),
+// somando todos os campos de MRR/Setup/Pontual do card. Não há mais overrides.
 const G4_MANUAL_VALUE_OVERRIDES: Record<
   string,
   { mrr?: number; setup?: number; pontual?: number }
-> = {
-  // Martinelli Industria (card 1303731824) — Pipefy digitou 7,5702 / 21.
-  "vanderson@martinelli.ind.br": { mrr: 7570.2, setup: 21000 },
-};
+> = {};
+
 
 function applyG4ValueOverride(lead: G4RealLead): G4RealLead {
   const email = (lead.email ?? "").toLowerCase();
