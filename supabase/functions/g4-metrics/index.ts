@@ -424,6 +424,37 @@ Deno.serve(async (req) => {
       };
     });
 
+    // ===== Ganhos: valores vindos direto da API do Pipefy =====
+    // O banco espelho não traz todos os campos de MRR (ex.: card 1409285792 com
+    // "Valor MRR" nulo). Para os cards em Ganho buscamos o card no Pipefy e
+    // somamos TODOS os campos monetários por label.
+    const ganhoLeads = leads.filter(
+      (l) =>
+        l.cardId &&
+        (l.isGanho === true || normalize(l.faseAtual) === "ganho"),
+    );
+    const ganhoIds = [...new Set(ganhoLeads.map((l) => l.cardId as string))];
+    let faturamentoDelta = 0;
+    if (ganhoIds.length > 0) {
+      const pipefyValues = await fetchPipefyCardValues(ganhoIds);
+      for (const lead of ganhoLeads) {
+        const v = pipefyValues.get(lead.cardId as string);
+        if (!v) {
+          (lead as Record<string, unknown>).valoresFonte = "espelho";
+          continue;
+        }
+        const antes =
+          (lead.valorMRR ?? 0) + (lead.valorSetup ?? 0) + (lead.valorPontual ?? 0);
+        lead.valorMRR = v.mrr;
+        lead.valorSetup = v.setup;
+        lead.valorPontual = v.pontual;
+        lead.tcv = v.mrr * 12 + v.setup + v.pontual;
+        (lead as Record<string, unknown>).valoresFonte = "pipefy";
+        faturamentoDelta += v.mrr + v.setup + v.pontual - antes;
+      }
+    }
+    kpis.faturamento = Math.max(0, kpis.faturamento + faturamentoDelta);
+
     return json({
       kpis,
       funil,
@@ -431,6 +462,7 @@ Deno.serve(async (req) => {
       leads,
       generatedAt: new Date().toISOString(),
     });
+
   } catch (err) {
     console.error("g4-metrics error", err);
     return json({ error: (err as Error).message ?? "unknown error" }, 500);
