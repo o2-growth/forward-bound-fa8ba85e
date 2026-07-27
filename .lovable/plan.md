@@ -1,40 +1,36 @@
-## Objetivo
+## O que eu conferi
 
-No dashboard G4 (`/dash-g4` e aba G4 nos Indicadores):
+Chamei a função `g4-metrics` e comparei lead a lead com a sua planilha (GMV = TCV = MRR×12 + Setup + Pontual).
 
-1. Lotus, Stillus Home e Tchau Entrega devem ser atribuídos ao **Talk SE de 25/06**, não às lives.
-2. Petromar deve sair da live e ir para **Finders Fee**, que passa a ser uma **aba/seção própria**, fora da árvore Live › Palestras › Eventos.
+| Cliente | GMV planilha | TCV dash | Status |
+|---|---|---|---|
+| Martinelli | 111.842,40 | 111.842,40 | OK |
+| Petromar | 120.334,50 | 120.334,50 | OK |
+| João Paulo | 30.000,00 | 30.000,00 | OK |
+| Stillus Home | 20.000,00 | 20.000,00 | OK |
+| Tchau Entrega | 12.000,00 | 12.000,00 | OK |
+| Lotus Logística | 208.466,00 | 208.466,00 | OK |
+| Invenzi | 148.644,00 | 148.644,00 | OK |
+| **Fabrizio Mazza** | **30.000,00** | **60.000,00** | divergente (2×) |
+| **B2G Vix** | **12.000,00** | **24.000,00** | divergente (2×) |
 
-## O que foi verificado
+## Causas identificadas
 
-- O evento existe na base como `G4 SCALE EXPERIENCE 25/06/2026` (2 inscritos, 2 vendas hoje).
-- Hoje ele cai em **Eventos**: `canonLive()` reescreve o nome para "Evento G4 - 25/06/2026" (não tem token "live"/"aula"), e o matcher `Talks SE` (`/\bse\b/`) nunca encontra o "SE" porque o nome original é descartado.
-- Vendas com várias lives já são atribuídas a uma só via `pickClosestLive` — é por isso que Petromar cai na live mais próxima do ganho.
-- O bucket `G4 - Finders Fee (fora das lives)` hoje só recebe vendas da whitelist **sem** nenhuma live associada, e é renderizado como um item comum dentro da árvore.
+**1. Duplicação de valor em Fabrizio e B2G Vix (o "TCV diferente" propriamente dito).**
+Desde que passamos a ler os ganhos direto do Pipefy, o `g4-metrics` **soma todos os campos** do card cujo rótulo casa com `setup|implanta` (e idem para MRR/Pontual). Nesses dois cards o valor aparece exatamente dobrado (30k→60k, 12k→24k), o padrão típico de dois campos de setup preenchidos com o mesmo valor (ex.: "Setup" e "Valor do Setup/Implantação"). Os rótulos exatos ainda precisam ser confirmados — é o primeiro passo do plano, não vou assumir.
 
-## Mudanças
+**2. O total do dash é maior que o total da planilha por desenho, não por erro.**
+A planilha tem 9 linhas (Finders Fee). O dash tem outros ganhos atribuídos ao G4 que não estão na sua planilha: Sciensa (124.681,80), Fusão (163.841,20), Captable (117.841,20), Spa Med (2.000), Fauhome (14.960). Somando, o TCV do dash fica bem acima dos 693.286,90 da planilha mesmo depois de corrigir os itens 1.
 
-### 1. Talk SE como Palestra (`canonLive.ts`)
-- Reconhecer "scale experience" / "talk se" / "SE" no nome cru: rótulo canônico `Talk SE - 25/06/2026` e classificação `{ categoria: "Palestras", subcategoria: "Talks" }`.
-- Manter o matcher `Talks SE` do esqueleto funcionando com o novo rótulo.
+## Plano
 
-### 2. Atribuição manual de vendas (`G4ConsolidatedDashboard.tsx`)
-- Novo mapa `G4_SALE_EVENT_OVERRIDE` (por e-mail, com fallback por nome/empresa normalizada para o Stillus, cujo e-mail não está claro na whitelist):
-  - Lotus (`administrativo@lotuslogistica.com` / `adm@lotuslogistica.com`), Stillus Home, Tchau Entrega (`tchauentrega@gmail.com`) → `Talk SE - 25/06/2026`.
-  - Petromar (`sidney@petromarcomercial.com.br`) → `Finders Fee`.
-- O override roda em `buildGroups`, antes de `pickClosestLive`, e substitui todas as lives do lead pelo grupo definido — assim o lead deixa de contar na live original (inscritos, quentes, fechados e valores).
+1. **Confirmar os rótulos**: adicionar um modo de diagnóstico temporário em `g4-metrics` (`?debugCard=1353771374`) que devolve os campos e valores brutos dos cards do Fabrizio e do B2G Vix, para ver exatamente quais rótulos estão sendo somados em dobro.
+2. **Corrigir o somatório** em `supabase/functions/g4-metrics/index.ts`, conforme o achado — provavelmente deduplicando por valor+categoria ou restringindo os rótulos aceitos (`IGNORE_LABEL_RE` / lista de rótulos canônicos), em vez de somar tudo que casa com o regex.
+3. **Revalidar** os 9 clientes contra a planilha: todos devem bater 100%.
+4. **Remover** o modo de diagnóstico.
 
-### 3. Finders Fee como seção separada
-- Separar o grupo Finders Fee dos grupos da árvore: ele deixa de aparecer dentro de Live/Palestras/Eventos.
-- Renderizar um bloco próprio abaixo da tabela de categorias, com as mesmas colunas (inscritos, MQLs, em contato, quentes, fechados, perdidos, MRR, Setup, Pontual, TCV) e o mesmo drill-down clicável.
-- Os KPIs do topo continuam somando tudo (lives + palestras + eventos + Finders Fee), com dedupe por lead, como já fazem hoje.
+Não vou mexer nos demais ganhos (Sciensa, Fusão, Captable, Spa Med, Fauhome) — se você quiser que eles saiam do dash G4 ou virem uma seção separada da de Finders Fee, me diga e incluo.
 
-## Detalhes técnicos
-
-- Arquivos: `src/components/planning/g4/canonLive.ts`, `src/components/planning/g4/G4ConsolidatedDashboard.tsx`.
-- Nada muda no edge function `g4-metrics` — os valores dos ganhos continuam vindo direto do Pipefy.
-- O filtro de data trata o Talk SE pela data 25/06/2026; o Finders Fee continua usando a data de criação do card como fallback.
-
-## Pendência
-
-Preciso confirmar o e-mail/identificação exata do **Stillus Home** (não aparece nomeado na whitelist atual). Se você tiver o e-mail, me passe; senão vou casar por nome/empresa contendo "stillus".
+### Detalhes técnicos
+- Arquivo principal: `supabase/functions/g4-metrics/index.ts` (`fetchPipefyCardValues`, `SETUP_LABEL_RE`, `IGNORE_LABEL_RE`).
+- O front (`G4ConsolidatedDashboard.tsx`) apenas consome o TCV já calculado; não precisa mudar.
