@@ -214,6 +214,45 @@ export function isG4Attributed(l: G4RealLead): boolean {
   return true;
 }
 
+// Rótulos canônicos de buckets especiais.
+const FINDERS_FEE_LABEL = "G4 - Finders Fee (fora das lives)";
+const TALK_SE_LABEL = "Talk SE - 25/06/2026";
+
+// Atribuição manual de vendas a um evento específico (decisão comercial).
+// Sobrescreve TODAS as lives do lead — ele deixa de contar na live original.
+const G4_SALE_EVENT_OVERRIDE: { match: (l: G4RealLead) => boolean; group: string }[] = [
+  // Lotus, Stillus Home e Tchau Entrega vieram do Talk SE de 25/06.
+  {
+    group: TALK_SE_LABEL,
+    match: (l) => {
+      const email = (l.email ?? "").toLowerCase();
+      const who = normalize(`${l.empresa ?? ""} ${l.nome ?? ""}`);
+      return (
+        email.includes("lotuslogistica") ||
+        email === "tchauentrega@gmail.com" ||
+        who.includes("lotus logistica") ||
+        who.includes("stillus") ||
+        who.includes("tchau entrega")
+      );
+    },
+  },
+  // Petromar não veio de live: é Finders Fee.
+  {
+    group: FINDERS_FEE_LABEL,
+    match: (l) => {
+      const email = (l.email ?? "").toLowerCase();
+      const who = normalize(`${l.empresa ?? ""} ${l.nome ?? ""}`);
+      return email === "sidney@petromarcomercial.com.br" || who.includes("petromar");
+    },
+  },
+];
+
+function overrideSaleGroup(lead: G4RealLead): string | null {
+  if (!isG4Sale(lead)) return null;
+  for (const rule of G4_SALE_EVENT_OVERRIDE) if (rule.match(lead)) return rule.group;
+  return null;
+}
+
 // Para vendas com múltiplas lives assistidas, atribui apenas à live mais próxima
 // da data de ganho (evita contar a mesma venda em várias lives).
 function pickClosestLive(lives: string[], dataGanho?: string | null): string[] {
@@ -236,6 +275,7 @@ function pickClosestLive(lives: string[], dataGanho?: string | null): string[] {
   }
   return [best];
 }
+
 
 function computeGroup(live: string, list: G4RealLead[]): LiveGroup {
   const seen = new Set<string>();
