@@ -40,8 +40,15 @@ const LIVE_CANONICAL_MAP: Record<string, string> = {
   "Live - G4 - 21-mai": "Live G4 - 21/05/2026",
 };
 
-function detectKind(name: string): "live" | "aula-traction" | "aula" | "evento" {
+// "G4 SCALE EXPERIENCE" (Talk SE) é uma palestra, não um evento genérico.
+function isTalkSE(name: string): boolean {
   const n = normalize(name);
+  return n.includes("scale experience") || /\btalk\s+se\b/.test(n) || /\bse\b/.test(n);
+}
+
+function detectKind(name: string): "live" | "aula-traction" | "aula" | "talk-se" | "evento" {
+  const n = normalize(name);
+  if (isTalkSE(name)) return "talk-se";
   if (n.includes("live")) return "live";
   if (n.includes("aula") && n.includes("traction")) return "aula-traction";
   if (n.includes("aula")) return "aula";
@@ -52,8 +59,10 @@ const KIND_LABEL: Record<ReturnType<typeof detectKind>, string> = {
   "live": "Live G4",
   "aula-traction": "Aula Traction",
   "aula": "Aula G4",
+  "talk-se": "Talk SE",
   "evento": "Evento G4",
 };
+
 
 function pad2(n: number) {
   return n.toString().padStart(2, "0");
