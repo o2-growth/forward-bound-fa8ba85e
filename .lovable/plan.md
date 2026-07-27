@@ -1,21 +1,20 @@
-## Causa encontrada
+## Objetivo
 
-A Petromar já está corretamente no bucket "G4 - Finders Fee (fora das lives)" (verifiquei no payload da função `g4-metrics`: `lives: ["G4 - Finders Fee (fora das lives)"]`).
+No dash G4, quando o filtro de tipo está em **Todos**, os indicadores do topo (Leads, MQLs, Em contato, Quentes, Fechados, Perdidos, MRR/Setup/Pontual/TCV) devem incluir também o bucket **G4 - Finders Fee (fora das lives)** — ou seja, a Petromar volta a contar. Quando o filtro estiver em **Lives** ou **Eventos**, ela continua fora, como já corrigimos.
 
-O problema está na classificação do bucket: em `computeGroup`, o grupo é classificado por `classifyG4Event(live)`. Como o rótulo **"G4 - Finders Fee (fora das lives)"** contém a palavra "lives", a regra de nome cai em `categoria: "Live"` e o grupo recebe `kind: "live"`.
+## Como fica
 
-Resultado: ao usar o filtro Live/Evento (`kind`), o grupo Finders Fee passa no filtro "Live" e a Petromar volta a aparecer nos KPIs.
+- Filtro **Todos**: KPIs = lives + eventos + Finders Fee (deduplicados por email/nome, como já é hoje).
+- Filtro **Lives**: KPIs só de lives (sem Petromar).
+- Filtro **Eventos**: KPIs só de eventos (sem Petromar).
+- A tabela por categoria (Live / Palestras / Eventos) continua **sem** Finders Fee em qualquer filtro.
+- A seção separada de Finders Fee continua existindo e respeitando só o filtro de data.
 
-## Correção
+## Detalhes técnicos
 
-1. Em `G4ConsolidatedDashboard.tsx`, marcar o bucket Finders Fee explicitamente:
-   - em `computeGroup`, se `live === FINDERS_FEE_LABEL`, forçar `kind: "finders"` (novo valor no tipo) e `categoria` fora da árvore, sem passar por `classifyG4Event`.
-2. No `useMemo` de `groups`, o filtro `if (kind !== "todos" && g.kind !== kind) continue;` passa a nunca deixar o grupo Finders Fee entrar quando o filtro for "live" ou "evento" — ele só existe na sua própria seção.
-3. Manter a seção Finders Fee sempre visível/independente (com seus próprios totais e drill-down), respeitando apenas o filtro de data (fallback por `dataEntradaPipe`, como hoje).
-4. Como o Finders Fee sai dos grupos filtrados, os KPIs de topo deixam de somá-lo quando o filtro Live/Evento está ativo — que é o comportamento pedido.
+Arquivo: `src/components/planning/g4/G4ConsolidatedDashboard.tsx`
 
-## Verificação
-
-- Filtro "Live": Petromar não aparece em nenhum KPI nem no drill-down.
-- Filtro "Todos": números totais continuam iguais aos de hoje (Finders Fee somado uma única vez).
-- Bloco Finders Fee: continua mostrando os 9 clientes com TCV correto.
+- Criar um memo `kpiGroups` = grupos filtrados por data, incluindo os de `kind: "finders"` **apenas** quando `kind === "todos"`; usar esse conjunto no cálculo de `totals`.
+- Manter `groups` (lives/eventos, sem finders) como fonte da árvore/tabela — `treeGroups` segue igual.
+- `findersGroup` continua vindo do próprio memo com filtro de data, sem mudança.
+- Nenhuma alteração na edge function `g4-metrics` nem em regras de valor/atribuição.
