@@ -323,20 +323,25 @@ function buildGroups(leads: G4RealLead[]): LiveGroup[] {
   const filtered = leads.filter(isG4Attributed);
   const byLive = new Map<string, G4RealLead[]>();
   for (const lead of filtered) {
+    // Atribuição manual (Talk SE / Finders Fee) vence qualquer live registrada.
+    const forced = overrideSaleGroup(lead);
     // Whitelist de vendas sem live associada cai no bucket "Finders Fee".
-    let lives = lead.lives.length > 0
-      ? lead.lives
-      : (isG4Sale(lead) ? ["G4 - Finders Fee (fora das lives)"] : []);
+    let lives = forced
+      ? [forced]
+      : lead.lives.length > 0
+        ? lead.lives
+        : (isG4Sale(lead) ? [FINDERS_FEE_LABEL] : []);
     // Vendas só contam em UMA live (a mais próxima da data de ganho).
-    if (isG4Sale(lead) && lives.length > 1) {
+    if (!forced && isG4Sale(lead) && lives.length > 1) {
       lives = pickClosestLive(lives, lead.dataGanho);
     }
     for (const rawLive of lives) {
-      const live = canonLive(rawLive);
+      const live = rawLive === FINDERS_FEE_LABEL ? rawLive : canonLive(rawLive);
       if (!byLive.has(live)) byLive.set(live, []);
       byLive.get(live)!.push(lead);
     }
   }
+
   const groups: LiveGroup[] = [];
   for (const [live, list] of byLive.entries()) {
     groups.push(computeGroup(live, list));
