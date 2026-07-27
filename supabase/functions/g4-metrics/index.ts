@@ -453,6 +453,10 @@ Deno.serve(async (req) => {
         lead.valorPontual = v.pontual;
         lead.tcv = v.mrr * 12 + v.setup + v.pontual;
         (lead as Record<string, unknown>).valoresFonte = "pipefy";
+        (lead as Record<string, unknown>).camposUsados = v.campos;
+        (lead as Record<string, unknown>).camposDescartados = v.camposDescartados;
+        (lead as Record<string, unknown>).camposNaoClassificados = v.camposNaoClassificados;
+
         faturamentoDelta += v.mrr + v.setup + v.pontual - antes;
       }
     }
@@ -505,12 +509,23 @@ function parseMoney(raw: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-type CardValues = { mrr: number; setup: number; pontual: number };
+type CampoUsado = { label: string; cat: "mrr" | "setup" | "pontual"; valor: number };
+type CardValues = {
+  mrr: number;
+  setup: number;
+  pontual: number;
+  campos: CampoUsado[];
+  camposDescartados: CampoUsado[];
+  camposNaoClassificados: { label: string; valor: number }[];
+};
 
 const MRR_LABEL_RE = /(mrr|cfoaas|cfo aas|oxy|turnaround|valuation|taxa de franquia)/;
 const SETUP_LABEL_RE = /setup|implanta/;
 const PONTUAL_LABEL_RE = /pontual/;
 const IGNORE_LABEL_RE = /(educacao|parcela|quantidade|desconto|isentado|previsto|data|%)/;
+// Rótulos monetários candidatos (para auditar o que ficou de fora)
+const MONEY_HINT_RE = /(valor|preco|fee|honorario|receita|ticket)/;
+
 
 // Canonicaliza o rótulo para deduplicar campos espelhados no Pipefy
 // (ex.: "Valor - Setup *" e "Valor Setup" são o MESMO valor, não devem somar).
@@ -573,26 +588,57 @@ async function fetchPipefyCardValues(
         for (const key of Object.keys(data)) {
           const card = data[key];
           if (!card?.id) continue;
-          const vals: CardValues = { mrr: 0, setup: 0, pontual: 0 };
+          const vals: CardValues = {
+            mrr: 0,
+            setup: 0,
+            pontual: 0,
+            campos: [],
+            camposDescartados: [],
+            camposNaoClassificados: [],
+          };
           // Deduplica por rótulo canônico: campos espelhados ("Valor Setup" vs
           // "Valor - Setup *") contam uma única vez (mantém o maior valor).
-          const seen = new Map<string, { cat: keyof CardValues; amount: number }>();
+          const seen = new Map<string, CampoUsado>();
           for (const f of card.fields ?? []) {
             const label = normalize(f.field?.label ?? f.name);
             if (!label || IGNORE_LABEL_RE.test(label)) continue;
             const amount = parseMoney(f.value);
             if (!amount) continue;
-            let cat: keyof CardValues | null = null;
+            let cat: CampoUsado["cat"] | null = null;
             if (PONTUAL_LABEL_RE.test(label)) cat = "pontual";
             else if (SETUP_LABEL_RE.test(label)) cat = "setup";
             else if (MRR_LABEL_RE.test(label)) cat = "mrr";
-            if (!cat) continue;
+            if (!cat) {
+              if (MONEY_HINT_RE.test(label)) {
+                vals.camposNaoClassificados.push({ label, valor: amount });
+              }
+              continue;
+            }
             const key = `${cat}:${canonicalLabelKey(label)}`;
             const prev = seen.get(key);
-            if (!prev || amount > prev.amount) seen.set(key, { cat, amount });
+            if (!prev) {
+              seen.set(key, { label, cat, valor: amount });
+            } else if (amount > prev.valor) {
+              vals.camposDescartados.push(prev);
+              seen.set(key, { label, cat, valor: amount });
+            } else {
+              vals.camposDescartados.push({ label, cat, valor: amount });
+            }
           }
-          for (const { cat, amount } of seen.values()) vals[cat] += amount;
+          for (const campo of seen.values()) {
+            vals[campo.cat] += campo.valor;
+            vals.campos.push(campo);
+          }
+          if (vals.camposNaoClassificados.length > 0) {
+            console.warn(
+              "g4-metrics: campos monetários não classificados",
+              card.id,
+              JSON.stringify(vals.camposNaoClassificados),
+            );
+          }
           out.set(String(card.id), vals);
+
+
 
         }
       } catch (err) {

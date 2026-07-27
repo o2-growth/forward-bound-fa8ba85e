@@ -1,36 +1,39 @@
-## O que eu conferi
+# Garantir 100% de precisão nos valores do Dash G4
 
-Chamei a função `g4-metrics` e comparei lead a lead com a sua planilha (GMV = TCV = MRR×12 + Setup + Pontual).
+## Objetivo
+Eliminar qualquer possibilidade de duplicação ou perda de valor (MRR, Setup, Pontual, TCV) no dashboard G4 e comprovar, com reconciliação automática, que o que aparece na tela é exatamente o que está no Pipefy.
 
-| Cliente | GMV planilha | TCV dash | Status |
-|---|---|---|---|
-| Martinelli | 111.842,40 | 111.842,40 | OK |
-| Petromar | 120.334,50 | 120.334,50 | OK |
-| João Paulo | 30.000,00 | 30.000,00 | OK |
-| Stillus Home | 20.000,00 | 20.000,00 | OK |
-| Tchau Entrega | 12.000,00 | 12.000,00 | OK |
-| Lotus Logística | 208.466,00 | 208.466,00 | OK |
-| Invenzi | 148.644,00 | 148.644,00 | OK |
-| **Fabrizio Mazza** | **30.000,00** | **60.000,00** | divergente (2×) |
-| **B2G Vix** | **12.000,00** | **24.000,00** | divergente (2×) |
+## Riscos identificados na leitura do código atual
 
-## Causas identificadas
+1. **Chave de deduplicação frágil.** Em `computeGroup`, `aggFromGroups` e `totals` (`G4ConsolidatedDashboard.tsx`) a chave é `email || nome` em minúsculas. Dois problemas reais: leads sem e-mail e com nomes iguais são fundidos (perde venda), e o mesmo card com e-mails diferentes (pai/filho, e-mail corrigido) conta duas vezes. O `cardId` existe no payload e não é usado como chave primária.
+2. **Finders Fee em duas contagens.** O grupo `FINDERS_FEE_LABEL` é exibido em seção separada, mas continua dentro de `groups`, que alimenta os KPIs de topo. Precisa ficar explícito e verificado se o total do topo é "árvore + finders" (correto) ou se algum bloco soma finders duas vezes.
+3. **Atribuição de venda a múltiplas lives.** `pickClosestLive` já reduz para uma live, mas só quando há `dataGanho`. Sem `dataGanho` a venda pode cair em mais de um grupo e inflar somas por categoria.
+4. **Somatório de campos monetários do Pipefy.** `canonicalLabelKey` deduplica rótulos espelhados mantendo o maior valor, mas depende de regex (`MRR_LABEL_RE`, `SETUP_LABEL_RE`, `IGNORE_LABEL_RE`). Rótulos novos ou fora do padrão podem ser somados em dobro ou ignorados silenciosamente.
 
-**1. Duplicação de valor em Fabrizio e B2G Vix (o "TCV diferente" propriamente dito).**
-Desde que passamos a ler os ganhos direto do Pipefy, o `g4-metrics` **soma todos os campos** do card cujo rótulo casa com `setup|implanta` (e idem para MRR/Pontual). Nesses dois cards o valor aparece exatamente dobrado (30k→60k, 12k→24k), o padrão típico de dois campos de setup preenchidos com o mesmo valor (ex.: "Setup" e "Valor do Setup/Implantação"). Os rótulos exatos ainda precisam ser confirmados — é o primeiro passo do plano, não vou assumir.
+## Plano de execução
 
-**2. O total do dash é maior que o total da planilha por desenho, não por erro.**
-A planilha tem 9 linhas (Finders Fee). O dash tem outros ganhos atribuídos ao G4 que não estão na sua planilha: Sciensa (124.681,80), Fusão (163.841,20), Captable (117.841,20), Spa Med (2.000), Fauhome (14.960). Somando, o TCV do dash fica bem acima dos 693.286,90 da planilha mesmo depois de corrigir os itens 1.
+### Etapa 1 — Auditoria com evidência (antes de qualquer alteração)
+- Rodar a edge function `g4-metrics` e extrair, para cada lead em Ganho: `cardId`, e-mail, empresa, MRR, Setup, Pontual, TCV, lives atribuídas e `valoresFonte`.
+- Buscar os mesmos cards direto no Pipefy e listar **todos** os campos monetários brutos com rótulo e valor.
+- Gerar uma tabela de reconciliação lado a lado (Pipefy bruto x valor consolidado x valor exibido) e apontar cada divergência com causa nomeada.
 
-## Plano
+### Etapa 2 — Correções estruturais
+- **Chave de identidade única**: criar `leadKey(lead)` = `cardId` → `email` → `nome+empresa`, e usá-la em todos os pontos de dedupe (`computeGroup`, `aggFromGroups`, `buildSyntheticGroup`, `totals`, drill-downs).
+- **Uma venda, um grupo**: garantir que toda venda G4 seja atribuída a exatamente um grupo, com fallback determinístico quando não há `dataGanho` (primeira live, depois entrada no pipe).
+- **Somatório à prova de rótulo**: no `g4-metrics`, registrar os rótulos monetários não classificados em log e nunca somar dois campos do mesmo grupo canônico; expor `camposUsados` por card no payload para auditoria.
+- **Finders Fee sem sobreposição**: separar explicitamente `treeGroups` e `findersGroup`, e calcular o total do topo como união deduplicada dos dois.
 
-1. **Confirmar os rótulos**: adicionar um modo de diagnóstico temporário em `g4-metrics` (`?debugCard=1353771374`) que devolve os campos e valores brutos dos cards do Fabrizio e do B2G Vix, para ver exatamente quais rótulos estão sendo somados em dobro.
-2. **Corrigir o somatório** em `supabase/functions/g4-metrics/index.ts`, conforme o achado — provavelmente deduplicando por valor+categoria ou restringindo os rótulos aceitos (`IGNORE_LABEL_RE` / lista de rótulos canônicos), em vez de somar tudo que casa com o regex.
-3. **Revalidar** os 9 clientes contra a planilha: todos devem bater 100%.
-4. **Remover** o modo de diagnóstico.
+### Etapa 3 — Verificação de invariantes (garantia do "100%")
+Adicionar checagens que rodam sobre os dados carregados:
+- soma dos TCVs por categoria + Finders Fee == TCV total do topo;
+- nenhum `cardId` aparece em mais de um grupo entre as vendas;
+- TCV de cada venda == MRR×12 + Setup + Pontual;
+- quantidade de vendas no KPI == quantidade de linhas no drill-down.
+Qualquer quebra aparece como aviso visível no dashboard (em vez de erro silencioso).
 
-Não vou mexer nos demais ganhos (Sciensa, Fusão, Captable, Spa Med, Fauhome) — se você quiser que eles saiam do dash G4 ou virem uma seção separada da de Finders Fee, me diga e incluo.
+### Etapa 4 — Relatório final
+Entregar a lista completa de vendas com origem (live/evento/finders), valores por componente e TCV, batendo com o Pipefy card a card.
 
-### Detalhes técnicos
-- Arquivo principal: `supabase/functions/g4-metrics/index.ts` (`fetchPipefyCardValues`, `SETUP_LABEL_RE`, `IGNORE_LABEL_RE`).
-- O front (`G4ConsolidatedDashboard.tsx`) apenas consome o TCV já calculado; não precisa mudar.
+## Detalhes técnicos
+- Arquivos: `supabase/functions/g4-metrics/index.ts`, `src/components/planning/g4/G4ConsolidatedDashboard.tsx`, `src/components/planning/g4/canonLive.ts`.
+- Nenhuma mudança em outras abas de indicadores; escopo restrito ao dash G4 (`/dash-g4` e a aba G4 interna, que compartilham o mesmo componente).
