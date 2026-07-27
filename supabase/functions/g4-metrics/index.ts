@@ -505,12 +505,23 @@ function parseMoney(raw: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-type CardValues = { mrr: number; setup: number; pontual: number };
+type CampoUsado = { label: string; cat: "mrr" | "setup" | "pontual"; valor: number };
+type CardValues = {
+  mrr: number;
+  setup: number;
+  pontual: number;
+  campos: CampoUsado[];
+  camposDescartados: CampoUsado[];
+  camposNaoClassificados: { label: string; valor: number }[];
+};
 
 const MRR_LABEL_RE = /(mrr|cfoaas|cfo aas|oxy|turnaround|valuation|taxa de franquia)/;
 const SETUP_LABEL_RE = /setup|implanta/;
 const PONTUAL_LABEL_RE = /pontual/;
 const IGNORE_LABEL_RE = /(educacao|parcela|quantidade|desconto|isentado|previsto|data|%)/;
+// Rótulos monetários candidatos (para auditar o que ficou de fora)
+const MONEY_HINT_RE = /(valor|preco|fee|honorario|receita|ticket)/;
+
 
 // Canonicaliza o rótulo para deduplicar campos espelhados no Pipefy
 // (ex.: "Valor - Setup *" e "Valor Setup" são o MESMO valor, não devem somar).
