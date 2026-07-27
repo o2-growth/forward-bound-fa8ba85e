@@ -97,9 +97,12 @@ export function classifyG4Event(name: string): G4Classification {
   const n = normalize(name);
   // Traction tem subcategoria própria dentro de Palestras (separado de Talks/Connect).
   if (n.includes("traction")) return { categoria: "Palestras", subcategoria: "Traction" };
+  // Talk SE (G4 Scale Experience) entra em Palestras › Talks.
+  if (isTalkSE(name)) return { categoria: "Palestras", subcategoria: "Talks" };
   // Connect entra em Palestras › Talks, mesmo que o nome contenha "live"/"aula".
   if (n.includes("connect")) return { categoria: "Palestras", subcategoria: "Talks" };
   if (n.includes("live")) return { categoria: "Live", subcategoria: null };
+
   if (n.includes("talk")) return { categoria: "Palestras", subcategoria: "Talks" };
   if (n.includes("palestra")) return { categoria: "Palestras", subcategoria: null };
   return { categoria: "Eventos", subcategoria: null };
