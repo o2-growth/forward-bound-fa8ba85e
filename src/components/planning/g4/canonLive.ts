@@ -43,8 +43,9 @@ const LIVE_CANONICAL_MAP: Record<string, string> = {
 // "G4 SCALE EXPERIENCE" (Talk SE) é uma palestra, não um evento genérico.
 function isTalkSE(name: string): boolean {
   const n = normalize(name);
-  return n.includes("scale experience") || /\btalk\s+se\b/.test(n) || /\bse\b/.test(n);
+  return n.includes("scale experience") || /\b(talk|g4)\s+se\b/.test(n) || /\bse\b\s*\d{1,2}\//.test(n);
 }
+
 
 function detectKind(name: string): "live" | "aula-traction" | "aula" | "talk-se" | "evento" {
   const n = normalize(name);
