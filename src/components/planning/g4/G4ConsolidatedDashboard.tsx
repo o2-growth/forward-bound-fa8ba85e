@@ -936,14 +936,23 @@ export function G4ConsolidatedDashboard() {
     [allGroups, kind, applyDateFilter],
   );
 
-
+  // KPIs do topo: em "Todos" somam também o bucket Finders Fee.
+  const kpiGroups = useMemo(
+    () =>
+      applyDateFilter(
+        allGroups.filter((g) =>
+          kind === "todos" ? true : g.kind === kind,
+        ),
+      ),
+    [allGroups, kind, applyDateFilter],
+  );
 
   const totals = useMemo(() => {
     // Deduplica leads por email/nome ao longo de todos os groups visíveis
     // para que os KPIs batam com os drill-downs (que também deduplicam).
     const seen = new Set<string>();
     const uniq: G4RealLead[] = [];
-    for (const g of groups) {
+    for (const g of kpiGroups) {
       for (const l of g.leads) {
         const k = (l.email ?? l.nome ?? "").toLowerCase();
         if (!k || seen.has(k)) continue;
