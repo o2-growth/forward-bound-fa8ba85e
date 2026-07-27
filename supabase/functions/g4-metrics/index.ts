@@ -18,6 +18,9 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+
+
+
   const url = Deno.env.get("G4_PG_URL");
   if (!url) {
     return json({ error: "G4_PG_URL not configured" }, 500);
@@ -509,6 +512,18 @@ const SETUP_LABEL_RE = /setup|implanta/;
 const PONTUAL_LABEL_RE = /pontual/;
 const IGNORE_LABEL_RE = /(educacao|parcela|quantidade|desconto|isentado|previsto|data|%)/;
 
+// Canonicaliza o rótulo para deduplicar campos espelhados no Pipefy
+// (ex.: "Valor - Setup *" e "Valor Setup" são o MESMO valor, não devem somar).
+function canonicalLabelKey(label: string): string {
+  return label
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t && !["valor", "valores", "de", "do", "da", "dos", "das", "total", "mensal", "r"].includes(t))
+    .sort()
+    .join("_");
+}
+
+
 // Busca os cards no Pipefy e soma todos os campos monetários por label.
 async function fetchPipefyCardValues(
   ids: string[],
@@ -559,16 +574,26 @@ async function fetchPipefyCardValues(
           const card = data[key];
           if (!card?.id) continue;
           const vals: CardValues = { mrr: 0, setup: 0, pontual: 0 };
+          // Deduplica por rótulo canônico: campos espelhados ("Valor Setup" vs
+          // "Valor - Setup *") contam uma única vez (mantém o maior valor).
+          const seen = new Map<string, { cat: keyof CardValues; amount: number }>();
           for (const f of card.fields ?? []) {
             const label = normalize(f.field?.label ?? f.name);
             if (!label || IGNORE_LABEL_RE.test(label)) continue;
             const amount = parseMoney(f.value);
             if (!amount) continue;
-            if (PONTUAL_LABEL_RE.test(label)) vals.pontual += amount;
-            else if (SETUP_LABEL_RE.test(label)) vals.setup += amount;
-            else if (MRR_LABEL_RE.test(label)) vals.mrr += amount;
+            let cat: keyof CardValues | null = null;
+            if (PONTUAL_LABEL_RE.test(label)) cat = "pontual";
+            else if (SETUP_LABEL_RE.test(label)) cat = "setup";
+            else if (MRR_LABEL_RE.test(label)) cat = "mrr";
+            if (!cat) continue;
+            const key = `${cat}:${canonicalLabelKey(label)}`;
+            const prev = seen.get(key);
+            if (!prev || amount > prev.amount) seen.set(key, { cat, amount });
           }
+          for (const { cat, amount } of seen.values()) vals[cat] += amount;
           out.set(String(card.id), vals);
+
         }
       } catch (err) {
         console.error("g4-metrics pipefy fetch falhou", err);
@@ -578,6 +603,9 @@ async function fetchPipefyCardValues(
 
   return out;
 }
+
+
+
 
 
 function json(body: unknown, status = 200) {
