@@ -589,6 +589,40 @@ async function fetchPipefyCardValues(
   return out;
 }
 
+// Diagnóstico temporário: devolve todos os campos monetários brutos dos cards.
+async function fetchPipefyCardFieldsRaw(ids: string[]): Promise<unknown> {
+  const apiKey = (Deno.env.get("PIPEFY_API_KEY") || "").trim().replace(/^Bearer\s+/i, "");
+  if (!apiKey) return { error: "PIPEFY_API_KEY ausente" };
+  const query = `query { ${
+    ids.map((id, i) => `c${i}: card(id: ${JSON.stringify(id)}) { id title fields { name value field { label } } }`).join(" ")
+  } }`;
+  const res = await fetch("https://api.pipefy.com/graphql", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ query }),
+  });
+  const body = await res.json();
+  const data = body.data ?? {};
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(data)) {
+    const card = data[key];
+    if (!card?.id) continue;
+    out[card.id] = {
+      title: card.title,
+      fields: (card.fields ?? [])
+        .map((f: { name: string; value: unknown; field?: { label?: string } }) => ({
+          label: f.field?.label ?? f.name,
+          value: f.value,
+          parsed: parseMoney(f.value),
+        }))
+        .filter((f: { parsed: number }) => f.parsed !== 0),
+    };
+  }
+  return { errors: body.errors ?? null, cards: out };
+}
+
+
+
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
