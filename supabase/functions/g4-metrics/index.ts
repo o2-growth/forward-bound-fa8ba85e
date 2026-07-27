@@ -13,18 +13,138 @@ const corsHeaders = {
 
 const MAIO_LIVE = "Live G4 - 20-21/05/2026";
 
+const CACHE_ID = "g4-metrics-v1";
+const CACHE_TTL_MS = 10 * 60 * 1000;
+
+// Evita recálculos concorrentes dentro da mesma instância
+let inFlight: Promise<Record<string, unknown>> | null = null;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  const reqUrl = new URL(req.url);
+  const forceRefresh = reqUrl.searchParams.get("refresh") === "1";
+  const debug = reqUrl.searchParams.get("debug") === "1";
 
+  try {
+    const cached = forceRefresh ? null : await readCache();
 
+    if (cached) {
+      const age = Date.now() - new Date(cached.generated_at).getTime();
+      if (age < CACHE_TTL_MS) {
+        return json(shapePayload(cached.payload, debug));
+      }
+      // Cache velho: devolve na hora e recalcula em background.
+      backgroundRefresh();
+      return json(shapePayload(cached.payload, debug));
+    }
 
-  const url = Deno.env.get("G4_PG_URL");
-  if (!url) {
-    return json({ error: "G4_PG_URL not configured" }, 500);
+    const fresh = await refresh();
+    return json(shapePayload(fresh, debug));
+  } catch (err) {
+    console.error("g4-metrics error", err);
+    return json({ error: (err as Error).message ?? "unknown error" }, 500);
   }
+});
+
+function supabaseAdmin() {
+  const url = Deno.env.get("SUPABASE_URL")!;
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  return { url, key };
+}
+
+async function readCache(): Promise<
+  { payload: Record<string, unknown>; generated_at: string } | null
+> {
+  try {
+    const { url, key } = supabaseAdmin();
+    const res = await fetch(
+      `${url}/rest/v1/g4_metrics_cache?id=eq.${CACHE_ID}&select=payload,generated_at`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` } },
+    );
+    if (!res.ok) return null;
+    const rows = await res.json();
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+  } catch (e) {
+    console.warn("g4-metrics readCache falhou", e);
+    return null;
+  }
+}
+
+async function writeCache(payload: Record<string, unknown>) {
+  try {
+    const { url, key } = supabaseAdmin();
+    await fetch(`${url}/rest/v1/g4_metrics_cache?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        id: CACHE_ID,
+        payload,
+        generated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch (e) {
+    console.warn("g4-metrics writeCache falhou", e);
+  }
+}
+
+function refresh(): Promise<Record<string, unknown>> {
+  if (inFlight) return inFlight;
+  inFlight = (async () => {
+    const payload = await computeMetrics();
+    await writeCache(payload);
+    return payload;
+  })().finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+function backgroundRefresh() {
+  const p = refresh().catch((e) =>
+    console.error("g4-metrics background refresh falhou", e)
+  );
+  try {
+    // deno-lint-ignore no-explicit-any
+    (globalThis as any).EdgeRuntime?.waitUntil?.(p);
+  } catch (_) { /* ignore */ }
+}
+
+/** Remove campos de auditoria pesados do payload quando não pedido debug. */
+function shapePayload(payload: Record<string, unknown>, debug: boolean) {
+  if (debug) return payload;
+  const leads = payload.leads as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(leads)) return payload;
+  return {
+    ...payload,
+    leads: leads.map((l) => {
+      if (
+        l.camposUsados === undefined &&
+        l.camposDescartados === undefined &&
+        l.camposNaoClassificados === undefined
+      ) return l;
+      const {
+        camposUsados: _a,
+        camposDescartados: _b,
+        camposNaoClassificados: _c,
+        ...rest
+      } = l;
+      return rest;
+    }),
+  };
+}
+
+async function computeMetrics(): Promise<Record<string, unknown>> {
+  const url = Deno.env.get("G4_PG_URL");
+  if (!url) throw new Error("G4_PG_URL not configured");
 
   const sql = postgres(url, {
     ssl: false,
@@ -33,6 +153,8 @@ Deno.serve(async (req) => {
     connect_timeout: 10,
     prepare: false,
   });
+
+
 
   try {
     const [funilRows, diagRows, kpiRows, fatRows, leadRows] = await Promise.all(
