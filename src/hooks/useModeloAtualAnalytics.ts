@@ -717,9 +717,19 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
     }
 
     const hydrated = maxMonetaryByCardId.get(card.id);
-    const mrr = Math.max(card.valorMRR || 0, hydrated?.mrr || 0);
-    const setup = Math.max(card.valorSetup || 0, hydrated?.setup || 0);
-    const pontual = Math.max(card.valorPontual || 0, hydrated?.pontual || 0);
+    // Vendas fechadas (Contrato assinado / Ganho) usam APENAS os valores do próprio
+    // card — a estrutura da venda fechada é fonte de verdade. Hidratar via Math.max
+    // com movimentos antigos infla valores (ex.: Alto Calçados tinha Pontual 14k de
+    // proposta de Diagnóstico antiga, mas fechou como MRR+Setup sem Pontual).
+    const faseAtualLower = String(card.faseAtual || '').toLowerCase();
+    const faseLower = String(card.fase || '').toLowerCase();
+    const isSigned = faseAtualLower === 'ganho'
+      || faseAtualLower.includes('contrato assinado')
+      || faseLower.includes('contrato assinado')
+      || faseLower === 'ganho';
+    const mrr = isSigned ? (card.valorMRR || 0) : Math.max(card.valorMRR || 0, hydrated?.mrr || 0);
+    const setup = isSigned ? (card.valorSetup || 0) : Math.max(card.valorSetup || 0, hydrated?.setup || 0);
+    const pontual = isSigned ? (card.valorPontual || 0) : Math.max(card.valorPontual || 0, hydrated?.pontual || 0);
     const total = mrr + setup + pontual;
 
     return {
