@@ -73,7 +73,7 @@ interface DetailSheetProps {
   columns: {
     key: keyof DetailItem;
     label: string;
-    format?: (value: any) => React.ReactNode;
+    format?: (value: any, row?: DetailItem) => React.ReactNode;
   }[];
   kpis?: KpiItem[];
   charts?: ChartConfig[];
