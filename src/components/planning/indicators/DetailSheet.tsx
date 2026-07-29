@@ -267,7 +267,7 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
                       {columns.map((col) => (
                         <TableCell key={col.key}>
                           {col.format 
-                            ? col.format(item[col.key]) 
+                            ? col.format(item[col.key], item) 
                             : item[col.key] ?? '-'
                           }
                         </TableCell>
