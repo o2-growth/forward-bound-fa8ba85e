@@ -710,10 +710,14 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       if (found) { produtoRaw = found; break; }
     }
     let productCategory = classifyProduto(produtoRaw);
+    let productList = classifyProdutoList(produtoRaw);
     // Fallback: se ainda "A definir", tenta inferir pelos campos Valor_* preenchidos
     if (productCategory === 'A definir' && card.valoresExtras) {
       const inferred = inferProductFromValues(card.valoresExtras);
-      if (inferred) productCategory = inferred;
+      if (inferred) {
+        productCategory = inferred;
+        if (productList.length === 0) productList = [inferred];
+      }
     }
 
     const hydrated = maxMonetaryByCardId.get(card.id);
