@@ -748,7 +748,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       revenueRange: card.faixa || undefined,
       responsible: card.closer || card.responsavel || undefined, // Prioritize closer for display
       duration: card.duracao,
-      product: productList.length > 0 ? productList[0] : productCategory,
+      product: productCategory,
       products: productList,
       mrr,
       setup,
