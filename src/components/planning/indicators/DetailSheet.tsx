@@ -36,7 +36,8 @@ export interface DetailItem {
   revenueRange?: string;
   responsible?: string;
   duration?: number; // Duration in seconds (from "Duração (s)" column)
-  product?: string; // CaaS, O2 TAX, Oxy Hacker, Franquia
+  product?: string; // CaaS, O2 TAX, Oxy Hacker, Franquia (categoria primária)
+  products?: string[]; // Lista completa de produtos contratados (>1 → dropdown "Produtos")
   mrr?: number; // Valor MRR for monetary indicators
   setup?: number; // Valor Setup for monetary indicators
   pontual?: number; // Valor Pontual for monetary indicators
