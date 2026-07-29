@@ -327,6 +327,7 @@ export const columnFormatters = {
       'Assessoria Financeira': 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200',
       'Captação de Recursos': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
       'BPO': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
+      'Coordenador Financeiro': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
       'Diagnóstico Estratégico': 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
       'Setup': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
       'Turnaround': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
