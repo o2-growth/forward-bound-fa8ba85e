@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
+import { ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { KpiCardsRow } from "./KpiCardsRow";
 import { KpiItem } from "./KpiCard";
 import { DrillDownCharts, ChartConfig } from "./DrillDownCharts";
