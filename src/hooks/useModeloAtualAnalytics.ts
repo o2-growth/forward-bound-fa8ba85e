@@ -6,7 +6,7 @@ import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isJunkCard } from "@/hooks/useModeloAtualMetas";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { useClientesProdutos } from "./useClientesProdutos";
-import { classifyProduto, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
+import { classifyProduto, classifyProdutoList, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
 import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
 import { sumMrrFields } from "@/lib/mrrFields";
 
