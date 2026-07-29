@@ -3,10 +3,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from "lucide-react";
+import { ExternalLink, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { KpiCardsRow } from "./KpiCardsRow";
 import { KpiItem } from "./KpiCard";
 import { DrillDownCharts, ChartConfig } from "./DrillDownCharts";
@@ -36,7 +37,8 @@ export interface DetailItem {
   revenueRange?: string;
   responsible?: string;
   duration?: number; // Duration in seconds (from "Duração (s)" column)
-  product?: string; // CaaS, O2 TAX, Oxy Hacker, Franquia
+  product?: string; // CaaS, O2 TAX, Oxy Hacker, Franquia (categoria primária)
+  products?: string[]; // Lista completa de produtos contratados (>1 → dropdown "Produtos")
   mrr?: number; // Valor MRR for monetary indicators
   setup?: number; // Valor Setup for monetary indicators
   pontual?: number; // Valor Pontual for monetary indicators
@@ -72,7 +74,7 @@ interface DetailSheetProps {
   columns: {
     key: keyof DetailItem;
     label: string;
-    format?: (value: any) => React.ReactNode;
+    format?: (value: any, row?: DetailItem) => React.ReactNode;
   }[];
   kpis?: KpiItem[];
   charts?: ChartConfig[];
@@ -266,7 +268,7 @@ export function DetailSheet({ open, onOpenChange, title, description, items, col
                       {columns.map((col) => (
                         <TableCell key={col.key}>
                           {col.format 
-                            ? col.format(item[col.key]) 
+                            ? col.format(item[col.key], item) 
                             : item[col.key] ?? '-'
                           }
                         </TableCell>
@@ -313,9 +315,7 @@ export const columnFormatters = {
     }
     return `${hours}h`;
   },
-  product: (value: string) => {
-    if (!value) return '-';
-    
+  product: (value: string, row?: DetailItem) => {
     const colorMap: Record<string, string> = {
       // BUs originais
       'CaaS': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
@@ -334,7 +334,46 @@ export const columnFormatters = {
       'Educação': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
       'A definir': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 italic',
     };
-    
+
+    // Cliente com múltiplos produtos → dropdown "Produtos"
+    const products = row?.products?.filter(Boolean) ?? [];
+    if (products.length > 1) {
+      return (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 gap-1 text-xs font-normal bg-primary/10 border-primary/30 hover:bg-primary/20"
+            >
+              <Package className="h-3 w-3" />
+              Produtos
+              <Badge variant="secondary" className="ml-1 h-4 px-1.5 text-[10px]">
+                {products.length}
+              </Badge>
+              <ChevronDown className="h-3 w-3 opacity-60" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-56 p-2">
+            <p className="text-xs font-semibold text-muted-foreground px-1 pb-1.5">
+              Produtos contratados
+            </p>
+            <div className="flex flex-col gap-1">
+              {products.map((p, i) => (
+                <Badge
+                  key={`${p}-${i}`}
+                  className={`font-normal justify-start ${colorMap[p] || 'bg-gray-100 text-gray-800'}`}
+                >
+                  {p}
+                </Badge>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
+    if (!value) return '-';
     const colorClass = colorMap[value] || 'bg-gray-100 text-gray-800';
 
     const badge = (

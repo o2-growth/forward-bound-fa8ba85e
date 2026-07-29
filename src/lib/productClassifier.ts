@@ -79,6 +79,27 @@ export function classifyProduto(produtosRaw: string | null | undefined): Product
   return 'A definir';
 }
 
+/**
+ * Divide a string crua de "Produtos" (ex.: "Setup, CFOaaS + OXY / BPO") em
+ * uma lista de categorias únicas (ordem preservada, sem duplicatas).
+ * Usada para exibir dropdown "Produtos" quando cliente contratou mais de um.
+ */
+export function classifyProdutoList(produtosRaw: string | null | undefined): ProductCategory[] {
+  if (!produtosRaw || !produtosRaw.trim()) return [];
+  // Separadores comuns no campo Pipefy: vírgula, +, /, ;, & e " e "
+  const tokens = produtosRaw
+    .split(/[,+/;&]|\s+e\s+/i)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const out: ProductCategory[] = [];
+  for (const tok of tokens) {
+    const cat = classifyProduto(tok);
+    if (cat === 'A definir') continue;
+    if (!out.includes(cat)) out.push(cat);
+  }
+  return out;
+}
+
 /** Normaliza chave (título / empresa / razão social) para lookup */
 export function normalizeClientKey(s: string | null | undefined): string {
   if (!s) return '';

@@ -6,7 +6,7 @@ import { IndicatorType } from "@/hooks/useFunnelRealized";
 import { isMqlQualified, isMqlExcludedByLoss, buildExcludedMqlCardIds, isJunkCard } from "@/hooks/useModeloAtualMetas";
 import { fixPossibleDateInversion, shouldForceAssinaturaDate, getForcedSaleDate } from "./dateUtils";
 import { useClientesProdutos } from "./useClientesProdutos";
-import { classifyProduto, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
+import { classifyProduto, classifyProdutoList, normalizeClientKey, inferProductFromValues, type ProductValueFields } from "@/lib/productClassifier";
 import { preferContratoAssinado } from "@/lib/salesDedupPolicy";
 import { sumMrrFields } from "@/lib/mrrFields";
 
@@ -710,10 +710,14 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       if (found) { produtoRaw = found; break; }
     }
     let productCategory = classifyProduto(produtoRaw);
+    let productList = classifyProdutoList(produtoRaw);
     // Fallback: se ainda "A definir", tenta inferir pelos campos Valor_* preenchidos
     if (productCategory === 'A definir' && card.valoresExtras) {
       const inferred = inferProductFromValues(card.valoresExtras);
-      if (inferred) productCategory = inferred;
+      if (inferred) {
+        productCategory = inferred;
+        if (productList.length === 0) productList = [inferred];
+      }
     }
 
     const hydrated = maxMonetaryByCardId.get(card.id);
@@ -745,6 +749,7 @@ export function useModeloAtualAnalytics(startDate: Date, endDate: Date) {
       responsible: card.closer || card.responsavel || undefined, // Prioritize closer for display
       duration: card.duracao,
       product: productCategory,
+      products: productList,
       mrr,
       setup,
       pontual,
