@@ -273,6 +273,12 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   if (containsAny(eventHaystack, EVENT_TOKENS)) {
     return 'evento';
   }
+  // Fallback por título/empresa (ex.: "Fulano | G4 Live 02/07") com tokens fortes.
+  const titleHaystack = [tituloNorm, empresaNorm].filter(Boolean).join(' | ');
+  if (containsAny(titleHaystack, ['g4', 'summit', 'talkshow', 'talk show', '4am', 'live ', 'traction'])) {
+    return 'evento';
+  }
+
 
 
   // 2) OUTBOUND — apenas via sinal explícito em tipoOrigem
