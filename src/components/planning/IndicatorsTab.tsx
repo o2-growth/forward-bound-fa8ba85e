@@ -2233,7 +2233,7 @@ export function IndicatorsTab() {
 
         const charts: ChartConfig[] = [
           { type: 'bar', title: 'Por Canal de Aquisição', data: canalData },
-          { type: 'bar', title: 'Por Faixa de Faturamento', data: revenueRangeData, sortable: true, sortOrder: TIER_ORDER },
+          { type: 'bar', title: 'Por Faixa de Faturamento', data: revenueRangeData, sortable: true, sortOrder: TIER_ORDER, maxItems: 50 },
         ];
         
         setDetailSheetTitle('MQL - De Onde Vêm Nossos Melhores Leads?');
