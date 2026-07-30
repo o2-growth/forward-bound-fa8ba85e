@@ -209,8 +209,19 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     if (containsAny(eventHay, EVENT_TOKENS_EARLY)) {
       return 'evento';
     }
+    // Fallback: título/empresa carrega o nome do evento (ex.: "Rogério Pimenta | G4 Live 02/07").
+    // Só tokens fortes aqui, para não classificar empresa qualquer como evento.
+    const titleEventHay = [tituloNorm, empresaNorm].filter(Boolean).join(' | ');
+    const STRONG_EVENT_TOKENS = [
+      'g4', 'summit', 'talkshow', 'talk show', '4am',
+      'live ', 'imersao', 'webinar', 'traction',
+    ];
+    if (containsAny(titleEventHay, STRONG_EVENT_TOKENS)) {
+      return 'evento';
+    }
     return 'inbound';
   }
+
 
   // 0.15) META ADS placeholders não resolvidos ({{site_source_name}}, {{campaign.name}},
   // {{ad.name}}, {{adset.name}}, etc.) OU posicionamento típico de mídia paga
@@ -262,6 +273,12 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
   if (containsAny(eventHaystack, EVENT_TOKENS)) {
     return 'evento';
   }
+  // Fallback por título/empresa (ex.: "Fulano | G4 Live 02/07") com tokens fortes.
+  const titleHaystack = [tituloNorm, empresaNorm].filter(Boolean).join(' | ');
+  if (containsAny(titleHaystack, ['g4', 'summit', 'talkshow', 'talk show', '4am', 'live ', 'traction'])) {
+    return 'evento';
+  }
+
 
 
   // 2) OUTBOUND — apenas via sinal explícito em tipoOrigem
