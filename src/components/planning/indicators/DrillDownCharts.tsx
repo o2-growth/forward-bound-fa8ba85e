@@ -32,7 +32,9 @@ export function DrillDownCharts({ charts }: DrillDownChartsProps) {
                 formatValue={chart.formatValue}
                 sortable={chart.sortable}
                 sortOrder={chart.sortOrder}
+                maxItems={chart.maxItems}
               />
+
             );
           case 'distribution':
             return (
