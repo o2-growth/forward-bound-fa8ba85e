@@ -9,6 +9,7 @@ export interface ChartConfig {
   formatValue?: (value: number) => string;
   sortable?: boolean;
   sortOrder?: string[];
+  maxItems?: number;
 }
 
 interface DrillDownChartsProps {
@@ -31,7 +32,9 @@ export function DrillDownCharts({ charts }: DrillDownChartsProps) {
                 formatValue={chart.formatValue}
                 sortable={chart.sortable}
                 sortOrder={chart.sortOrder}
+                maxItems={chart.maxItems}
               />
+
             );
           case 'distribution':
             return (
