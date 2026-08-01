@@ -336,43 +336,23 @@ export const columnFormatters = {
       'A definir': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 italic',
     };
 
-    // Cliente com múltiplos produtos → dropdown "Produtos"
+    // Cliente com múltiplos produtos → lista empilhada (um em cima do outro)
     const products = row?.products?.filter(Boolean) ?? [];
     if (products.length > 1) {
       return (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-6 px-2 gap-1 text-xs font-normal bg-primary/10 border-primary/30 hover:bg-primary/20"
+        <div className="flex flex-col items-start gap-1">
+          {products.map((p, i) => (
+            <Badge
+              key={`${p}-${i}`}
+              className={`font-normal justify-start whitespace-nowrap ${colorMap[p] || 'bg-gray-100 text-gray-800'}`}
             >
-              <Package className="h-3 w-3" />
-              Produtos
-              <Badge variant="secondary" className="ml-1 h-4 px-1.5 text-[10px]">
-                {products.length}
-              </Badge>
-              <ChevronDown className="h-3 w-3 opacity-60" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-56 p-2">
-            <p className="text-xs font-semibold text-muted-foreground px-1 pb-1.5">
-              Produtos contratados
-            </p>
-            <div className="flex flex-col gap-1">
-              {products.map((p, i) => (
-                <Badge
-                  key={`${p}-${i}`}
-                  className={`font-normal justify-start ${colorMap[p] || 'bg-gray-100 text-gray-800'}`}
-                >
-                  {p}
-                </Badge>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
+              {p}
+            </Badge>
+          ))}
+        </div>
       );
     }
+
 
     if (!value) return '-';
     const colorClass = colorMap[value] || 'bg-gray-100 text-gray-800';
