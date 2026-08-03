@@ -174,37 +174,74 @@ export function MonetizacaoSection({ startDate, endDate }: Props) {
           </div>
         </div>
 
-        {/* Mini-funil por fase */}
+        {/* Funil por fase — visual afunilado (barras horizontais), estilo do dashzão */}
         <div>
-          <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-            Por fase atual
+          <div className="text-xs font-semibold uppercase text-muted-foreground mb-3">
+            Funil por fase
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {byFase
-              .filter((f) =>
-                (MONETIZACAO_FASES_ORDER as readonly string[]).includes(f.fase) ||
-                f.count > 0,
-              )
-              .map((f) => (
-                <button
-                  key={f.fase}
-                  onClick={() =>
-                    f.count > 0 && setDrill({ kind: "fase", value: f.fase })
-                  }
-                  disabled={f.count === 0}
-                  className="group rounded-md border px-3 py-2 text-left hover:border-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  <div className="text-[11px] text-muted-foreground truncate">
-                    {f.fase}
+          <div className="flex flex-col gap-1">
+            {(() => {
+              // Ordena as fases na ordem canônica do funil e filtra as vazias.
+              const ordered = [...byFase]
+                .filter((f) =>
+                  (MONETIZACAO_FASES_ORDER as readonly string[]).includes(f.fase),
+                )
+                .sort(
+                  (a, b) =>
+                    (MONETIZACAO_FASES_ORDER as readonly string[]).indexOf(a.fase) -
+                    (MONETIZACAO_FASES_ORDER as readonly string[]).indexOf(b.fase),
+                );
+              const maxCount = Math.max(1, ...ordered.map((f) => f.count));
+              const funnelColors = [
+                "from-orange-400 to-orange-500",
+                "from-emerald-400 to-cyan-500",
+                "from-cyan-500 to-blue-500",
+                "from-blue-500 to-blue-600",
+                "from-blue-600 to-indigo-500",
+                "from-indigo-500 to-violet-500",
+                "from-violet-500 to-slate-500",
+                "from-slate-500 to-slate-600",
+              ];
+              return ordered.map((f, index) => {
+                // Largura proporcional ao volume (mín. 32% pra legibilidade).
+                const widthPercent = Math.max(
+                  32,
+                  Math.round((f.count / maxCount) * 100),
+                );
+                const color = funnelColors[index] || funnelColors[funnelColors.length - 1];
+                const isLast = index === ordered.length - 1;
+                return (
+                  <div key={f.fase} className="relative flex items-center justify-center">
+                    <button
+                      onClick={() =>
+                        f.count > 0 && setDrill({ kind: "fase", value: f.fase })
+                      }
+                      disabled={f.count === 0}
+                      style={{ width: `${widthPercent}%` }}
+                      className={`relative h-12 min-w-[200px] rounded-sm bg-gradient-to-r ${color}
+                        flex items-center justify-between gap-2 px-4 text-white transition-all duration-300
+                        hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed
+                        ${isLast ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}`}
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="bg-white/20 rounded-full w-6 h-6 flex-shrink-0 flex items-center justify-center text-xs font-bold">
+                          {index + 1}
+                        </span>
+                        <span className="text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                          {f.fase}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline gap-2 flex-shrink-0">
+                        <span className="text-base font-bold">{f.count}</span>
+                        <span className="text-[11px] font-medium text-white/80 hidden sm:inline">
+                          {formatCurrency(f.valor)}
+                        </span>
+                      </div>
+                    </button>
                   </div>
-                  <div className="flex items-baseline justify-between mt-1 gap-2">
-                    <span className="text-lg font-bold">{f.count}</span>
-                    <span className="text-[11px] font-medium text-muted-foreground">
-                      {formatCurrency(f.valor)}
-                    </span>
-                  </div>
-                </button>
-              ))}
+                );
+              });
+            })()}
           </div>
         </div>
       </CardContent>
