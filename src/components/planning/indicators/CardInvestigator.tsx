@@ -506,6 +506,20 @@ export function CardInvestigator({ open, onOpenChange }: CardInvestigatorProps) 
                   <div>SDR: <span className={card.sdr ? 'text-foreground' : 'text-destructive font-medium'}>{card.sdr || '(vazio)'}</span> | Closer: <span className={card.closer ? 'text-foreground' : 'text-muted-foreground'}>{card.closer || '(vazio)'}</span></div>
                   <div>Faixa: <span className={card.faixaFaturamento ? 'text-foreground' : 'text-destructive font-medium'}>{card.faixaFaturamento || '(vazio)'}</span></div>
                   <div>Fase Atual: <span className="text-foreground font-medium">{card.faseAtual}</span></div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>Canal:</span>
+                    <Badge variant={card.canal === 'sem_origem' ? 'destructive' : 'secondary'} className="text-[10px]">
+                      {LEAD_SOURCE_LABELS[card.canal]}
+                    </Badge>
+                  </div>
+                  <div className="text-xs">
+                    Tipo de Origem: <span className="text-foreground">{card.tipoOrigem || '(vazio)'}</span>
+                    {' | '}Origem do lead: <span className="text-foreground">{card.origemLead || '(vazio)'}</span>
+                  </div>
+                  <div className="text-xs">
+                    Fonte: <span className="text-foreground">{card.fonteOrigem || '(vazio)'}</span>
+                    {' | '}Campanha: <span className="text-foreground">{card.campanha || '(vazio)'}</span>
+                  </div>
                 </div>
               </div>
 
