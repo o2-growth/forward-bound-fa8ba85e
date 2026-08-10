@@ -104,6 +104,11 @@ interface Movement {
   motivoPerda: string;
   fonte: string;
   table: string;
+  tipoOrigem: string;
+  origemLead: string;
+  fonteOrigem: string;
+  campanha: string;
+  produto: string;
 }
 
 interface DiagnosticResult {
