@@ -8,6 +8,7 @@ import { Loader2, Search, AlertTriangle, CheckCircle2, XCircle, Clock, HelpCircl
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { classifyLeadSource, LEAD_SOURCE_LABELS, type LeadSource } from "@/lib/leadSource";
 
 // Phase to indicator mapping (Modelo Atual - pipefy_moviment_cfos)
 const MA_PHASE_TO_INDICATOR: Record<string, string> = {
@@ -104,6 +105,11 @@ interface Movement {
   motivoPerda: string;
   fonte: string;
   table: string;
+  tipoOrigem: string;
+  origemLead: string;
+  fonteOrigem: string;
+  campanha: string;
+  produto: string;
 }
 
 interface DiagnosticResult {
@@ -127,6 +133,11 @@ interface CardResult {
   faseAtual: string;
   fonte: string;
   table: string;
+  canal: LeadSource;
+  tipoOrigem: string;
+  origemLead: string;
+  fonteOrigem: string;
+  campanha: string;
   movements: Movement[];
   diagnostics: DiagnosticResult[];
   problems: Problem[];
@@ -305,6 +316,11 @@ async function searchCards(searchTerm: string): Promise<CardResult[]> {
           motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || '',
           fonte: tableLabels[table],
           table,
+          tipoOrigem: row['Tipo de Origem do lead'] || row['Tipo de origem do lead'] || row['tipo_origem'] || '',
+          origemLead: row['Origem do lead'] || row['origem_lead'] || '',
+          fonteOrigem: row['Fonte'] || row['fonte'] || row['source'] || '',
+          campanha: row['Campanha'] || row['campanha'] || row['campaign'] || '',
+          produto: row['Produto'] || row['produto'] || '',
         }))
         .sort((a, b) => a.entrada.getTime() - b.entrada.getTime());
 
@@ -314,15 +330,40 @@ async function searchCards(searchTerm: string): Promise<CardResult[]> {
 
       const { diagnostics, problems } = buildDiagnostics(movements, faixa, motivo);
 
+      const tipoOrigem = movements.find(m => m.tipoOrigem)?.tipoOrigem || '';
+      const origemLead = movements.find(m => m.origemLead)?.origemLead || '';
+      const fonteOrigem = movements.find(m => m.fonteOrigem)?.fonteOrigem || '';
+      const campanha = movements.find(m => m.campanha)?.campanha || '';
+      const produto = movements.find(m => m.produto)?.produto || '';
+      const titulo = latest.titulo || movements[0]?.titulo || '';
+
+      const canal = classifyLeadSource({
+        id,
+        tipoOrigem,
+        origemLead,
+        fonte: fonteOrigem,
+        campanha,
+        produto,
+        titulo,
+        empresa: titulo,
+        sdr: movements.find(m => m.sdr)?.sdr || '',
+        bu: table === 'pipefy_cards_movements_expansao' ? 'Expansão' : 'Modelo Atual',
+      });
+
       allResults.push({
         id,
-        titulo: latest.titulo || movements[0]?.titulo || '',
+        titulo,
         sdr: movements.find(m => m.sdr)?.sdr || '',
         closer: movements.find(m => m.closer)?.closer || '',
         faixaFaturamento: faixa,
         faseAtual: latest.faseAtual || latest.fase,
         fonte: tableLabels[table],
         table,
+        canal,
+        tipoOrigem,
+        origemLead,
+        fonteOrigem,
+        campanha,
         movements,
         diagnostics,
         problems,
@@ -465,6 +506,20 @@ export function CardInvestigator({ open, onOpenChange }: CardInvestigatorProps) 
                   <div>SDR: <span className={card.sdr ? 'text-foreground' : 'text-destructive font-medium'}>{card.sdr || '(vazio)'}</span> | Closer: <span className={card.closer ? 'text-foreground' : 'text-muted-foreground'}>{card.closer || '(vazio)'}</span></div>
                   <div>Faixa: <span className={card.faixaFaturamento ? 'text-foreground' : 'text-destructive font-medium'}>{card.faixaFaturamento || '(vazio)'}</span></div>
                   <div>Fase Atual: <span className="text-foreground font-medium">{card.faseAtual}</span></div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>Canal:</span>
+                    <Badge variant={card.canal === 'sem_origem' ? 'destructive' : 'secondary'} className="text-[10px]">
+                      {LEAD_SOURCE_LABELS[card.canal]}
+                    </Badge>
+                  </div>
+                  <div className="text-xs">
+                    Tipo de Origem: <span className="text-foreground">{card.tipoOrigem || '(vazio)'}</span>
+                    {' | '}Origem do lead: <span className="text-foreground">{card.origemLead || '(vazio)'}</span>
+                  </div>
+                  <div className="text-xs">
+                    Fonte: <span className="text-foreground">{card.fonteOrigem || '(vazio)'}</span>
+                    {' | '}Campanha: <span className="text-foreground">{card.campanha || '(vazio)'}</span>
+                  </div>
                 </div>
               </div>
 
