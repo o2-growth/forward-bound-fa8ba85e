@@ -132,6 +132,11 @@ interface CardResult {
   faseAtual: string;
   fonte: string;
   table: string;
+  canal: LeadSource;
+  tipoOrigem: string;
+  origemLead: string;
+  fonteOrigem: string;
+  campanha: string;
   movements: Movement[];
   diagnostics: DiagnosticResult[];
   problems: Problem[];
