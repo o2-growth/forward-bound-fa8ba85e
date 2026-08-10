@@ -196,6 +196,14 @@ export function classifyLeadSource(c: ClassifyInput): LeadSource {
     return 'monetizacao';
   }
 
+  // 0.07) EVENTO por sigla "GE" (eventos G4) em Origem do lead. Vem antes das
+  // regras de Franquia/Oxy e de Indicação para não virar "palavra solta".
+  if (isGeEventOrigin(origem)) {
+    return 'evento';
+  }
+
+
+
   // 0.1) FRANQUIA + OXY HACKER — regra de negócio: todo card desses produtos
   // é Inbound POR DEFAULT, a menos que haja sinal explícito de Evento/G4 nos
   // campos de origem (aí Evento tem precedência — ver bloco 1 abaixo).
