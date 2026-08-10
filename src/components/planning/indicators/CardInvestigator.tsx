@@ -330,15 +330,40 @@ async function searchCards(searchTerm: string): Promise<CardResult[]> {
 
       const { diagnostics, problems } = buildDiagnostics(movements, faixa, motivo);
 
+      const tipoOrigem = movements.find(m => m.tipoOrigem)?.tipoOrigem || '';
+      const origemLead = movements.find(m => m.origemLead)?.origemLead || '';
+      const fonteOrigem = movements.find(m => m.fonteOrigem)?.fonteOrigem || '';
+      const campanha = movements.find(m => m.campanha)?.campanha || '';
+      const produto = movements.find(m => m.produto)?.produto || '';
+      const titulo = latest.titulo || movements[0]?.titulo || '';
+
+      const canal = classifyLeadSource({
+        id,
+        tipoOrigem,
+        origemLead,
+        fonte: fonteOrigem,
+        campanha,
+        produto,
+        titulo,
+        empresa: titulo,
+        sdr: movements.find(m => m.sdr)?.sdr || '',
+        bu: table === 'pipefy_cards_movements_expansao' ? 'Expansão' : 'Modelo Atual',
+      });
+
       allResults.push({
         id,
-        titulo: latest.titulo || movements[0]?.titulo || '',
+        titulo,
         sdr: movements.find(m => m.sdr)?.sdr || '',
         closer: movements.find(m => m.closer)?.closer || '',
         faixaFaturamento: faixa,
         faseAtual: latest.faseAtual || latest.fase,
         fonte: tableLabels[table],
         table,
+        canal,
+        tipoOrigem,
+        origemLead,
+        fonteOrigem,
+        campanha,
         movements,
         diagnostics,
         problems,
