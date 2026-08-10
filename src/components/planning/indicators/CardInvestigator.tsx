@@ -310,6 +310,11 @@ async function searchCards(searchTerm: string): Promise<CardResult[]> {
           motivoPerda: row['Motivo da perda'] || row['motivo_perda'] || '',
           fonte: tableLabels[table],
           table,
+          tipoOrigem: row['Tipo de Origem do lead'] || row['Tipo de origem do lead'] || row['tipo_origem'] || '',
+          origemLead: row['Origem do lead'] || row['origem_lead'] || '',
+          fonteOrigem: row['Fonte'] || row['fonte'] || row['source'] || '',
+          campanha: row['Campanha'] || row['campanha'] || row['campaign'] || '',
+          produto: row['Produto'] || row['produto'] || '',
         }))
         .sort((a, b) => a.entrada.getTime() - b.entrada.getTime());
 
