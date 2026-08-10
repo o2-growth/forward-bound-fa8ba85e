@@ -41,10 +41,14 @@ const TAB_CONFIG: { key: TabKey; label: string; icon: React.ComponentType<{ clas
 
 const HIDDEN_TABS: TabKey[] = ['context', 'goals', 'financial', 'marketing', 'structure'];
 
+// A aba "Operação" não abre conteúdo interno: leva ao sistema de dash de operação (dash-v2).
+const OPERACAO_DASH_URL = 'https://dash-v2.o2inc.com.br/';
+
 export default function Planning2026() {
   const { user, signOut } = useAuth();
   const { allowedTabs, isAdmin, isCfo, loading } = useUserPermissions(user?.id);
   const [showHiddenTabs, setShowHiddenTabs] = useState(false);
+  const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const handleSignOut = async () => {
     await signOut();
@@ -65,6 +69,16 @@ export default function Planning2026() {
     return hasPermission && (!isHidden || showHiddenTabs);
   });
   const defaultTab = visibleTabs[0]?.key || 'context';
+  const currentTab = activeTab ?? defaultTab;
+
+  const handleTabChange = (value: string) => {
+    // "Operação" redireciona pro dash-v2 em nova aba e mantém a aba atual selecionada.
+    if (value === 'cs') {
+      window.open(OPERACAO_DASH_URL, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    setActiveTab(value);
+  };
 
   return (
     <MediaMetasProvider>
@@ -135,7 +149,7 @@ export default function Planning2026() {
               </p>
             </div>
           ) : (
-            <Tabs defaultValue={defaultTab} className="w-full">
+            <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
               <TabsList className={`grid w-full max-w-6xl mb-8`} style={{ gridTemplateColumns: `repeat(${visibleTabs.length}, minmax(0, 1fr))` }}>
                 {visibleTabs.map(tab => {
                   const Icon = tab.icon;
