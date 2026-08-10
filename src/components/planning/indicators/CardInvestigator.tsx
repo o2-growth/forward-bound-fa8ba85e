@@ -8,6 +8,7 @@ import { Loader2, Search, AlertTriangle, CheckCircle2, XCircle, Clock, HelpCircl
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { classifyLeadSource, LEAD_SOURCE_LABELS, type LeadSource } from "@/lib/leadSource";
 
 // Phase to indicator mapping (Modelo Atual - pipefy_moviment_cfos)
 const MA_PHASE_TO_INDICATOR: Record<string, string> = {
