@@ -1,22 +1,40 @@
-## Problema
+# Corrigir canal da Invenzi: Indicação → Evento
 
-Na tabela do dash G4 existem 3 categorias (Live · Palestras · Eventos), mas o filtro de pílulas só tem Lives e Eventos.
+## O que está acontecendo
 
-Causa confirmada em `src/components/planning/g4/G4ConsolidatedDashboard.tsx`:
-- linha 100: `kind: "live" | "evento" | "finders"`
-- linha 309: `kind = isFinders ? "finders" : cls.categoria === "Live" ? "live" : "evento"` — ou seja, **Palestras é classificada como "evento"**.
-- linhas 861/1181-1183: `KindFilter = "todos" | "live" | "evento"` e só 3 pílulas.
+No espelho do Pipefy, o card da Invenzi (ID 1409285792, Ganho em 07/07) tem:
+- "Tipo de Origem do lead": vazio
+- "Origem do lead": `GE ` (sigla solta, com espaço)
+
+Como a sigla não bate com nenhum token de evento, o classificador cai na regra
+"origem é uma palavra solta → Indicação". Por isso todo o funil desse card
+(Lead, MQL, RM, RR, Proposta e Venda) aparece como Indicação.
 
 ## Correção
 
-1. Adicionar `"palestra"` ao tipo `LiveGroup["kind"]` e ao `KindFilter`.
-2. Ajustar a classificação (linha 309) para mapear `cls.categoria`: `Live → "live"`, `Palestras → "palestra"`, resto → `"evento"` (Finders Fee segue em `"finders"`).
-3. Ajustar o fallback do grupo agregado (linhas 568-569) para derivar o `kind` da categoria em vez de assumir `"evento"`.
-4. Adicionar a pílula **Palestras** entre "Lives" e "Eventos" no filtro.
-5. Manter o comportamento atual do Finders Fee: fora das pílulas específicas, somando nos KPIs apenas em "Todos".
+Em `src/lib/leadSource.ts`, adicionar `GE` como sigla de evento G4:
 
-## Detalhes técnicos
+- Nova checagem, junto do bloco de EVENTO (que já roda antes de Indicação):
+  se o campo Origem do lead, depois de normalizado e sem espaços, for
+  exatamente `ge` (ou `g.e.`), retorna `evento`.
+- Comparação por token exato — nada de "contém GE" — para não afetar palavras
+  como "Gestão", "Google", "Agência" nem qualquer outro card.
+- A mesma regra vale no bloco antecipado de Franquia/Oxy Hacker, para manter
+  consistência caso um card desses produtos venha com `GE`.
 
-- Arquivo único: `src/components/planning/g4/G4ConsolidatedDashboard.tsx`.
-- Os memos `groups`, `treeGroups` e `kpiGroups` já comparam `g.kind === kind`, então passam a funcionar com o novo valor sem mudança adicional.
-- Nada muda nos números: é só granularidade de filtro; "Todos" continua somando as três categorias.
+Como a classificação é a mesma função usada em todas as etapas do funil, o
+card da Invenzi passa a contar como Evento em Leads, MQL, RM, RR, Proposta e
+Venda — sem mexer na movimentação nem nos valores do card.
+
+## Escopo e segurança
+
+- Nenhuma outra regra de canal é alterada.
+- Nenhum outro card muda de canal, a não ser que tenha exatamente `GE` em
+  Origem do lead (mesmo caso, mesma intenção).
+- Sem alteração no banco, no Pipefy ou nas métricas de valores.
+
+## Verificação
+
+Após a mudança, conferir em Indicadores › Comercial que a Invenzi aparece com
+canal **Evento** nas vendas de julho e nos demais estágios do funil, e que os
+totais por canal continuam batendo (apenas 1 card migra de Indicação p/ Evento).
