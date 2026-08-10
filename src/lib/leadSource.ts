@@ -152,6 +152,14 @@ const isNumericAdCampaignId = (campanha: string): boolean => {
   return /^\d{8,}$/.test(campanha.trim());
 };
 
+// "GE" = sigla usada no Pipefy para eventos do G4 (ex.: card Invenzi, Origem
+// do lead = "GE "). Comparação por token exato para não pegar "Gestão",
+// "Google", "Agência" etc.
+const isGeEventOrigin = (origemNorm: string): boolean => {
+  const t = origemNorm.trim();
+  return t === 'ge' || t === 'g e' || t === 'g.e.';
+};
+
 export function classifyLeadSource(c: ClassifyInput): LeadSource {
   const tipo = norm(c.tipoOrigem);
   const origem = norm(c.origemLead);
