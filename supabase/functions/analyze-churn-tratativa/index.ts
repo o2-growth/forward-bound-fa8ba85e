@@ -347,20 +347,20 @@ Deno.serve(async (req) => {
       })),
     };
 
-    // 5) Call Lovable AI Gateway (OpenAI-compatible)
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY não configurada" }), {
+    // 5) Call Gemini API (OpenAI-compatible)
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiKey) {
+      return new Response(JSON.stringify({ error: "GEMINI_API_KEY não configurada" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const userMessage = `JSON do post-mortem de churn:\n\`\`\`json\n${JSON.stringify(dossie, null, 2)}\n\`\`\`\n\nProduza o post-mortem seguindo as regras.`;
-    const gatewayResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const gatewayResp = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": lovableKey },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${geminiKey}` },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
@@ -372,12 +372,12 @@ Deno.serve(async (req) => {
 
     if (!gatewayResp.ok) {
       const errText = await gatewayResp.text();
-      console.error("Lovable AI Gateway error:", gatewayResp.status, errText);
+      console.error("Gemini API error:", gatewayResp.status, errText);
       const status = gatewayResp.status === 429 ? 429 : gatewayResp.status === 402 ? 402 : 502;
       const msg = status === 429
-        ? "Limite de requisições atingido. Tente em instantes."
+        ? "Limite de quota da API Gemini atingido."
         : status === 402
-          ? "Créditos da workspace esgotados. Adicione em Settings → Workspace → Usage."
+          ? "Limite de quota da API Gemini atingido."
           : `IA falhou: ${errText.slice(0, 500)}`;
       return new Response(JSON.stringify({ error: msg }), {
         status, headers: { ...corsHeaders, "Content-Type": "application/json" },

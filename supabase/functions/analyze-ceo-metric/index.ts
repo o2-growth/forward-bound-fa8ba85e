@@ -36,8 +36,8 @@ Deno.serve(async (req) => {
       return json({ error: "section, title e context são obrigatórios" }, 400);
     }
 
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) return json({ error: "LOVABLE_API_KEY não configurada" }, 500);
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiKey) return json({ error: "GEMINI_API_KEY não configurada" }, 500);
 
     const contextStr = JSON.stringify(context, null, 2).slice(0, 12000);
 
@@ -51,14 +51,14 @@ ${contextStr}
 
 Gere a análise seguindo as regras.`;
 
-    const gatewayResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const gatewayResp = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Lovable-API-Key": lovableKey,
+        "Authorization": `Bearer ${geminiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt },
@@ -70,9 +70,9 @@ Gere a análise seguindo as regras.`;
 
     if (!gatewayResp.ok) {
       const errText = await gatewayResp.text();
-      console.error("analyze-ceo-metric gateway error:", gatewayResp.status, errText);
-      if (gatewayResp.status === 429) return json({ error: "Limite de requisições atingido. Tente em instantes." }, 429);
-      if (gatewayResp.status === 402) return json({ error: "Créditos da workspace esgotados." }, 402);
+      console.error("Gemini API error:", gatewayResp.status, errText);
+      if (gatewayResp.status === 429) return json({ error: "Limite de quota da API Gemini atingido." }, 429);
+      if (gatewayResp.status === 402) return json({ error: "Limite de quota da API Gemini atingido." }, 402);
       return json({ error: `IA falhou: ${errText.slice(0, 400)}` }, 502);
     }
 
@@ -80,7 +80,7 @@ Gere a análise seguindo as regras.`;
     const text: string = (data?.choices?.[0]?.message?.content ?? "").toString().trim();
     if (!text) return json({ error: "IA não retornou texto" }, 502);
 
-    return json({ text, model: "google/gemini-3-flash-preview" }, 200);
+    return json({ text, model: "gemini-2.5-flash" }, 200);
   } catch (e) {
     console.error("analyze-ceo-metric error:", e);
     const msg = e instanceof Error ? e.message : "Unknown error";

@@ -84,9 +84,9 @@ Deno.serve(async (req) => {
     });
     if (insUserErr) return json({ error: insUserErr.message }, 500);
 
-    // Monta payload para Lovable AI Gateway (formato OpenAI-compatible)
-    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableKey) return json({ error: "LOVABLE_API_KEY não configurada" }, 500);
+    // Monta payload para Gemini API (formato OpenAI-compatible)
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiKey) return json({ error: "GEMINI_API_KEY não configurada" }, 500);
 
     const openaiMessages: Array<{ role: string; content: string }> = [];
     if (systemMsg?.content) {
@@ -136,12 +136,12 @@ Deno.serve(async (req) => {
     }
     openaiMessages.push({ role: "user", content: user_message });
 
-    const modelId = "google/gemini-2.5-flash";
-    const gatewayResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const modelId = "gemini-2.5-flash";
+    const gatewayResp = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Lovable-API-Key": lovableKey,
+        "Authorization": `Bearer ${geminiKey}`,
       },
       body: JSON.stringify({
         model: modelId,
@@ -153,9 +153,9 @@ Deno.serve(async (req) => {
 
     if (!gatewayResp.ok) {
       const errText = await gatewayResp.text();
-      console.error("Lovable AI Gateway error:", gatewayResp.status, errText);
-      if (gatewayResp.status === 429) return json({ error: "Limite de requisições atingido. Tente em instantes." }, 429);
-      if (gatewayResp.status === 402) return json({ error: "Créditos da workspace esgotados. Adicione em Settings → Workspace → Usage." }, 402);
+      console.error("Gemini API error:", gatewayResp.status, errText);
+      if (gatewayResp.status === 429) return json({ error: "Limite de quota da API Gemini atingido." }, 429);
+      if (gatewayResp.status === 402) return json({ error: "Limite de quota da API Gemini atingido." }, 402);
       return json({ error: `IA falhou: ${errText.slice(0, 500)}` }, 502);
     }
 
